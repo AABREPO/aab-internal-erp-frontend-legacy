@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Close from '../Images/close.png'
 
-const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], fieldName = 'Vendor', onAddNew, showStarIcon = true }) => {
+const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], fieldName = 'Vendor', onAddNew, showStarIcon = true, zIndex }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingNewValue, setPendingNewValue] = useState('');
@@ -99,11 +99,12 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
     setPendingNewValue('');
   };
 
+  const layerStyle = zIndex != null ? { zIndex } : undefined;
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 ${zIndex == null ? 'z-50' : ''}`}
+      style={{ fontFamily: "'Manrope', sans-serif", ...layerStyle }}
       onClick={handleBackdropClick}
-      style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       <div 
         className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"

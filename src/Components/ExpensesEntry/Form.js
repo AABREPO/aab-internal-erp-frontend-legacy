@@ -70,6 +70,8 @@ const Form = ({ username, userRoles = [] }) => {
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [isReviewEditMode, setIsReviewEditMode] = useState(false);
     const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+    const [advanceData, setAdvanceData] = useState([]);
+    const [projectAdvance, setProjectAdvance] = useState('');
     useEffect(() => {
         const syncBranch = () => {
             const nextBranchId = resolveActiveBranchId();
@@ -236,6 +238,54 @@ const Form = ({ username, userRoles = [] }) => {
         };
         fetchMachinTools();
     }, []);
+    // Fetch advance portal data (for right-side advance history table)
+    useEffect(() => {
+        const fetchAdvanceData = async () => {
+            try {
+                const response = await fetch(
+                    buildBranchUrl("https://backendaab.in/aabuildersDash/api/advance_portal/getAll"),
+                    {
+                        method: "GET",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                setAdvanceData(list);
+            } catch (error) {
+                console.error("Error fetching advance portal data:", error);
+            }
+        };
+        fetchAdvanceData();
+    }, [activeBranchId]);
+
+    // Compute project advance locally whenever selection or data changes
+    useEffect(() => {
+        if (!selectedOption || !selectedSite || !advanceData.length) {
+            setProjectAdvance('');
+            return;
+        }
+        const isVendor = selectedOption.type === 'Vendor';
+        const vid = Number(selectedOption.id);
+        const pid = Number(selectedSite.id);
+        const relevant = advanceData.filter(item =>
+            (isVendor ? item.vendor_id === vid : item.contractor_id === vid) &&
+            item.project_id === pid
+        );
+        const total = relevant.reduce((sum, entry) => {
+            const amount = parseFloat(entry.amount) || 0;
+            const billAmount = parseFloat(entry.bill_amount) || 0;
+            const refundAmount = parseFloat(entry.refund_amount) || 0;
+            return sum + amount - billAmount - refundAmount;
+        }, 0);
+        setProjectAdvance(total.toLocaleString('en-IN'));
+    }, [advanceData, selectedOption, selectedSite]);
     useEffect(() => {
         const fetchAccountType = async () => {
             try {
@@ -1452,6 +1502,45 @@ const Form = ({ username, userRoles = [] }) => {
                                     )}
                                 </>
                             )}
+                            {/* Comments + Attach + Submit kept in left column so there is no empty gap next to the advance table */}
+                            <div className="mt-6 text-left">
+                                <label className="text-md font-semibold mb-2 block">Comments</label>
+                                <input
+                                    type="text"
+                                    value={comments}
+                                    onChange={(e) => setComments(e.target.value)}
+                                    placeholder="Enter Your Comments ..."
+                                    className="border-2 border-[#BF9853] rounded-md px-4 py-2 lg:w-[604px] w-80 h-[45px] focus:outline-none border-opacity-[0.20]"
+                                />
+                            </div>
+                            <div className="mt-4 flex items-center justify-between">
+                                <div className='flex'>
+                                    <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
+                                        <img className='w-5 h-4' alt='' src={Attach}></img>
+                                        Attach file {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Refund') && <span className="text-red-500 ml-1">*</span>}
+                                    </label>
+                                    <input
+                                        type="file"
+                                        id="fileInput"
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                                    />
+                                </div>
+                                {selectedFile && <span className="text-gray-600">{selectedFile.name}</span>}
+                            </div>
+                            <div className="mt-4 flex">
+                                {userPermissions.includes("Create") && (
+                                    <button
+                                        type='submit'
+                                        disabled={isSubmitting}
+                                        className={`bg-yellow-700 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        {isSubmitting ? 'Submitting...' : 'Submit'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         {showMachineTools && (
                             <div className='text-left lg:ml-[-570px]'>
@@ -1467,34 +1556,124 @@ const Form = ({ username, userRoles = [] }) => {
                                 />
                             </div>
                         )}
-                        <div className="md:col-span-2 text-left">
-                            <label className="text-md font-semibold mb-2 block">Comments</label>
-                            <input
-                                type="text"
-                                value={comments}
-                                onChange={(e) => setComments(e.target.value)}
-                                placeholder="Enter Your Comments ..."
-                                className="border-2 border-[#BF9853] rounded-md px-4 py-2 lg:w-[604px] w-80 h-[45px] focus:outline-none border-opacity-[0.20]"
-                            />
-                        </div>
-                        <div className="md:col-span-2 items-center justify-between">
-                            <div className='flex'>
-                                <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
-                                    <img className='w-5 h-4' alt='' src={Attach}></img>
-                                    Attach file {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Refund') && <span className="text-red-500 ml-1">*</span>}
-                                </label>
-                                <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf" />
+                        {/* Advance history table for selected project and vendor/contractor (same logic as Advance Portal) */}
+                        <div className="hidden lg:flex flex-col items-stretch -ml-[120px]">
+                            <div className="flex items-center mb-2">
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base font-semibold text-[#E4572E]">Advance </h2>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={projectAdvance}
+                                        className="border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs"
+                                    />
+                                </div>
+                                <div className="flex flex-wrap gap-3 ml-44">
+                                    <span className="text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm">Export PDF</span>
+                                    <span className="text-[#007233] font-semibold hover:underline cursor-pointer text-sm">Export XL</span>
+                                    <span className="text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm">Print</span>
+                                </div>
                             </div>
-                            {selectedFile && <span className="text-gray-600 lg:-ml-[84rem] -ml-48">{selectedFile.name}</span>}
-                        </div>
-                        <div className="flex ">
-                            {userPermissions.includes("Create") && (
-                                <button type='submit' disabled={isSubmitting}
-                                    className={`bg-yellow-700 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                    {isSubmitting ? 'Submitting...' : 'Submit'}
-                                </button>
-                            )}
+                            <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full max-w-[640px]">
+                                <div className="overflow-x-auto max-h-[430px] overflow-y-auto thin-scrollbar w-full">
+                                    <table className="w-full">
+                                        <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
+                                            <tr>
+                                                <th className="px-4 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
+                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Advance</th>
+                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Bill</th>
+                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
+                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {!selectedOption || !selectedSite ? (
+                                                <tr>
+                                                    <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                                                        Please select a project and vendor/contractor to view advance records.
+                                                    </td>
+                                                </tr>
+                                            ) : (() => {
+                                                const filtered = advanceData
+                                                    .filter(entry => {
+                                                        const isMatchingVendor =
+                                                            selectedOption?.type === 'Vendor'
+                                                                ? entry.vendor_id === selectedOption.id
+                                                                : selectedOption?.type === 'Contractor'
+                                                                    ? entry.contractor_id === selectedOption.id
+                                                                    : false;
+                                                        const isForCurrentProject = entry.project_id === selectedSite.id;
+                                                        return isMatchingVendor && isForCurrentProject;
+                                                    })
+                                                    .sort((a, b) => {
+                                                        const entryNoA = a.entry_no || 0;
+                                                        const entryNoB = b.entry_no || 0;
+                                                        return entryNoB - entryNoA;
+                                                    });
+                                                if (!filtered.length) {
+                                                    return (
+                                                        <tr>
+                                                            <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                                                                No advance records found for the selected project and vendor/contractor.
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
+                                                return filtered.map((entry, index) => {
+                                                    const {
+                                                        date: entryDate,
+                                                        amount: entryAmount,
+                                                        bill_amount,
+                                                        type,
+                                                        transfer_site_id,
+                                                        payment_mode,
+                                                        refund_amount,
+                                                    } = entry;
+                                                    const advanceAmount = (() => {
+                                                        if (type === 'Refund') {
+                                                            return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
+                                                        }
+                                                        return parseFloat(entryAmount || 0).toLocaleString('en-IN');
+                                                    })();
+                                                    const billAmount = type === 'Bill Settlement'
+                                                        ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
+                                                        : '';
+                                                    let transferOrRefund = '';
+                                                    if (type === 'Refund') {
+                                                        transferOrRefund = 'Refund';
+                                                    } else if (type === 'Transfer') {
+                                                        const relatedSiteId = transfer_site_id;
+                                                        const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
+                                                        transferOrRefund =
+                                                            parseFloat(entryAmount) < 0
+                                                                ? `Transfer to ${siteLabel || 'Unknown Site'}`
+                                                                : `Transfer from ${siteLabel || 'Unknown Site'}`;
+                                                    }
+                                                    return (
+                                                        <tr key={index} className="border-t hover:bg-gray-50">
+                                                            <td className="px-4 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
+                                                                {entryDate ? new Date(entryDate).toLocaleDateString('en-GB') : ''}
+                                                            </td>
+                                                            <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
+                                                                {advanceAmount}
+                                                            </td>
+                                                            <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
+                                                                {billAmount}
+                                                            </td>
+                                                            <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
+                                                                {transferOrRefund}
+                                                            </td>
+                                                            <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
+                                                                {payment_mode || ''}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                });
+                                            })()}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>

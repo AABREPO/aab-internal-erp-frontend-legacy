@@ -4,6 +4,7 @@ import AdvanceTableView from './AdvanceTableView';
 import AdvanceDatabase from './AdvanceDatabase';
 import AdvanceReport from './AdvanceReport';
 import AdvanceSummary from './AdvanceSummary';
+import MobileProjectAdvance from '../../componentsMobile/ProjectAdvance/ProjectAdvance';
 
 // Payment Mode options
 const paymentModeOptions = [
@@ -16,6 +17,20 @@ const paymentModeOptions = [
 ];
 
 const AdvanceHeading = ({ username, userRoles = [] }) => {
+
+    const [isMobile, setIsMobile] = useState(() => {
+        return window.innerWidth <= 768;
+    });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
 
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activePaintTab');
@@ -32,6 +47,16 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
             localStorage.setItem('activePaintTab', activeTab);
         }
     }, [activeTab, username]);
+
+    if (isMobile) {
+        const storedUser = localStorage.getItem('user');
+        const user = storedUser ? JSON.parse(storedUser) : { username, userRoles };
+        return (
+            <div style={{ textAlign: 'left' }}>
+                <MobileProjectAdvance user={user} onLogout={() => { }} />
+            </div>
+        );
+    }
 
     const renderContent = () => {
         switch (activeTab) {

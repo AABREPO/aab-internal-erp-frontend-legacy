@@ -13,6 +13,8 @@ const ProjectAdvance = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState('project-advance');
+  // Data passed from History when user clicks a vendor name (pre-fill AdvanceForm and show bill details)
+  const [initialFromHistory, setInitialFromHistory] = useState(null);
   // Load activeTab from localStorage on mount, default to 'advanceform'
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('projectAdvanceActiveTab');
@@ -49,7 +51,7 @@ const ProjectAdvance = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto pb-[80px]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -62,16 +64,30 @@ const ProjectAdvance = ({ user, onLogout }) => {
       <Header user={user} onLogout={onLogout} onMenuClick={handleMenuClick} />
       {/* Tabs - Fixed */}
       <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
-      {/* Content Area - Add padding to account for fixed Header and Tabs */}
-      <div className="pt-[85px]">
+      {/* Content Area - fixed height so only inner content (e.g. cards) scrolls, not the page */}
+      <div className="pt-[85px] flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 85px)' }}>
         {/* Advance Form Tab Content */}
-        {activeTab === 'advanceform' && <AdvanceForm />}
+        {activeTab === 'advanceform' && (
+          <AdvanceForm
+            initialFromHistory={initialFromHistory}
+            onConsumedInitialFromHistory={() => setInitialFromHistory(null)}
+          />
+        )}
         {/* History Tab Content */}
-        {activeTab === 'history' && <History />}
+        {activeTab === 'history' && (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <History
+              onVendorClick={(data) => {
+                setInitialFromHistory(data);
+                setActiveTab('advanceform');
+              }}
+            />
+          </div>
+        )}
         {/* Report Tab Content */}
-        {activeTab === 'report' && <Report />}
+        {activeTab === 'report' && <div className="flex-1 min-h-0 overflow-hidden"><Report /></div>}
         {/* Summary Tab Content */}
-        {activeTab === 'summary' && <Summary />}
+        {activeTab === 'summary' && <div className="flex-1 min-h-0 overflow-hidden"><Summary /></div>}
       </div>
       {/* Bottom Navigation */}
       <BottomNav activeTab="home" />

@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 
 const Tabs = ({ activeTab = 'advanceform', onTabChange }) => {
   const tabs = [
-    { id: 'advanceform', label: 'Advance Form' },
+    { id: 'advanceform', label: 'Advance' },
     { id: 'history', label: 'History' },
     { id: 'report', label: 'Report' },
     { id: 'summary', label: 'Summary' }

@@ -1,11 +1,1026 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Filter from '../Images/Filter.png';
+import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 
-const History = () => {
+// ISO 8601 week helpers (same as AdvanceReport.js)
+const getISOWeekNumber = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const dayOfWeek = d.getDay() || 7;
+  const thursday = new Date(d);
+  thursday.setDate(d.getDate() + 4 - dayOfWeek);
+  thursday.setHours(0, 0, 0, 0);
+  const weekYear = thursday.getFullYear();
+  const jan1 = new Date(weekYear, 0, 1);
+  jan1.setHours(0, 0, 0, 0);
+  const jan1DayOfWeek = jan1.getDay() || 7;
+  const firstThursday = new Date(jan1);
+  firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+  firstThursday.setHours(0, 0, 0, 0);
+  const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+  return Math.floor(daysDiff / 7) + 1;
+};
+
+const getWeekYear = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const dayOfWeek = d.getDay() || 7;
+  const thursday = new Date(d);
+  thursday.setDate(d.getDate() + 4 - dayOfWeek);
+  return thursday.getFullYear();
+};
+
+const getCurrentWeekNumber = () => getISOWeekNumber(new Date());
+const getCurrentWeekYear = () => getWeekYear(new Date());
+
+// Get Monday of a given ISO week number and year
+const getMondayOfISOWeek = (weekNum, yearNum) => {
+  const jan4 = new Date(yearNum, 0, 4);
+  jan4.setHours(0, 0, 0, 0);
+  const jan4Day = jan4.getDay() || 7;
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNum - 1) * 7);
+  return monday.toISOString().slice(0, 10);
+};
+
+const PREDEFINED_SITE_OPTIONS = [
+  { value: 'Mason Advance', label: 'Mason Advance', id: 1, sNo: '1' },
+  { value: 'Material Advance', label: 'Material Advance', id: 2, sNo: '2' },
+  { value: 'Weekly Advance', label: 'Weekly Advance', id: 3, sNo: '3' },
+  { value: 'Excess Advance', label: 'Excess Advance', id: 4, sNo: '4' },
+  { value: 'Material Rent', label: 'Material Rent', id: 5, sNo: '5' },
+  { value: 'Subhash Kumar - Kunnur', label: 'Subhash Kumar - Kunnur', id: 6, sNo: '6' },
+  { value: 'Summary Bill', label: 'Summary Bill', id: 7, sNo: '7' },
+  { value: 'Daily Wage', label: 'Daily Wage', id: 8, sNo: '8' },
+  { value: 'Rent Management Portal', label: 'Rent Management Portal', id: 9, sNo: '9' },
+  { value: 'Multi-Project Batch', label: 'Multi-Project Batch', id: 10, sNo: '10' },
+  { value: 'Loan Portal', label: 'Loan Portal', id: 11, sNo: '11' },
+  { value: 'Bill Payment Tracker', label: 'Bill Payment Tracker', id: 12, sNo: '12' },
+];
+
+const History = ({ onVendorClick }) => {
+  const resolveActiveBranchId = () => {
+    try {
+      const selectedBranchId = localStorage.getItem('selectedBranchId');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  };
+  const [activeBranchId] = useState(() => resolveActiveBranchId());
+  const withBranchUrl = (baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== '') {
+      url.searchParams.set('branchId', String(activeBranchId));
+    }
+    return url.toString();
+  };
+
+  const [advanceData, setAdvanceData] = useState([]);
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [contractorOptions, setContractorOptions] = useState([]);
+  const [siteOptions, setSiteOptions] = useState([...PREDEFINED_SITE_OPTIONS]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [typeSearchQuery, setTypeSearchQuery] = useState('');
+  const [week, setWeek] = useState(() => String(getCurrentWeekNumber()).padStart(2, '0'));
+  const [year, setYear] = useState(() => String(getCurrentWeekYear()));
+  const [showWeekYearModal, setShowWeekYearModal] = useState(false);
+  const [modalWeek, setModalWeek] = useState('');
+  const [modalYear, setModalYear] = useState('');
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [selectedDescription, setSelectedDescription] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [vendorContractorFilter, setVendorContractorFilter] = useState('');
+  const [entryNoFilter, setEntryNoFilter] = useState('');
+  const [projectNameFilter, setProjectNameFilter] = useState('');
+  const [paymentModeFilter, setPaymentModeFilter] = useState('');
+  const [showVendorContractorModal, setShowVendorContractorModal] = useState(false);
+  const [showEntryNoModal, setShowEntryNoModal] = useState(false);
+  const [showProjectNameModal, setShowProjectNameModal] = useState(false);
+  const [showPaymentModeModal, setShowPaymentModeModal] = useState(false);
+
+  const weekNum = week ? parseInt(week, 10) : null;
+  const yearNum = year ? parseInt(year, 10) : null;
+
+  const formatDateTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    try {
+      const date = new Date(dateTimeString);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const timeStr = `${hours}:${minutes} ${ampm}`;
+      if (dateOnly.getTime() === today.getTime()) {
+        return `Today • ${timeStr}`;
+      } else if (dateOnly.getTime() === yesterday.getTime()) {
+        return `Yesterday • ${timeStr}`;
+      } else {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year} • ${timeStr}`;
+      }
+    } catch {
+      return '';
+    }
+  };
+
+  const fetchVendors = async () => {
+    try {
+      const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+      if (res.ok) {
+        const data = await res.json();
+        setVendorOptions(data.map((item) => ({ id: item.id, label: item.vendorName })));
+      }
+    } catch (err) {
+      console.error('Error fetching vendors:', err);
+    }
+  };
+
+  const fetchContractors = async () => {
+    try {
+      const res = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
+      if (res.ok) {
+        const data = await res.json();
+        setContractorOptions(data.map((item) => ({ id: item.id, label: item.contractorName })));
+      }
+    } catch (err) {
+      console.error('Error fetching contractors:', err);
+    }
+  };
+
+  const fetchSites = async () => {
+    try {
+      const res = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = data.map((item) => ({
+          value: item.siteName,
+          label: item.siteName,
+          id: item.id,
+          sNo: item.siteNo,
+        }));
+        setSiteOptions([...PREDEFINED_SITE_OPTIONS, ...formatted]);
+      }
+    } catch (err) {
+      console.error('Error fetching sites:', err);
+      setSiteOptions([...PREDEFINED_SITE_OPTIONS]);
+    }
+  };
+
+  const loadAdvanceData = useCallback(async () => {
+    try {
+      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      if (!res.ok) throw new Error('Failed to fetch advance data');
+      const data = await res.json();
+      setAdvanceData(data);
+    } catch (err) {
+      console.error('Error loading advance data:', err);
+    }
+  }, [activeBranchId]);
+
+  useEffect(() => {
+    fetchVendors();
+    fetchContractors();
+    fetchSites();
+  }, []);
+
+  useEffect(() => {
+    loadAdvanceData();
+    const handleAdvanceUpdate = () => loadAdvanceData();
+    window.addEventListener('advanceUpdated', handleAdvanceUpdate);
+    return () => window.removeEventListener('advanceUpdated', handleAdvanceUpdate);
+  }, [loadAdvanceData]);
+
+  const getVendorName = (vendorId) => {
+    const v = vendorOptions.find((x) => x.id === vendorId);
+    return v?.label || '';
+  };
+  const getContractorName = (contractorId) => {
+    const c = contractorOptions.find((x) => x.id === contractorId);
+    return c?.label || '';
+  };
+  const getProjectName = (projectId) => {
+    const s = siteOptions.find((x) => x.id === projectId);
+    return s?.label || s?.value || '';
+  };
+
+  // Parse date from API (same as AdvanceReport: supports ISO or DD/MM/YYYY)
+  const parseItemDate = (item) => {
+    const raw = item.date || item.timestamp || item.createdAt || item.created_at || '';
+    if (!raw) return null;
+    const s = String(raw).trim();
+    const ddmmyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddmmyy) {
+      const [, dd, mm, yyyy] = ddmmyy;
+      const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      return isNaN(d.getTime()) ? new Date(s) : d;
+    }
+    const parsed = new Date(s);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const transformEntries = () => {
+    return advanceData
+      .map((entry) => {
+        const vendorName = getVendorName(entry.vendor_id);
+        const contractorName = getContractorName(entry.contractor_id);
+        const entityName = vendorName || contractorName || entry.contractor_vendor || '';
+        const projectName = getProjectName(entry.project_id) || entry.project_name || '';
+
+        let amount = 0;
+        const t = entry.type || '';
+        if (t === 'Refund') {
+          amount = -(parseFloat(entry.refund_amount) || 0);
+        } else if (t === 'Bill Settlement') {
+          amount = parseFloat(entry.bill_amount) || 0;
+        } else {
+          amount = parseFloat(entry.amount) || 0;
+        }
+
+        const dateStr = entry.timestamp || entry.createdAt || entry.created_at || '';
+        const entryNo = entry.entry_no || 0;
+        const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+        let prefix = 'AD';
+        if (t === 'Bill Settlement') {
+          prefix = 'BS';
+        } else if (t === 'Transfer') {
+          prefix = 'TF';
+        } else if (t === 'Refund') {
+          prefix = 'RF';
+        }
+        const ref = `${prefix} - ${year} - ${entryNo}`;
+
+        // Get transfer site name for Transfer type
+        const transferSiteName = t === 'Transfer' && entry.transfer_site_id
+          ? getProjectName(entry.transfer_site_id) || ''
+          : '';
+
+        return {
+          id: entry.advancePortalId || entry.id || `${entry.entry_no}-${entry.date}`,
+          ref,
+          entityName,
+          projectName,
+          transferSiteName,
+          timestamp: dateStr,
+          type: t || 'Advance',
+          paymentMode: entry.payment_mode || '',
+          amount,
+          entry,
+        };
+      })
+      .sort((a, b) => {
+        const noA = a.entry.entry_no || 0;
+        const noB = b.entry.entry_no || 0;
+        return noB - noA;
+      });
+  };
+
+  const transformed = transformEntries();
+
+  const filtered = (() => {
+    let result = transformed;
+    if (searchQuery) {
+      result = result.filter(
+        (item) =>
+          (item.entityName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.projectName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.ref || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.type || '').toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (typeFilter) {
+      result = result.filter((item) => (item.type || '').toLowerCase() === typeFilter.toLowerCase());
+    }
+    if (vendorContractorFilter) {
+      result = result.filter((item) => {
+        const entityName = item.entityName || '';
+        return entityName.toLowerCase() === vendorContractorFilter.toLowerCase();
+      });
+    }
+    if (entryNoFilter) {
+      result = result.filter((item) => {
+        const entryNo = String(item.entry.entry_no || '');
+        return entryNo === entryNoFilter;
+      });
+    }
+    if (projectNameFilter) {
+      result = result.filter((item) => {
+        const projectName = item.projectName || '';
+        return projectName.toLowerCase() === projectNameFilter.toLowerCase();
+      });
+    }
+    if (paymentModeFilter) {
+      result = result.filter((item) => {
+        const paymentMode = item.paymentMode || '';
+        return paymentMode.toLowerCase() === paymentModeFilter.toLowerCase();
+      });
+    }
+    return result;
+  })();
+
+  const getTypeBadgeClass = (type) => {
+    switch (type) {
+      case 'Advance':
+        return 'bg-[#E8F5E9] text-[#2E7D32]';
+      case 'Bill Settlement':
+        return 'bg-[#E3F2FD] text-[#1976D2]';
+      case 'Refund':
+        return 'bg-[#FFF3E0] text-[#F57C00]';
+      case 'Transfer':
+        return 'bg-[#FFF3E0] text-black';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const openWeekYearModal = () => {
+    setModalWeek(week || String(getCurrentWeekNumber()).padStart(2, '0'));
+    setModalYear(year || String(getCurrentWeekYear()));
+    setShowWeekYearModal(true);
+  };
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 12 }, (_, i) => currentYear - 5 + i);
+  const weeks = Array.from({ length: 53 }, (_, i) => String(i + 1).padStart(2, '0'));
+
+  const getVisibleWeeks = () => {
+    const w = parseInt(modalWeek, 10) || 1;
+    const prev = w <= 1 ? 53 : w - 1;
+    const next = w >= 53 ? 1 : w + 1;
+    return [prev, w, next].map((n) => String(n).padStart(2, '0'));
+  };
+  const getVisibleYears = () => {
+    const y = parseInt(modalYear, 10) || currentYear;
+    return [y - 1, y, y + 1];
+  };
+  const handleWeekWheel = (e, delta) => {
+    e.preventDefault();
+    const w = parseInt(modalWeek, 10) || 1;
+    const next = delta > 0 ? (w >= 53 ? 1 : w + 1) : (w <= 1 ? 53 : w - 1);
+    setModalWeek(String(next).padStart(2, '0'));
+  };
+  const handleYearWheel = (e, delta) => {
+    e.preventDefault();
+    const y = parseInt(modalYear, 10) || currentYear;
+    setModalYear(String(y + (delta > 0 ? 1 : -1)));
+  };
+  const handleWeekYearOk = () => {
+    const w = parseInt(modalWeek, 10);
+    const y = parseInt(modalYear, 10);
+    if (w >= 1 && w <= 53 && y) {
+      setWeek(String(w).padStart(2, '0'));
+      setYear(String(y));
+    }
+    setShowWeekYearModal(false);
+  };
   return (
-    <div className="px-4 py-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="text-center text-gray-500 mt-8">
-        <p>History content will be displayed here</p>
+    <div
+      className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden"
+      style={{ fontFamily: "'Manrope', sans-serif" }}
+    >
+      {/* Date and Category Section */}
+      <div className="px-4 pt-2">
+        <div className="flex items-center justify-end border-b border-[#E0E0E0] pb-2">
+          
+          <button
+            onClick={() => setShowTypeModal(true)}
+            className="text-[12px] font-semibold text-black leading-normal cursor-pointer"
+          >
+            {typeFilter || 'Type'}
+          </button>
+        </div>
       </div>
+      {/* Filter */}
+      <div className="flex-shrink-0 px-4 pt-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button 
+            type="button" 
+            onClick={() => setShowFilterModal(true)}
+            className="flex items-center gap-1 text-[13px] font-semibold text-[#9E9E9E] leading-normal cursor-pointer"
+          >
+            <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
+            Filter
+          </button>
+        </div>
+      </div>
+      {/* Cards List - Scrollable */}
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 max-h-[calc(100vh-160px-80px)]">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 32 32"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M8 12H24M8 20H24M8 28H24"
+                  stroke="#9E9E9E"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <p className="text-[14px] font-medium text-[#9E9E9E] text-center mt-4">
+              {searchQuery ? 'No advance records found' : 'No advance records yet'}
+            </p>
+          </div>
+        ) : (
+          filtered.map((item) => (
+            <div
+              key={item.id}
+              className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
+              style={{ height: '95px' }}
+            >
+              <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out">
+                <div className="flex flex-col gap-0.5">
+                  {/* Row 1: ref and payment mode */}
+                  <div className="flex items-center justify-between">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        const desc = item.entry?.description || '';
+                        if (desc) {
+                          setSelectedDescription(desc);
+                          setShowDescriptionModal(true);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          const desc = item.entry?.description || '';
+                          if (desc) {
+                            setSelectedDescription(desc);
+                            setShowDescriptionModal(true);
+                          }
+                        }
+                      }}
+                      className={`text-[12px] font-semibold text-black leading-snug ${item.entry?.description ? 'cursor-pointer hover:underline' : ''}`}
+                    >
+                      {item.ref}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getTypeBadgeClass(
+                        item.type
+                      )}`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          item.type === 'Advance'
+                            ? 'bg-[#2E7D32]'
+                            : item.type === 'Bill Settlement'
+                              ? 'bg-[#1976D2]'
+                              : item.type === 'Refund'
+                                ? 'bg-[#F57C00]'
+                                : item.type === 'Transfer'
+                                  ? ''
+                                  : ''
+                        }`}
+                      />
+                      {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
+                    </span>
+                  </div>
+                  {/* Row 2: entityName (clickable – opens Advance form with vendor/project and bill details) and empty space */}
+                  <div className="flex items-center justify-between">
+                    {onVendorClick ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const entry = item.entry || {};
+                          const vendorId = entry.vendor_id;
+                          const contractorId = entry.contractor_id;
+                          const projectId = entry.project_id;
+                          let selectedOption = null;
+                          if (vendorId) {
+                            const v = vendorOptions.find((x) => x.id === vendorId);
+                            if (v) selectedOption = { value: v.label, label: v.label, id: v.id, type: 'Vendor' };
+                          }
+                          if (!selectedOption && contractorId) {
+                            const c = contractorOptions.find((x) => x.id === contractorId);
+                            if (c) selectedOption = { value: c.label, label: c.label, id: c.id, type: 'Contractor' };
+                          }
+                          const site = siteOptions.find((x) => x.id === projectId);
+                          const selectedSite = site ? { value: site.value || site.label, label: site.label, id: site.id, sNo: site.sNo } : null;
+                          onVendorClick({
+                            selectedOption,
+                            selectedSite,
+                            billDetails: {
+                              ref: item.ref,
+                              amount: item.amount,
+                              paymentMode: item.paymentMode,
+                              timestamp: item.timestamp,
+                              type: item.type,
+                              entryNo: entry.entry_no,
+                              date: entry.date || entry.timestamp,
+                            },
+                          });
+                        }}
+                        className="text-[12px] font-semibold text-black leading-snug break-words text-left cursor-pointer hover:underline focus:outline-none focus:underline"
+                        style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                      >
+                        {item.entityName || 'N/A'}
+                      </button>
+                    ) : (
+                      <p
+                        className="text-[12px] font-semibold text-black leading-snug break-words"
+                        style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                      >
+                        {item.entityName || 'N/A'}
+                      </p>
+                    )}
+                    <span></span>
+                  </div>
+                  {/* Row 3: projectName and amount */}
+                  <div className="flex items-center justify-between">
+                    <p
+                      className="text-[11px] font-medium text-[#777777] leading-snug break-words"
+                      style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                    >
+                      {item.projectName || 'N/A'}
+                    </p>
+                    <p
+                      className={`text-[12px] font-semibold block leading-snug ${
+                        item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'
+                      }`}
+                    >
+                      {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                  {/* Row 4: date/time and transfer site name */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#777777] leading-snug">
+                      {formatDateTime(item.timestamp)}
+                    </span>
+                    {item.type === 'Transfer' && item.transferSiteName ? (
+                      <p className={`text-[10px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#BF9853]' : 'text-[#007233]'}`}>
+                        {item.transferSiteName}
+                      </p>
+                    ) : item.type === 'Bill Settlement' && item.entry.amount ? (
+                      <span className="text-[12px] font-medium text-[#007233] leading-snug">
+                        ₹{parseFloat(item.entry.amount || 0).toLocaleString('en-IN')}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      {/* Select Type Modal */}
+      {showTypeModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => {
+            setShowTypeModal(false);
+            setTypeSearchQuery('');
+          }}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 pt-5">
+              <p className="text-[16px] font-semibold text-black">Select Type</p>
+              <button
+                onClick={() => {
+                  setShowTypeModal(false);
+                  setTypeSearchQuery('');
+                }}
+                className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"
+              >
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L10 10M10 1L1 10" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="px-6 pt-4 pb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={typeSearchQuery}
+                  onChange={(e) => setTypeSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Options List */}
+            <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {(['Advance', 'Bill Settlement', 'Transfer', 'Refund']
+                  .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
+                  .map((type, index) => {
+                    const isSelected = typeFilter === type;
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setTypeFilter(typeFilter === type ? '' : type);
+                          setShowTypeModal(false);
+                          setTypeSearchQuery('');
+                        }}
+                        className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                          }`}
+                      >
+                        {/* Left: Option Text */}
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <p className="text-[14px] font-medium text-black text-left truncate">{type}</p>
+                        </div>
+
+                        {/* Right: Radio Button */}
+                        <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
+                          {isSelected ? (
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
+                              <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                            </svg>
+                          ) : (
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Select Week & Year modal */}
+      {showWeekYearModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center" onClick={() => setShowWeekYearModal(false)}>
+          <div className="bg-white w-[320px] rounded-[6px] p-6 relative" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[16px] font-medium text-black text-center mb-6">Select Week & Year</p>
+            <div className="flex justify-center gap-8 mb-6">
+              {/* Week column - show "Week 1", "Week 2", ... */}
+              <div
+                className="flex flex-col items-center relative"
+                onWheel={(e) => handleWeekWheel(e, e.deltaY > 0 ? 1 : -1)}
+              >
+                {getVisibleWeeks().map((w, idx) => (
+                  <div key={`${w}-${idx}`} className="relative w-full flex flex-col items-center">
+                    {idx > 0 && <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                    <button
+                      type="button"
+                      onClick={() => setModalWeek(w)}
+                      className={`min-w-[72px] h-8 text-[14px] relative ${modalWeek === w ? 'font-medium text-black' : 'font-normal text-[#979ea3]'}`}
+                    >
+                      Week {parseInt(w, 10)}
+                    </button>
+                    {idx < 2 && <div className="absolute bottom-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                  </div>
+                ))}
+              </div>
+              {/* Year column */}
+              <div className="flex flex-col items-center relative" onWheel={(e) => handleYearWheel(e, e.deltaY > 0 ? 1 : -1)}>
+                {getVisibleYears().map((y, idx) => (
+                  <div key={`${y}-${idx}`} className="relative w-full flex flex-col items-center">
+                    {idx > 0 && <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                    <button
+                      type="button"
+                      onClick={() => setModalYear(String(y))}
+                      className={`w-12 h-8 text-[14px] relative ${modalYear === String(y) ? 'font-medium text-black' : 'font-normal text-[#979ea3]'}`}
+                    >
+                      {y}
+                    </button>
+                    {idx < 2 && <div className="absolute bottom-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-4">
+              <button type="button" onClick={() => setShowWeekYearModal(false)} className="text-[#656565] text-[16px] font-semibold">
+                Cancel
+              </button>
+              <button type="button" onClick={handleWeekYearOk} className="text-[#bf9853] text-[16px] font-bold">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40"
+          onClick={() => setShowFilterModal(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full max-w-[360px] p-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[16px] font-semibold text-black">Select Filters</p>
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(false)}
+                className="w-6 h-6 flex items-center justify-center"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15 5L5 15M5 5L15 15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-[2fr_1fr] gap-4 mb-3">
+              {/* Contractor/Vendor Filter */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Contractor/Vendor</p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowVendorContractorModal(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{ boxSizing: 'border-box', color: vendorContractorFilter ? '#000' : '#9E9E9E' }}
+                  >
+                    {vendorContractorFilter || 'Select'}
+                    {vendorContractorFilter ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVendorContractorFilter('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Entry. No Filter */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Entry. No</p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowEntryNoModal(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{ boxSizing: 'border-box', color: entryNoFilter ? '#000' : '#9E9E9E' }}
+                  >
+                    {entryNoFilter || 'Select'}
+                    {entryNoFilter ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEntryNoFilter('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Project Name Filter */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Project Name</p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowProjectNameModal(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{ boxSizing: 'border-box', color: projectNameFilter ? '#000' : '#9E9E9E' }}
+                  >
+                    {projectNameFilter || 'Select'}
+                    {projectNameFilter ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectNameFilter('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Mode Filter */}
+              <div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Mode</p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowPaymentModeModal(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{ boxSizing: 'border-box', color: paymentModeFilter ? '#000' : '#9E9E9E' }}
+                  >
+                    {paymentModeFilter || 'Select'}
+                    {paymentModeFilter ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPaymentModeFilter('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setVendorContractorFilter('');
+                  setEntryNoFilter('');
+                  setProjectNameFilter('');
+                  setPaymentModeFilter('');
+                  setShowFilterModal(false);
+                }}
+                className="px-6 w-full py-2 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(false)}
+                className="px-6 py-2 w-full text-[14px] font-semibold text-white bg-black rounded-lg"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vendor/Contractor Modal - higher z-index when opened from Filter sheet */}
+      <SelectVendorModal
+        isOpen={showVendorContractorModal}
+        onClose={() => setShowVendorContractorModal(false)}
+        onSelect={(value) => {
+          setVendorContractorFilter(value);
+          setShowVendorContractorModal(false);
+        }}
+        selectedValue={vendorContractorFilter}
+        options={[...vendorOptions.map((opt) => opt.label), ...contractorOptions.map((opt) => opt.label)]}
+        fieldName="Contractor/Vendor"
+        showStarIcon={false}
+        zIndex={10000}
+      />
+
+      {/* Entry No Modal - higher z-index when opened from Filter sheet */}
+      <SelectVendorModal
+        isOpen={showEntryNoModal}
+        onClose={() => setShowEntryNoModal(false)}
+        onSelect={(value) => {
+          setEntryNoFilter(value);
+          setShowEntryNoModal(false);
+        }}
+        selectedValue={entryNoFilter}
+        options={[...new Set(transformed.map((item) => String(item.entry.entry_no || '')))].sort((a, b) => Number(b) - Number(a))}
+        fieldName="Entry. No"
+        showStarIcon={false}
+        zIndex={10000}
+      />
+
+      {/* Project Name Modal - higher z-index when opened from Filter sheet */}
+      <SelectVendorModal
+        isOpen={showProjectNameModal}
+        onClose={() => setShowProjectNameModal(false)}
+        onSelect={(value) => {
+          setProjectNameFilter(value);
+          setShowProjectNameModal(false);
+        }}
+        selectedValue={projectNameFilter}
+        options={siteOptions.map((opt) => opt.label || opt.value)}
+        fieldName="Project Name"
+        showStarIcon={false}
+        zIndex={10000}
+      />
+
+      {/* Payment Mode Modal - higher z-index when opened from Filter sheet */}
+      <SelectVendorModal
+        isOpen={showPaymentModeModal}
+        onClose={() => setShowPaymentModeModal(false)}
+        onSelect={(value) => {
+          setPaymentModeFilter(value);
+          setShowPaymentModeModal(false);
+        }}
+        selectedValue={paymentModeFilter}
+        options={['Cash', 'GPay', 'PhonePe', 'Net Banking', 'Cheque', 'Online']}
+        fieldName="Mode"
+        showStarIcon={false}
+        zIndex={10000}
+      />
+
+      {/* Description Modal */}
+      {showDescriptionModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
+          onClick={() => setShowDescriptionModal(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-5 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-[#FFF3E0] flex items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18.5 2.5C18.8978 2.10218 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10218 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10218 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-[18px] font-bold text-black text-center mb-4">Description!</h3>
+
+            {/* Description Content */}
+            <p className="text-[11px] font-medium text-black text-center mb-6 leading-relaxed">
+              {selectedDescription}
+            </p>
+
+            {/* Okay Button */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowDescriptionModal(false)}
+                className="px-8 py-2 bg-black text-white text-[14px] font-semibold rounded-[8px] hover:opacity-90 transition-opacity"
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

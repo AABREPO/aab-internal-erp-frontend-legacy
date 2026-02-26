@@ -29,6 +29,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
 
   // Image viewer state
   const [showImageViewer, setShowImageViewer] = useState(false);
+  const [imagesLoading, setImagesLoading] = useState(false);
   const [imageViewerData, setImageViewerData] = useState({
     images: [],
     currentIndex: 0,
@@ -272,10 +273,10 @@ const ServiceHistory = ({ user, onTabChange }) => {
           (Array.isArray(data) ? data : []).forEach(entry => {
             const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
             if (entryItems.length === 0) {
-              // If no items, still show the entry
               flattenedData.push({
                 id: `${entry.id}-0`,
                 entryId: entry.id,
+                itemTableId: null,
                 eno: entry.eno || '',
                 toolsEntryType: entry.tools_entry_type || entry.toolsEntryType || 'Entry',
                 fromProjectId: entry.from_project_id || entry.fromProjectId || '',
@@ -290,29 +291,15 @@ const ServiceHistory = ({ user, onTabChange }) => {
                 machineNumber: '',
                 machineStatus: '',
                 quantity: 0,
-                description: '',
-                images: []
+                description: ''
               });
             } else {
-              // Create separate entry for each item
               entryItems.forEach((item, index) => {
-                // Process images - convert base64 to data URLs if needed
-                const rawImages = item.tools_item_live_images || item.toolsItemLiveImages || [];
-                const processedImages = rawImages.map(img => {
-                  // If tools_image exists (byte array as base64), convert to data URL
-                  if (img.tools_image || img.toolsImage) {
-                    const base64Data = img.tools_image || img.toolsImage;
-                    return `data:image/jpeg;base64,${base64Data}`;
-                  }
-                  // Fallback to URL if exists
-                  if (img.tools_image_url || img.toolsImageUrl) {
-                    return img.tools_image_url || img.toolsImageUrl;
-                  }
-                  return null;
-                }).filter(Boolean);
+                const itemTableId = item.id ?? item.Id ?? null;
                 flattenedData.push({
                   id: `${entry.id}-${index}`,
                   entryId: entry.id,
+                  itemTableId: itemTableId,
                   eno: entry.eno || '',
                   toolsEntryType: entry.tools_entry_type || entry.toolsEntryType || 'Entry',
                   fromProjectId: entry.from_project_id || entry.fromProjectId || '',
@@ -328,8 +315,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
                   machineNumberId: item.machine_number_id || item.machineNumberId || '',
                   machineStatus: item.machine_status || item.machineStatus || 'Working',
                   quantity: item.quantity || 0,
-                  description: item.description || '',
-                  images: processedImages
+                  description: item.description || ''
                 });
               });
             }
@@ -467,21 +453,57 @@ const ServiceHistory = ({ user, onTabChange }) => {
     return '-';
   };
 
-  // Image viewer handlers
-  const handleOpenImageViewer = (entry, itemName, itemId) => {
-    if (entry.images.length === 0) {
+  // Image viewer handlers - fetch images on demand via API
+  const handleOpenImageViewer = async (entry, itemName, displayValue) => {
+    const itemTableId = entry.itemTableId;
+    if (!itemTableId) {
       alert('No images available for this item');
       return;
     }
-
     setImageViewerData({
-      images: entry.images,
+      images: [],
       currentIndex: 0,
       itemName: itemName,
-      itemId: itemId,
-      machineStatus: entry.machineStatus
+      itemId: displayValue,
+      machineStatus: entry.machineStatus || ''
     });
     setShowImageViewer(true);
+    setImagesLoading(true);
+    try {
+      const res = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/items/${itemTableId}/images`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        setImageViewerData(prev => ({ ...prev, images: [] }));
+        setImagesLoading(false);
+        return;
+      }
+      const rawImages = await res.json();
+      const arr = Array.isArray(rawImages) ? rawImages : [];
+      const processedImages = arr.map(img => {
+        const base64 = img.tools_image ?? img.toolsImage;
+        const url = img.tools_image_url ?? img.toolsImageUrl;
+        if (base64) return `data:image/jpeg;base64,${base64}`;
+        if (url) return url;
+        return null;
+      }).filter(Boolean);
+      setImageViewerData(prev => ({
+        ...prev,
+        images: processedImages,
+        currentIndex: 0
+      }));
+      if (processedImages.length === 0) {
+        alert('No images available for this item');
+      }
+    } catch (err) {
+      console.error('Error fetching images:', err);
+      alert('Failed to load images');
+      setImageViewerData(prev => ({ ...prev, images: [] }));
+    } finally {
+      setImagesLoading(false);
+    }
   };
 
   const handleCloseImageViewer = () => {
@@ -814,7 +836,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
 
               // Get item ID name (like "AA DM 01") from the map using item_ids_id
               const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
-              const hasImages = entry.images.length > 0;
+              const canViewImages = Boolean(entry.itemTableId);
               const machineNumberText = resolveMachineNumberText(entry);
 
               // Get status display
@@ -890,10 +912,10 @@ const ServiceHistory = ({ user, onTabChange }) => {
                       </p>
                       {itemIdName && (
                         <p
-                          className={`item-id-clickable text-[13px] font-semibold leading-snug flex-shrink-0 ml-2 ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-[#4CAF50]'}`}
+                          className={`item-id-clickable text-[13px] font-semibold leading-snug flex-shrink-0 ml-2 ${canViewImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-[#4CAF50]'}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (hasImages) {
+                            if (canViewImages) {
                               handleOpenImageViewer(entry, itemName, itemIdName || 'View');
                             }
                           }}
@@ -966,11 +988,21 @@ const ServiceHistory = ({ user, onTabChange }) => {
           >
             {/* Image */}
             <div className="relative">
-              <img
-                src={imageViewerData.images[imageViewerData.currentIndex]}
-                alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
-                className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
-              />
+              {imagesLoading ? (
+                <div className="flex items-center justify-center min-h-[200px] rounded-lg bg-gray-100">
+                  <p className="text-[14px] text-gray-600">Loading images...</p>
+                </div>
+              ) : imageViewerData.images.length > 0 && imageViewerData.images[imageViewerData.currentIndex] ? (
+                <img
+                  src={imageViewerData.images[imageViewerData.currentIndex]}
+                  alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
+                  className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
+                />
+              ) : (
+                <div className="flex items-center justify-center min-h-[200px] rounded-lg bg-gray-100">
+                  <p className="text-[14px] text-gray-600">No images available</p>
+                </div>
+              )}
               {/* Close Button - Inside image at top right */}
               <button
                 onClick={handleCloseImageViewer}

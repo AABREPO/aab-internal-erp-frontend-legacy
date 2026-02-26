@@ -9,6 +9,7 @@ const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/empl
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
+const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
 
 const History = ({ user, onTabChange }) => {
   const [historyType, setHistoryType] = useState('entry'); // 'entry' or 'relocate'
@@ -21,7 +22,9 @@ const History = ({ user, onTabChange }) => {
   const [itemNamesMap, setItemNamesMap] = useState({});
   const [brandsMap, setBrandsMap] = useState({});
   const [itemIdsMap, setItemIdsMap] = useState({});
+  const [machineNumbersMap, setMachineNumbersMap] = useState({});
   const [showImageViewer, setShowImageViewer] = useState(false);
+  const [imagesLoading, setImagesLoading] = useState(false);
   const [imageViewerData, setImageViewerData] = useState({
     images: [],
     currentIndex: 0,
@@ -128,6 +131,23 @@ const History = ({ user, onTabChange }) => {
           });
           setItemIdsMap(map);
         }
+        const machineNumbersRes = await fetch(`${TOOLS_MACHINE_NUMBER_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (machineNumbersRes.ok) {
+          const data = await machineNumbersRes.json();
+          const map = {};
+          (Array.isArray(data) ? data : []).forEach(m => {
+            const id = m?.id ?? m?._id;
+            const machineNumber = (m?.machine_number ?? m?.machineNumber ?? '').trim();
+            if (id != null && machineNumber) {
+              map[String(id)] = machineNumber;
+            }
+          });
+          setMachineNumbersMap(map);
+        }
       } catch (error) {
         console.error('Error fetching lookup data:', error);
       }
@@ -154,6 +174,7 @@ const History = ({ user, onTabChange }) => {
               flattenedData.push({
                 id: `${entry.id}-0`,
                 entryId: entry.id,
+                itemTableId: null,
                 eno: entry.eno || '',
                 toolsEntryType: entry.tools_entry_type || entry.toolsEntryType || 'Entry',
                 fromProjectId: entry.from_project_id || entry.fromProjectId || '',
@@ -169,25 +190,15 @@ const History = ({ user, onTabChange }) => {
                 machineNumber: '',
                 machineStatus: '',
                 quantity: 0,
-                description: '',
-                images: []
+                description: ''
               });
             } else {
               entryItems.forEach((item, index) => {
-                const rawImages = item.tools_item_live_images || item.toolsItemLiveImages || [];
-                const processedImages = rawImages.map(img => {
-                  if (img.tools_image || img.toolsImage) {
-                    const base64Data = img.tools_image || img.toolsImage;
-                    return `data:image/jpeg;base64,${base64Data}`;
-                  }
-                  if (img.tools_image_url || img.toolsImageUrl) {
-                    return img.tools_image_url || img.toolsImageUrl;
-                  }
-                  return null;
-                }).filter(Boolean);
+                const itemTableId = item.id ?? item.Id ?? null;
                 flattenedData.push({
                   id: `${entry.id}-${index}`,
                   entryId: entry.id,
+                  itemTableId: itemTableId,
                   eno: entry.eno || '',
                   toolsEntryType: entry.tools_entry_type || entry.toolsEntryType || 'Entry',
                   fromProjectId: entry.from_project_id || entry.fromProjectId || '',
@@ -201,10 +212,10 @@ const History = ({ user, onTabChange }) => {
                   brandId: item.brand_id || item.brandId || '',
                   itemIdsId: item.item_ids_id || item.itemIdsId || '',
                   machineNumber: item.machine_number || item.machineNumber || '',
+                  machineNumberId: item.machine_number_id || item.machineNumberId || '',
                   machineStatus: item.machine_status || item.machineStatus || 'Working',
                   quantity: item.quantity || 0,
-                  description: item.description || '',
-                  images: processedImages
+                  description: item.description || ''
                 });
               });
             }
@@ -250,6 +261,17 @@ const History = ({ user, onTabChange }) => {
       return { date: '', time: '' };
     }
   };
+  const resolveMachineNumberText = (entry) => {
+    if (entry.machineNumber && String(entry.machineNumber).trim()) {
+      return String(entry.machineNumber).trim();
+    }
+    const id = entry.machineNumberId;
+    if (id) {
+      const text = machineNumbersMap[String(id)] || machineNumbersMap[id];
+      if (text) return text;
+    }
+    return '';
+  };
   const getLocationName = (id, checkVendorsFirst = false) => {
     if (!id) return '-';
     const idStr = String(id);
@@ -275,19 +297,56 @@ const History = ({ user, onTabChange }) => {
     }
     return '-';
   };
-  const handleOpenImageViewer = (entry, itemName, itemId) => {
-    if (entry.images.length === 0) {
+  const handleOpenImageViewer = async (entry, itemName, displayValue) => {
+    const itemTableId = entry.itemTableId;
+    if (!itemTableId) {
       alert('No images available for this item');
       return;
     }
     setImageViewerData({
-      images: entry.images,
+      images: [],
       currentIndex: 0,
       itemName: itemName,
-      itemId: itemId,
-      machineStatus: entry.machineStatus
+      itemId: displayValue,
+      machineStatus: entry.machineStatus || ''
     });
     setShowImageViewer(true);
+    setImagesLoading(true);
+    try {
+      const res = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/items/${itemTableId}/images`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        setImageViewerData(prev => ({ ...prev, images: [] }));
+        setImagesLoading(false);
+        return;
+      }
+      const rawImages = await res.json();
+      const arr = Array.isArray(rawImages) ? rawImages : [];
+      const processedImages = arr.map(img => {
+        const base64 = img.tools_image ?? img.toolsImage;
+        const url = img.tools_image_url ?? img.toolsImageUrl;
+        if (base64) return `data:image/jpeg;base64,${base64}`;
+        if (url) return url;
+        return null;
+      }).filter(Boolean);
+      setImageViewerData(prev => ({
+        ...prev,
+        images: processedImages,
+        currentIndex: 0
+      }));
+      if (processedImages.length === 0) {
+        alert('No images available for this item');
+      }
+    } catch (err) {
+      console.error('Error fetching images:', err);
+      alert('Failed to load images');
+      setImageViewerData(prev => ({ ...prev, images: [] }));
+    } finally {
+      setImagesLoading(false);
+    }
   };
   const handleCloseImageViewer = () => {
     setShowImageViewer(false);
@@ -688,8 +747,9 @@ const History = ({ user, onTabChange }) => {
               const inchargeName = employeesMap[entry.projectInchargeId] || employeesMap[String(entry.projectInchargeId)] || '-';
               const itemName = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || entry.itemNameId || '-';
               const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
-              const hasImages = entry.images.length > 0;
+              const canViewImages = Boolean(entry.itemTableId);
               const displayValue = itemIdName || (entry.quantity > 0 ? String(entry.quantity) : '');
+              const machineNumberText = resolveMachineNumberText(entry);
               const entryId = entry.id;
               const swipeState = swipeStates[entryId];
               const isExpanded = expandedEntryId === entryId;
@@ -760,12 +820,12 @@ const History = ({ user, onTabChange }) => {
                       </p>
                       <div className="flex flex-col items-end flex-shrink-0 ml-2">
                         {displayValue ? (
-                          <p className={`text-[12px] font-semibold leading-snug ${hasImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
-                            onClick={() => hasImages && handleOpenImageViewer(entry, itemName, displayValue)}
+                          <p className={`text-[12px] font-semibold leading-snug ${canViewImages ? 'text-[#E4572E] cursor-pointer underline' : 'text-black'}`}
+                            onClick={() => canViewImages && handleOpenImageViewer(entry, itemName, displayValue)}
                           >
                             {displayValue}
                           </p>
-                        ) : hasImages ? (
+                        ) : canViewImages ? (
                           <p className="text-[12px] font-semibold leading-snug text-[#E4572E] cursor-pointer underline"
                             onClick={() => handleOpenImageViewer(entry, itemName, 'View')}
                           >
@@ -778,11 +838,11 @@ const History = ({ user, onTabChange }) => {
                       <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
                         From - {fromLocation}
                       </p>
-                      {entry.machineNumber && (
-                        <p className="text-[12px] leading-snug text-black flex-shrink-0 ml-2">
-                          {entry.machineNumber}
+                      {machineNumberText ? (
+                        <p className="text-[11px] text-black leading-snug flex-shrink-0 ml-2 truncate max-w-[40%]">
+                          {machineNumberText}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex items-start justify-between mb-0.5">
                       <p className="text-[11px] text-[#BF9853] leading-snug truncate flex-1 min-w-0">
@@ -855,11 +915,21 @@ const History = ({ user, onTabChange }) => {
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
           <div className="relative z-10 w-full max-w-[90%] mx-4" onClick={(e) => e.stopPropagation()} >
             <div className="relative">
-              <img
-                src={imageViewerData.images[imageViewerData.currentIndex]}
-                alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
-                className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
-              />
+              {imagesLoading ? (
+                <div className="flex items-center justify-center min-h-[200px] rounded-lg bg-gray-100">
+                  <p className="text-[14px] text-gray-600">Loading images...</p>
+                </div>
+              ) : imageViewerData.images.length > 0 && imageViewerData.images[imageViewerData.currentIndex] ? (
+                <img
+                  src={imageViewerData.images[imageViewerData.currentIndex]}
+                  alt={`${imageViewerData.itemName} - ${imageViewerData.currentIndex + 1}`}
+                  className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
+                />
+              ) : (
+                <div className="flex items-center justify-center min-h-[200px] rounded-lg bg-gray-100">
+                  <p className="text-[14px] text-gray-600">No images available</p>
+                </div>
+              )}
               <button onClick={handleCloseImageViewer} className="absolute -top-7 -right-1 w-8 h-8 rounded-full flex items-center justify-center z-20 ">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M18 6L6 18M6 6L18 18" stroke="#E4572E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import EditIcon from '../Images/edit1.png';
@@ -150,6 +150,7 @@ const Transfer = ({ user }) => {
   const [cloneModeActive, setCloneModeActive] = useState(false);
   const [editEntryId, setEditEntryId] = useState(null);
   const [originalEditData, setOriginalEditData] = useState(null);
+  const initialImageCountByItemIdRef = useRef({});
   const [customAlert, setCustomAlert] = useState({
     isOpen: false,
     message: ''
@@ -913,9 +914,9 @@ const Transfer = ({ user }) => {
           };
           const cloneFallbackFromId = editData.to_project_id || editData.toProjectId || '';
           const resolvedCloneFromId = await resolveCloneFromIdFromApi(cloneFallbackFromId);
-          const loadItems = () => {
+          const loadItems = async () => {
             const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
-            const loadedItems = entryItems.map((item, index) => {
+            const rawItems = entryItems.map((item, index) => {
               const rawImages = isCloneMode ? [] : (item.tools_item_live_images || item.toolsItemLiveImages || []);
               const processedImages = rawImages.map(img => {
                 if (img.tools_image || img.toolsImage) {
@@ -924,7 +925,6 @@ const Transfer = ({ user }) => {
                 }
                 return null;
               }).filter(Boolean);
-              const localImageUrls = processedImages;
               const itemName = toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.item_name ||
                 toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.itemName || '';
               const brand = toolsBrandFullData.find(b => String(b?.id) === String(item?.brand_id ?? item?.brandId))?.tools_brand ||
@@ -939,20 +939,59 @@ const Transfer = ({ user }) => {
                 brand_id: item.brand_id ? String(item.brand_id) : null,
                 model: item.model || '',
                 machine_number: item.machine_number || item.machineNumber || '',
+                machine_number_id: item.machine_number_id || item.machineNumberId || '',
                 quantity: item.quantity || 0,
                 machine_status: isCloneMode ? 'Working' : (item.machine_status || item.machineStatus || 'Working'),
                 description: item.description || '',
-                tools_item_live_images: rawImages.map(img => ({
-                  tools_image: img.tools_image || img.toolsImage
-                })),
-                localImageUrls: localImageUrls,
+                tools_item_live_images: rawImages.map(img => ({ tools_image: img.tools_image || img.toolsImage })),
+                localImageUrls: processedImages,
                 itemName: itemName,
                 brand: brand,
                 itemId: itemId
               };
             });
+            if (isCloneMode) {
+              setItems(rawItems);
+              return;
+            }
+            const loadedItems = await Promise.all(rawItems.map(async (baseItem) => {
+              const itemTableId = baseItem.id;
+              if (!itemTableId) return baseItem;
+              try {
+                const res = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/items/${itemTableId}/images`, {
+                  method: 'GET',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                if (!res.ok) return baseItem;
+                const imgList = await res.json();
+                const arr = Array.isArray(imgList) ? imgList : [];
+                const urls = arr.map(img => {
+                  const base64 = img.tools_image ?? img.toolsImage;
+                  const url = img.tools_image_url ?? img.toolsImageUrl;
+                  if (base64) return `data:image/jpeg;base64,${base64}`;
+                  if (url) return url;
+                  return null;
+                }).filter(Boolean);
+                const toolsImages = arr.map(img => ({ tools_image: img.tools_image ?? img.toolsImage })).filter(o => o.tools_image);
+                return {
+                  ...baseItem,
+                  localImageUrls: urls,
+                  tools_item_live_images: toolsImages.length > 0 ? toolsImages : baseItem.tools_item_live_images
+                };
+              } catch {
+                return baseItem;
+              }
+            }));
             setItems(loadedItems);
+            initialImageCountByItemIdRef.current = {};
+            loadedItems.forEach((item) => {
+              initialImageCountByItemIdRef.current[String(item.id)] = (item.tools_item_live_images || []).length;
+            });
           };
+          if (isCloneMode) {
+            initialImageCountByItemIdRef.current = {};
+          }
           setIsEditMode(!isCloneMode);
           setEditEntryId(isCloneMode ? null : editEntryId);
           if (isCloneMode) {
@@ -2027,6 +2066,9 @@ const Transfer = ({ user }) => {
       if (String(curr.machine_status || '') !== String(origItem.machine_status || '')) return true;
       if (String(curr.description || '') !== String(origItem.description || '')) return true;
       if (String(curr.model || '') !== String(origItem.model || '')) return true;
+      const currImageCount = (curr.tools_item_live_images || curr.localImageUrls || []).length;
+      const initialImageCount = initialImageCountByItemIdRef.current[String(curr.id)];
+      if (initialImageCount !== undefined && currImageCount !== initialImageCount) return true;
     }
     return false;
   };
@@ -2157,6 +2199,7 @@ const Transfer = ({ user }) => {
       setIsEditMode(false);
       setEditEntryId(null);
       setOriginalEditData(null);
+      initialImageCountByItemIdRef.current = {};
       setSelectedFrom(null);
       setSelectedTo(null);
       setSelectedServiceStore(null);

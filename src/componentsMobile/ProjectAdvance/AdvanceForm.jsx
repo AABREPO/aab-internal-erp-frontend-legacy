@@ -1,7 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
+import Attach from '../Images/Attachfile.svg';
 
-const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] }) => {
+const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], initialFromHistory = null, onConsumedInitialFromHistory }) => {
+  const resolveActiveBranchId = () => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+    } catch {
+      return null;
+    }
+  };
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const withBranchUrl = (baseUrl) => {
+    const url = new URL(baseUrl);
+    if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
+      url.searchParams.set("branchId", String(activeBranchId));
+    }
+    return url.toString();
+  };
+  useEffect(() => {
+    const syncBranch = () => {
+      const nextBranchId = resolveActiveBranchId();
+      setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId));
+    };
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+  }, []);
+
   // Use paymentModeOptions from props, fallback to default if not provided
   const defaultPaymentModeOptions = [
     { value: 'Cash', label: 'Cash' },
@@ -42,6 +73,20 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
   const [showPaymentModeModal, setShowPaymentModeModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showTransferSiteModal, setShowTransferSiteModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showChequeDatePicker, setShowChequeDatePicker] = useState(false);
+  const [showPaymentDetailsBottomSheet, setShowPaymentDetailsBottomSheet] = useState(false);
+  const [paymentModalData, setPaymentModalData] = useState({
+    date: '',
+    amount: '',
+    paymentMode: '',
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: ''
+  });
+  const [accountDetails, setAccountDetails] = useState([]);
+  const [showAccountSelectModal, setShowAccountSelectModal] = useState(false);
 
   // Format date helper
   const getTodayDate = () => {
@@ -271,52 +316,116 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
     fetchLatestEno();
   }, []);
 
-  // Fetch advance data
+  // Fetch account details for Payment Details bottom sheet
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/getAll');
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
+        const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" }
+        });
+        if (!response.ok) throw new Error("Network response was not ok: " + response.statusText);
         const data = await response.json();
-        setAdvanceData(data);
-        const maxEntryNo = data.length > 0 ? Math.max(...data.map(item => item.entry_no || 0)) : 0;
-        setEntryNo(maxEntryNo + 1);
+        setAccountDetails(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.error('Error fetching advance portal data:', error);
+        console.error("Error fetching account details:", error);
       }
     };
-    fetchData();
+    fetchAccountDetails();
   }, []);
+
+  // Fetch advance data (use branch URL so list matches History and filter works)
+  const fetchAdvanceData = async () => {
+    try {
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const data = await response.json();
+      setAdvanceData(data);
+      const maxEntryNo = data.length > 0 ? Math.max(...data.map(item => item.entry_no || 0)) : 0;
+      setEntryNo(maxEntryNo + 1);
+    } catch (error) {
+      console.error('Error fetching advance portal data:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdvanceData();
+  }, []);
+
+  // Apply initialFromHistory when user navigated from History – only set selection; use existing advanceData load
+  useEffect(() => {
+    if (!initialFromHistory || !onConsumedInitialFromHistory) return;
+    const { selectedOption, selectedSite } = initialFromHistory;
+    if (selectedOption) setSelectedOption(selectedOption);
+    if (selectedSite) setSelectedSite(selectedSite);
+    onConsumedInitialFromHistory();
+  }, [initialFromHistory, onConsumedInitialFromHistory]);
+
+  // Derive overall advance from advanceData when we have both (avoids extra fetch when opening from History)
+  useEffect(() => {
+    if (!selectedOption || !advanceData.length) return;
+    const vid = Number(selectedOption.id);
+    const total = advanceData
+      .filter(item =>
+        selectedOption.type === 'Vendor'
+          ? Number(item.vendor_id) === vid
+          : Number(item.contractor_id) === vid
+      )
+      .reduce((sum, curr) => {
+        const amount = parseFloat(curr.amount) || 0;
+        const billAmount = parseFloat(curr.bill_amount) || 0;
+        const refundAmount = parseFloat(curr.refund_amount) || 0;
+        return sum + amount - billAmount - refundAmount;
+      }, 0);
+    setOverallAdvance(total);
+  }, [advanceData, selectedOption]);
 
   // Combine vendor and contractor options
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
 
-  // Handle contractor/vendor change
+  // Handle contractor/vendor change (use advanceData when already loaded to avoid extra fetch)
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     if (selected) {
       localStorage.setItem("advanceContractorVendor", JSON.stringify(selected));
     } else {
       localStorage.removeItem("advanceContractorVendor");
+      setOverallAdvance(0);
+      return;
+    }
+    if (advanceData.length > 0) {
+      const vid = Number(selected.id);
+      const total = advanceData
+        .filter(item =>
+          selected.type === 'Vendor'
+            ? Number(item.vendor_id) === vid
+            : Number(item.contractor_id) === vid
+        )
+        .reduce((sum, curr) => {
+          const amount = parseFloat(curr.amount) || 0;
+          const billAmount = parseFloat(curr.bill_amount) || 0;
+          const refundAmount = parseFloat(curr.refund_amount) || 0;
+          return sum + amount - billAmount - refundAmount;
+        }, 0);
+      setOverallAdvance(total);
+      return;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/getAll');
-      if (!response.ok) {
-        throw new Error('Failed to fetch data');
-      }
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      if (!response.ok) throw new Error('Failed to fetch data');
       const data = await response.json();
+      const vid = Number(selected.id);
       const total = data
-        .filter(item => {
-          return selected.type === 'Vendor'
-            ? item.vendor_id === selected.id
-            : selected.type === 'Contractor'
-              ? item.contractor_id === selected.id
-              : false;
-        })
+        .filter(item =>
+          selected.type === 'Vendor'
+            ? Number(item.vendor_id) === vid
+            : Number(item.contractor_id) === vid
+        )
         .reduce((sum, curr) => {
           const amount = parseFloat(curr.amount) || 0;
           const billAmount = parseFloat(curr.bill_amount) || 0;
@@ -330,20 +439,20 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
     }
   };
 
-  // Calculate project advance
-  const calculateProjectAdvance = async (vendorOrContractor, project) => {
+  // Calculate project advance (use existingData when provided to avoid extra fetch)
+  const calculateProjectAdvance = async (vendorOrContractor, project, existingData) => {
     if (!vendorOrContractor || !project) {
       setProjectAdvance('');
       return;
     }
-    try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/getAll');
-      if (!response.ok) throw new Error('Failed to fetch advance portal data');
-      const data = await response.json();
+    const run = (data) => {
       const isVendor = vendorOrContractor.type === 'Vendor';
-      const idField = isVendor ? 'vendor_id' : 'contractor_id';
+      const vid = Number(vendorOrContractor.id);
+      const pid = Number(project.id);
       const relevantData = data.filter(
-        item => item[idField] === vendorOrContractor.id && item.project_id === project.id
+        item =>
+          (isVendor ? Number(item.vendor_id) === vid : Number(item.contractor_id) === vid) &&
+          Number(item.project_id) === pid
       );
       const total = relevantData.reduce((sum, entry) => {
         const amount = parseFloat(entry.amount) || 0;
@@ -352,6 +461,16 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
         return sum + amount - billAmount - refundAmount;
       }, 0);
       setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    };
+    if (existingData && existingData.length > 0) {
+      run(existingData);
+      return;
+    }
+    try {
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      if (!response.ok) throw new Error('Failed to fetch advance portal data');
+      const data = await response.json();
+      run(data);
     } catch (error) {
       console.error('Error calculating project advance:', error);
       setProjectAdvance('');
@@ -360,11 +479,11 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
 
   useEffect(() => {
     if (selectedOption && selectedSite) {
-      calculateProjectAdvance(selectedOption, selectedSite);
+      calculateProjectAdvance(selectedOption, selectedSite, advanceData);
     } else {
       setProjectAdvance('');
     }
-  }, [selectedOption, selectedSite]);
+  }, [selectedOption, selectedSite, advanceData]);
 
   // Format with commas
   const formatWithCommas = (value) => {
@@ -472,7 +591,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
           return;
         }
       }
-      const res = await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/getAll');
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
       if (!res.ok) throw new Error('Failed to fetch entry numbers');
       const allData = await res.json();
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
@@ -495,6 +614,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
         week_no: getWeekNumber(),
         description: description,
         file_url: fileUrl,
+        branch_id: activeBranchId,
         ...overrides
       });
       if (selectedType === 'Transfer') {
@@ -516,9 +636,10 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
             labour_id: 0,
             project_id: 0,
             description: "Transfer from Advance Portal",
-            file_url: ""
+            file_url: "",
+            branch_id: activeBranchId
           };
-          const loanResponse = await fetch("https://backendaab.in/aabuilderDash/api/loans/save", {
+          const loanResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(loanPayload)
@@ -532,7 +653,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
             amount: -Math.abs(amountValue),
             loan_portal_id: loanPortalId
           });
-          await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/save', {
+          await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(advancePayload)
@@ -547,7 +668,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
             bill_amount: 0,
             refund_amount: 0
           };
-          const vendorCarryForwardResponse = await fetch("https://backendaab.in/aabuilderDash/api/vendor_carry_forward/save", {
+          const vendorCarryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(vendorCarryForwardPayload)
@@ -561,7 +682,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
             amount: -Math.abs(amountValue),
             vendor_carry_forward_id: vendorCarryForwardId
           });
-          await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/save', {
+          await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(advancePayload)
@@ -574,12 +695,12 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
             amount: Math.abs(amountValue)
           });
           await Promise.all([
-            fetch('https://backendaab.in/aabuilderDash/api/advance_portal/save', {
+            fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(firstPayload)
             }),
-            fetch('https://backendaab.in/aabuilderDash/api/advance_portal/save', {
+            fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(secondPayload)
@@ -588,7 +709,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
         }
       } else {
         const payload = createPayload();
-        await fetch('https://backendaab.in/aabuilderDash/api/advance_portal/save', {
+        await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -618,8 +739,9 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
             machineTools: '',
             billCopyUrl: fileUrl || '',
             source: "Advance Portal",
+            branchId: activeBranchId,
           };
-          const expensesResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/save", {
+          const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -634,6 +756,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
         }
       }
       alert('Advance saved successfully!');
+      window.dispatchEvent(new CustomEvent('advanceUpdated'));
       setAdvanceAmount('');
       setDescription('');
       setPaymentMode('');
@@ -644,8 +767,9 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
         fileInputRef.current.value = '';
       }
       setEntryNo(nextEntryNo);
+      fetchAdvanceData();
       if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
+      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite, advanceData);
     } catch (error) {
       console.error('Error submitting data:', error);
       alert('Failed to save data!');
@@ -654,20 +778,205 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
     }
   };
 
-  // Handle pay advance
-  const handlePayAdvance = () => {
-    if (!validateFormFields()) {
-      return;
-    }
-    submitAdvanceData();
+  // Check if payment mode requires Payment Details bottom sheet (netbanking, online UPI, cheque)
+  const requiresPaymentDetailsSheet = () => {
+    if (!paymentMode) return false;
+    if (paymentMode === 'Cash' || paymentMode === 'Direct') return false;
+    return ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(paymentMode);
   };
 
-  // Handle file attach
+  // Handle pay advance: open Payment Details bottom sheet for GPay/PhonePe/Net Banking/Cheque, else submit directly
+  const handlePayAdvance = () => {
+    if (!validateFormFields()) return;
+    if (requiresPaymentDetailsSheet()) {
+      setPaymentModalData({
+        date: dateValue,
+        amount: advanceAmount.toString().replace(/,/g, '') || '',
+        paymentMode: paymentMode,
+        chequeNo: '',
+        chequeDate: '',
+        transactionNumber: '',
+        accountNumber: ''
+      });
+      setShowPaymentDetailsBottomSheet(true);
+      return;
+    }
+    const confirmed = window.confirm('Are you sure you want to submit?');
+    if (confirmed) {
+      submitAdvanceData();
+    }
+  };
+
+  // Submit from Payment Details bottom sheet: save advance_portal then weekly-payment-bills (same as AdvancePortal.js)
+  const handlePaymentDetailsSubmit = async () => {
+    if (!paymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    if (paymentModalData.paymentMode === 'Cheque' && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    if (selectedType === 'Bill Settlement' && !selectedAdvanceFile) {
+      alert('Please attach the bill file for Bill Settlement');
+      return;
+    }
+    if (selectedType === 'Bill Settlement' && !selectedCategory) {
+      alert('Please select a category for Bill Settlement');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      let fileUrl = '';
+      if (selectedAdvanceFile && selectedType === 'Bill Settlement') {
+        const formData = new FormData();
+        const formatDateOnly = (dateString) => {
+          const date = new Date(dateString);
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          return `${day}-${month}-${year}`;
+        };
+        const finalName = `${formatDateOnly(paymentModalData.date)} ${selectedSite.sNo} ${selectedOption.label}`;
+        formData.append('file', selectedAdvanceFile);
+        formData.append('file_name', finalName);
+        const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          method: "POST",
+          body: formData,
+        });
+        if (!uploadResponse.ok) throw new Error('File upload failed');
+        const uploadResult = await uploadResponse.json();
+        fileUrl = uploadResult.url;
+      }
+      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      if (!res.ok) throw new Error('Failed to fetch entry numbers');
+      const allData = await res.json();
+      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
+      const nextEntryNo = maxEntryNo + 1;
+      const advancePayload = {
+        type: selectedType,
+        date: paymentModalData.date,
+        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : 0,
+        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : 0,
+        project_id: selectedSite?.id || 0,
+        transfer_site_id: selectedType === 'Transfer' ? parseInt(transferSiteId) : 0,
+        payment_mode: paymentModalData.paymentMode,
+        amount:
+          selectedType === 'Advance' || selectedType === 'Transfer' || selectedType === 'Bill Settlement'
+            ? parseFloat(paymentModalData.amount) || 0
+            : 0,
+        bill_amount: selectedType === 'Bill Settlement' ? parseFloat(billAmount) || 0 : 0,
+        refund_amount: selectedType === 'Refund' ? parseFloat(paymentModalData.amount) || 0 : 0,
+        entry_no: nextEntryNo,
+        week_no: getWeekNumber(),
+        description: description,
+        file_url: fileUrl,
+        branch_id: activeBranchId,
+      };
+      const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(advancePayload)
+      });
+      if (!advanceResponse.ok) throw new Error('Failed to save advance portal data');
+      const advanceResult = await advanceResponse.json();
+      const advancePortalId = advanceResult.id ?? advanceResult.advancePortalId;
+
+      const weeklyPaymentBillPayload = {
+        date: paymentModalData.date,
+        created_at: new Date().toISOString(),
+        contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+        vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+        employee_id: null,
+        project_id: selectedSite?.id || null,
+        type: selectedType,
+        bill_payment_mode: paymentModalData.paymentMode,
+        amount: parseFloat(paymentModalData.amount),
+        status: true,
+        weekly_number: "",
+        weekly_payment_expense_id: null,
+        advance_portal_id: advancePortalId,
+        staff_advance_portal_id: null,
+        claim_payment_id: null,
+        cheque_number: paymentModalData.paymentMode === 'Cheque' ? paymentModalData.chequeNo : null,
+        cheque_date: paymentModalData.paymentMode === 'Cheque' ? paymentModalData.chequeDate : null,
+        transaction_number: paymentModalData.transactionNumber || null,
+        account_number: paymentModalData.accountNumber || null,
+        branch_id: activeBranchId
+      };
+      const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(weeklyPaymentBillPayload)
+      });
+      if (!weeklyResponse.ok) throw new Error('Failed to save weekly payment bills data');
+
+      if (selectedType === 'Bill Settlement') {
+        let vendor = '';
+        let contractor = '';
+        if (selectedOption?.type === 'Vendor') vendor = selectedOption.label;
+        else if (selectedOption?.type === 'Contractor') contractor = selectedOption.label;
+        const expensesPayload = {
+          accountType: 'Bill Payments',
+          eno: eno,
+          date: paymentModalData.date,
+          siteName: selectedSite ? selectedSite.label : '',
+          projectId: selectedSite ? selectedSite.id : null,
+          vendor,
+          vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+          contractor,
+          contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+          quantity: '',
+          amount: parseInt(billAmount) || 0,
+          category: selectedCategory ? selectedCategory.label : '',
+          comments: description,
+          machineTools: '',
+          billCopyUrl: fileUrl || '',
+          source: "Advance Portal",
+          branchId: activeBranchId,
+        };
+        const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(expensesPayload),
+        });
+        if (!expensesResponse.ok) {
+          const errorText = await expensesResponse.text();
+          throw new Error(`Expenses form submission failed: ${errorText}`);
+        }
+        setEno(eno + 1);
+      }
+
+      alert('Advance saved successfully and added to Weekly Payment Bills!');
+      window.dispatchEvent(new CustomEvent('advanceUpdated'));
+      setAdvanceAmount('');
+      setDescription('');
+      setPaymentMode('');
+      setBillAmount('');
+      setSelectedAdvanceFile(null);
+      setSelectedCategory(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setEntryNo(nextEntryNo);
+      setShowPaymentDetailsBottomSheet(false);
+      setPaymentModalData({ date: '', amount: '', paymentMode: '', chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
+      fetchAdvanceData();
+      if (selectedOption) handleChange(selectedOption);
+      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite, advanceData);
+    } catch (error) {
+      console.error('Error submitting payment details:', error);
+      alert(error?.message || 'Failed to save data!');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle file attach (same as AdvancePortal handleFileChange)
   const handleFileAttach = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedAdvanceFile(file);
     }
+    e.target.value = ''; // Allow re-selecting the same file
   };
 
   // Get button label
@@ -686,32 +995,84 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
     }
   };
 
-  // Format date for display
+  // Check if all required fields are filled (except description)
+  const areAllRequiredFieldsFilled = () => {
+    if (!selectedType) return false;
+    
+    if (selectedType === 'Advance' || selectedType === 'Refund') {
+      return !!(selectedOption && selectedSite && advanceAmount && paymentMode);
+    } else if (selectedType === 'Bill Settlement') {
+      const hasBillAmount = billAmount && billAmount.toString().trim() !== '';
+      const hasCategory = selectedCategory !== null;
+      const hasFile = selectedAdvanceFile !== null;
+      const rawAmount = advanceAmount ? advanceAmount.toString().replace(/,/g, '').trim() : '';
+      // If advanceAmount is filled, paymentMode is required
+      const paymentModeValid = !rawAmount || paymentMode;
+      return !!(selectedOption && selectedSite && hasBillAmount && hasCategory && hasFile && paymentModeValid);
+    } else if (selectedType === 'Transfer') {
+      return !!(selectedOption && selectedSite && advanceAmount && transferSiteId);
+    }
+    return false;
+  };
+
+  // Format date for display (DD/MM/YYYY)
   const formattedDate = dateValue ? new Date(dateValue).toLocaleDateString('en-GB') : getTodayDate();
 
+  // Convert DD/MM/YYYY to YYYY-MM-DD for dateValue state
+  const convertToDateValue = (ddmmyyyy) => {
+    const parts = ddmmyyyy.split('/');
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+    return dateValue; // Return current dateValue if conversion fails
+  };
+
+  // Handle date confirmation from DatePickerModal
+  const handleDateConfirm = (dateString) => {
+    // dateString is in DD/MM/YYYY format from DatePickerModal
+    const convertedDate = convertToDateValue(dateString);
+    setDateValue(convertedDate);
+  };
+
+   // Handle cheque date confirmation from DatePickerModal (Payment Details bottom sheet)
+   const handleChequeDateConfirm = (dateString) => {
+     const convertedDate = convertToDateValue(dateString);
+     setPaymentModalData(prev => ({ ...prev, chequeDate: convertedDate }));
+     setShowChequeDatePicker(false);
+   };
+
   return (
-    <div className="px-4 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div
+      className="px-4 flex flex-col flex-1 min-h-0 overflow-hidden"
+      style={{ fontFamily: "'Manrope', sans-serif" }}
+    >
+      {/* Form section - no scroll */}
+      <div className="flex-shrink-0">
       {/* Advance Number and Date */}
       <div className="mb-2 items-center border-b border-gray-200 pb-1 mt-1.5 flex justify-between">
         <div className="flex items-center gap-2 mt-0.5">
           <button
             type="button"
-            className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
           >
-            #NO {entryNo || '09/08/2025'}
+            # {entryNo}
           </button>
           <button
             type="button"
-            className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+            onClick={() => setShowDatePicker(true)}
+            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
           >
-            {'09/08/2025'}
+            {formattedDate}
           </button>
         </div>
         <div>
           <button
             type="button"
             onClick={() => setShowTypeModal(true)}
-            className="text-[12px] font-medium text-black leading-normal underline-offset-2 hover:underline"
+            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
           >
             {selectedType || 'Select Type'}
           </button>
@@ -1002,40 +1363,194 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
           />
         </div>
       </div>
-      {/* Attach File */}
-      <div className="">
-        <div className="flex items-center gap-2 mb-0.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 2V10M5 5L8 2L11 5M3 12H13" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-[12px] font-medium text-[#9E9E9E]">Attach File</span>
-        </div>
+      {/* Attach File - same pattern as AdvancePortal: label wraps clickable area */}
+      <div className="flex flex-wrap items-center gap-x-2 mb-1 gap-y-1 w-full max-w-[328px]">
         <input
           type="file"
           id="fileInput"
           ref={fileInputRef}
           className="hidden"
           onChange={handleFileAttach}
+          accept="image/*,.pdf,.doc,.docx"
         />
-        <label htmlFor="fileInput" className="cursor-pointer">
-          {selectedAdvanceFile && (
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#F5F5F5] rounded-full text-[12px] font-medium text-[#9E9E9E]">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M6 1L2 5H5V9H7V5H10L6 1Z" fill="#9E9E9E" />
-              </svg>
-              <span>Image X</span>
-            </div>
-          )}
+        <label
+          htmlFor="fileInput"
+          className="cursor-pointer flex items-center gap-0.5 text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
+        >
+          <img className='w-4 h-3' alt='#' src={Attach}></img>
+          <span className="text-[12px] font-medium underline">Attach File</span>
         </label>
+        {selectedAdvanceFile && (
+          <span className="text-[11px] font-medium text-[#666] break-words min-w-0 flex-1">
+            {selectedAdvanceFile.name}
+          </span>
+        )}
       </div>
       {/* Pay Advance Button */}
       <button
         onClick={handlePayAdvance}
-        disabled={isSubmitting}
-        className="w-[328px] h-[40px] bg-[#D9D9D9] text-black font-semibold rounded text-[14px] leading-normal"
+        disabled={isSubmitting || !areAllRequiredFieldsFilled()}
+        className={`w-[328px] h-[40px] font-semibold rounded text-[14px] leading-normal ${
+          areAllRequiredFieldsFilled() && !isSubmitting
+            ? 'bg-black text-white'
+            : 'bg-[#D9D9D9] text-black'
+        }`}
       >
         {isSubmitting ? 'Submitting...' : getButtonLabel()}
       </button>
+      </div>
+
+      {/* Advance Records - only this section scrolls */}
+      <div className="mt-3 w-full max-w-[328px] flex-1 min-h-0 flex flex-col">
+        {!selectedOption || !selectedSite ? (
+          <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-4 py-6 text-center">
+            <p className="text-[12px] font-medium text-[#9E9E9E]">
+              Please select a contractor/vendor and project to view advance records.
+            </p>
+          </div>
+        ) : (() => {
+          const vid = selectedOption?.id != null ? Number(selectedOption.id) : null;
+          const pid = selectedSite?.id != null ? Number(selectedSite.id) : null;
+          const filteredEntries = advanceData
+            .filter(entry => {
+              const isMatchingVendor =
+                selectedOption?.type === 'Vendor'
+                  ? Number(entry.vendor_id) === vid
+                  : selectedOption?.type === 'Contractor'
+                    ? Number(entry.contractor_id) === vid
+                    : false;
+              const isForCurrentProject = Number(entry.project_id) === pid;
+              return isMatchingVendor && isForCurrentProject;
+            })
+            .sort((a, b) => {
+              const entryNoA = a.entry_no || 0;
+              const entryNoB = b.entry_no || 0;
+              return entryNoB - entryNoA;
+            });
+          if (filteredEntries.length === 0) {
+            return (
+              <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-4 py-6 text-center">
+                <p className="text-[12px] font-medium text-[#9E9E9E]">
+                  No records found for the selected contractor/vendor and project.
+                </p>
+              </div>
+            );
+          }
+          return (
+            <div
+              className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {filteredEntries.map((entry, index) => {
+                const {
+                  date,
+                  amount,
+                  bill_amount,
+                  type,
+                  transfer_site_id,
+                  payment_mode,
+                  refund_amount,
+                  entry_no
+                } = entry;
+                
+                // Get type code
+                const getTypeCode = (type) => {
+                  switch (type) {
+                    case 'Refund': return 'RF';
+                    case 'Transfer': return 'TF';
+                    case 'Bill Settlement': return 'BS';
+                    case 'Advance': return 'AD';
+                    default: return '';
+                  }
+                };
+                
+                // Format date as DD/MM/YYYY
+                const formatDate = (dateString) => {
+                  const date = new Date(dateString);
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const year = date.getFullYear();
+                  return `${day}/${month}/${year}`;
+                };
+                
+                const typeCode = getTypeCode(type);
+                const formattedDate = formatDate(date);
+                const transactionId = `${typeCode} - ${formattedDate} - ${entry_no || ''}`;
+                
+                // Get transfer site label for Transfer type
+                const transferSiteLabel = type === 'Transfer' && transfer_site_id 
+                  ? siteOptions.find(site => site.id === parseInt(transfer_site_id))?.label || transfer_site_id
+                  : null;
+                
+                return (
+                  <div
+                    key={entry.advancePortalId || index}
+                    className="bg-white border border-[#E0E0E0] border-opacity-30 rounded-[8px] px-3 py-2 shadow-lg flex justify-between items-start gap-2"
+                  >
+                    {/* Left side: Transaction ID and additional info */}
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-black">
+                        {transactionId}
+                      </p>
+                      {type === 'Transfer' && transferSiteLabel && (
+                        <p className="text-[12px] font-medium text-black">
+                          {transferSiteLabel}
+                        </p>
+                      )}
+                      {type === 'Bill Settlement' && (
+                        <p className="text-[12px] font-semibold text-black">
+                          ₹{parseFloat(bill_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Right side: Payment Mode and Amount(s) */}
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      {(payment_mode || (type === 'Transfer' && !payment_mode)) && (
+                        <span
+                          className={`inline-block text-[10px] font-medium pl-2 pr-2 rounded-full ${
+                            type === 'Transfer'
+                              ? 'bg-[#FFF3E0] text-black'
+                              : type === 'Bill Settlement'
+                                ? 'bg-[#007233] text-white'
+                                : 'bg-[#FFF3E0] text-[#E4572E]'
+                          }`}
+                        >
+                          {type === 'Transfer' && !payment_mode ? 'Online' : (payment_mode || '')}
+                        </span>
+                      )}
+                      
+                      {type === 'Refund' && (
+                        <span className="text-[12px] font-semibold text-[#007233]">
+                          ₹{parseFloat(refund_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      
+                      {type === 'Transfer' && (
+                        <span className={`text-[12px] font-semibold ${parseFloat(amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
+                          {parseFloat(amount || 0) < 0 ? '-' : ''}₹{Math.abs(parseFloat(amount || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      
+                      {type === 'Bill Settlement' && (
+                        <span className={`text-[12px] font-semibold ${parseFloat(amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
+                          ₹{parseFloat(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      
+                      {type === 'Advance' && (
+                        <span className={`text-[12px] font-semibold ${parseFloat(amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
+                          ₹{parseFloat(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
 
       {/* Select Type Modal */}
       {showTypeModal && (
@@ -1158,7 +1673,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
           if (selected) {
             setSelectedSite(selected);
             if (selectedOption) {
-              calculateProjectAdvance(selectedOption, selected);
+              calculateProjectAdvance(selectedOption, selected, advanceData);
             }
           }
           setShowProjectModal(false);
@@ -1213,6 +1728,216 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [] })
         selectedValue={transferSiteId ? (siteOptions.find(opt => opt.id === parseInt(transferSiteId))?.label || '') : ''}
         options={siteOptions.map(opt => opt.label)}
         fieldName="To Project"
+        showStarIcon={false}
+      />
+
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        onConfirm={handleDateConfirm}
+        initialDate={formattedDate}
+      />
+
+      {/* Cheque Date Picker Modal for Payment Details bottom sheet */}
+      <DatePickerModal
+        isOpen={showChequeDatePicker}
+        onClose={() => setShowChequeDatePicker(false)}
+        onConfirm={handleChequeDateConfirm}
+        initialDate={
+          paymentModalData.chequeDate
+            ? new Date(paymentModalData.chequeDate).toLocaleDateString('en-GB')
+            : formattedDate
+        }
+      />
+
+      {/* Payment Details Bottom Sheet - for Net Banking, Online UPI (GPay/PhonePe), Cheque */}
+      {showPaymentDetailsBottomSheet && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center px-0"
+          onClick={() => !isSubmitting && setShowPaymentDetailsBottomSheet(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] shadow-lg max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-4 pt-4 pb-2 border-b border-[rgba(0,0,0,0.08)]">
+              <p className="text-[16px] font-semibold text-black">Payment Details</p>
+              <button
+                type="button"
+                onClick={() => !isSubmitting && setShowPaymentDetailsBottomSheet(false)}
+                className="text-[#9E9E9E] text-[20px] font-semibold hover:opacity-80"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 2L16 16M16 2L2 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              {/* Date, Amount, Payment Mode - readonly */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold text-black mb-1">Date</p>
+                  <div className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 flex items-center text-[12px] font-medium bg-[#F5F5F5] text-[#666]">
+                    {paymentModalData.date ? new Date(paymentModalData.date).toLocaleDateString('en-GB') : '-'}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-black mb-1">Amount</p>
+                  <div className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 flex items-center text-[12px] font-medium bg-[#F5F5F5] text-[#666]">
+                    {paymentModalData.amount ? `₹${Number(paymentModalData.amount).toLocaleString('en-IN')}` : '-'}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-black mb-1">Payment Mode</p>
+                  <div className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 flex items-center text-[12px] font-medium bg-[#F5F5F5] text-[#666]">
+                    {paymentModalData.paymentMode || '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cheque fields - only for Cheque */}
+              {paymentModalData.paymentMode === 'Cheque' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[12px] font-semibold text-black mb-1">Cheque No<span className="text-[#eb2f8e]">*</span></p>
+                    <input
+                      type="text"
+                      value={paymentModalData.chequeNo}
+                      onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                      placeholder="Enter cheque number"
+                      className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 text-[12px] font-medium bg-white focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-semibold text-black mb-1">Cheque Date<span className="text-[#eb2f8e]">*</span></p>
+                    <div
+                      onClick={() => setShowChequeDatePicker(true)}
+                      className="relative w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 flex items-center text-[12px] font-medium bg-white cursor-pointer"
+                      style={{ color: paymentModalData.chequeDate ? '#000' : '#9E9E9E' }}
+                    >
+                      {paymentModalData.chequeDate
+                        ? new Date(paymentModalData.chequeDate).toLocaleDateString('en-GB')
+                        : 'dd-mm-yyyy'}
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="#9E9E9E" strokeWidth="1.2" />
+                          <path d="M1 5H13" stroke="#9E9E9E" strokeWidth="1.2" />
+                          <path d="M4 1V4" stroke="#9E9E9E" strokeWidth="1.2" strokeLinecap="round" />
+                          <path d="M10 1V4" stroke="#9E9E9E" strokeWidth="1.2" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction Number */}
+              <div>
+                <p className="text-[12px] font-semibold text-black mb-1">Transaction Number</p>
+                <input
+                  type="text"
+                  value={paymentModalData.transactionNumber}
+                  onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                  placeholder="Enter transaction number"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 text-[12px] font-medium bg-white focus:outline-none"
+                />
+              </div>
+
+              {/* Account Number - required (clearable dropdown) */}
+              <div>
+                <p className="text-[12px] font-semibold text-black mb-1">
+                  Account Number<span className="text-[#eb2f8e]">*</span>
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowAccountSelectModal(true)}
+                    className="relative w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{ color: paymentModalData.accountNumber ? '#000' : '#9E9E9E' }}
+                  >
+                    {paymentModalData.accountNumber || 'Select Account'}
+                    {paymentModalData.accountNumber ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPaymentModalData(prev => ({ ...prev, accountNumber: '' }));
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M9 3L3 9M3 3L9 9"
+                            stroke="#000"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg
+                          width="12"
+                          height="8"
+                          viewBox="0 0 12 8"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M1 1L6 6L11 1"
+                            stroke="#9E9E9E"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-4 pb-6 pt-2 border-t border-[rgba(0,0,0,0.08)]">
+              <button
+                type="button"
+                onClick={() => !isSubmitting && setShowPaymentDetailsBottomSheet(false)}
+                className="flex-1 h-[40px] border border-[rgba(0,0,0,0.2)] rounded text-[14px] font-semibold text-black bg-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePaymentDetailsSubmit}
+                disabled={isSubmitting}
+                className="flex-1 h-[40px] rounded text-[14px] font-semibold text-white bg-black disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Saving...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account selection modal for Payment Details (same style as Contractor/Vendor dropdown) */}
+      <SelectVendorModal
+        isOpen={showAccountSelectModal}
+        onClose={() => setShowAccountSelectModal(false)}
+        onSelect={(value) => {
+          setPaymentModalData(prev => ({ ...prev, accountNumber: value }));
+          setShowAccountSelectModal(false);
+        }}
+        selectedValue={paymentModalData.accountNumber}
+        options={accountDetails.map(acc => acc.account_number || '')}
+        fieldName="Account Number"
         showStarIcon={false}
       />
     </div>

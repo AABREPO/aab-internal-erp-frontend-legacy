@@ -138,9 +138,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const [showCheckModal, setShowCheckModal] = useState(false)
     const [checkFilteredExpenses, setCheckFilteredExpenses] = useState([])
     const [loadingCheckExpenses, setLoadingCheckExpenses] = useState(false)
+    // When false, show verified bills immediately; when true, filter to fully paid only (after payment statuses load)
+    const [paymentStatusesLoaded, setPaymentStatusesLoaded] = useState(false)
 
     // Custom styles for Select components
-
     // Fetch vendor names
     const fetchVendorNames = async () => {
         try {
@@ -2059,6 +2060,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     // Fetch tracker data
     const fetchTrackerData = async () => {
         setLoading(true);
+        setPaymentStatusesLoaded(false); // Reset so we show verified bills first, then re-check conditions
         try {
             const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-payments/trackers", {
                 method: "GET",
@@ -2125,9 +2127,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
     };
 
-    // Calculate expense match status for bills (ported from PendingBill)
+    // Calculate expense match status for bills (ported from PendingBill). Returns { matchStatus, matchDetails } so callers can use without waiting for state.
     const calculateExpenseMatchStatus = (expenses, billEntries = allBillEntries) => {
         const matchStatus = {};
+        const matchDetails = {};
         const billMap = {};
         apiData.forEach(bill => {
             billMap[bill.id] = bill;
@@ -2164,7 +2167,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     const totalExpenseAmount = matchingExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
                     const adjustmentAmount = parseFloat(bill.adjustment_amount) || 0;
                     const adjustedBillAmount = billAmount - adjustmentAmount;
-                    const matchDetails = {
+                    const details = {
                         matchingExpensesCount: matchingExpenses.length,
                         totalExpenseAmount,
                         billAmount,
@@ -2174,6 +2177,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         matchingExpenses,
                         enteredDates,
                     };
+                    matchDetails[trackerId] = details;
                     if (matchingExpenses.length === 0) {
                         matchStatus[trackerId] = 'no_match';
                     } else if (Math.abs(totalExpenseAmount - adjustedBillAmount) < 0.01) {
@@ -2183,10 +2187,6 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     } else {
                         matchStatus[trackerId] = 'no_match';
                     }
-                    setExpenseMatchDetails(prev => ({
-                        ...prev,
-                        [trackerId]: matchDetails,
-                    }));
                 } else {
                     matchStatus[trackerId] = 'no_match';
                 }
@@ -2195,6 +2195,8 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             }
         });
         setExpenseMatchStatus(matchStatus);
+        setExpenseMatchDetails(prev => ({ ...prev, ...matchDetails }));
+        return { matchStatus, matchDetails };
     };
     // Get bill verification status
     const getBillVerificationStatus = (item) => {
@@ -2428,14 +2430,22 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         }
         return filteredData;
     };
-    // Load payment statuses for all bills
+    // Same as PendingBill: fetch all payment statuses in parallel (Promise.all), then set once
     const loadPaymentStatuses = async () => {
-        const statuses = {};
-        for (const item of apiData) {
-            const status = await getPaymentStatus(item);
-            statuses[item.id] = status;
+        if (!apiData || apiData.length === 0) return;
+        try {
+            const statusPromises = apiData.map(async (item) => {
+                const status = await getPaymentStatus(item);
+                return { id: item.id, status };
+            });
+            const results = await Promise.all(statusPromises);
+            const statusMap = {};
+            results.forEach(({ id, status }) => { statusMap[id] = status; });
+            setPaymentStatuses(statusMap);
+            setPaymentStatusesLoaded(true);
+        } catch (error) {
+            console.error('Error fetching payment statuses:', error);
         }
-        setPaymentStatuses(statuses);
     };
     // Show all bills (like PendingBill) instead of only fully paid bills
     const getAllBills = () => {
@@ -2553,15 +2563,26 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             alert(`An error occurred while deleting the tracker: ${error.message}`);
         }
     }
+    // Same load pattern as PendingBill.js: fetch tracker + expenses together; table shows when tracker returns; then bill entries when apiData is set; condition check when all data is ready.
+    useEffect(() => {
+        fetchTrackerData();
+        fetchExpensesData();
+    }, []);
     useEffect(() => {
         fetchVendorNames();
         fetchContractorNames();
-        fetchTrackerData();
-        fetchAllBillEntries();
-        fetchExpensesData();
+    }, []);
+    useEffect(() => {
         fetchAccountDetails();
+    }, []);
+    useEffect(() => {
         fetchUserList();
     }, []);
+    useEffect(() => {
+        if (apiData.length > 0) {
+            fetchAllBillEntries();
+        }
+    }, [apiData]);
     // Fetch account details
     const fetchAccountDetails = async () => {
         try {
@@ -2616,22 +2637,21 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions]);
     }, [vendorOptions, contractorOptions]);
+    // Same as PendingBill: one condition check when apiData, expensesData, allBillEntries are ready
     useEffect(() => {
-        if (apiData.length > 0) {
-            loadPaymentStatuses();
-        }
-    }, [apiData]);
-    useEffect(() => {
-        if (apiData.length > 0 && allBillEntries.length > 0 && expensesData.length > 0) {
+        if (apiData.length > 0 && expensesData.length > 0 && allBillEntries.length > 0) {
             calculateExpenseMatchStatus(expensesData, allBillEntries);
         }
-    }, [apiData, allBillEntries, expensesData]);
+    }, [apiData, expensesData, allBillEntries]);
+    // Same as PendingBill: fetch all payment statuses in parallel when apiData is set
     useEffect(() => {
-        if (Object.keys(paymentStatuses).length > 0) {
-            console.log('Payment statuses loaded:', paymentStatuses);
-        }
-    }, [paymentStatuses]);
-    const baseData = apiData.filter(isFullyFinished);
+        if (apiData.length === 0) return;
+        loadPaymentStatuses();
+    }, [apiData]);
+    // Show verified bills immediately; once payment statuses are loaded, filter to fully paid only
+    const baseData = paymentStatusesLoaded
+        ? apiData.filter(isFullyFinished)
+        : apiData.filter((item) => getBillVerificationStatus(item) === '✓ Verified');
     const filteredData = getFilteredData(baseData);
     const sortedData = applySorting(filteredData);
     return (
@@ -2883,10 +2903,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                         </td>
                                         <td className=" py-3 text-left pr-4 text-sm border-b border-gray-100">
                                             <button
-                                                className={`${getButtonClass(paymentStatuses[item.id] || 'To Pay')}`}
+                                                className={`${getButtonClass(paymentStatuses[item.id] || (paymentStatusesLoaded ? 'To Pay' : '...'))}`}
                                                 onClick={() => handlePaymentClick(item)}
                                             >
-                                                {paymentStatuses[item.id] || 'To Pay'}
+                                                {paymentStatusesLoaded ? (paymentStatuses[item.id] || 'To Pay') : 'Checking...'}
                                             </button>
                                         </td>
                                         <td className="px-2 py-3 text-left text-sm border-b border-gray-100">

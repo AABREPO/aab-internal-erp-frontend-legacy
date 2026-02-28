@@ -72,6 +72,9 @@ const Form = ({ username, userRoles = [] }) => {
     const [filePreviewUrl, setFilePreviewUrl] = useState(null);
     const [advanceData, setAdvanceData] = useState([]);
     const [projectAdvance, setProjectAdvance] = useState('');
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
+    const [checkingDuplicate, setCheckingDuplicate] = useState(false);
     useEffect(() => {
         const syncBranch = () => {
             const nextBranchId = resolveActiveBranchId();
@@ -472,31 +475,31 @@ const Form = ({ username, userRoles = [] }) => {
     // Monday to Sunday weeks
     const getISOWeekNumber = (date) => {
         const d = new Date(date);
-        d.setHours(0, 0, 0, 0);        
+        d.setHours(0, 0, 0, 0);
         // Get Thursday of the week containing the date
         // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
         const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
         const thursday = new Date(d);
         thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
         thursday.setHours(0, 0, 0, 0);
-        
+
         // Use the year that Thursday falls in (ISO 8601 rule)
         const weekYear = thursday.getFullYear();
-        
+
         // Get January 1st of that year
         const jan1 = new Date(weekYear, 0, 1);
         jan1.setHours(0, 0, 0, 0);
-        
+
         // Get the Thursday of week 1 (first Thursday of the year)
         const jan1DayOfWeek = jan1.getDay() || 7;
         const firstThursday = new Date(jan1);
         firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
         firstThursday.setHours(0, 0, 0, 0);
-        
+
         // Calculate week number: difference in days divided by 7, plus 1
         const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
         const weekNo = Math.floor(daysDiff / 7) + 1;
-        
+
         return weekNo;
     };
 
@@ -747,6 +750,90 @@ const Form = ({ username, userRoles = [] }) => {
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
     };
+    const formatDateview = (dateString) => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+    const formatDate = (dateString) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const hour12 = hours % 12 || 12;
+        return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
+    };
+    const toLocalDateStr = (val) => {
+        if (!val) return '';
+        const d = new Date(val);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    const normalizeStr = (s) => (s == null ? '' : String(s).trim());
+    const checkForDuplicateEntry = async () => {
+        const vendorLabel = normalizeStr(selectedType === 'Vendor' && selectedOption ? selectedOption.label : '');
+        const contractorLabel = normalizeStr(selectedType === 'Contractor' && selectedOption ? selectedOption.label : '');
+        const siteLabel = normalizeStr(selectedSite ? selectedSite.label : '');
+        const amountNum = parseFloat(String(amount).replace(/,/g, '')) || 0;
+        const dateStr = date ? (date.includes('-') ? date.split('T')[0] : toLocalDateStr(date)) : '';
+
+        try {
+            const response = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+            if (!response.ok) return [];
+            const allExpenses = await response.json();
+
+            const matching = allExpenses.filter((exp) => {
+                const expDateStr = toLocalDateStr(exp.date || exp.timestamp);
+                const dateMatch = expDateStr === dateStr;
+                if (!dateMatch) return false;
+
+                const expAmount = Math.abs(parseFloat(exp.amount) || 0);
+                const amountMatch = Math.abs(expAmount - amountNum) < 0.01;
+                if (!amountMatch) return false;
+
+                const expSiteName = normalizeStr(exp.siteName || exp.projectName || '');
+                const expProjectId = exp.projectId ?? exp.project_id ?? null;
+                const selectedProjectId = selectedSite ? Number(selectedSite.id) : null;
+                const projectMatch =
+                    (siteLabel && expSiteName && expSiteName === siteLabel) ||
+                    (selectedProjectId && expProjectId != null && Number(expProjectId) === selectedProjectId);
+                if (!projectMatch) return false;
+
+                const expVendor = normalizeStr(exp.vendor || '');
+                const expContractor = normalizeStr(exp.contractor || '');
+                const expVendorId = exp.vendorId ?? exp.vendor_id ?? null;
+                const expContractorId = exp.contractorId ?? exp.contractor_id ?? null;
+                const selectedId = selectedOption ? Number(selectedOption.id) : null;
+
+                let vendorContractorMatch = false;
+                if (selectedType === 'Vendor') {
+                    vendorContractorMatch =
+                        (vendorLabel && expVendor === vendorLabel) ||
+                        (selectedId != null && expVendorId != null && Number(expVendorId) === selectedId);
+                } else if (selectedType === 'Contractor') {
+                    vendorContractorMatch =
+                        (contractorLabel && expContractor === contractorLabel) ||
+                        (selectedId != null && expContractorId != null && Number(expContractorId) === selectedId);
+                }
+                if (!vendorContractorMatch) return false;
+
+                return true;
+            });
+
+            return matching;
+        } catch (err) {
+            console.error('Error checking duplicate:', err);
+            return [];
+        }
+    };
     const validateFormFields = () => {
         if (!selectedAccountType || !date || !selectedSite || !amount || !selectedCategory || !selectedOption) {
             alert('Please fill out all required fields.');
@@ -775,13 +862,36 @@ const Form = ({ username, userRoles = [] }) => {
         }
         return true;
     };
-    const handleFormSubmit = (e) => {
+    const handleFormSubmit = async (e) => {
         e.preventDefault();
         if (!validateFormFields()) {
             return;
         }
+        setCheckingDuplicate(true);
+        try {
+            const duplicates = await checkForDuplicateEntry();
+            if (duplicates && duplicates.length > 0) {
+                setDuplicateMatchedExpenses(duplicates);
+                setShowDuplicateModal(true);
+                return;
+            }
+        } catch (err) {
+            console.error('Duplicate check failed:', err);
+        } finally {
+            setCheckingDuplicate(false);
+        }
         setShowReviewModal(true);
         setIsReviewEditMode(false);
+    };
+    const handleDuplicateIgnore = () => {
+        setShowDuplicateModal(false);
+        setDuplicateMatchedExpenses([]);
+        setShowReviewModal(true);
+        setIsReviewEditMode(false);
+    };
+    const handleDuplicateCancel = () => {
+        setShowDuplicateModal(false);
+        setDuplicateMatchedExpenses([]);
     };
     const submitExpenseData = async () => {
         if (
@@ -859,7 +969,7 @@ const Form = ({ username, userRoles = [] }) => {
                 vendorId: vendorId,
                 contractor: contractor,
                 contractorId: contractorId,
-                source:"Expenses Entry",
+                source: "Expenses Entry",
                 quantity: quantity,
                 amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseInt(amount)) : parseInt(amount),
                 category: selectedCategory ? selectedCategory.label : '',
@@ -1306,6 +1416,7 @@ const Form = ({ username, userRoles = [] }) => {
         const formatted = today.toISOString().split('T')[0];
         setDate(formatted);
     }, []);
+    
     return (
         <body className=' bg-[#FAF6ED]'>
             <style jsx>{`
@@ -1534,10 +1645,10 @@ const Form = ({ username, userRoles = [] }) => {
                                 {userPermissions.includes("Create") && (
                                     <button
                                         type='submit'
-                                        disabled={isSubmitting}
-                                        className={`bg-yellow-700 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={isSubmitting || checkingDuplicate}
+                                        className={`bg-yellow-700 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition duration-200 ${isSubmitting || checkingDuplicate ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
-                                        {isSubmitting ? 'Submitting...' : 'Submit'}
+                                        {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Submitting...' : 'Submit'}
                                     </button>
                                 )}
                             </div>
@@ -1628,6 +1739,7 @@ const Form = ({ username, userRoles = [] }) => {
                                                         transfer_site_id,
                                                         payment_mode,
                                                         refund_amount,
+                                                        file_url,
                                                     } = entry;
                                                     const advanceAmount = (() => {
                                                         if (type === 'Refund') {
@@ -1658,7 +1770,18 @@ const Form = ({ username, userRoles = [] }) => {
                                                                 {advanceAmount}
                                                             </td>
                                                             <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
-                                                                {billAmount}
+                                                                {billAmount && file_url ? (
+                                                                    <a
+                                                                        href={file_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="hover:text-red-600 cursor-pointer"
+                                                                    >
+                                                                        {billAmount}
+                                                                    </a>
+                                                                ) : (
+                                                                    billAmount
+                                                                )}
                                                             </td>
                                                             <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
                                                                 {transferOrRefund}
@@ -1687,6 +1810,97 @@ const Form = ({ username, userRoles = [] }) => {
                 draggable
                 theme="colored"
             />
+            {showDuplicateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1600px] max-h-[90vh] shadow-lg flex flex-col">
+                        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-black">
+                                    Possible Duplicate Entry - Matching expenses found
+                                </h3>
+                                <button
+                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
+                                    onClick={handleDuplicateCancel}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <div className="mt-2 text-sm text-gray-600">
+                                Same date, vendor/contractor, project and amount detected. Total Entries: {duplicateMatchedExpenses.length} |
+                                Total Amount: ₹{duplicateMatchedExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4">
+                            <div className="overflow-x-auto border-l-8 border-l-[#BF9853] rounded-lg">
+                                <table className="table-fixed min-w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-[#FAF6ED]">
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Time Stamp</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Date</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">E.No</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Project Name</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Vendor</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Contractor</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">A/C Type</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Amount</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Comments</th>
+                                            <th className="px-3 py-3 text-left font-bold text-sm border-b">Attach File</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {duplicateMatchedExpenses.map((expense, index) => (
+                                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{formatDate(expense.timestamp || expense.date)}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{formatDateOnly(expense.date)}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.eno || '-'}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.siteName || '-'}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.vendor || '-'}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.contractor || '-'}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.accountType || '-'}</td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">
+                                                    ₹{Number(expense.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.comments || '-'}</td>
+                                                <td className="px-3 py-2 text-left text-sm border-b">
+                                                    {(expense.billCopy || expense.billCopyUrl) ? (
+                                                        <a
+                                                            href={expense.billCopy || expense.billCopyUrl}
+                                                            className="text-red-500 underline font-semibold"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            View
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-gray-400">-</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between">
+                            <span className="text-sm text-gray-600">Do you want to proceed anyway?</span>
+                            <div className="flex gap-3">
+                                <button
+                                    className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
+                                    onClick={handleDuplicateIgnore}
+                                >
+                                    Ignore & Continue
+                                </button>
+                                <button
+                                    className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded font-medium hover:bg-gray-50 transition-colors duration-200"
+                                    onClick={handleDuplicateCancel}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             {showReviewModal && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-white text-left rounded-xl p-6 w-[1400px] h-[680px] overflow-hidden flex flex-col">

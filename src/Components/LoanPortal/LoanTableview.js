@@ -4,6 +4,7 @@ import "jspdf-autotable";
 import Select from 'react-select';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Calendar } from 'lucide-react';
 import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import edit from '../Images/Edit.svg';
@@ -246,12 +247,60 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      lineHeight: '20px',
+      fontSize: '12px',
+      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'rgba(191, 152, 83, 0.2)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
+      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
+      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+      minWidth: '100%',
+      maxWidth: '100%',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      cursor: 'pointer',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+      maxHeight: '300px',
+      minWidth: '100%',
+      width: '100%',
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '250px',
+      overflowY: 'auto',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#000',
+      maxWidth: 'calc(100% - 20px)',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      fontWeight: '300',
+      fontSize: '14px',
+      backgroundColor: state.isSelected
+        ? 'rgba(191, 152, 83, 0.3)'
+        : state.isFocused
+          ? 'rgba(191, 152, 83, 0.1)'
+          : 'white',
+      color: 'black',
+      textAlign: 'left',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
     }),
   }), []);
   const getVendorName = (id) =>
@@ -1018,166 +1067,96 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <table className="w-full min-w-[1400px] border-collapse">
+            <table className="table-fixed min-w-[1400px] w-screen border-collapse">
               <thead className="sticky top-0 z-10 bg-white ">
-                <tr className="bg-[#FAF6ED] h-12">
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
+                <tr className="bg-[#FAF6ED]">
+                  <th className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('date')}>
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>
+                  <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('vendor')}>
                     Associate {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project')}>
+                  <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project')}>
                     Purpose {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left whitespace-nowrap">Transfer To</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-bold text-right">Loan</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-right">Refund</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
+                  <th className="px-0.5 w-[120px] font-bold text-left whitespace-nowrap">Transfer To</th>
+                  <th className="px-0.5 w-[140px] font-bold text-right">Loan</th>
+                  <th className="px-0.5 w-[120px] font-bold text-right">Refund</th>
+                  <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
                     Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Description</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Source From</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-bold text-left">Branch</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode')}>
+                  <th className="px-0.5 w-[120px] font-bold text-left">Description</th>
+                  <th className="px-0.5 w-[120px] font-bold text-left whitespace-nowrap">Source From</th>
+                  <th className="px-0.5 w-[120px] font-bold text-left">Branch</th>
+                  <th className="px-0.5 w-[180px] font-bold text-left cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode')}>
                     Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[80px] font-bold text-left">E.No</th>
-                  <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-bold text-left">Activity</th>
+                  <th className="px-0.5 w-[80px] font-bold text-left">E.No</th>
+                  <th className="px-0.5 w-[100px] font-bold text-left">Activity</th>
                 </tr>
                 {showFilters && (
-                  <tr className="bg-white border-b border-gray-200 h-12">
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px]">
-                      <input
-                        type="date"
-                        value={selectDate}
-                        onChange={(e) => setSelectDate(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-full max-w-[130px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                        placeholder="Search Date..."
-                      />
+                  <tr className="bg-[#FAF6ED]">
+                    <th className=" py-3">
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={selectDate}
+                          onChange={(e) => setSelectDate(e.target.value)}
+                          className="w-full px-1.5 py-2 pr-8 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                          placeholder="Search Date..."
+                        />
+                        <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      </div>
                     </th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px]">
+                    <th className=" py-3">
                       <Select
+                        className="w-full"
                         options={associateFilterOptions}
                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
                         onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
-                        className="text-xs focus:outline-none"
                         placeholder="Client Name..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
+                        menuPlacement="bottom"
+                        styles={customStyles}
                       />
                     </th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px]">
+                    <th className=" py-3">
                       <Select
+                        className="w-full"
                         options={uniqueProjectPurposeOptions}
                         value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
                         onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
-                        className="focus:outline-none text-xs"
                         placeholder="Project Name..."
                         isSearchable
                         isClearable
-                        styles={{
-                          control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            borderWidth: '3px',
-                            borderColor: state.isFocused
-                              ? 'rgba(191, 152, 83, 0.2)'
-                              : 'rgba(191, 152, 83, 0.2)',
-                            borderRadius: '6px',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': {
-                              borderColor: 'rgba(191, 152, 83, 0.2)',
-                            },
-                          }),
-                          placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                          }),
-                          menu: (provided) => ({
-                            ...provided,
-                            zIndex: 9,
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                          }),
-                          singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            color: 'black',
-                          }),
-                        }}
+                        menuPlacement="bottom"
+                        styles={customStyles}
                       />
                     </th>
-                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
-                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
-                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6">
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th className=" py-3">
                       <select
                         value={selectType}
                         onChange={(e) => setSelectType(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
-                        placeholder="Type..."
+                        className="w-full px-1.5 py-2 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200"
                       >
-                        <option value=''>Select Type...</option>
+                        <option value='' className="whitespace-nowrap">Select Type...</option>
                         {uniqueTypes.map(type => (
                           <option key={type} value={type}>{type}</option>
                         ))}
                       </select>
                     </th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6"></th>
-                    <th className="pl-4 pr-4 lg:pl-6 lg:pr-6">
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th className=" py-3">
                       <select
                         value={selectMode}
                         onChange={(e) => setSelectMode(e.target.value)}
-                        className="p-1 rounded-md bg-transparent w-full max-w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                        className="w-full px-1.5 py-2 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200"
                         placeholder="Mode..."
                       >
                         <option value=''>Select Mode...</option>
@@ -1186,23 +1165,23 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                         ))}
                       </select>
                     </th>
-                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
-                    <th className='pl-4 pr-4 lg:pl-6 lg:pr-6'></th>
+                    <th></th>
+                    <th></th>
                   </tr>
                 )}
               </thead>
               <tbody>
                 {currentData.length > 0 ? (
                   currentData.map((entry) => (
-                    <tr key={entry.loanPortalId || entry.id} className="odd:bg-white even:bg-[#FAF6ED] h-12">
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-semibold">{formatDateOnly(entry.date)}</td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-semibold">
+                    <tr key={entry.loanPortalId || entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                      <td className="text-sm text-left pl-3">{formatDateOnly(entry.date)}</td>
+                      <td className="text-sm text-left">
                         {getAssociateName(entry)}
                       </td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[200px] font-semibold">
+                      <td className="text-sm text-left">
                         {getSiteName(entry.project_id) || purposeOptions.find(p => p.id === entry.from_purpose_id)?.value || entry.from_purpose_id}
                       </td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">
+                      <td className="text-sm text-left">
                         {entry.type === "Transfer" ? (
                           entry.to_purpose_id
                             ? purposeOptions.find(purpose => purpose.id === entry.to_purpose_id)?.value || ""
@@ -1211,26 +1190,26 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                           ""
                         )}
                       </td>
-                      <td className="text-sm text-right pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[140px] font-semibold">
+                      <td className="text-sm text-right pr-5">
                         {(entry.type === "Loan" || entry.type === "Transfer") && entry.amount
                           ? Number(entry.amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
                           : ""}
                         {entry.type === "Refund" ? "-" : ""}
                       </td>
-                      <td className="text-sm text-right pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">
+                      <td className="text-sm text-right pr-5">
                         {entry.type === "Refund" && entry.loan_refund_amount
                           ? Number(entry.loan_refund_amount).toLocaleString("en-US", { maximumFractionDigits: 0 })
                           : ""}
                       </td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] font-semibold">{entry.type}</td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{entry.description}</td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{entry.source || ''}</td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[120px] font-semibold">{getBranchName(entry.branch_id ?? entry.branchId ?? '') || ''}</td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[180px] font-semibold">
+                      <td className="text-sm text-left">{entry.type}</td>
+                      <td className="text-sm text-left px-1">{entry.description}</td>
+                      <td className="text-sm text-left whitespace-nowrap">{entry.source || ''}</td>
+                      <td className="text-sm text-left">{getBranchName(entry.branch_id ?? entry.branchId ?? '') || ''}</td>
+                      <td className="text-sm text-left">
                         {finalPaymentModeOptions.find(opt => opt.value === entry.loan_payment_mode)?.label || entry.loan_payment_mode || ''}
                       </td>
-                      <td className="text-sm text-left pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[80px] font-semibold">{entry.entry_no}</td>
-                      <td className="flex py-2 pl-4 pr-4 lg:pl-6 lg:pr-6 min-w-[100px] justify-center">
+                      <td className="text-sm text-left pl-3">{entry.entry_no}</td>
+                      <td className="py-1.5">
                         <button className="rounded-full transition duration-200">
                           <img
                             src={edit}

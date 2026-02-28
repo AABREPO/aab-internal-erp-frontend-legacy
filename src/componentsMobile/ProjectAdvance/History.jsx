@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Filter from '../Images/Filter.png';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import UploadFile from '../Images/Upload Small.svg';
+import Pen from '../Images/Pen.svg';
 
 // ISO 8601 week helpers (same as AdvanceReport.js)
 const getISOWeekNumber = (date) => {
@@ -104,8 +106,23 @@ const History = ({ onVendorClick }) => {
   const [showProjectNameModal, setShowProjectNameModal] = useState(false);
   const [showPaymentModeModal, setShowPaymentModeModal] = useState(false);
 
+  // Swipe-to-upload: same as PO History Clone - right swipe reveals upload button on left
+  const [swipeStates, setSwipeStates] = useState({});
+  const [uploadExpandedId, setUploadExpandedId] = useState(null);
+  const [uploadingForId, setUploadingForId] = useState(null);
+  const [showUploadConfirmModal, setShowUploadConfirmModal] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'completed'
+  const [itemToUploadFor, setItemToUploadFor] = useState(null);
+  const cardRefs = useRef({});
+  const fileInputRef = useRef(null);
+  const uploadExpandedIdRef = useRef(uploadExpandedId);
+
   const weekNum = week ? parseInt(week, 10) : null;
   const yearNum = year ? parseInt(year, 10) : null;
+
+  useEffect(() => {
+    uploadExpandedIdRef.current = uploadExpandedId;
+  }, [uploadExpandedId]);
 
   const formatDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
@@ -179,16 +196,21 @@ const History = ({ onVendorClick }) => {
     }
   };
 
+  const hasActiveFilters = !!(typeFilter || vendorContractorFilter || entryNoFilter || projectNameFilter || paymentModeFilter || searchQuery);
+
   const loadAdvanceData = useCallback(async () => {
     try {
-      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      const endpoint = hasActiveFilters
+        ? 'https://backendaab.in/aabuildersDash/api/advance_portal/getAll'
+        : 'https://backendaab.in/aabuildersDash/api/advance_portal/getLast150';
+      const res = await fetch(withBranchUrl(endpoint));
       if (!res.ok) throw new Error('Failed to fetch advance data');
       const data = await res.json();
       setAdvanceData(data);
     } catch (err) {
       console.error('Error loading advance data:', err);
     }
-  }, [activeBranchId]);
+  }, [activeBranchId, hasActiveFilters]);
 
   useEffect(() => {
     fetchVendors();
@@ -385,6 +407,239 @@ const History = ({ onVendorClick }) => {
     }
     setShowWeekYearModal(false);
   };
+
+  // Swipe handlers - same pattern as PurchaseOrder History (Clone button on left, right swipe)
+  const minSwipeDistance = 50;
+
+  const handleUploadClick = (item) => {
+    setItemToUploadFor(item);
+    setShowUploadConfirmModal(true);
+  };
+
+  const handleUploadConfirm = () => {
+    if (!itemToUploadFor) return;
+    setShowUploadConfirmModal(false);
+    setUploadingForId(itemToUploadFor.id);
+    setItemToUploadFor(null);
+    setTimeout(() => fileInputRef.current?.click(), 100);
+  };
+
+  const handleUploadCancel = () => {
+    setShowUploadConfirmModal(false);
+    setItemToUploadFor(null);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target?.files?.[0];
+    e.target.value = '';
+    if (!file || !uploadingForId) {
+      setUploadingForId(null);
+      return;
+    }
+    const item = filtered.find((i) => i.id === uploadingForId);
+    if (!item) {
+      setUploadingForId(null);
+      return;
+    }
+    setUploadStatus('uploading');
+    const entryId = item.entry?.advancePortalId || item.entry?.id || uploadingForId;
+    try {
+      const formData = new FormData();
+      const now = new Date();
+      const timestamp = now.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).replace(',', '').replace(/\s/g, '-');
+      const site = siteOptions.find((s) => s.id === item.entry?.project_id);
+      const entityName = item.entityName || '';
+      const finalName = `${timestamp} ${site?.sNo || ''} ${entityName}`;
+      formData.append('file', file);
+      formData.append('file_name', finalName);
+      const uploadRes = await fetch('https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      const uploadResult = await uploadRes.json();
+      const fileUrl = uploadResult.url;
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const username = user?.username || user?.name || '';
+      const payload = { ...item.entry, file_url: fileUrl };
+      const editRes = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${entryId}?editedBy=${username}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      if (!editRes.ok) {
+        const errText = await editRes.text();
+        throw new Error(errText || 'Failed to update record');
+      }
+      setUploadExpandedId(null);
+      loadAdvanceData();
+      window.dispatchEvent(new Event('advanceUpdated'));
+      setUploadStatus('completed');
+      setTimeout(() => setUploadStatus(null), 2500);
+    } catch (err) {
+      console.error('Upload or update failed:', err);
+      setUploadStatus(null);
+      alert(err?.message || 'Failed to upload file. Please try again.');
+    } finally {
+      setUploadingForId(null);
+    }
+  };
+
+  // Attach swipe listeners - same as PurchaseOrder History
+  useEffect(() => {
+    const cleanups = [];
+    const globalMouseMoveHandler = (e) => {
+      setSwipeStates((prev) => {
+        let hasChanges = false;
+        const newState = { ...prev };
+        filtered.forEach((item) => {
+          const state = prev[item.id];
+          if (!state) return;
+          const deltaX = e.clientX - state.startX;
+          const isUploadExpanded = uploadExpandedIdRef.current === item.id;
+          if (deltaX > 0 || (isUploadExpanded && deltaX < 0)) {
+            newState[item.id] = {
+              ...state,
+              currentX: e.clientX,
+              isSwiping: true,
+              wasUploadExpanded: state.wasUploadExpanded,
+            };
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? newState : prev;
+      });
+    };
+    const globalMouseUpHandler = () => {
+      setSwipeStates((prev) => {
+        const newState = { ...prev };
+        filtered.forEach((item) => {
+          const state = prev[item.id];
+          if (!state) return;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          const wasUploadExpanded = state.wasUploadExpanded || false;
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX > 0) {
+              if (!wasUploadExpanded) setUploadExpandedId(item.id);
+            } else {
+              setUploadExpandedId(null);
+            }
+          }
+          delete newState[item.id];
+        });
+        return newState;
+      });
+    };
+    document.addEventListener('mousemove', globalMouseMoveHandler);
+    document.addEventListener('mouseup', globalMouseUpHandler);
+    cleanups.push(() => {
+      document.removeEventListener('mousemove', globalMouseMoveHandler);
+      document.removeEventListener('mouseup', globalMouseUpHandler);
+    });
+    filtered.forEach((item) => {
+      const el = cardRefs.current[item.id];
+      if (!el) return;
+      const touchStartHandler = (e) => {
+        const touch = e.touches[0];
+        const wasUploadExpanded = uploadExpandedIdRef.current === item.id;
+        setSwipeStates((prev) => ({
+          ...prev,
+          [item.id]: {
+            startX: touch.clientX,
+            startY: touch.clientY,
+            currentX: touch.clientX,
+            currentY: touch.clientY,
+            isSwiping: false,
+            wasUploadExpanded,
+          },
+        }));
+      };
+      const touchMoveHandler = (e) => {
+        const touch = e.touches[0];
+        setSwipeStates((prev) => {
+          const state = prev[item.id];
+          if (!state) return prev;
+          const deltaX = touch.clientX - state.startX;
+          const deltaY = touch.clientY - state.startY;
+          const absDeltaX = Math.abs(deltaX);
+          const absDeltaY = Math.abs(deltaY);
+          if (absDeltaX <= absDeltaY) {
+            const next = { ...prev };
+            delete next[item.id];
+            return next;
+          }
+          const isUploadExpanded = uploadExpandedIdRef.current === item.id;
+          if (deltaX > 0 || (isUploadExpanded && deltaX < 0)) {
+            e.preventDefault();
+            return {
+              ...prev,
+              [item.id]: {
+                ...state,
+                currentX: touch.clientX,
+                currentY: touch.clientY,
+                isSwiping: true,
+                wasUploadExpanded: state.wasUploadExpanded,
+              },
+            };
+          }
+          return prev;
+        });
+      };
+      const touchEndHandler = () => {
+        setSwipeStates((prev) => {
+          const state = prev[item.id];
+          if (!state) return prev;
+          const deltaX = state.currentX - state.startX;
+          const absDeltaX = Math.abs(deltaX);
+          const wasUploadExpanded = state.wasUploadExpanded || false;
+          if (absDeltaX >= minSwipeDistance) {
+            if (deltaX > 0) {
+              if (!wasUploadExpanded) setUploadExpandedId(item.id);
+            } else {
+              setUploadExpandedId(null);
+            }
+          }
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
+      };
+      const mouseDownHandler = (e) => {
+        e.preventDefault();
+        const wasUploadExpanded = uploadExpandedIdRef.current === item.id;
+        setSwipeStates((prev) => ({
+          ...prev,
+          [item.id]: {
+            startX: e.clientX,
+            currentX: e.clientX,
+            isSwiping: false,
+            wasUploadExpanded,
+          },
+        }));
+      };
+      el.addEventListener('touchstart', touchStartHandler, { passive: false });
+      el.addEventListener('touchmove', touchMoveHandler, { passive: false });
+      el.addEventListener('touchend', touchEndHandler, { passive: false });
+      el.addEventListener('mousedown', mouseDownHandler);
+      cleanups.push(() => {
+        el.removeEventListener('touchstart', touchStartHandler);
+        el.removeEventListener('touchmove', touchMoveHandler);
+        el.removeEventListener('touchend', touchEndHandler);
+        el.removeEventListener('mousedown', mouseDownHandler);
+      });
+    });
+    return () => cleanups.forEach((c) => c());
+  }, [filtered, minSwipeDistance]);
+
   return (
     <div
       className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden"
@@ -393,7 +648,7 @@ const History = ({ onVendorClick }) => {
       {/* Date and Category Section */}
       <div className="px-4 pt-2">
         <div className="flex items-center justify-end border-b border-[#E0E0E0] pb-2">
-          
+
           <button
             onClick={() => setShowTypeModal(true)}
             className="text-[12px] font-semibold text-black leading-normal cursor-pointer"
@@ -404,19 +659,115 @@ const History = ({ onVendorClick }) => {
       </div>
       {/* Filter */}
       <div className="flex-shrink-0 px-4 pt-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button 
-            type="button" 
-            onClick={() => setShowFilterModal(true)}
-            className="flex items-center gap-1 text-[13px] font-semibold text-[#9E9E9E] leading-normal cursor-pointer"
-          >
-            <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
-            Filter
-          </button>
+        <div className="flex items-center justify-between gap-5">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => setShowFilterModal(true)}
+              className="flex items-center gap-2 px-0 flex-shrink-0"
+            >
+              <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
+              {!(typeFilter || vendorContractorFilter || entryNoFilter || projectNameFilter || paymentModeFilter) && (
+                <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">
+                  Filter
+                </span>
+              )}
+            </button>
+            {/* Active Filter Tags - Next to Filter button */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {/* Type Filter Tag */}
+              {typeFilter && (
+                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <span className="text-[11px] font-medium text-black">{typeFilter}</span>
+                  <button
+                    onClick={() => setTypeFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Contractor/Vendor Filter Tag */}
+              {vendorContractorFilter && (
+                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <span className="text-[11px] font-medium text-black">Contractor/Vendor</span>
+                  <button
+                    onClick={() => setVendorContractorFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Entry No Filter Tag */}
+              {entryNoFilter && (
+                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <span className="text-[11px] font-medium text-black">Entry. No</span>
+                  <button
+                    onClick={() => setEntryNoFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Project Name Filter Tag */}
+              {projectNameFilter && (
+                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <span className="text-[11px] font-medium text-black">Project</span>
+                  <button
+                    onClick={() => setProjectNameFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Mode Filter Tag */}
+              {paymentModeFilter && (
+                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <span className="text-[11px] font-medium text-black">Mode</span>
+                  <button
+                    onClick={() => setPaymentModeFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {(typeFilter || vendorContractorFilter || entryNoFilter || projectNameFilter || paymentModeFilter) && (
+            <button
+              onClick={() => {
+                setTypeFilter('');
+                setVendorContractorFilter('');
+                setEntryNoFilter('');
+                setProjectNameFilter('');
+                setPaymentModeFilter('');
+              }}
+              className="text-[13px] font-semibold hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
+            >
+              x
+            </button>
+          )}
         </div>
       </div>
       {/* Cards List - Scrollable */}
-      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 max-h-[calc(100vh-160px-80px)]">
+      <div
+        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 max-h-[calc(100vh-160px-80px)]"
+        onClick={() => setUploadExpandedId(null)}
+      >
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
@@ -440,147 +791,306 @@ const History = ({ onVendorClick }) => {
             </p>
           </div>
         ) : (
-          filtered.map((item) => (
-            <div
-              key={item.id}
-              className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
-              style={{ height: '95px' }}
-            >
-              <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out">
-                <div className="flex flex-col gap-0.5">
-                  {/* Row 1: ref and payment mode */}
-                  <div className="flex items-center justify-between">
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        const desc = item.entry?.description || '';
-                        if (desc) {
-                          setSelectedDescription(desc);
-                          setShowDescriptionModal(true);
-                        }
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf,.pdf,.doc,.docx"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {filtered.map((item) => {
+              const swipeState = swipeStates[item.id];
+              const isUploadExpanded = uploadExpandedId === item.id;
+              let swipeOffset = 0;
+              if (swipeState?.isSwiping) {
+                const dx = swipeState.currentX - swipeState.startX;
+                if (dx > 0) {
+                  swipeOffset = Math.min(48, dx);
+                } else {
+                  swipeOffset = isUploadExpanded ? Math.max(0, 48 + dx) : 0;
+                }
+              } else if (isUploadExpanded) {
+                swipeOffset = 48;
+              }
+              return (
+                <div
+                  key={item.id}
+                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
+                  style={{
+                    height: '95px',
+                    userSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                    WebkitUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                  }}
+                >
+                  {/* Upload button - behind card on left, revealed on right swipe (same as PO Clone) */}
+                  <div
+                    className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    style={{
+                      opacity: (isUploadExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20)) ? 1 : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isUploadExpanded ? 'auto' : 'none',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUploadClick(item);
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          const desc = item.entry?.description || '';
-                          if (desc) {
-                            setSelectedDescription(desc);
-                            setShowDescriptionModal(true);
-                          }
-                        }
-                      }}
-                      className={`text-[12px] font-semibold text-black leading-snug ${item.entry?.description ? 'cursor-pointer hover:underline' : ''}`}
+                      disabled={!!uploadingForId}
+                      className="w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center hover:bg-[#a88645] transition-colors shadow-sm disabled:opacity-60"
+                      title="Upload file"
                     >
-                      {item.ref}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getTypeBadgeClass(
-                        item.type
-                      )}`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          item.type === 'Advance'
-                            ? 'bg-[#2E7D32]'
-                            : item.type === 'Bill Settlement'
-                              ? 'bg-[#1976D2]'
-                              : item.type === 'Refund'
-                                ? 'bg-[#F57C00]'
-                                : item.type === 'Transfer'
-                                  ? ''
-                                  : ''
-                        }`}
-                      />
-                      {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
-                    </span>
+                      <img src={UploadFile} alt="Upload File" className="w-[18px] h-[18px]" />
+                    </button>
                   </div>
-                  {/* Row 2: entityName (clickable – opens Advance form with vendor/project and bill details) and empty space */}
-                  <div className="flex items-center justify-between">
-                    {onVendorClick ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const entry = item.entry || {};
-                          const vendorId = entry.vendor_id;
-                          const contractorId = entry.contractor_id;
-                          const projectId = entry.project_id;
-                          let selectedOption = null;
-                          if (vendorId) {
-                            const v = vendorOptions.find((x) => x.id === vendorId);
-                            if (v) selectedOption = { value: v.label, label: v.label, id: v.id, type: 'Vendor' };
-                          }
-                          if (!selectedOption && contractorId) {
-                            const c = contractorOptions.find((x) => x.id === contractorId);
-                            if (c) selectedOption = { value: c.label, label: c.label, id: c.id, type: 'Contractor' };
-                          }
-                          const site = siteOptions.find((x) => x.id === projectId);
-                          const selectedSite = site ? { value: site.value || site.label, label: site.label, id: site.id, sNo: site.sNo } : null;
-                          onVendorClick({
-                            selectedOption,
-                            selectedSite,
-                            billDetails: {
-                              ref: item.ref,
-                              amount: item.amount,
-                              paymentMode: item.paymentMode,
-                              timestamp: item.timestamp,
-                              type: item.type,
-                              entryNo: entry.entry_no,
-                              date: entry.date || entry.timestamp,
-                            },
-                          });
-                        }}
-                        className="text-[12px] font-semibold text-black leading-snug break-words text-left cursor-pointer hover:underline focus:outline-none focus:underline"
-                        style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                      >
-                        {item.entityName || 'N/A'}
-                      </button>
-                    ) : (
-                      <p
-                        className="text-[12px] font-semibold text-black leading-snug break-words"
-                        style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                      >
-                        {item.entityName || 'N/A'}
-                      </p>
-                    )}
-                    <span></span>
-                  </div>
-                  {/* Row 3: projectName and amount */}
-                  <div className="flex items-center justify-between">
-                    <p
-                      className="text-[11px] font-medium text-[#777777] leading-snug break-words"
-                      style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                    >
-                      {item.projectName || 'N/A'}
-                    </p>
-                    <p
-                      className={`text-[12px] font-semibold block leading-snug ${
-                        item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'
-                      }`}
-                    >
-                      {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
-                    </p>
-                  </div>
-                  {/* Row 4: date/time and transfer site name */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-[#777777] leading-snug">
-                      {formatDateTime(item.timestamp)}
-                    </span>
-                    {item.type === 'Transfer' && item.transferSiteName ? (
-                      <p className={`text-[10px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#BF9853]' : 'text-[#007233]'}`}>
-                        {item.transferSiteName}
-                      </p>
-                    ) : item.type === 'Bill Settlement' && item.entry.amount ? (
-                      <span className="text-[12px] font-medium text-[#007233] leading-snug">
-                        ₹{parseFloat(item.entry.amount || 0).toLocaleString('en-IN')}
-                      </span>
-                    ) : null}
+                  <div
+                    ref={(el) => {
+                      if (el) cardRefs.current[item.id] = el;
+                      else delete cardRefs.current[item.id];
+                    }}
+                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                    style={{
+                      transform: `translateX(${swipeOffset}px)`,
+                      touchAction: 'pan-y',
+                      userSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      WebkitUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      MozUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      msUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      willChange: 'transform',
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                      transition: swipeState?.isSwiping ? 'none' : 'transform 0.3s ease-out',
+                    }}
+                    onClick={(e) => {
+                      if (!isUploadExpanded) e.stopPropagation();
+                    }}
+                  >
+                    <div className="flex flex-col gap-0.5">
+                      {/* Row 1: ref and payment mode */}
+                      <div className="flex items-center justify-between">
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            const desc = item.entry?.description || '';
+                            if (desc) {
+                              setSelectedDescription(desc);
+                              setShowDescriptionModal(true);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              const desc = item.entry?.description || '';
+                              if (desc) {
+                                setSelectedDescription(desc);
+                                setShowDescriptionModal(true);
+                              }
+                            }
+                          }}
+                          className={`text-[12px] font-semibold text-black leading-snug ${item.entry?.description ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                          {item.ref}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getTypeBadgeClass(
+                            item.type
+                          )}`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${item.type === 'Advance'
+                                ? 'bg-[#2E7D32]'
+                                : item.type === 'Bill Settlement'
+                                  ? 'bg-[#1976D2]'
+                                  : item.type === 'Refund'
+                                    ? 'bg-[#F57C00]'
+                                    : item.type === 'Transfer'
+                                      ? ''
+                                      : ''
+                              }`}
+                          />
+                          {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
+                        </span>
+                      </div>
+                      {/* Row 2: entityName (clickable – opens Advance form with vendor/project and bill details) and empty space */}
+                      <div className="flex items-center justify-between">
+                        {onVendorClick ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const entry = item.entry || {};
+                              const vendorId = entry.vendor_id;
+                              const contractorId = entry.contractor_id;
+                              const projectId = entry.project_id;
+                              let selectedOption = null;
+                              if (vendorId) {
+                                const v = vendorOptions.find((x) => x.id === vendorId);
+                                if (v) selectedOption = { value: v.label, label: v.label, id: v.id, type: 'Vendor' };
+                              }
+                              if (!selectedOption && contractorId) {
+                                const c = contractorOptions.find((x) => x.id === contractorId);
+                                if (c) selectedOption = { value: c.label, label: c.label, id: c.id, type: 'Contractor' };
+                              }
+                              const site = siteOptions.find((x) => x.id === projectId);
+                              const selectedSite = site ? { value: site.value || site.label, label: site.label, id: site.id, sNo: site.sNo } : null;
+                              onVendorClick({
+                                selectedOption,
+                                selectedSite,
+                                billDetails: {
+                                  ref: item.ref,
+                                  amount: item.amount,
+                                  paymentMode: item.paymentMode,
+                                  timestamp: item.timestamp,
+                                  type: item.type,
+                                  entryNo: entry.entry_no,
+                                  date: entry.date || entry.timestamp,
+                                },
+                              });
+                            }}
+                            className="text-[12px] font-semibold text-black leading-snug break-words text-left cursor-pointer hover:underline focus:outline-none focus:underline"
+                            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                          >
+                            {item.entityName || 'N/A'}
+                          </button>
+                        ) : (
+                          <p
+                            className="text-[12px] font-semibold text-black leading-snug break-words"
+                            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                          >
+                            {item.entityName || 'N/A'}
+                          </p>
+                        )}
+                        <span></span>
+                      </div>
+                      {/* Row 3: projectName and amount/refund_amount (not bill_amount) */}
+                      <div className="flex items-center justify-between">
+                        <p
+                          className="text-[11px] font-medium text-[#777777] leading-snug break-words"
+                          style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                        >
+                          {item.projectName || 'N/A'}
+                        </p>
+                        {item.type === 'Bill Settlement' ? (
+                          <span className="text-[12px] font-semibold leading-snug text-[#007233]">
+                            ₹{parseFloat(item.entry?.amount || 0).toLocaleString('en-IN')}
+                          </span>
+                        ) : item.entry?.file_url ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(item.entry.file_url, '_blank', 'noopener,noreferrer');
+                            }}
+                            className={`text-[12px] font-semibold block leading-snug cursor-pointer hover:underline focus:outline-none focus:underline ${item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}
+                          >
+                            {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
+                          </button>
+                        ) : (
+                          <p
+                            className={`text-[12px] font-semibold block leading-snug ${item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}
+                          >
+                            {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
+                          </p>
+                        )}
+                      </div>
+                      {/* Row 4: timestamp and bill_amount (or transfer site) */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-[#777777] leading-snug">
+                          {formatDateTime(item.timestamp)}
+                        </span>
+                        {item.type === 'Transfer' && item.transferSiteName ? (
+                          <p className={`text-[10px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#BF9853]' : 'text-[#007233]'}`}>
+                            {item.transferSiteName}
+                          </p>
+                        ) : item.type === 'Bill Settlement' ? (
+                          item.entry?.file_url ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(item.entry.file_url, '_blank', 'noopener,noreferrer');
+                              }}
+                              className="text-[12px] font-medium text-[#007233] leading-snug cursor-pointer hover:underline focus:outline-none focus:underline"
+                            >
+                              ₹{parseFloat(item.entry?.bill_amount || item.amount || 0).toLocaleString('en-IN')}
+                            </button>
+                          ) : (
+                            <span className="text-[12px] font-medium text-[#007233] leading-snug">
+                              ₹{parseFloat(item.entry?.bill_amount || item.amount || 0).toLocaleString('en-IN')}
+                            </span>
+                          )
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          ))
+              );
+            })}
+          </>
         )}
       </div>
+      {/* Upload confirmation modal */}
+      {showUploadConfirmModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
+          onClick={handleUploadCancel}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[16px] font-semibold text-black text-center mb-4">
+              Upload file for this entry?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleUploadCancel}
+                className="flex-1 py-2.5 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.2)] rounded-[8px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadConfirm}
+                className="flex-1 py-2.5 text-[14px] font-semibold text-white bg-[#BF9853] rounded-[8px]"
+              >
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Uploading overlay */}
+      {uploadStatus === 'uploading' && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div className="bg-white rounded-[12px] p-6 flex flex-col items-center gap-4 min-w-[200px]">
+            <div className="w-10 h-10 border-2 border-[#BF9853] border-t-transparent rounded-full animate-spin" />
+            <p className="text-[14px] font-medium text-black">Uploading and updating...</p>
+          </div>
+        </div>
+      )}
+      {/* Upload completed toast */}
+      {uploadStatus === 'completed' && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4 pointer-events-none"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div className="bg-white rounded-[12px] px-6 py-4 flex items-center gap-3 shadow-lg">
+            <div className="w-8 h-8 rounded-full bg-[#2E7D32] flex items-center justify-center flex-shrink-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="text-[14px] font-semibold text-black">Upload file completed</p>
+          </div>
+        </div>
+      )}
       {/* Select Type Modal */}
       {showTypeModal && (
         <div
@@ -990,18 +1500,13 @@ const History = ({ onVendorClick }) => {
             className="bg-white w-full max-w-[320px] rounded-[12px] p-5 relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Icon */}
+            {/* Icon - image has its own background */}
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 rounded-full bg-[#FFF3E0] flex items-center justify-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M18.5 2.5C18.8978 2.10218 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10218 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10218 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              <img src={Pen} alt="Pen" className="w-[74px] h-[74px]" />
             </div>
 
             {/* Title */}
-            <h3 className="text-[18px] font-bold text-black text-center mb-4">Description!</h3>
+            <h3 className="text-[18px] font-bold text-gray-500 text-center mb-4">Description!</h3>
 
             {/* Description Content */}
             <p className="text-[11px] font-medium text-black text-center mb-6 leading-relaxed">

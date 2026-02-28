@@ -94,6 +94,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isReviewEditMode, setIsReviewEditMode] = useState(false);
   const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
   useEffect(() => {
     const savedselectedType = sessionStorage.getItem('selectedType');
     const savedContractorVendor = sessionStorage.getItem('selectedOption');
@@ -562,11 +566,106 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     }
     return true;
   };
+  const formatDateOnlyForDup = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  const formatDateForDup = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
+  };
+  const toLocalDateStr = (val) => {
+    if (!val) return '';
+    const d = new Date(val);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const normalizeStr = (s) => (s == null ? '' : String(s).trim());
+
+  const checkForDuplicateEntry = async (checkDate, checkAmount) => {
+    const vendorLabel = normalizeStr(selectedOption?.type === 'Vendor' ? selectedOption.label : '');
+    const contractorLabel = normalizeStr(selectedOption?.type === 'Contractor' ? selectedOption.label : '');
+    const siteLabel = normalizeStr(selectedSite ? selectedSite.label : '');
+    const dateStr = checkDate ? (typeof checkDate === 'string' && checkDate.includes('-') ? checkDate.split('T')[0] : toLocalDateStr(checkDate)) : '';
+
+    try {
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuilderDash/expenses_form/get_form'));
+      if (!response.ok) return [];
+      const allExpenses = await response.json();
+
+      const matching = allExpenses.filter((exp) => {
+        const expDateStr = toLocalDateStr(exp.date || exp.timestamp);
+        const expAmount = Math.abs(parseFloat(exp.amount) || 0);
+        const dateMatch = expDateStr === dateStr;
+        const amountMatch = Math.abs(expAmount - (checkAmount || 0)) < 0.01;
+        const expSiteName = normalizeStr(exp.siteName || exp.projectName || '');
+        const projectMatch =
+          (siteLabel && expSiteName && expSiteName === siteLabel) ||
+          (exp.projectId && selectedSite && Number(exp.projectId) === Number(selectedSite.id));
+        let vendorContractorMatch = false;
+        if (vendorLabel) vendorContractorMatch = normalizeStr(exp.vendor || '') === vendorLabel;
+        else if (contractorLabel) vendorContractorMatch = normalizeStr(exp.contractor || '') === contractorLabel;
+        return dateMatch && amountMatch && projectMatch && vendorContractorMatch;
+      });
+
+      return matching;
+    } catch (err) {
+      console.error('Error checking duplicate:', err);
+      return [];
+    }
+  };
+  const handleDuplicateIgnore = () => {
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    if (pendingActionAfterIgnore === 'review') {
+      setPendingActionAfterIgnore(null);
+      setShowReviewModal(true);
+      setIsReviewEditMode(false);
+    } else if (pendingActionAfterIgnore === 'paymentSubmit') {
+      setPendingActionAfterIgnore(null);
+      handlePaymentSubmit(true);
+    }
+  };
+  const handleDuplicateCancel = () => {
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    setPendingActionAfterIgnore(null);
+  };
   const handleSubmit = async () => {
     if (!validateFormFields()) {
       return;
     }
-    // Show review modal before submission
+    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+      const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(advanceAmount.toString().replace(/,/g, '')) || 0);
+      setCheckingDuplicate(true);
+      try {
+        const duplicates = await checkForDuplicateEntry(dateValue, checkAmount);
+        if (duplicates && duplicates.length > 0) {
+          setDuplicateMatchedExpenses(duplicates);
+          setPendingActionAfterIgnore('review');
+          setShowDuplicateModal(true);
+          setCheckingDuplicate(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check failed:', err);
+      }
+      setCheckingDuplicate(false);
+    }
     setShowReviewModal(true);
     setIsReviewEditMode(false);
   };
@@ -1224,7 +1323,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     });
     setIsEditModalOpen(true);
   };
-  const handlePaymentSubmit = async () => {
+  const handlePaymentSubmit = async (skipDuplicateCheck = false) => {
     if (!paymentModalData.accountNumber && paymentModalData.paymentMode !== "Cash" && paymentModalData.paymentMode !== "Direct") {
       alert("Please select account number.");
       return;
@@ -1243,6 +1342,25 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       alert("Please select a category for Bill Settlement");
       return;
     }
+
+    if (!skipDuplicateCheck && (selectedType === 'Advance' || selectedType === 'Bill Settlement')) {
+      const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(paymentModalData.amount) || 0);
+      setCheckingDuplicate(true);
+      try {
+        const duplicates = await checkForDuplicateEntry(paymentModalData.date, checkAmount);
+        if (duplicates && duplicates.length > 0) {
+          setDuplicateMatchedExpenses(duplicates);
+          setPendingActionAfterIgnore('paymentSubmit');
+          setShowDuplicateModal(true);
+          setCheckingDuplicate(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check failed:', err);
+      }
+      setCheckingDuplicate(false);
+    }
+
     setIsSubmitting(true);
     try {
       // Upload file if exists (for Bill Settlement)
@@ -1402,8 +1520,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         // Update ENo for next entry
         setEno(eno + 1);
       }
-      const successMessage = isWeeklyPaymentBillSaved 
-        ? 'Advance saved successfully and added to Weekly Payment Bills!' 
+      const successMessage = isWeeklyPaymentBillSaved
+        ? 'Advance saved successfully and added to Weekly Payment Bills!'
         : 'Advance saved successfully!';
       toast.success(successMessage, {
         position: "top-center",
@@ -1741,9 +1859,9 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                       {selectedAdvanceFile && <span className="text-gray-600 text-sm">{selectedAdvanceFile.name}</span>}
                     </div>
                     <button className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2'
-                      onClick={handleSubmit} disabled={isSubmitting}
+                      onClick={handleSubmit} disabled={isSubmitting || checkingDuplicate}
                     >
-                      {isSubmitting ? 'Saving...' : getButtonLabel()}
+                      {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Saving...' : getButtonLabel()}
                     </button>
                     <ToastContainer
                       position="top-right"
@@ -2028,6 +2146,98 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
                 <button onClick={handleUpdate} className="w-[100px] h-[45px] bg-[#BF9853] text-white rounded text-sm">
                   Save
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showDuplicateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-[1600px] max-h-[90vh] shadow-lg flex flex-col">
+              <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-black">Possible Duplicate Entry - Matching expenses found</h3>
+                  <button
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
+                    onClick={handleDuplicateCancel}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="mt-2 text-sm text-gray-600">
+                  Same date, vendor/contractor, project and amount detected. Total Entries: {duplicateMatchedExpenses.length} |
+                  Total Amount: ₹{duplicateMatchedExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <div className="overflow-x-auto border-l-8 border-l-[#BF9853] rounded-lg">
+                  <table className="table-fixed min-w-full border-collapse">
+                    <thead>
+                      <tr className="bg-[#FAF6ED]">
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Time Stamp</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Date</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">E.No</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Project Name</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Vendor</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Contractor</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">A/C Type</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Amount</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Comments</th>
+                        <th className="px-3 py-3 text-left font-bold text-sm border-b">Attach File</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {duplicateMatchedExpenses.map((expense, index) => (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{formatDateForDup(expense.timestamp || expense.date)}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{formatDateOnlyForDup(expense.date)}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.eno || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.siteName || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.vendor || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.contractor || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.accountType || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">
+                            ₹{Number(expense.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-3 py-2 text-left text-sm font-semibold border-b">{expense.comments || '-'}</td>
+                          <td className="px-3 py-2 text-left text-sm border-b">
+                            {(expense.billCopy || expense.billCopyUrl) ? (
+                              <a
+                                href={expense.billCopy || expense.billCopyUrl}
+                                className="text-red-500 underline font-semibold"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between">
+                <span className="text-sm text-gray-600">Do you want to proceed anyway?</span>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-[#BF9853] text-white rounded font-medium hover:bg-[#a67c3a] transition-colors duration-200"
+                    onClick={handleDuplicateIgnore}
+                  >
+                    Ignore & Continue
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded font-medium hover:bg-gray-50 transition-colors duration-200"
+                    onClick={handleDuplicateCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>

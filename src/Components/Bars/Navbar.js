@@ -1137,10 +1137,10 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
               className="cursor-pointer w-[42px] h-[40px] rounded-full"
               onClick={toggleSidebar}
             />
-            <p className="text-[#BF9853] ml-2 font-medium text-lg">BUILDERS</p>
+            <p className="hidden md:block text-[#BF9853] ml-2 font-medium text-lg">BUILDERS</p>
           </div>
           <div className="relative flex items-center space-x-4" ref={profileRef}>
-            {canSelectBranch && (
+            {canSelectBranch ? (
               <div className="flex items-center">
                 <select
                   value={selectedBranchId}
@@ -1156,17 +1156,23 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
                   ))}
                 </select>
               </div>
-            )}
+            ) : selectedBranchId ? (
+              <div className="flex items-center">
+                <span className="h-9 px-3 flex items-center rounded-md border border-[#BF9853] text-[#5B4636] text-sm bg-gray-50">
+                  {branchOptions.find((b) => String(b.id) === String(selectedBranchId))?.branch || ''}
+                </span>
+              </div>
+            ) : null}
             {canDownloadExpenses && (
               <button type="button" onClick={handleDownloadExpenses} disabled={isDownloading}
-                className="flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="hidden md:flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
                 title={isDownloading ? "Preparing download..." : "Download expenses and master data"}
               >
                 <img src={DownloadIcon} alt="Download expenses" className="w-5 h-5" />
               </button>
             )}
             {canViewEditRequests && (
-              <div className="relative">
+              <div className="hidden md:block relative">
                 <button
                   type="button"
                   onClick={() => {

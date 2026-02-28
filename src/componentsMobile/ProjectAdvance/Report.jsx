@@ -3,7 +3,8 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import Filter from '../Images/Filter.png';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
-import Download from '../Images/Download.svg'
+import Download from '../Images/Download.svg';
+import Pen from '../Images/Pen.svg';
 
 // ISO 8601 week helpers (same as AdvanceReport.js)
 const getISOWeekNumber = (date) => {
@@ -179,6 +180,7 @@ const Report = () => {
   const [typeSearchQuery, setTypeSearchQuery] = useState('');
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [selectedDescription, setSelectedDescription] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const weekNum = week ? parseInt(week, 10) : null;
   const yearNum = year ? parseInt(year, 10) : null;
@@ -331,12 +333,31 @@ const Report = () => {
     if (typeFilter) {
       filtered = filtered.filter((item) => (item.type || '').toString().toLowerCase() === typeFilter.toLowerCase());
     }
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((item) => {
+        const vendorName = getVendorName(item.vendor_id);
+        const contractorName = getContractorName(item.contractor_id);
+        const entityName = vendorName || contractorName || item.contractor_vendor || '';
+        const projectName = getProjectName(item.project_id) || item.project_name || '';
+        const type = (item.type || '').toString();
+        const paymentMode = (item.payment_mode || '').toString();
+        const entryNo = String(item.entry_no || '');
+        return (
+          entityName.toLowerCase().includes(q) ||
+          projectName.toLowerCase().includes(q) ||
+          type.toLowerCase().includes(q) ||
+          paymentMode.toLowerCase().includes(q) ||
+          entryNo.toLowerCase().includes(q)
+        );
+      });
+    }
     return [...filtered].sort((a, b) => {
       const dateA = parseItemDate(a);
       const dateB = parseItemDate(b);
       return (dateB?.getTime() ?? 0) - (dateA?.getTime() ?? 0);
     });
-  }, [advanceData, startDate, endDate, weekNum, yearNum, paymentModeFilter, vendorContractorFilter, projectNameFilter, typeFilter, useDateRangeFromCalendar, vendorOptions, contractorOptions, siteOptions]);
+  }, [advanceData, startDate, endDate, weekNum, yearNum, paymentModeFilter, vendorContractorFilter, projectNameFilter, typeFilter, searchQuery, useDateRangeFromCalendar, vendorOptions, contractorOptions, siteOptions]);
 
   // Total Advance = Advance + Cash only (same as AdvanceReport.js)
   const totalAdvance = filteredData
@@ -349,36 +370,97 @@ const Report = () => {
       const contractorName = getContractorName(entry.contractor_id);
       const entityName = vendorName || contractorName || entry.contractor_vendor || '';
       const projectName = getProjectName(entry.project_id) || entry.project_name || '';
-      const t = entry.type || '';
+
       let amount = 0;
-      if (t === 'Refund') amount = parseFloat(entry.refund_amount) || 0;
-      else amount = parseFloat(entry.amount) || 0;
+      const t = entry.type || '';
+      if (t === 'Refund') {
+        amount = -(parseFloat(entry.refund_amount) || 0);
+      } else if (t === 'Bill Settlement') {
+        amount = parseFloat(entry.bill_amount) || 0;
+      } else {
+        amount = parseFloat(entry.amount) || 0;
+      }
+
+      const dateStr = entry.timestamp || entry.createdAt || entry.created_at || '';
+      const entryNo = entry.entry_no || 0;
+      const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
       let prefix = 'AD';
-      if (t === 'Bill Settlement') prefix = 'BS';
-      else if (t === 'Transfer') prefix = 'TF';
-      else if (t === 'Refund') prefix = 'RF';
-      const ref = `#${prefix} - ${entityName}`;
-      const transferSiteName = t === 'Transfer' && entry.transfer_site_id ? getProjectName(entry.transfer_site_id) || '' : '';
-      const parsed = parseItemDate(entry);
+      if (t === 'Bill Settlement') {
+        prefix = 'BS';
+      } else if (t === 'Transfer') {
+        prefix = 'TF';
+      } else if (t === 'Refund') {
+        prefix = 'RF';
+      }
+      const ref = `${prefix} - ${year} - ${entryNo}`;
+
+      // Get transfer site name for Transfer type
+      const transferSiteName = t === 'Transfer' && entry.transfer_site_id
+        ? getProjectName(entry.transfer_site_id) || ''
+        : '';
+
       return {
         id: entry.advancePortalId || entry.id || `${entry.entry_no}-${entry.date}`,
         ref,
+        entityName,
         projectName,
         transferSiteName,
-        date: parsed ? parsed.toISOString() : (entry.date || entry.timestamp || ''),
+        timestamp: dateStr,
         type: t || 'Advance',
         paymentMode: entry.payment_mode || '',
         amount,
-        billAmount: parseFloat(entry.bill_amount) || 0,
-        description: entry.description || '',
+        entry,
       };
+    })
+    .sort((a, b) => {
+      const noA = a.entry.entry_no || 0;
+      const noB = b.entry.entry_no || 0;
+      return noB - noA;
     });
   }, [filteredData, vendorOptions, contractorOptions, siteOptions]);
 
   const getTypeBadgeClass = (type) => {
-    if (type === 'Transfer') return 'bg-[#FFF3E0] text-black';
-    if (type === 'Advance' || type === 'Refund') return 'bg-[#E8F5E9] text-black';
-    return 'bg-[#FFF3E0] text-black';
+    switch (type) {
+      case 'Advance':
+        return 'bg-[#E8F5E9] text-[#2E7D32]';
+      case 'Bill Settlement':
+        return 'bg-[#E3F2FD] text-[#1976D2]';
+      case 'Refund':
+        return 'bg-[#FFF3E0] text-[#F57C00]';
+      case 'Transfer':
+        return 'bg-[#FFF3E0] text-black';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const formatDateTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    try {
+      const date = new Date(dateTimeString);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const timeStr = `${hours}:${minutes} ${ampm}`;
+      if (dateOnly.getTime() === today.getTime()) {
+        return `Today • ${timeStr}`;
+      } else if (dateOnly.getTime() === yesterday.getTime()) {
+        return `Yesterday • ${timeStr}`;
+      } else {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year} • ${timeStr}`;
+      }
+    } catch {
+      return '';
+    }
   };
 
   const formatDateOnly = (dateString) => {
@@ -834,17 +916,116 @@ const Report = () => {
         </div>
       </div>
 
-      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-        <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-1 text-[13px] font-semibold text-[#9E9E9E] leading-normal cursor-pointer">
-          <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
-          Filter
-        </button>
-        <div className="text-[12px] font-semibold text-black">
-          Total Advance : <span className="text-[#E4572E]">₹{Number(totalAdvance).toLocaleString('en-IN')}</span>
+      {/* Search Bar */}
+      <div className="px-4 mb-1 mt-2">
+        <div className="relative">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
+              <path d="M11 11L14 14" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-[36px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
+          />
         </div>
       </div>
 
-      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 flex-1 max-h-[430px] pb-16">
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-0 flex-shrink-0">
+            <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
+            {!(typeFilter || vendorContractorFilter || projectNameFilter || paymentModeFilter) && (
+              <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">
+                Filter
+              </span>
+            )}
+          </button>
+          {/* Active Filter Tags - Next to Filter button */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {/* Type Filter Tag */}
+            {typeFilter && (
+              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <span className="text-[11px] font-medium text-black">{typeFilter}</span>
+                <button
+                  onClick={() => setTypeFilter('')}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {/* Contractor/Vendor Filter Tag */}
+            {vendorContractorFilter && (
+              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <span className="text-[11px] font-medium text-black">Vendor/Contractor</span>
+                <button
+                  onClick={() => setVendorContractorFilter('')}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {/* Project Name Filter Tag */}
+            {projectNameFilter && (
+              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <span className="text-[11px] font-medium text-black">Project</span>
+                <button
+                  onClick={() => setProjectNameFilter('')}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {/* Mode Filter Tag */}
+            {paymentModeFilter && (
+              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <span className="text-[11px] font-medium text-black">Mode</span>
+                <button
+                  onClick={() => setPaymentModeFilter('')}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {(typeFilter || vendorContractorFilter || projectNameFilter || paymentModeFilter) && (
+            <button 
+              onClick={() => {
+                setTypeFilter('');
+                setVendorContractorFilter('');
+                setProjectNameFilter('');
+                setPaymentModeFilter('');
+              }} 
+              className="text-[13px] font-semibold hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
+            >
+              x
+            </button>
+          )}
+          <div className="text-[12px] font-semibold text-black">
+            Total Advance : <span className="text-[#E4572E]">₹{Number(totalAdvance).toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 flex-1 max-h-[430px] pb-11">
         {transformed.length === 0 ? (
           <div className="flex flex-col items-center justify-center">
             <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
@@ -862,12 +1043,13 @@ const Report = () => {
             >
               <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out">
                 <div className="flex flex-col gap-0.5">
+                  {/* Row 1: ref and payment mode */}
                   <div className="flex items-center justify-between">
                     <span
                       role="button"
                       tabIndex={0}
                       onClick={() => {
-                        const desc = item.description || '';
+                        const desc = item.entry?.description || '';
                         if (desc) {
                           setSelectedDescription(desc);
                           setShowDescriptionModal(true);
@@ -875,52 +1057,83 @@ const Report = () => {
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          const desc = item.description || '';
+                          const desc = item.entry?.description || '';
                           if (desc) {
                             setSelectedDescription(desc);
                             setShowDescriptionModal(true);
                           }
                         }
                       }}
-                      className={`text-[12px] font-semibold text-black leading-snug ${item.description ? 'cursor-pointer hover:underline' : ''}`}
+                      className={`text-[12px] font-semibold text-black leading-snug ${item.entry?.description ? 'cursor-pointer hover:underline' : ''}`}
                     >
                       {item.ref}
                     </span>
-                    {(item.paymentMode || (item.type === 'Transfer' && !item.paymentMode)) && (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getTypeBadgeClass(item.type)}`}>
-                        {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
-                      </span>
-                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getTypeBadgeClass(
+                        item.type
+                      )}`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          item.type === 'Advance'
+                            ? 'bg-[#2E7D32]'
+                            : item.type === 'Bill Settlement'
+                              ? 'bg-[#1976D2]'
+                              : item.type === 'Refund'
+                                ? 'bg-[#F57C00]'
+                                : item.type === 'Transfer'
+                                  ? ''
+                                  : ''
+                        }`}
+                      />
+                      {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
+                    </span>
                   </div>
+                  {/* Row 2: entityName and empty space */}
                   <div className="flex items-center justify-between">
-                    {item.type === 'Transfer' && item.transferSiteName ? (
-                      <>
-                        <span className="text-[12px] font-medium text-black leading-snug">{formatDateOnly(item.date)}</span>
-                        <p className="text-[12px] font-medium text-black leading-snug">{item.transferSiteName}</p>
-                      </>
-                    ) : item.type === 'Bill Settlement' ? (
-                      <>
-                        <span className="text-[12px] font-medium text-black leading-snug">{formatDateOnly(item.date)}</span>
-                        <p className={`text-[12px] font-semibold leading-snug ${(item.amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>₹{(item.amount || 0).toLocaleString('en-IN')}</p>
-                      </>
-                    ) : item.type === 'Transfer' && item.amount ? (
-                      <>
-                        <span className="text-[12px] font-medium text-black leading-snug">{formatDateOnly(item.date)}</span>
-                        <p className={`text-[12px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>₹{item.amount.toLocaleString('en-IN')}</p>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-[12px] font-medium text-black leading-snug">{formatDateOnly(item.date)}</span>
-                        <p className={`text-[12px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>₹{item.amount.toLocaleString('en-IN')}</p>
-                      </>
-                    )}
+                    <p
+                      className="text-[12px] font-semibold text-black leading-snug break-words"
+                      style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                    >
+                      {item.entityName || 'N/A'}
+                    </p>
+                    <span></span>
                   </div>
+                  {/* Row 3: projectName and amount/refund_amount (not bill_amount) */}
                   <div className="flex items-center justify-between">
-                    <p className="text-[12px] font-medium text-black leading-snug break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                    <p
+                      className="text-[11px] font-medium text-[#777777] leading-snug break-words"
+                      style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                    >
                       {item.projectName || 'N/A'}
                     </p>
                     {item.type === 'Bill Settlement' ? (
-                      <p className={`text-[12px] font-semibold leading-snug ${(item.billAmount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>₹{(item.billAmount || 0).toLocaleString('en-IN')}</p>
+                      <span className="text-[12px] font-semibold leading-snug text-[#007233]">
+                        ₹{parseFloat(item.entry?.amount || 0).toLocaleString('en-IN')}
+                      </span>
+                    ) : (
+                      <p
+                        className={`text-[12px] font-semibold block leading-snug ${
+                          item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'
+                        }`}
+                      >
+                        {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                  </div>
+                  {/* Row 4: timestamp and bill_amount (or transfer site) */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#777777] leading-snug">
+                      {formatDateTime(item.timestamp)}
+                    </span>
+                    {item.type === 'Transfer' && item.transferSiteName ? (
+                      <p className={`text-[10px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#BF9853]' : 'text-[#007233]'}`}>
+                        {item.transferSiteName}
+                      </p>
+                    ) : item.type === 'Bill Settlement' ? (
+                      <span className="text-[12px] font-medium text-[#007233] leading-snug">
+                        ₹{parseFloat(item.entry?.bill_amount || item.amount || 0).toLocaleString('en-IN')}
+                      </span>
                     ) : null}
                   </div>
                 </div>
@@ -1335,16 +1548,11 @@ const Report = () => {
           >
             {/* Icon */}
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 rounded-full bg-[#FFF3E0] flex items-center justify-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M18.5 2.5C18.8978 2.10218 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10218 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10218 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              <img src={Pen} alt="Pen" className="w-[74px] h-[74px]" />
             </div>
 
             {/* Title */}
-            <h3 className="text-[18px] font-bold text-black text-center mb-4">Description!</h3>
+            <h3 className="text-[18px] font-bold text-gray-500 text-opacity-70 text-center mb-4">Description!</h3>
 
             {/* Description Content */}
             <p className="text-[11px] font-medium text-black text-center mb-6 leading-relaxed">

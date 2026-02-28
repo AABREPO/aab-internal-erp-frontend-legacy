@@ -43,7 +43,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
   ];
   const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
 
-  const [selectedType, setSelectedType] = useState('');
+  const [selectedType, setSelectedType] = useState('Advance');
   const [selectedOption, setSelectedOption] = useState(null);
   const [combinedOptions, setCombinedOptions] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -87,6 +87,10 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
   });
   const [accountDetails, setAccountDetails] = useState([]);
   const [showAccountSelectModal, setShowAccountSelectModal] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
 
   // Format date helper
   const getTodayDate = () => {
@@ -557,6 +561,63 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     return true;
   };
 
+  // Check for duplicate expense entries (same date, vendor/contractor, project, amount)
+  const checkForDuplicateEntry = async (checkDate, checkAmount) => {
+    const vendorLabel = selectedOption?.type === 'Vendor' ? selectedOption.label : '';
+    const contractorLabel = selectedOption?.type === 'Contractor' ? selectedOption.label : '';
+    const siteLabel = selectedSite ? selectedSite.label : '';
+    const dateStr = checkDate ? new Date(checkDate).toISOString().split('T')[0] : '';
+
+    try {
+      const response = await fetch(withBranchUrl('https://backendaab.in/aabuilderDash/expenses_form/get_form'));
+      if (!response.ok) return [];
+      const allExpenses = await response.json();
+
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+      const matching = allExpenses.filter((exp) => {
+        const expDate = new Date(exp.timestamp || exp.date).toISOString().split('T')[0];
+        const expAmount = Math.abs(parseFloat(exp.amount) || 0);
+        const dateMatch = expDate === dateStr;
+        const amountMatch = Math.abs(expAmount - (checkAmount || 0)) < 0.01;
+        const projectMatch = (exp.siteName === siteLabel) || (exp.projectId && selectedSite && Number(exp.projectId) === Number(selectedSite.id));
+        let vendorContractorMatch = false;
+        if (vendorLabel) vendorContractorMatch = (exp.vendor || '') === vendorLabel;
+        else if (contractorLabel) vendorContractorMatch = (exp.contractor || '') === contractorLabel;
+        const isWithinLastMonth = new Date(exp.timestamp || exp.date) >= oneMonthAgo;
+        return dateMatch && amountMatch && projectMatch && vendorContractorMatch && isWithinLastMonth;
+      });
+
+      return matching;
+    } catch (err) {
+      console.error('Error checking duplicate:', err);
+      return [];
+    }
+  };
+
+  const formatDateOnly = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
+  };
+
   // Submit advance data
   const submitAdvanceData = async () => {
     setIsSubmitting(true);
@@ -785,9 +846,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     return ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(paymentMode);
   };
 
-  // Handle pay advance: open Payment Details bottom sheet for GPay/PhonePe/Net Banking/Cheque, else submit directly
-  const handlePayAdvance = () => {
-    if (!validateFormFields()) return;
+  const proceedWithPayAdvance = () => {
     if (requiresPaymentDetailsSheet()) {
       setPaymentModalData({
         date: dateValue,
@@ -799,16 +858,60 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
         accountNumber: ''
       });
       setShowPaymentDetailsBottomSheet(true);
-      return;
-    }
-    const confirmed = window.confirm('Are you sure you want to submit?');
-    if (confirmed) {
-      submitAdvanceData();
+    } else {
+      const confirmed = window.confirm('Are you sure you want to submit?');
+      if (confirmed) {
+        submitAdvanceData();
+      }
     }
   };
 
+  // Handle pay advance: open Payment Details bottom sheet for GPay/PhonePe/Net Banking/Cheque, else submit directly
+  const handlePayAdvance = async () => {
+    if (!validateFormFields()) return;
+
+    // Duplicate check for Advance and Bill Settlement (they create expense entries)
+    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+      const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(advanceAmount.toString().replace(/,/g, '')) || 0);
+      setCheckingDuplicate(true);
+      try {
+        const duplicates = await checkForDuplicateEntry(dateValue, checkAmount);
+        if (duplicates && duplicates.length > 0) {
+          setDuplicateMatchedExpenses(duplicates);
+          setPendingActionAfterIgnore('payAdvance');
+          setShowDuplicateModal(true);
+          setCheckingDuplicate(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check failed:', err);
+      }
+      setCheckingDuplicate(false);
+    }
+
+    proceedWithPayAdvance();
+  };
+
+  const handleDuplicateIgnore = () => {
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    if (pendingActionAfterIgnore === 'payAdvance') {
+      setPendingActionAfterIgnore(null);
+      proceedWithPayAdvance();
+    } else if (pendingActionAfterIgnore === 'paymentDetailsSubmit') {
+      setPendingActionAfterIgnore(null);
+      handlePaymentDetailsSubmit(true);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    setPendingActionAfterIgnore(null);
+  };
+
   // Submit from Payment Details bottom sheet: save advance_portal then weekly-payment-bills (same as AdvancePortal.js)
-  const handlePaymentDetailsSubmit = async () => {
+  const handlePaymentDetailsSubmit = async (skipDuplicateCheck = false) => {
     if (!paymentModalData.accountNumber) {
       alert('Please select account number.');
       return;
@@ -825,6 +928,25 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
       alert('Please select a category for Bill Settlement');
       return;
     }
+
+    if (!skipDuplicateCheck && (selectedType === 'Advance' || selectedType === 'Bill Settlement')) {
+      const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(paymentModalData.amount) || 0);
+      setCheckingDuplicate(true);
+      try {
+        const duplicates = await checkForDuplicateEntry(paymentModalData.date, checkAmount);
+        if (duplicates && duplicates.length > 0) {
+          setDuplicateMatchedExpenses(duplicates);
+          setPendingActionAfterIgnore('paymentDetailsSubmit');
+          setShowDuplicateModal(true);
+          setCheckingDuplicate(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check failed:', err);
+      }
+      setCheckingDuplicate(false);
+    }
+
     setIsSubmitting(true);
     try {
       let fileUrl = '';
@@ -1389,14 +1511,14 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
       {/* Pay Advance Button */}
       <button
         onClick={handlePayAdvance}
-        disabled={isSubmitting || !areAllRequiredFieldsFilled()}
+        disabled={isSubmitting || checkingDuplicate || !areAllRequiredFieldsFilled()}
         className={`w-[328px] h-[40px] font-semibold rounded text-[14px] leading-normal ${
-          areAllRequiredFieldsFilled() && !isSubmitting
+          areAllRequiredFieldsFilled() && !isSubmitting && !checkingDuplicate
             ? 'bg-black text-white'
             : 'bg-[#D9D9D9] text-black'
         }`}
       >
-        {isSubmitting ? 'Submitting...' : getButtonLabel()}
+        {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Submitting...' : getButtonLabel()}
       </button>
       </div>
 
@@ -1521,8 +1643,8 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                       )}
                       
                       {type === 'Refund' && (
-                        <span className="text-[12px] font-semibold text-[#007233]">
-                          ₹{parseFloat(refund_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        <span className="text-[12px] font-semibold text-[#E4572E]">
+                          -₹{Math.abs(parseFloat(refund_amount || 0) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </span>
                       )}
                       
@@ -1662,6 +1784,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
         selectedValue={selectedOption ? selectedOption.label : ''}
         options={combinedOptions.map(opt => opt.label)}
         fieldName="Contractor/Vendor"
+        showStarIcon={false}
       />
 
       {/* Project Name Modal */}
@@ -1681,6 +1804,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
         selectedValue={selectedSite ? selectedSite.label : ''}
         options={siteOptions.map(opt => opt.label)}
         fieldName="Project Name"
+        showStarIcon={false}
       />
 
       {/* Payment Mode Modal */}
@@ -1922,6 +2046,86 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
               >
                 {isSubmitting ? 'Saving...' : 'Submit'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Entry Modal - card view matching page UI */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-[12px] w-full max-w-[90vw] max-h-[85vh] shadow-lg flex flex-col">
+            <div className="px-4 py-3 border-b border-[#E0E0E0] flex-shrink-0">
+              <div className="flex justify-between items-center">
+                <h3 className="text-base font-bold text-black">Possible Duplicate Entry</h3>
+                <button
+                  type="button"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-xl font-bold"
+                  onClick={handleDuplicateCancel}
+                >
+                  ×
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-600">
+                Same date, vendor/contractor, project and amount. Entries: {duplicateMatchedExpenses.length} |
+                Total: ₹{duplicateMatchedExpenses.reduce((s, i) => s + Number(i.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="flex-1 overflow-auto p-3 space-y-2">
+              {duplicateMatchedExpenses.map((exp, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white border border-[#E0E0E0] border-opacity-30 rounded-[8px] px-3 py-3 shadow-lg border-l-4 border-l-[#BF9853]"
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
+                        <span>{formatDate(exp.timestamp || exp.date)}</span>
+                        <span>•</span>
+                        <span>{formatDateOnly(exp.date)}</span>
+                      </div>
+                      <p className="text-[12px] font-semibold text-black">E.No {exp.eno || '-'}</p>
+                      <p className="text-[12px] font-medium text-black">{exp.siteName || '-'}</p>
+                      <p className="text-[12px] font-medium text-black">{exp.vendor || exp.contractor || '-'}</p>
+                    </div>
+                    <div className="flex flex-col items-end flex-shrink-0">
+                      {(exp.billCopy || exp.billCopyUrl) ? (
+                        <a
+                          href={exp.billCopy || exp.billCopyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[14px] font-semibold text-[#007233] underline underline-offset-1 active:opacity-80"
+                        >
+                          ₹{Number(exp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </a>
+                      ) : (
+                        <span className="text-[14px] font-semibold text-black">
+                          ₹{Number(exp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#FAFAFA] border-t border-[#E0E0E0] px-4 py-3 flex justify-between items-center">
+              <span className="text-xs text-gray-600">Proceed anyway?</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-sm bg-white border border-[rgba(0,0,0,0.16)] rounded font-medium"
+                  onClick={handleDuplicateCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-sm bg-black text-white rounded font-medium"
+                  onClick={handleDuplicateIgnore}
+                >
+                  Ignore & Continue
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -861,16 +861,63 @@ const Summary = () => {
 
       {/* Filter and Pending Advance */}
       <div className="px-4 pt-1 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setShowFilterModal(true)}
-          className="flex items-center gap-1 text-[13px] font-semibold text-[#9E9E9E] leading-normal cursor-pointer"
-        >
-          <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
-          Filter
-        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => setShowFilterModal(true)}
+            className="flex items-center gap-2 px-0 flex-shrink-0"
+          >
+            <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
+            {!(projectNameFilter || billStatusFilter) && (
+              <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">
+                Filter
+              </span>
+            )}
+          </button>
+          {/* Active Filter Tags - Next to Filter button */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {/* Project Name Filter Tag */}
+            {projectNameFilter && (
+              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <span className="text-[11px] font-medium text-black">Project</span>
+                <button
+                  onClick={() => setProjectNameFilter('')}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {/* Bill Status Filter Tag */}
+            {billStatusFilter && (
+              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <span className="text-[11px] font-medium text-black">Bill Status</span>
+                <button
+                  onClick={() => setBillStatusFilter('')}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
-
+          {(projectNameFilter || billStatusFilter) && (
+            <button 
+              onClick={() => {
+                setProjectNameFilter('');
+                setBillStatusFilter('');
+              }} 
+              className="text-[13px] font-semibold hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
+            >
+              x
+            </button>
+          )}
           <div className="text-[12px] font-semibold text-black">
             Pending Advance : <span className="text-[#E4572E]">{totalPendingAdvance.toLocaleString('en-IN')}</span>
           </div>
@@ -1188,7 +1235,7 @@ const Summary = () => {
             <div className="absolute inset-0 bg-black bg-opacity-40" />
             <div
               className="relative z-10 w-full max-w-[360px] mx-auto bg-white rounded-t-[20px] shadow-lg overflow-hidden flex flex-col"
-              style={{ maxHeight: '38vh' }}
+              style={{ maxHeight: '68vh' }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header: title + download icon + close */}
@@ -1212,34 +1259,40 @@ const Summary = () => {
               {/* Content: single scrollable list with type codes (BS/RF/AD/TF) and transfer site for TF */}
               <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
                 {!isStatus && listItems.map((entry, idx) => {
-                  const typeCode = isBill ? 'BS' : getAdvanceTypeCode(entry);
-                  const amountColor = entry.amount < 0 ? 'text-red-600' : (typeCode === 'RF' ? 'text-green-600' : 'text-black');
-                  return (
-                    <div key={idx} className="py-2 border-b border-gray-100 last:border-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] text-gray-800">#{typeCode} - {entry.advancePortalId || idx + 1} {entry.date}</span>
-                        <span className={`text-[13px] font-semibold ${amountColor}`}>₹{entry.amount.toLocaleString('en-IN')}</span>
-                      </div>
-                      {isAdvance && typeCode === 'TF' && entry.transferSiteName && (
-                        <p className="text-[11px] text-gray-500 mt-0.5 pl-0">{entry.transferSiteName}</p>
-                      )}
+                const typeCode = isBill ? 'BS' : getAdvanceTypeCode(entry);
+                const amountColor = entry.amount < 0 ? 'text-red-600' : (typeCode === 'RF' ? 'text-green-600' : 'text-black');
+                const displayAmount = Math.abs(entry.amount || 0).toLocaleString('en-IN');
+                return (
+                  <div key={idx} className="py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] text-gray-800">#{typeCode} - {entry.advancePortalId || idx + 1} {entry.date}</span>
+                      <span className={`text-[13px] font-semibold ${amountColor}`}>
+                        {entry.amount < 0 ? '-' : ''}₹{displayAmount}
+                      </span>
                     </div>
-                  );
-                })}
+                    {isAdvance && typeCode === 'TF' && entry.transferSiteName && (
+                      <p className="text-[11px] text-gray-500 mt-0.5 pl-0">{entry.transferSiteName}</p>
+                    )}
+                  </div>
+                );
+              })}
                 {isStatus && listItems.map((entry, idx) => {
-                  const amountColor = entry.amount < 0 ? 'text-red-600' : (entry.typeCode === 'RF' ? 'text-green-600' : 'text-black');
-                  return (
-                    <div key={idx} className="py-2 border-b border-gray-100 last:border-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] text-gray-800">#{entry.typeCode} - {entry.advancePortalId || idx + 1} {entry.date}</span>
-                        <span className={`text-[13px] font-semibold ${amountColor}`}>₹{entry.amount.toLocaleString('en-IN')}</span>
-                      </div>
-                      {entry.typeCode === 'TF' && entry.transferSiteName && (
-                        <p className="text-[11px] text-gray-500 mt-0.5 pl-0">{entry.transferSiteName}</p>
-                      )}
+                const amountColor = entry.amount < 0 ? 'text-red-600' : (entry.typeCode === 'RF' ? 'text-green-600' : 'text-black');
+                const displayAmount = Math.abs(entry.amount || 0).toLocaleString('en-IN');
+                return (
+                  <div key={idx} className="py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] text-gray-800">#{entry.typeCode} - {entry.advancePortalId || idx + 1} {entry.date}</span>
+                      <span className={`text-[13px] font-semibold ${amountColor}`}>
+                        {entry.amount < 0 ? '-' : ''}₹{displayAmount}
+                      </span>
                     </div>
-                  );
-                })}
+                    {entry.typeCode === 'TF' && entry.transferSiteName && (
+                      <p className="text-[11px] text-gray-500 mt-0.5 pl-0">{entry.transferSiteName}</p>
+                    )}
+                  </div>
+                );
+              })}
               </div>
 
               {/* Footer: totals and balance */}

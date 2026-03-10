@@ -134,7 +134,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
   };
   return (
     <aside ref={sidebarRef}
-      className={`fixed  h-screen w-[250px] bg-[#FFFFFF] mt-14 z-20 overflow-y-auto transition-transform duration-1000 ease-in-out transform ${isVisible ? 'translate-x-0' : '-translate-x-full'
+      className={`fixed h-screen w-[250px] bg-[#FFFFFF] mt-14 z-40 overflow-y-auto transition-transform duration-1000 ease-in-out transform ${isVisible ? 'translate-x-0' : '-translate-x-full'
         }`}>
       <nav className="h-full flex flex-col">
         <Link

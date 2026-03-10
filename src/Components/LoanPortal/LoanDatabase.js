@@ -19,6 +19,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const [projectClientNamesById, setProjectClientNamesById] = useState({});
   const [projectClientNamesByName, setProjectClientNamesByName] = useState({});
   const [loanData, setLoanData] = useState([]);
+  const [selectTimeStampDate, setSelectTimeStampDate] = useState('');
   const [selectDate, setSelectDate] = useState('');
   const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
   const [selectProjectName, setSelectProjectName] = useState('');
@@ -599,6 +600,13 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     fetchBranches();
   }, []);
   const filteredData = loanData.filter((entry) => {
+    if (selectTimeStampDate) {
+      const selectedDate = new Date(selectTimeStampDate);
+      const entryTimestamp = new Date(entry.timestamp);
+      if (selectedDate.toDateString() !== entryTimestamp.toDateString()) {
+        return false;
+      }
+    }
     if (selectDate) {
       const [year, month, day] = selectDate.split("-");
       const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
@@ -699,7 +707,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const currentData = sortedData.slice(startIndex, endIndex);
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDate, selectContractororVendorName, selectProjectName, selectType, selectMode]);
+  }, [selectTimeStampDate, selectDate, selectContractororVendorName, selectProjectName, selectType, selectMode]);
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
@@ -1091,7 +1099,7 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       </div>
       <div className='max-w-[95vw] h-[630px] ml-10 mr-10 bg-white rounded mt-5 pt-5'>
         <div
-          className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode
+          className={`text-left flex ${selectTimeStampDate || selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
             } mb-3 gap-2`}>
@@ -1099,8 +1107,15 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
               <img src={Filter} alt="Toggle Filter" className="w-7 h-7 border border-[#BF9853] rounded-md ml-3" />
             </button>
-            {(selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode) && (
+            {(selectTimeStampDate || selectDate || selectContractororVendorName || selectProjectName || selectType || selectMode) && (
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                {selectTimeStampDate && (
+                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                    <span className="font-normal">Timestamp: </span>
+                    <span className="font-bold">{selectTimeStampDate}</span>
+                    <button onClick={() => setSelectTimeStampDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  </span>
+                )}
                 {selectDate && (
                   <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                     <span className="font-normal">Date: </span>
@@ -1182,7 +1197,18 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                 </tr>
                 {showFilters && (
                   <tr className="bg-[#FAF6ED]">
-                    <th></th>
+                    <th className=" py-3">
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={selectTimeStampDate}
+                          onChange={(e) => setSelectTimeStampDate(e.target.value)}
+                          className="w-full px-1.5 py-2 pr-8 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                          placeholder="Date..."
+                        />
+                        <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
                     <th className=" py-3">
                       <div className="relative">
                         <input

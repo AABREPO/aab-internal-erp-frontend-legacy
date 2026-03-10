@@ -191,6 +191,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editEmployeeId, setEditEmployeeId] = useState('');
   const [editAadhaarPdfFile, setEditAadhaarPdfFile] = useState(null);
   const [editAadhaarImageUrl, setEditAadhaarImageUrl] = useState('');
+  const [isSiteEngineer, setIsSiteEngineer] = useState(false);
+  const [editIsSiteEngineer, setEditIsSiteEngineer] = useState(false);
 
   // State for Labours List
   const [isLaboursListDataOpen, setIsLaboursListDataOpen] = useState(false);
@@ -1118,7 +1120,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       upi_id: empUpiId,
       gpay_number: empGpayNumber,
       contact_email: empContactEmail,
-      aadhaar_image_url: aadhaarUrl
+      aadhaar_image_url: aadhaarUrl,
+      is_site_engineer: isSiteEngineer
     };
 
     console.log('Saving employee with data:', employeeDetails);
@@ -1156,6 +1159,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setEmployeeId('');
         setAadhaarPdfFile(null);
         setAadhaarImageUrl('');
+        setIsSiteEngineer(false);
         window.location.reload();
       } else {
         console.error('Save request failed:', response.status, response.statusText);
@@ -1498,6 +1502,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setEditEmpContactEmail(item.contact_email || '');
     setEditAadhaarImageUrl(item.aadhaar_image_url || '');
     setEditAadhaarPdfFile(null);
+    setEditIsSiteEngineer(item.is_site_engineer === true);
 
     // Handle QR image from backend byte array (like vendor implementation)
     let qrImagePreview = null;
@@ -3805,7 +3810,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   <button className="flex items-center text-[#E4572E] font-bold px-1 ml-4 mt-2 mb-6">
                     <img src={imports} alt='import' className='w-4 h-4 mr-1' />
                     Import File
-                  </button>                  
+                  </button>
                   <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
                     <div className="bg-[#FAF6ED]">
                       <table className="table-auto lg:w-72">
@@ -3852,8 +3857,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       </div>
       {/* Modal Forms */}
       {isSiteNamesOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[30rem] min-h-80 max-h-[90vh] overflow-y-auto px-2 py-2">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={closeSiteNames}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -3894,8 +3899,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isVendorNameOpens && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
             <div className='p-4'>
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closevendorNames}>
@@ -4064,8 +4069,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isContractorNameOpens && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
             <div className='p-4'>
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeContractorNames}>
@@ -4236,8 +4241,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isCategoryOpens && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-52 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeCategory}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -4269,8 +4274,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isMachineToolsOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-52 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeMachineTools}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -4301,8 +4306,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         )
       }
       {isEmployeeDataOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
             <div className='p-4'>
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeEmployeeDetails}>
@@ -4478,6 +4483,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                             Add Image
                           </button>
                         </div>
+                        <div className="mb-4 mt-4 flex items-center gap-2">                          
+                          <label htmlFor="isSiteEngineerAdd" className="text-sm font-medium text-gray-700">
+                            Project Incharge
+                          </label>
+                          <input
+                            type="checkbox"
+                            id="isSiteEngineerAdd"
+                            checked={isSiteEngineer}
+                            onChange={(e) => setIsSiteEngineer(e.target.checked)}
+                            className="w-4 h-4 rounded border-[#BF9853] text-[#BF9853] focus:ring-[#BF9853]"
+                          />
+                        </div>
                       </div>
                       <div className="flex space-x-2 justify-end mt-52 ml-5">
                         <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
@@ -4529,8 +4546,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isLaboursListDataOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-80 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeLabourDetails}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -4572,8 +4589,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isAccountDetailsOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
               <div className='p-4'>
                 <div>
                   <button className="text-red-500 ml-[95%]" onClick={closeAccountDetails}>
@@ -4733,8 +4750,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       {/* Edit Modal Forms */}
       {
         isEditSiteNameOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-80 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={() => setIsEditSiteNameOpen(false)}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -4794,8 +4811,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isVendorEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md px-2 py-2 text-left w-[1150px]">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1150px] max-h-[90vh] overflow-y-auto">
               <div className='p-4'>
                 <div>
                   <button className="text-red-500 ml-[95%]" onClick={resetVendorData}>
@@ -5111,8 +5128,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isVendorBulkUploadOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md px-2 py-2 text-left w-[600px]">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[600px] max-h-[90vh] overflow-y-auto">
               <div className='p-4'>
                 <div>
                   <button className="text-red-500 ml-[95%]" onClick={() => {
@@ -5164,8 +5181,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isContractorEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
               <div className='p-4'>
                 <div>
                   <button className="text-red-500 ml-[95%]" onClick={resetContractorData}>
@@ -5486,8 +5503,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isCategoriesEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-52 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={() => setIsCategoriesEditOpen(false)}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5536,8 +5553,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isMachineToolsEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-52 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={() => setIsMachineToolsEditOpen(false)}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5586,8 +5603,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isBankAccountTypeOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-52 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeBankAccountType}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5619,8 +5636,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isBankAccountTypeEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] min-h-52 max-h-[90vh] overflow-y-auto px-2 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={() => setIsBankAccountTypeEditOpen(false)}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5669,8 +5686,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isEbServiceLinkOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] text-left px-6 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] max-h-[90vh] overflow-y-auto text-left px-6 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={closeEbServiceLink}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5731,8 +5748,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       {
         isEbServiceLinkEditOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-            <div className="bg-white rounded-md w-[30rem] text-left px-6 py-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+            <div className="bg-white rounded-md w-full max-w-[30rem] max-h-[90vh] overflow-y-auto text-left px-6 py-2">
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={() => setIsEbServiceLinkEditOpen(false)}>
                   <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5811,8 +5828,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         )
       }
       {isSupportStaffNameOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[30rem] h-[320px] px-2 py-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[30rem] min-h-[320px] max-h-[90vh] overflow-y-auto px-2 py-2">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={closeSupportStaffName}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5853,8 +5870,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       )
       }
       {isSupportStaffNameEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[30rem] h-[320px] px-2 py-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[30rem] min-h-[320px] max-h-[90vh] overflow-y-auto px-2 py-2">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={() => setIsSupportStaffNameEditOpen(false)}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -5912,8 +5929,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isProjectManagementOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[95rem] max-h-[90vh] text-left overflow-y-auto pl-4 sm:pl-20">
             <div className='flex justify-end mt-4 mr-8'>
               <div>
                 <button className="text-red-500 " onClick={closeProjectManagement}>
@@ -5949,7 +5966,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Branch</label>
-                    <select 
+                    <select
                       className="w-[15rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       value={newProject.branch}
                       onChange={(e) =>
@@ -6059,7 +6076,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         onClick={() => {
                           const updatedOwners = [...newProject.ownerDetailsList];
                           updatedOwners.splice(index, 1);
-                          setNewProject((prev) => ({...prev, ownerDetailsList: updatedOwners,}));
+                          setNewProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners, }));
                         }}
                         className="absolute ml-2 mt-3 text-red-500 font-bold text-xl"
                         title="Remove this owner"
@@ -6226,8 +6243,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isProjectEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[95rem] h-[40rem] text-left overflow-y-auto pl-20">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[95rem] max-h-[90vh] text-left overflow-y-auto pl-4 sm:pl-20">
             <div className='flex justify-end mr-8 mt-5'>
               <button className="text-red-500 " onClick={() => setIsProjectEditOpen(false)}>
                 <img src={cross} alt="close" className="w-5 h-5" />
@@ -6261,7 +6278,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </div>
                   <div className="mb-4 pl-5">
                     <label className="block text-lg font-medium mb-2">Branch</label>
-                    <select 
+                    <select
                       className="w-[15rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
                       value={editProject.branch}
                       onChange={(e) =>
@@ -6509,8 +6526,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isEditEmployeeDataOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
             <div className='p-4'>
               <div>
                 <button className="text-red-500 ml-[95%]" onClick={() => setIsEditEmployeeDataOpen(false)}>
@@ -6549,7 +6566,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                     upi_id: editEmpUpiId,
                     gpay_number: editEmpGpayNumber,
                     contact_email: editEmpContactEmail,
-                    aadhaar_image_url: aadhaarUrl
+                    aadhaar_image_url: aadhaarUrl,
+                    is_site_engineer: editIsSiteEngineer
                   };
                   const employeeBlob = new Blob([JSON.stringify(employeeDetails)], { type: 'application/json' });
                   formData.append('employeeDetails', employeeBlob);
@@ -6821,20 +6839,20 @@ const MasterData = ({ username, userRoles = [] }) => {
                         <div className="mb-4">
                           <div className="w-48 h-48 border-2 border-[#BF9853] border-opacity-35 rounded-lg flex items-center justify-center bg-gray-50">
                             {editEmpUpiQRImagePreview ? (
-                              <img 
-                                src={editEmpUpiQRImagePreview} 
-                                alt="QR Preview" 
-                                className="w-full h-full object-contain rounded-lg cursor-pointer" 
+                              <img
+                                src={editEmpUpiQRImagePreview}
+                                alt="QR Preview"
+                                className="w-full h-full object-contain rounded-lg cursor-pointer"
                                 onClick={() => {
                                   setEmpUpiQRImageModalUrl(editEmpUpiQRImagePreview);
                                   setIsEmpUpiQRImageModalOpen(true);
                                 }}
                               />
                             ) : editEmpUpiQRImage ? (
-                              <img 
-                                src={URL.createObjectURL(editEmpUpiQRImage)} 
-                                alt="QR Preview" 
-                                className="w-full h-full object-contain rounded-lg cursor-pointer" 
+                              <img
+                                src={URL.createObjectURL(editEmpUpiQRImage)}
+                                alt="QR Preview"
+                                className="w-full h-full object-contain rounded-lg cursor-pointer"
                                 onClick={() => {
                                   const url = URL.createObjectURL(editEmpUpiQRImage);
                                   setEmpUpiQRImageModalUrl(url);
@@ -6869,6 +6887,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                           >
                             {isEmployeeEditMode ? 'Disable Edit' : 'Edit Employee Details'}
                           </button>
+                        </div>
+                        <div className="mb-4 mt-4 flex items-center gap-2">
+                          <label htmlFor="isSiteEngineerEdit" className="text-sm font-medium text-gray-700">
+                            Project Incharge
+                          </label>
+                          <input
+                            type="checkbox"
+                            id="isSiteEngineerEdit"
+                            checked={editIsSiteEngineer}
+                            onChange={(e) => setEditIsSiteEngineer(e.target.checked)}
+                            className="w-4 h-4 rounded border-[#BF9853] text-[#BF9853] focus:ring-[#BF9853] disabled:opacity-50"
+                          />
                         </div>
                       </div>
                       <div className="flex space-x-2 justify-end mt-40 ml-5">
@@ -6922,14 +6952,14 @@ const MasterData = ({ username, userRoles = [] }) => {
           <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center w-full mb-4">
               <h2 className="text-xl font-semibold text-gray-800">Profile Image</h2>
-              <button  className="text-red-500 hover:text-red-700" onClick={() => setIsEmpUpiQRImageModalOpen(false)}>
+              <button className="text-red-500 hover:text-red-700" onClick={() => setIsEmpUpiQRImageModalOpen(false)}>
                 <img src={cross} alt='close' className='w-5 h-5' />
               </button>
             </div>
             <div className="flex-1 flex items-center justify-center mb-4">
-              <img 
-                src={empUpiQRImageModalUrl} 
-                alt="UPI QR Code" 
+              <img
+                src={empUpiQRImageModalUrl}
+                alt="UPI QR Code"
                 className="max-w-full max-h-[70vh] object-contain rounded-lg"
               />
             </div>
@@ -6938,19 +6968,19 @@ const MasterData = ({ username, userRoles = [] }) => {
                 type="button"
                 onClick={async () => {
                   try {
-                    let downloadUrl = empUpiQRImageModalUrl;                    
+                    let downloadUrl = empUpiQRImageModalUrl;
                     // If it's a blob URL, fetch it first
                     if (empUpiQRImageModalUrl.startsWith('blob:')) {
                       const response = await fetch(empUpiQRImageModalUrl);
                       const blob = await response.blob();
                       downloadUrl = URL.createObjectURL(blob);
-                    }                    
+                    }
                     const link = document.createElement('a');
                     link.href = downloadUrl;
                     link.download = `employee_image_${Date.now()}.png`;
                     document.body.appendChild(link);
                     link.click();
-                    document.body.removeChild(link);                    
+                    document.body.removeChild(link);
                     // Clean up blob URL if we created one
                     if (downloadUrl !== empUpiQRImageModalUrl && downloadUrl.startsWith('blob:')) {
                       URL.revokeObjectURL(downloadUrl);
@@ -6976,8 +7006,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isEditLaboursListDataOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[30rem] min-h-80 max-h-[90vh] overflow-y-auto px-2 py-2">
             <div>
               <button className="text-red-500 ml-[95%]" onClick={() => setIsEditLaboursListDataOpen(false)}>
                 <img src={cross} alt='cross' className='w-5 h-5' />
@@ -7039,8 +7069,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       )
       }
       {isAccountDetailsEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div className="bg-white rounded-md px-2 py-2 text-left w-[1100px]">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md px-2 py-2 text-left w-full max-w-[1100px] max-h-[90vh] overflow-y-auto">
             <div className='p-2'>
               <div>
                 <button className="text-red-500 ml-[98%] " onClick={resetAccountData}>
@@ -7333,8 +7363,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       )
       }
       {isExportTypeModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg px-8 py-6 w-96">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50">
+          <div className="bg-white rounded-lg px-8 py-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-[#BF9853]">Select Export Type</h2>
               <button onClick={() => setIsExportTypeModalOpen(false)} className="text-red-500 hover:text-red-700">
@@ -7353,8 +7383,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         </div>
       )}
       {isExportSelectionModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg px-6 py-6 w-[1200px] max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-50">
+          <div className="bg-white rounded-lg px-6 py-6 w-full max-w-[1200px] max-h-[85vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-[#BF9853]">
                 Select {
@@ -7513,7 +7543,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                                             `${item.project_id || item.projectId || ''} - ${item.door_no || item.doorNo || ''} - ${item.eb_service_no || item.ebServiceNo || ''}`
                                   }
                                 </td>
-                                <td className="p-3 text-center">                                  
+                                <td className="p-3 text-center">
                                   <button onClick={() => handleExportItemToggle(itemId)} className="text-red-500 hover:text-red-700 transition-colors" title="Remove">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

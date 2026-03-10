@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Close from '../Images/close.png';
 
 const SearchableDropdown = ({ 
   value, 
@@ -10,7 +11,9 @@ const SearchableDropdown = ({
   showAddNew = true,
   showAllOptions = false,
   maxHeight = '144px', // 4 items * 36px height = 144px
-  className = '' // Allow custom className for width/height
+  className = '', // Allow custom className for width/height
+  suggestedNewValue = '', // Pre-fill when opening "Add New" (e.g. next Item ID like "DH 03")
+  addNewLabel = null // Override "Add New {fieldName}" (e.g. "+ DH 05" for Item ID)
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,10 +179,10 @@ const SearchableDropdown = ({
 
   const handleSelect = (option) => {
     onChange(option);
+    // Reset search query to selected value
+    setSearchQuery(option);
     // Close dropdown after selection
     setIsOpen(false);
-    // Reset search query to selected value when closing
-    setSearchQuery(option);
   };
   
   const handleClear = (e) => {
@@ -298,7 +301,7 @@ const SearchableDropdown = ({
           className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded pl-3 text-[12px] font-medium text-black bg-white focus:outline-none`}
           style={{ 
             boxSizing: 'border-box',
-            paddingRight: value ? '60px' : '32px'
+            paddingRight: value ? '40px' : '40px'
           }}
           placeholder={placeholder}
         />
@@ -308,150 +311,220 @@ const SearchableDropdown = ({
             type="button"
             onClick={handleClear}
             className="clear-button absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
-            style={{ right: '32px' }}
+            style={{ right: '12px' }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}
-        {/* Dropdown Arrow - Always visible */}
-        <div
-          className="absolute top-1/2 transform -translate-y-1/2 pointer-events-none"
-          style={{ right: '10px' }}
-        >
-          <svg 
-            width="12" 
-            height="12" 
-            viewBox="0 0 12 12" 
-            fill="none" 
-            xmlns="http://www.w3.org/2000/svg"
-            className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        {/* Dropdown Arrow - Hide when value is selected */}
+        {!value && (
+          <div
+            className="absolute top-1/2 transform -translate-y-1/2 pointer-events-none"
+            style={{ right: '12px' }}
           >
-            <path 
-              d="M2.5 4.5L6 8L9.5 4.5" 
-              stroke="#666" 
-              strokeWidth="1.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-            />
-          </svg>
-        </div>
+            <svg 
+              width="12" 
+              height="12" 
+              viewBox="0 0 12 12" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
+              className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            >
+              <path 
+                d="M2.5 4.5L6 8L9.5 4.5" 
+                stroke="#666" 
+                strokeWidth="1.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+              />
+            </svg>
+          </div>
+        )}
       </div>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu - Always show as popup modal */}
       {isOpen && (
         <div 
-          className={`dropdown-options bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] shadow-lg ${
-            showAllOptions ? 'overflow-y-auto' : 'overflow-hidden'
-          }`}
-          style={{
-            ...dropdownStyle,
-            maxHeight: showAllOptions ? maxHeight : 'auto'
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-4 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsOpen(false);
+              setSearchQuery(value || '');
+            }
           }}
-          onMouseDown={(e) => e.preventDefault()}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
         >
-          {/* Create New Option - Show when typing something that doesn't exist (like SelectVendorModal) */}
-          {canCreateNew && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCreateNewFromSearch();
-              }}
-              className="w-full h-[36px] px-3 flex items-center gap-2 hover:bg-[#f3f5f7] text-left border-b border-[rgba(0,0,0,0.08)]"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <p className="text-[12px] font-medium text-black">"{searchQueryTrimmed}"</p>
-            </button>
-          )}
-
-          {/* Add New Option - Only show if showAddNew is true and no creatable option is available */}
-          {showAddNew && !canCreateNew && (
-            <>
-              {!showAddInput ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowAddInput(true);
-                  }}
-                  className="w-full h-[36px] px-3 flex items-center gap-2 hover:bg-[#f3f5f7] text-left border-b border-[rgba(0,0,0,0.08)]"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                  <p className="text-[12px] font-medium text-black">Add New {fieldName}</p>
-                </button>
-              ) : (
-                <div className="p-2 border-b border-[rgba(0,0,0,0.16)]">
-                  <input
-                    type="text"
-                    value={newOption}
-                    onChange={(e) => setNewOption(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddNew()}
-                    className="w-full h-[36px] border border-[rgba(0,0,0,0.16)] rounded-[6px] px-3 text-[12px] font-medium text-black bg-white mb-2"
-                    placeholder={`Enter new ${fieldName.toLowerCase()}`}
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddNew();
-                      }}
-                      className="flex-1 h-[32px] rounded-[6px] bg-black text-white text-[12px] font-medium"
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowAddInput(false);
-                        setNewOption('');
-                      }}
-                      className="flex-1 h-[32px] rounded-[6px] border border-[#949494] text-[#363636] text-[12px] font-medium bg-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Filtered Options - Show all when showAllOptions is true */}
-          {visibleOptions.length > 0 ? (
-            <div>
-              {visibleOptions.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelect(option);
-                  }}
-                  className={`w-full h-[36px] px-3 flex items-center justify-between hover:bg-[#f3f5f7] text-left ${
-                    value === option ? 'bg-[#f3f5f7]' : ''
-                  }`}
-                >
-                  <p className="text-[12px] font-medium text-black">{option}</p>
-                  {value === option && (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="7" cy="7" r="6" stroke="#26bf94" strokeWidth="2" />
-                      <path d="M4 7L6 9L10 5" stroke="#26bf94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </button>
-              ))}
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-5">
+              <p className="text-[16px] font-semibold text-black">Select {fieldName}</p>
+              <button onClick={() => {
+                setIsOpen(false);
+                setSearchQuery(value || '');
+              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+              </button>
             </div>
-          ) : (
-            searchQuery && !canCreateNew && (
-              <p className="text-[12px] text-[#777777] text-center py-4">
-                No results found
-              </p>
-            )
-          )}
+            <div className="px-6 pt-4 pb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {/* Create New Option - Show when typing something that doesn't exist */}
+                {canCreateNew && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCreateNewFromSearch();
+                    }}
+                    className="w-full px-6 flex items-center gap-3 transition-colors hover:bg-[#F5F5F5]"
+                    style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                  >
+                    <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <p className="text-[12px] font-medium text-black">"{searchQueryTrimmed}"</p>
+                  </button>
+                )}
+
+                {/* Add New Option - Only show if showAddNew is true and no creatable option is available */}
+                {showAddNew && !canCreateNew && (
+                  <>
+                    {!showAddInput ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewOption(suggestedNewValue || '');
+                          setShowAddInput(true);
+                        }}
+                        className="w-full px-6 flex items-center gap-3 transition-colors hover:bg-[#F5F5F5]"
+                        style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                      >
+                        <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                        <p className="text-[12px] font-medium text-black">{addNewLabel ?? `Add New ${fieldName}`}</p>
+                      </button>
+                    ) : (
+                      <div className="p-4 border-b border-[rgba(0,0,0,0.16)]">
+                        <input
+                          type="text"
+                          value={newOption}
+                          onChange={(e) => setNewOption(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddNew()}
+                          className="w-full h-[36px] border border-[rgba(0,0,0,0.16)] rounded-[6px] px-3 text-[12px] font-medium text-black bg-white mb-2"
+                          placeholder={`Enter new ${fieldName.toLowerCase()}`}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleAddNew();
+                            }}
+                            className="flex-1 h-[32px] rounded-[6px] bg-black text-white text-[12px] font-medium"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddInput(false);
+                              setNewOption('');
+                            }}
+                            className="flex-1 h-[32px] rounded-[6px] border border-[#949494] text-[#363636] text-[12px] font-medium bg-white"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Filtered Options */}
+                {filteredOptions.length > 0 ? (
+                  <div className="space-y-0">
+                    {filteredOptions.map((option, index) => {
+                      // Helper function to split option text at first hyphen (like From dropdown)
+                      const splitOptionText = (text) => {
+                        if (!text) return { firstLine: '', secondLine: '' };
+                        const firstHyphenIndex = text.indexOf(' - ');
+                        if (firstHyphenIndex === -1) {
+                          return { firstLine: text, secondLine: '' };
+                        }
+                        return {
+                          firstLine: text.substring(0, firstHyphenIndex),
+                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                        };
+                      };
+                      const { firstLine, secondLine } = splitOptionText(option);
+                      const isSelected = value === option;
+                      
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSelect(option);
+                          }}
+                          className={`w-full px-6 flex items-center gap-3 transition-colors ${
+                            isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                          }`}
+                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                        >
+                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          <div className="flex flex-col flex-1 min-w-0 text-left">
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            {secondLine && (
+                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                      {searchQuery ? 'No options found' : 'No options available'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

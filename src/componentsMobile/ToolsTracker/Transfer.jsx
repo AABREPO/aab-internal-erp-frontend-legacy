@@ -111,7 +111,7 @@ const Transfer = ({ user }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState('Working');
+  const [uploadStatus, setUploadStatus] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [statusOptions] = useState(['Working', 'Not Working', 'Under Repair', 'Machine Dead']);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -128,7 +128,7 @@ const Transfer = ({ user }) => {
   const [selectedSearchItem, setSelectedSearchItem] = useState(null);
   const [showSearchUploadModal, setShowSearchUploadModal] = useState(false);
   const [searchUploadFiles, setSearchUploadFiles] = useState([]);
-  const [searchUploadStatus, setSearchUploadStatus] = useState('Working');
+  const [searchUploadStatus, setSearchUploadStatus] = useState('');
   const [searchUploadDescription, setSearchUploadDescription] = useState('');
   const [showSearchStatusDropdown, setShowSearchStatusDropdown] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -165,6 +165,13 @@ const Transfer = ({ user }) => {
       message: String(message ?? '')
     });
   };
+  const filteredStatusOptions = React.useMemo(
+    () =>
+      entryServiceMode === 'Service' && serviceFlowMode === 'sent'
+        ? statusOptions.filter((status) => status !== 'Working')
+        : statusOptions,
+    [entryServiceMode, serviceFlowMode, statusOptions]
+  );
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -571,6 +578,12 @@ const Transfer = ({ user }) => {
     if (!normalized) return null;
     const [day, month, year] = normalized.split('/');
     return `${year}-${month}-${day}T00:00:00`;
+  };
+  // Format date for API as dd-mm-yyyy
+  const formatDateAsDdMmYyyy = (dateValue) => {
+    const normalized = normalizeDisplayDate(dateValue);
+    if (!normalized) return null;
+    return normalized.replace(/\//g, '-');
   };
   const areFieldsFilled = entryServiceMode === 'Entry'
     ? (selectedFrom && selectedTo && selectedIncharge)
@@ -1248,7 +1261,7 @@ const Transfer = ({ user }) => {
     setShowUploadModal(false);
     setUploadFiles([]);
     setIsUploading(false);
-    setUploadStatus('Working');
+    setUploadStatus('');
     setUploadDescription('');
   };
   const validateDraftItemBeforeAdd = (draft) => {
@@ -1355,6 +1368,7 @@ const Transfer = ({ user }) => {
         if (!isValidToAdd) {
           return;
         }
+        setUploadStatus('');
         setShowUploadModal(true);
       }
     }
@@ -1979,6 +1993,15 @@ const Transfer = ({ user }) => {
   };
 
   const handleConfirmUpload = () => {
+    if (!uploadStatus) {
+      alert('Please select the machine status before confirming.');
+      return;
+    }
+    // For Service tab, image upload is required
+    if (entryServiceMode === 'Service' && uploadFiles.length === 0) {
+      alert('Image should upload definitely.');
+      return;
+    }
     // If itemId is selected, only check the full set (itemIdsId + brandId + machineNumber)
     // Don't check itemNameId separately when itemId is selected
     if (selectedFrom && addItemFormData.itemIdDbId) {
@@ -2152,6 +2175,8 @@ const Transfer = ({ user }) => {
         to_project_id: entryServiceMode === 'Entry' && selectedTo?.id ? String(selectedTo.id) : null,
         project_incharge_id: selectedIncharge?.id ? String(selectedIncharge.id) : null,
         service_store_id: entryServiceMode === 'Service' && selectedServiceStore?.id ? String(selectedServiceStore.id) : null,
+        // Persist the user-selected/auto-selected date
+        date: formatDateAsDdMmYyyy(date),
         created_date_time: getApiDateTimeFromDisplayDate(date),
         tools_entry_type: entryServiceMode.toLowerCase(),
         tools_tracker_item_name_table: updatedItemRows
@@ -2166,7 +2191,6 @@ const Transfer = ({ user }) => {
       if (!response.ok) {
         throw new Error(`Failed to update: ${response.status} ${response.statusText}`);
       }
-
       // Save machine_status to the new API for each item that has itemIdsId and machine_number_id
       const machineStatusPromises = statusItemsForApi
         .filter(item => item.item_ids_id && item.machine_number_id)
@@ -2213,6 +2237,7 @@ const Transfer = ({ user }) => {
         const data = await countRes.json();
         setEntryNo(data + 1);
       }
+      window.location.reload();
     } catch (error) {
       console.error('Error updating transfer:', error);
       alert('Failed to update. Please try again.');
@@ -2425,7 +2450,9 @@ const Transfer = ({ user }) => {
           to_project_id: null,
           project_incharge_id: null,
           service_store_id: null,
-          created_date_time: getApiDateTimeFromDisplayDate(date),
+        // Persist the user-selected/auto-selected date
+        date: formatDateAsDdMmYyyy(date),
+        created_date_time: getApiDateTimeFromDisplayDate(date),
           created_by: user?.name || user?.username || 'mobile',
           tools_entry_type: 'relocate',
           eno: String(entryNo),
@@ -2493,6 +2520,8 @@ const Transfer = ({ user }) => {
           created_by: user?.name || user?.username || 'mobile',
           tools_entry_type: isServiceReturn ? 'service_return' : entryServiceMode.toLowerCase(),
           eno: String(entryNo),
+          date: formatDateAsDdMmYyyy(date),
+          created_date_time: getApiDateTimeFromDisplayDate(date),
           tools_tracker_item_name_table: itemRows
         };
       }
@@ -2568,6 +2597,7 @@ const Transfer = ({ user }) => {
       } else {
         setEntryNo(prev => prev + 1);
       }
+      window.location.reload();
     } catch (error) {
       console.error('Error saving transfer:', error);
       alert('Failed to save transfer. Please try again.');
@@ -2756,7 +2786,7 @@ const Transfer = ({ user }) => {
   const handleConfirmSearchItem = () => {
     setShowSearchConfirmModal(false);
     setSearchUploadFiles([]);
-    setSearchUploadStatus('Working');
+    setSearchUploadStatus('');
     setSearchUploadDescription('');
     setShowSearchUploadModal(true);
   };
@@ -2768,7 +2798,7 @@ const Transfer = ({ user }) => {
     setShowSearchUploadModal(false);
     setSelectedSearchItem(null);
     setSearchUploadFiles([]);
-    setSearchUploadStatus('Working');
+    setSearchUploadStatus('');
     setSearchUploadDescription('');
   };
   const handleSearchFileSelect = (e) => {
@@ -2802,6 +2832,15 @@ const Transfer = ({ user }) => {
     setSearchUploadFiles(prev => prev.filter(f => f.id !== fileId));
   };
   const handleConfirmSearchUpload = () => {
+    if (!searchUploadStatus) {
+      alert('Please select the machine status before confirming.');
+      return;
+    }
+    // For Service tab, image upload is required
+    if (entryServiceMode === 'Service' && searchUploadFiles.length === 0) {
+      alert('Image should upload definitely.');
+      return;
+    }
     if (!selectedSearchItem) return;
     const selectedItemNameId = selectedSearchItem?.item_name_id ?? selectedSearchItem?.itemNameId ?? null;
     const selectedBrandId = selectedSearchItem?.brand_id ?? selectedSearchItem?.brandId ?? selectedSearchItem?.brand_name_id ?? selectedSearchItem?.brandNameId ?? null;
@@ -2843,16 +2882,131 @@ const Transfer = ({ user }) => {
     handleCloseSearchUploadModal();
   };
   const getFilteredSearchItems = () => {
+    // Special handling for Service Return: pull items from service store using movement history
+    if (entryServiceMode === 'Service' && serviceFlowMode === 'return' && selectedServiceStore) {
+      const serviceStoreIdStr = String(selectedServiceStore.id);
+      const searchLower = universalSearchQuery.toLowerCase();
+
+      const results = [];
+
+      toolsTrackerManagementData.forEach((entry) => {
+        const entryTypeNorm = getEntryTypeNormalized(entry);
+        if (!isServiceEntryType(entryTypeNorm)) return;
+
+        const entryServiceStoreId = entry?.service_store_id ?? entry?.serviceStoreId;
+        if (!entryServiceStoreId || String(entryServiceStoreId) !== serviceStoreIdStr) return;
+
+        const entryItems = entry?.tools_tracker_item_name_table ?? entry?.toolsTrackerItemNameTable ?? [];
+
+        entryItems.forEach((entryItem) => {
+          const itemIdsId = entryItem?.item_ids_id ?? entryItem?.itemIdsId ?? null;
+          const itemNameId = entryItem?.item_name_id ?? entryItem?.itemNameId ?? null;
+          const brandId = entryItem?.brand_id ?? entryItem?.brandId ?? entryItem?.brand_name_id ?? entryItem?.brandNameId ?? null;
+
+          // For item sets, ensure the current location is still this service store
+          if (itemIdsId) {
+            const resolvedMachineNumber = resolveMachineNumberText(
+              entryItem?.machine_number_id ??
+              entryItem?.machineNumberId ??
+              entryItem?.machine_number ??
+              entryItem?.machineNumber ??
+              ''
+            );
+
+            if (!isItemSetAvailableAtLocation(itemIdsId, brandId, resolvedMachineNumber, serviceStoreIdStr)) {
+              return;
+            }
+          }
+
+          const itemNameObj = toolsItemNameListData.find(
+            i => String(i?.id) === String(itemNameId)
+          );
+          const itemIdObj = toolsItemIdFullData.find(
+            i => String(i?.id) === String(itemIdsId)
+          );
+          const brandObj = toolsBrandFullData.find(
+            i => String(i?.id) === String(brandId)
+          );
+
+          const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
+          const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
+          const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
+          const machineNumberDisplay = resolveMachineNumberText(
+            entryItem?.machine_number_id ??
+            entryItem?.machineNumberId ??
+            entryItem?.machine_number ??
+            entryItem?.machineNumber ??
+            ''
+          );
+
+          if (
+            searchLower &&
+            !(
+              itemName.toLowerCase().includes(searchLower) ||
+              itemIdName.toLowerCase().includes(searchLower) ||
+              brandName.toLowerCase().includes(searchLower) ||
+              machineNumberDisplay.toLowerCase().includes(searchLower)
+            )
+          ) {
+            return;
+          }
+
+          results.push({
+            ...entryItem,
+            item_name_id: itemNameId,
+            item_ids_id: itemIdsId,
+            brand_id: brandId,
+            itemName,
+            itemId: itemIdName,
+            brand: brandName,
+            machine_number: machineNumberDisplay
+          });
+        });
+      });
+
+      return results;
+    }
+
     if (!stockManagementData || stockManagementData.length === 0) return [];
+
+    // Resolve "From" location for all other flows
+    const fromLocationId = entryServiceMode === 'Relocate'
+      ? (selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null)
+      : (selectedFrom?.id ? String(selectedFrom.id) : null);
+
+    // Require From to be selected - cannot determine availability without it
+    if (!fromLocationId) return [];
+
     return stockManagementData.filter(item => {
+      const itemNameId = item?.item_name_id ?? item?.itemNameId;
+      const brandId = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+      const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
+
+      // Filter by "From" location: only show items available at the selected From
+      if (fromLocationId) {
+        if (itemIdsId) {
+          // Item set (unique machine): check if available at location
+          const machineNumber = resolveMachineNumFromStock(item) || (item?.machine_number ?? item?.machineNumber ?? '').trim();
+          if (!isItemSetAvailableAtLocation(itemIdsId, brandId, machineNumber, fromLocationId)) {
+            return false;
+          }
+        } else {
+          // Quantity-based item: check if any quantity available at location
+          const availableQty = getAvailableQuantityAtLocation(itemNameId, brandId, fromLocationId);
+          if (availableQty <= 0) {
+            return false;
+          }
+        }
+      }
+
       const itemNameObj = toolsItemNameListData.find(
-        i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId)
+        i => String(i?.id) === String(itemNameId)
       );
       const itemIdObj = toolsItemIdFullData.find(
-        i => String(i?.id) === String(item?.item_ids_id ?? item?.itemIdsId)
+        i => String(i?.id) === String(itemIdsId)
       );
       const brandObj = toolsBrandFullData.find(
-        i => String(i?.id) === String(item?.brand_id ?? item?.brandId)
+        i => String(i?.id) === String(brandId)
       );
       const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
       const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
@@ -3714,8 +3868,8 @@ const Transfer = ({ user }) => {
   };
   return (
     <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex-shrink-0 px-4 pt-1 pb-0.5 flex items-center justify-between">
-        <div className="flex items-center gap-1">
+      <div className="flex-shrink-0 px-4 flex pt-1.5 pb-1.5 items-center justify-between">
+        <div className="flex items-center gap-1 ">
           <p className="text-[12px] font-semibold text-black leading-normal">
             #{entryNo || 'NO'}
           </p>
@@ -3723,7 +3877,7 @@ const Transfer = ({ user }) => {
             {date}
           </button>
         </div>
-        <div className='flex gap-3'>
+        <div className='flex gap-3 items-center'>
           {isEditMode ? (
             <>
               <button
@@ -3733,30 +3887,32 @@ const Transfer = ({ user }) => {
               >
                 {isSaving ? 'Updating...' : 'Update'}
               </button>
-              <button onClick={() => setIsEditingTransferDetails(!isEditingTransferDetails)}>
+              <button 
+                onClick={() => setIsEditingTransferDetails(!isEditingTransferDetails)}
+                className={items.length > 0 ? '' : 'invisible'}
+              >
                 <img src={Edit} alt="Edit" className="w-[14px] h-[14px]" />
               </button>
             </>
           ) : (
             <>
-              {(cloneModeActive || ((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled))) && (
-                <button
-                  onClick={() => setShowConfirmModal(true)}
-                  disabled={isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)}
-                  className={`flex items-center gap-1 text-[14px] font-medium ${isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0) ? 'text-gray-400' : 'text-black'}`}
-                >
-                  {isSaving ? (
-                    <span className="text-gray-500">...</span>
-                  ) : (
-                    <span>{entryServiceMode === 'Service' ? (serviceFlowMode === 'return' ? 'Return from Service' : 'Sent to service') : entryServiceMode === 'Relocate' ? 'Relocate' : 'Transfer'}</span>
-                  )}
-                </button>
-              )}
-              <div>
-                <button onClick={() => setIsEditingTransferDetails(!isEditingTransferDetails)}>
-                  <img src={Edit} alt="Edit" className="w-[14px] h-[14px]" />
-                </button>
-              </div>
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                disabled={isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)}
+                className={`flex items-center gap-1 text-[14px] font-medium ${isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0) ? 'text-gray-400' : 'text-black'} ${(cloneModeActive || ((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled))) ? '' : 'invisible'}`}
+              >
+                {isSaving ? (
+                  <span className="text-gray-500">...</span>
+                ) : (
+                  <span>{entryServiceMode === 'Service' ? (serviceFlowMode === 'return' ? 'Return from Service' : 'Sent to service') : entryServiceMode === 'Relocate' ? 'Relocate' : 'Transfer'}</span>
+                )}
+              </button>
+              <button 
+                onClick={() => setIsEditingTransferDetails(!isEditingTransferDetails)}
+                className={items.length > 0 ? '' : 'invisible'}
+              >
+                <img src={Edit} alt="Edit" className="w-[14px] h-[14px]" />
+              </button>
             </>
           )}
         </div>
@@ -3835,7 +3991,7 @@ const Transfer = ({ user }) => {
             <>
               <div className="relative dropdown-container">
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                  From<span className="text-[#eb2f8e]">*</span>
+                  From<span className="text-[#E4572E]">*</span>
                 </p>
                 <div className="relative">
                   <div
@@ -3860,18 +4016,20 @@ const Transfer = ({ user }) => {
                         e.stopPropagation();
                         setSelectedFrom(null);
                       }}
-                      className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                     >
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
                   )}
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
+                  {!selectedFrom && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
               {showFromDropdown && entryServiceMode !== 'Relocate' && !(entryServiceMode === 'Service' && serviceFlowMode === 'return') && (
@@ -3916,6 +4074,19 @@ const Transfer = ({ user }) => {
                             {getFilteredFromOptions().map((option) => {
                               const isFavorite = fromFavorites.includes(option.id);
                               const isSelected = selectedFrom?.id === option.id;
+                              // Helper function to split option text at first hyphen
+                              const splitOptionText = (text) => {
+                                if (!text) return { firstLine: '', secondLine: '' };
+                                const firstHyphenIndex = text.indexOf(' - ');
+                                if (firstHyphenIndex === -1) {
+                                  return { firstLine: text, secondLine: '' };
+                                }
+                                return {
+                                  firstLine: text.substring(0, firstHyphenIndex),
+                                  secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                                };
+                              };
+                              const { firstLine, secondLine } = splitOptionText(option.label);
                               return (
                                 <button
                                   key={option.id}
@@ -3973,33 +4144,25 @@ const Transfer = ({ user }) => {
                                     setShowFromDropdown(false);
                                     setIsEditingTransferDetails(false);
                                   }}
-                                  className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                  className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                                     }`}
+                                  style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                                 >
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <button onClick={(e) => handleToggleFromFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                      {isFavorite ? (
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                      ) : (
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                      )}
-                                    </button>
-                                    <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                                  </div>
-                                  <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                                    {isSelected ? (
+                                  <button onClick={(e) => handleToggleFromFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                    {isFavorite ? (
                                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                        <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                        <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                       </svg>
                                     ) : (
                                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                        <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                       </svg>
+                                    )}
+                                  </button>
+                                  <div className="flex flex-col flex-1 min-w-0 text-left">
+                                    <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                    {secondLine && (
+                                      <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                                     )}
                                   </div>
                                 </button>
@@ -4024,7 +4187,7 @@ const Transfer = ({ user }) => {
             <div className=" relative dropdown-container">
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                  {isServiceSwapIconToggled ? 'From' : 'To'}<span className="text-[#eb2f8e]">*</span>
+                  {isServiceSwapIconToggled ? 'From' : 'To'}<span className="text-[#E4572E]">*</span>
                 </p>
                 {serviceFlowMode === 'sent' && (
                   <button onClick={() => {
@@ -4068,18 +4231,20 @@ const Transfer = ({ user }) => {
                       e.stopPropagation();
                       setSelectedServiceStore(null);
                     }}
-                    className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 )}
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
+                {!selectedServiceStore && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -4140,18 +4305,20 @@ const Transfer = ({ user }) => {
                       e.stopPropagation();
                       setSelectedTo(null);
                     }}
-                    className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 )}
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
+                {!selectedTo && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -4197,6 +4364,19 @@ const Transfer = ({ user }) => {
                         {getFilteredToOptions().map((option) => {
                           const isFavorite = toFavorites.includes(option.id);
                           const isSelected = selectedTo?.id === option.id;
+                          // Helper function to split option text at first hyphen
+                          const splitOptionText = (text) => {
+                            if (!text) return { firstLine: '', secondLine: '' };
+                            const firstHyphenIndex = text.indexOf(' - ');
+                            if (firstHyphenIndex === -1) {
+                              return { firstLine: text, secondLine: '' };
+                            }
+                            return {
+                              firstLine: text.substring(0, firstHyphenIndex),
+                              secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                            };
+                          };
+                          const { firstLine, secondLine } = splitOptionText(option.label);
                           return (
                             <button
                               key={option.id}
@@ -4205,33 +4385,25 @@ const Transfer = ({ user }) => {
                                 setShowToDropdown(false);
                                 setIsEditingTransferDetails(false);
                               }}
-                              className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                              className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                                 }`}
+                              style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                             >
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <button onClick={(e) => handleToggleToFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                  {isFavorite ? (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  ) : (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  )}
-                                </button>
-                                <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                              </div>
-                              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                                {isSelected ? (
+                              <button onClick={(e) => handleToggleToFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                {isFavorite ? (
                                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                    <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                 ) : (
                                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
+                                )}
+                              </button>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                {secondLine && (
+                                  <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                                 )}
                               </div>
                             </button>
@@ -4306,6 +4478,19 @@ const Transfer = ({ user }) => {
                         {getFilteredServiceStoreOptions().map((option) => {
                           const isFavorite = serviceStoreFavorites.includes(option.id);
                           const isSelected = selectedServiceStore?.id === option.id;
+                          // Helper function to split option text at first hyphen
+                          const splitOptionText = (text) => {
+                            if (!text) return { firstLine: '', secondLine: '' };
+                            const firstHyphenIndex = text.indexOf(' - ');
+                            if (firstHyphenIndex === -1) {
+                              return { firstLine: text, secondLine: '' };
+                            }
+                            return {
+                              firstLine: text.substring(0, firstHyphenIndex),
+                              secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                            };
+                          };
+                          const { firstLine, secondLine } = splitOptionText(option.label);
                           return (
                             <button
                               key={option.id}
@@ -4314,33 +4499,25 @@ const Transfer = ({ user }) => {
                                 setShowServiceStoreDropdown(false);
                                 setIsEditingTransferDetails(false);
                               }}
-                              className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                              className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                                 }`}
+                              style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                             >
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <button onClick={(e) => handleToggleServiceStoreFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                  {isFavorite ? (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  ) : (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  )}
-                                </button>
-                                <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                              </div>
-                              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                                {isSelected ? (
+                              <button onClick={(e) => handleToggleServiceStoreFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                {isFavorite ? (
                                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                    <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                 ) : (
                                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
+                                )}
+                              </button>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                {secondLine && (
+                                  <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                                 )}
                               </div>
                             </button>
@@ -4361,7 +4538,7 @@ const Transfer = ({ user }) => {
           )}
           <div className="relative dropdown-container">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Project Incharge<span className="text-[#eb2f8e]">*</span>
+              Project Incharge<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div
@@ -4387,18 +4564,20 @@ const Transfer = ({ user }) => {
                     e.stopPropagation();
                     setSelectedIncharge(null);
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              {!selectedIncharge && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
           {showInchargeDropdown && (
@@ -4463,34 +4642,23 @@ const Transfer = ({ user }) => {
                                 setShowInchargeDropdown(false);
                                 setIsEditingTransferDetails(false);
                               }}
-                              className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                              className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                                 }`}
+                              style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                             >
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <button onClick={(e) => handleToggleInchargeFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0" >
-                                  {isFavorite ? (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  ) : (
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  )}
-                                </button>
-                                <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                              </div>
-                              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                                {isSelected ? (
+                              <button onClick={(e) => handleToggleInchargeFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0" >
+                                {isFavorite ? (
                                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                    <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                 ) : (
                                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                 )}
+                              </button>
+                              <div className="flex flex-col flex-1 min-w-0 text-left">
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{option.label}</p>
                               </div>
                             </button>
                           );
@@ -4539,7 +4707,7 @@ const Transfer = ({ user }) => {
         <div className="flex-shrink-0 px-4 space-y-[6px]">
           <div className="relative dropdown-container">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Item ID<span className="text-[#eb2f8e]">*</span>
+              Item ID<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div
@@ -4566,18 +4734,20 @@ const Transfer = ({ user }) => {
                     setSelectedCurrentLocation(null);
                     setRelocateItemDetails(null);
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              {!selectedRelocateItemId && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
             </div>
             {showRelocateItemIdDropdown && (
               <div
@@ -4642,6 +4812,19 @@ const Transfer = ({ user }) => {
                             const itemIdDbId = itemIdObj?.id;
                             const isFavorite = itemIdDbId && relocateItemIdFavorites.includes(itemIdDbId);
                             const isSelected = selectedRelocateItemId && String(selectedRelocateItemId) === String(itemIdDbId);
+                            // Helper function to split option text at first hyphen
+                            const splitOptionText = (text) => {
+                              if (!text) return { firstLine: '', secondLine: '' };
+                              const firstHyphenIndex = text.indexOf(' - ');
+                              if (firstHyphenIndex === -1) {
+                                return { firstLine: text, secondLine: '' };
+                              }
+                              return {
+                                firstLine: text.substring(0, firstHyphenIndex),
+                                secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                              };
+                            };
+                            const { firstLine, secondLine } = splitOptionText(option);
                             return (
                               <button
                                 key={option}
@@ -4728,33 +4911,25 @@ const Transfer = ({ user }) => {
                                     setRelocateItemDetails(null);
                                   }
                                 }}
-                                className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                                   }`}
+                                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                               >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <button onClick={(e) => handleToggleItemIdFavorite(e, option)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                    {isFavorite ? (
-                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                      </svg>
-                                    ) : (
-                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                      </svg>
-                                    )}
-                                  </button>
-                                  <p className="text-[14px] font-medium text-black text-left truncate">{option}</p>
-                                </div>
-                                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                                  {isSelected ? (
+                                <button onClick={(e) => handleToggleItemIdFavorite(e, option)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                  {isFavorite ? (
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                      <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                   ) : (
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                      <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
+                                  )}
+                                </button>
+                                <div className="flex flex-col flex-1 min-w-0 text-left">
+                                  <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                                  {secondLine && (
+                                    <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                                   )}
                                 </div>
                               </button>
@@ -4776,7 +4951,7 @@ const Transfer = ({ user }) => {
           </div>
           <div className="relative dropdown-container">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Current Location<span className="text-[#eb2f8e]">*</span>
+              Current Location<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div
@@ -4805,23 +4980,25 @@ const Transfer = ({ user }) => {
                     setSelectedCurrentLocation(null);
                     setRelocateItemDetails(null);
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              {!selectedCurrentLocation && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
           <div className="mb-2 relative dropdown-container">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Relocate Location<span className="text-[#eb2f8e]">*</span>
+              Relocate Location<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div
@@ -4851,19 +5028,20 @@ const Transfer = ({ user }) => {
                     e.stopPropagation();
                     setSelectedRelocateLocation(null);
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                  style={{ zIndex: 5 }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              {!selectedRelocateLocation && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
           {selectedRelocateItemId && relocateItemDetails && (
@@ -4878,7 +5056,7 @@ const Transfer = ({ user }) => {
                     <span className="flex-1 truncate text-[#4F4F4F]">{relocateItemDetails.itemName || '-'}</span>
                   </div>
                   <div className="flex items-start text-[12px] leading-normal ">
-                    <span className="w-[102px] text-black">Birth Location</span>
+                    <span className="w-[102px] text-black">Home Location</span>
                     <span className="mx-2">:</span>
                     <span className="flex-1 truncate text-[#4F4F4F]">{relocateItemDetails.birthLocation || '-'}</span>
                   </div>
@@ -4952,6 +5130,19 @@ const Transfer = ({ user }) => {
                     {getFilteredRelocateLocationOptions().map((option) => {
                       const isFavorite = relocateLocationFavorites.includes(option.id);
                       const isSelected = selectedRelocateLocation?.id === option.id;
+                      // Helper function to split option text at first hyphen
+                      const splitOptionText = (text) => {
+                        if (!text) return { firstLine: '', secondLine: '' };
+                        const firstHyphenIndex = text.indexOf(' - ');
+                        if (firstHyphenIndex === -1) {
+                          return { firstLine: text, secondLine: '' };
+                        }
+                        return {
+                          firstLine: text.substring(0, firstHyphenIndex),
+                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                        };
+                      };
+                      const { firstLine, secondLine } = splitOptionText(option.label);
                       return (
                         <button
                           key={option.id}
@@ -4961,33 +5152,25 @@ const Transfer = ({ user }) => {
                             setRelocateLocationSearchQuery('');
                             setIsEditingTransferDetails(false);
                           }}
-                          className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                          className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                             }`}
+                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                         >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <button onClick={(e) => handleToggleRelocateLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                              {isFavorite ? (
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              ) : (
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </button>
-                            <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                          </div>
-                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                            {isSelected ? (
+                          <button onClick={(e) => handleToggleRelocateLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            {isFavorite ? (
                               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                             ) : (
                               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
+                            )}
+                          </button>
+                          <div className="flex flex-col flex-1 min-w-0 text-left">
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            {secondLine && (
+                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                             )}
                           </div>
                         </button>
@@ -5043,6 +5226,19 @@ const Transfer = ({ user }) => {
                     {getFilteredCurrentLocationOptions().map((option) => {
                       const isFavorite = currentLocationFavorites.includes(option.id);
                       const isSelected = selectedCurrentLocation?.id === option.id;
+                      // Helper function to split option text at first hyphen
+                      const splitOptionText = (text) => {
+                        if (!text) return { firstLine: '', secondLine: '' };
+                        const firstHyphenIndex = text.indexOf(' - ');
+                        if (firstHyphenIndex === -1) {
+                          return { firstLine: text, secondLine: '' };
+                        }
+                        return {
+                          firstLine: text.substring(0, firstHyphenIndex),
+                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                        };
+                      };
+                      const { firstLine, secondLine } = splitOptionText(option.label);
                       return (
                         <button
                           key={option.id}
@@ -5052,33 +5248,25 @@ const Transfer = ({ user }) => {
                             setCurrentLocationSearchQuery('');
                             setIsEditingTransferDetails(false);
                           }}
-                          className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                          className={`w-full px-6 flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                             }`}
+                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                         >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <button onClick={(e) => handleToggleCurrentLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                              {isFavorite ? (
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              ) : (
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </button>
-                            <p className="text-[14px] font-medium text-black text-left truncate">{option.label}</p>
-                          </div>
-                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                            {isSelected ? (
+                          <button onClick={(e) => handleToggleCurrentLocationFavorite(e, option.id)} className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            {isFavorite ? (
                               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                                <circle cx="10" cy="10" r="4" fill="#e4572e" />
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
                             ) : (
                               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
+                            )}
+                          </button>
+                          <div className="flex flex-col flex-1 min-w-0 text-left">
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            {secondLine && (
+                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                             )}
                           </div>
                         </button>
@@ -5098,7 +5286,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {entryServiceMode !== 'Relocate' && (
-        <div className="flex-shrink-0 px-4 pt-4">
+        <div className="flex-shrink-0 px-4 pt-2">
           <div className="flex items-center justify-between pb-2 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <p className="text-[12px] font-semibold text-black leading-normal">Items</p>
@@ -5321,11 +5509,6 @@ const Transfer = ({ user }) => {
               <p className="text-[16px] font-medium text-black leading-normal">
                 {editingItem ? 'Edit Item' : 'Add Items'}
               </p>
-              <div className="flex items-center gap-2">
-                <button onClick={() => {/* Handle category selection */ }} className="text-[16px] font-semibold text-black" >
-                  {selectedCategory ? selectedCategory.value : 'Electricals'}
-                </button>
-              </div>
             </div>
             <div className="px-6 pb-6">
               <div className="flex gap-3 mb-[10px]">
@@ -5499,14 +5682,14 @@ const Transfer = ({ user }) => {
                   <div onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                     className="w-full h-[40px] border border-gray-300 rounded-lg px-4 flex items-center justify-between cursor-pointer bg-white"
                   >
-                    <span className="text-[14px] text-black">{uploadStatus}</span>
+                    <span className="text-[14px] text-black">{uploadStatus || 'Select'}</span>
                     <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   {showStatusDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
-                      {statusOptions.map((status) => (
+                      {(entryServiceMode === 'Service' && serviceFlowMode === 'sent' ? filteredStatusOptions : statusOptions).map((status) => (
                         <button
                           key={status}
                           onClick={() => {
@@ -5534,8 +5717,12 @@ const Transfer = ({ user }) => {
               </div>
             </div>
             <div className="px-6 pb-6 pt-2 flex-shrink-0">
-              <button onClick={handleConfirmUpload} disabled={isUploading}
-                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-black'
+              <button
+                onClick={handleConfirmUpload}
+                disabled={isUploading || !uploadStatus || (entryServiceMode === 'Service' && uploadFiles.length === 0)}
+                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${isUploading || !uploadStatus || (entryServiceMode === 'Service' && uploadFiles.length === 0)
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-black'
                   }`}
               >
                 {isUploading ? 'Uploading...' : 'Confirm'}
@@ -5718,11 +5905,11 @@ const Transfer = ({ user }) => {
       />
       {showUniversalSearchModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" onClick={handleCloseUniversalSearch} style={{ fontFamily: "'Manrope', sans-serif" }}>
-          <div className="bg-white w-full max-w-[400px] rounded-tl-[16px] rounded-tr-[16px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
+          <div className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 pt-4 mb-[6px] flex-shrink-0">
               <p className="text-[16px] font-semibold text-black">Search Items</p>
               <button onClick={handleCloseUniversalSearch} className="text-[#E4572E] text-xl font-bold">
-                ×
+              <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
             <div className="px-4 pb-3 flex-shrink-0">
@@ -5743,18 +5930,35 @@ const Transfer = ({ user }) => {
                   value={universalSearchQuery}
                   onChange={(e) => setUniversalSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[40px] border border-gray-300 rounded-full pl-10 pr-4 text-[14px] text-black placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                  className="w-full h-[40px] border border-gray-300 rounded-full pl-9 pr-4 text-[14px] text-black placeholder-gray-400 focus:outline-none focus:border-gray-400"
                 />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none px-4 pb-4">
-              {getFilteredSearchItems().length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <p className="text-[12px] text-gray-500">No items found</p>
-                </div>
-              ) : (
-                <div className="">
-                  {getFilteredSearchItems().map((item, index, entry) => {
+              {(() => {
+                const fromLocationId = entryServiceMode === 'Relocate'
+                  ? (selectedCurrentLocation?.id ? String(selectedCurrentLocation.id) : null)
+                  : (entryServiceMode === 'Service' && serviceFlowMode === 'return'
+                    ? (selectedServiceStore?.id ? String(selectedServiceStore.id) : null)
+                    : (selectedFrom?.id ? String(selectedFrom.id) : null));
+                const filtered = getFilteredSearchItems();
+                if (!fromLocationId) {
+                  return (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-[12px] text-gray-500">Please select From location first</p>
+                    </div>
+                  );
+                }
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-[12px] text-gray-500">No items found</p>
+                    </div>
+                  );
+                }
+                return (
+                <div className="" key="search-results">
+                  {filtered.map((item, index, entry) => {
                     const itemNameObj = toolsItemNameListData.find(
                       i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId)
                     );
@@ -5844,7 +6048,8 @@ const Transfer = ({ user }) => {
                     );
                   })}
                 </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -5957,15 +6162,20 @@ const Transfer = ({ user }) => {
                   <div onClick={() => setShowSearchStatusDropdown(!showSearchStatusDropdown)}
                     className="w-full h-[40px] border border-gray-300 rounded-lg px-4 flex items-center justify-between cursor-pointer bg-white"
                   >
-                    <span className="text-[14px] text-black">{searchUploadStatus}</span>
+                    <span className="text-[14px] text-black">{searchUploadStatus || 'Select'}</span>
                     <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   {showSearchStatusDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
-                      {statusOptions.map((status) => (
-                        <button key={status} onClick={() => { setSearchUploadStatus(status); setShowSearchStatusDropdown(false); }}
+                      {(entryServiceMode === 'Service' && serviceFlowMode === 'sent' ? filteredStatusOptions : statusOptions).map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            setSearchUploadStatus(status);
+                            setShowSearchStatusDropdown(false);
+                          }}
                           className={`w-full px-4 py-2 text-left text-[14px] hover:bg-gray-100 ${searchUploadStatus === status ? 'bg-gray-50 font-semibold' : ''
                             }`}
                         >
@@ -5987,7 +6197,14 @@ const Transfer = ({ user }) => {
               </div>
             </div>
             <div className="px-6 pb-6 pt-2 flex-shrink-0">
-              <button onClick={handleConfirmSearchUpload} className="w-full h-[48px] rounded-lg text-[16px] font-bold text-white bg-black">
+              <button
+                onClick={handleConfirmSearchUpload}
+                disabled={!searchUploadStatus || (entryServiceMode === 'Service' && searchUploadFiles.length === 0)}
+                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${!searchUploadStatus || (entryServiceMode === 'Service' && searchUploadFiles.length === 0)
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-black'
+                  }`}
+              >
                 Confirm
               </button>
             </div>

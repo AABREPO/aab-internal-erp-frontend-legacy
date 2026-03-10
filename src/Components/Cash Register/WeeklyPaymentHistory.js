@@ -153,6 +153,12 @@ const History = ({ username, userRoles = [] }) => {
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [isConfirmingCategory, setIsConfirmingCategory] = useState(false);
+    const [purposeOptions, setPurposeOptions] = useState([]);
+    const [showPurposePopup, setShowPurposePopup] = useState(false);
+    const [selectedPurpose, setSelectedPurpose] = useState(null);
+    const [loanPurposeDescription, setLoanPurposeDescription] = useState("");
+    const [pendingLoanData, setPendingLoanData] = useState(null); // { expensePayload, loanPayload, amount, date }
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "", editRowId: null, editField: null, editIndex: null, originalDate: "" });
     const [showPopups, setShowPopups] = useState(false);
     const [currentRow, setCurrentRow] = useState(null);
@@ -410,6 +416,9 @@ const History = ({ username, userRoles = [] }) => {
     useEffect(() => {
         fetchCategories();
     }, []);
+    useEffect(() => {
+        fetchPurposeOptions();
+    }, []);
     const fetchWeeklyType = async () => {
         try {
             const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
@@ -470,6 +479,31 @@ const History = ({ username, userRoles = [] }) => {
             setCategoryOptions(formattedData);
         } catch (error) {
             console.error("Fetch error: ", error);
+        }
+    };
+    const fetchPurposeOptions = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.statusText);
+            }
+            const data = await response.json();
+            const formattedData = data.map((item) => ({
+                value: item.purpose,
+                label: item.purpose,
+                id: item.id,
+                type: "Purpose"
+            }));
+            setPurposeOptions(formattedData);
+        } catch (error) {
+            console.error("Error fetching purpose options: ", error);
+            setPurposeOptions([]);
         }
     };
     const handleFileUploadClick = (row) => {
@@ -1265,21 +1299,22 @@ const History = ({ username, userRoles = [] }) => {
         }
         return response.json();
     };
-    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId }) => {
+    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId, purposeId = 0 , description = ""}) => {
         const payload = {
             type: "Loan",
             date,
             amount,
             loan_payment_mode: "Cash",
             loan_refund_amount: 0,
-            from_purpose_id: 0,
+            from_purpose_id: Number(purposeId) || 0,
             transfer_Project_id: 0,
             to_purpose_id: 0,
             vendor_id: vendorId || 0,
             contractor_id: contractorId || 0,
             employee_id: employeeId || 0,
-            project_id: projectId || 0,
-            description: "Loan from Cash Register",
+            project_id: 0,
+            source: "Cash Register",
+            description: description || "",
             file_url: "",
             branch_id: activeBranchId ?? null,
         };
@@ -1295,6 +1330,84 @@ const History = ({ username, userRoles = [] }) => {
             throw new Error("Failed to save Loan Portal entry");
         }
         return response.json();
+    };
+    const handlePurposeSelection = async () => {
+        if (!selectedPurpose) {
+            alert("Please select a purpose");
+            return;
+        }
+        const trimmedDescription = (loanPurposeDescription || "").trim();
+        if (!trimmedDescription) {
+            alert("Please enter description");
+            return;
+        }
+        if (!pendingLoanData?.expensePayload || !pendingLoanData?.loanPayload) {
+            alert("No pending loan data found");
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const loanResponse = await createLoanPortalEntry({
+                ...pendingLoanData.loanPayload,
+                purposeId: selectedPurpose.id,
+                description: trimmedDescription,
+            });
+
+            const expensePayloadToSave = {
+                ...pendingLoanData.expensePayload,
+                loan_portal_id: loanResponse?.id || loanResponse?.loanPortalId || null,
+                enteredBy: username,
+            };
+
+            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(expensePayloadToSave),
+            });
+
+            if (response.ok) {
+                setShowPurposePopup(false);
+                setSelectedPurpose(null);
+                setLoanPurposeDescription("");
+                setPendingLoanData(null);
+                window.location.reload();
+                setExpenses((prev) => [{ id: Date.now(), ...newExpense }, ...prev]);
+                setNewExpense({
+                    date: "",
+                    contractor: "",
+                    vendor: "",
+                    project: "",
+                    project_id: "",
+                    contractor_id: "",
+                    vendor_id: "",
+                    employee_id: "",
+                    type: "",
+                    amount: "",
+                    client_name: "",
+                    client_id: "",
+                });
+                setSelectedClient(null);
+                setClientProjectOptions([]);
+                setSelectedProjectName(null);
+                setSelectedProjectOption(null);
+                setSelectedContractor(null);
+                setSelectedVendor(null);
+                setSelectedEmployee(null);
+                setVendorId('');
+                setContractorId('');
+                setProjectId('');
+            } else {
+                console.error("Failed to save expense. Server responded with:", response.status);
+                alert("Failed to save expense. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error saving loan with purpose:", error);
+            alert("Error saving loan. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
     // ISO 8601 week number calculation with year boundary handling
     // For weeks spanning two years, use the year the week starts in (Monday's year)
@@ -1491,6 +1604,7 @@ const History = ({ username, userRoles = [] }) => {
             description: "",
             file_url: "",
             branch_id: activeBranchId ?? null,
+            enteredBy: username,
         };
         const saveResponse = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
             method: "POST",
@@ -1582,22 +1696,28 @@ const History = ({ username, userRoles = [] }) => {
             staff_advance_portal_id: null,
             loan_portal_id: null,
             branch_id: activeBranchId,
+            enteredBy: username,
         };
         try {
             if (newExpense.type === "Loan") {
-                try {
-                    const loanResponse = await createLoanPortalEntry({
-                        date: newExpense.date,
-                        amount: Number(newExpense.amount) || 0,
-                        vendorId: selectedVendor ? Number(selectedVendor.id) : 0,
-                        contractorId: selectedContractor ? Number(selectedContractor.id) : 0,
-                        employeeId: selectedEmployee ? Number(selectedEmployee.id) : 0,
-                        projectId: selectedProjectName ? Number(selectedProjectName.id) : 0,
-                    });
-                    payload.loan_portal_id = loanResponse?.id || loanResponse?.loanPortalId || null;
-                } catch (loanError) {
-                    console.error("Error creating loan portal entry:", loanError);
-                }
+                const loanPayload = {
+                    date: newExpense.date,
+                    amount: Number(newExpense.amount) || 0,
+                    vendorId: selectedVendor ? Number(selectedVendor.id) : 0,
+                    contractorId: selectedContractor ? Number(selectedContractor.id) : 0,
+                    employeeId: selectedEmployee ? Number(selectedEmployee.id) : 0,
+                    projectId: selectedProjectName ? Number(selectedProjectName.id) : 0,
+                };
+                setPendingLoanData({
+                    expensePayload: payload,
+                    loanPayload,
+                    amount: Number(newExpense.amount) || 0,
+                    date: newExpense.date,
+                });
+                setSelectedPurpose(null);
+                setLoanPurposeDescription("");
+                setShowPurposePopup(true);
+                return;
             }
             if (newExpense.type === "Project Advance") {
                 const advanceResponse = await createAdvancePortalEntry({
@@ -1633,6 +1753,7 @@ const History = ({ username, userRoles = [] }) => {
                         description: "",
                         file_url: null,
                         branch_id: activeBranchId ?? null,
+                        enteredBy: username,
                     };
                     const staffAdvanceResponse = await fetch(
                         "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -1703,6 +1824,7 @@ const History = ({ username, userRoles = [] }) => {
                 period_start_date: new Date().toISOString().split("T")[0],
                 period_end_date: new Date().toISOString().split("T")[0],
                 branch_id: activeBranchId,
+                enteredBy: username,
             };
             try {
                 const response = await fetch("https://backendaab.in/aabuildersDash/api/payments-received/update/save", {
@@ -2650,6 +2772,7 @@ const History = ({ username, userRoles = [] }) => {
                             description: "",
                             file_url: null,
                             branch_id: activeBranchId ?? null,
+                            enteredBy: username,
                         };
                         const staffAdvanceResponse = await fetch(
                             "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -4338,6 +4461,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             payment_mode: paymentPopupData.paymentMode,
                                                             not_allow_to_edit: true,
                                                             branch_id: activeBranchId ?? null,
+                                                            enteredBy: username,
                                                         };
                                                         const advanceResponse = await fetch(
                                                             "https://backendaab.in/aabuildersDash/api/advance_portal/save",
@@ -4386,6 +4510,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             labour_id: 0,
                                                             not_allow_to_edit: true,
                                                             branch_id: activeBranchId ?? null,
+                                                            enteredBy: username,
                                                         };
                                                         const staffAdvanceResponse = await fetch(
                                                             "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -4425,6 +4550,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     transaction_number: paymentPopupData.transactionNumber || null,
                                                     account_number: paymentPopupData.accountNumber || null,
                                                     branch_id: activeBranchId ?? null,
+                                                    enteredBy: username,
                                                 };
                                                 const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save", {
                                                     method: "POST",
@@ -4719,6 +4845,7 @@ const History = ({ username, userRoles = [] }) => {
                                             source: "Cash Register",
                                             billCopyUrl: currentProjectAdvanceRow.bill_copy_url,
                                             branchId: activeBranchId ?? null,
+                                            enteredBy: username,
                                         };
                                         const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
                                             method: 'POST',
@@ -4823,6 +4950,125 @@ const History = ({ username, userRoles = [] }) => {
                         >
                             OK
                         </button>
+                    </div>
+                </div>
+            )}
+            {showPurposePopup && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                            setShowPurposePopup(false);
+                            setSelectedPurpose(null);
+                            setLoanPurposeDescription("");
+                            setPendingLoanData(null);
+                        }
+                    }}
+                    tabIndex={0}
+                >
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                        <h3 className="text-lg font-semibold mb-4 text-center">
+                            Select Purpose for Loan
+                        </h3>
+                        <div className="mb-4">
+                            <label className="block mb-2 text-sm font-medium">
+                                Purpose <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                name="purpose"
+                                className="w-full"
+                                placeholder="Select Purpose"
+                                isSearchable
+                                isClearable
+                                value={selectedPurpose}
+                                onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
+                                options={purposeOptions}
+                                menuPortalTarget={document.body}
+                                styles={{
+                                    control: (provided, state) => ({
+                                        ...provided,
+                                        minHeight: '45px',
+                                        border: '2px solid rgba(191, 152, 83, 0.25)',
+                                        borderRadius: '8px',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                        '&:hover': {
+                                            border: '2px solid rgba(191, 152, 83, 0.5)'
+                                        }
+                                    }),
+                                    valueContainer: (provided) => ({
+                                        ...provided,
+                                        padding: '2px 8px'
+                                    }),
+                                    input: (provided) => ({
+                                        ...provided,
+                                        margin: '0px'
+                                    }),
+                                    indicatorSeparator: () => ({
+                                        display: 'none'
+                                    }),
+                                    indicatorsContainer: (provided) => ({
+                                        ...provided,
+                                        height: '45px',
+                                        gap: '0px'
+                                    }),
+                                    clearIndicator: (provided) => ({
+                                        ...provided,
+                                        padding: '2px'
+                                    }),
+                                    dropdownIndicator: (provided) => ({
+                                        ...provided,
+                                        padding: '2px'
+                                    }),
+                                    menuPortal: (provided) => ({
+                                        ...provided,
+                                        zIndex: 9999
+                                    }),
+                                    menu: (provided) => ({
+                                        ...provided,
+                                        zIndex: 9999
+                                    })
+                                }}
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block mb-2 text-sm font-medium">
+                                Description <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                                value={loanPurposeDescription}
+                                onChange={(e) => setLoanPurposeDescription(e.target.value)}
+                                placeholder="Enter description"
+                                rows={3}
+                                className="w-full border-2 border-[rgba(191, 152, 83, 0.25)] rounded-lg px-3 py-2 focus:outline-none focus:border-[rgba(191, 152, 83, 0.5)]"
+                            />
+                        </div>
+                        {pendingLoanData && (
+                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-600 mb-1">Loan Details:</p>
+                                <p className="text-sm">Amount: ₹{Number(pendingLoanData.amount || 0).toLocaleString('en-IN')}</p>
+                                <p className="text-sm">Date: {formatDateOnly(pendingLoanData.date)}</p>
+                            </div>
+                        )}
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowPurposePopup(false);
+                                    setSelectedPurpose(null);
+                                    setLoanPurposeDescription("");
+                                    setPendingLoanData(null);
+                                }}
+                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handlePurposeSelection}
+                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                disabled={!selectedPurpose || !(loanPurposeDescription || "").trim() || isSubmitting}
+                            >
+                                {isSubmitting ? "Saving..." : "Save"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

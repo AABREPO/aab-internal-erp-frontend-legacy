@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
   const [focusedColumn, setFocusedColumn] = useState(null); // 'day', 'month', 'year'
+  const touchStartYRef = React.useRef(null);
   // Parse initial date or use current date
   const getInitialDate = () => {
     if (initialDate) {
@@ -103,12 +104,30 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, selectedDay, selectedMonth, selectedYear, focusedColumn]);
 
-  // Handle mouse wheel scrolling
+  // Handle mouse wheel scrolling (desktop)
   const handleWheel = (e, type) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 1 : -1;
+    applyScrollDelta(type, delta);
+  };
+
+  // Handle touch scrolling (mobile) - wheel event doesn't fire on touch devices
+  const SWIPE_THRESHOLD = 25;
+  const handleTouchStart = (e, type) => {
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+  const handleTouchEnd = (e, type) => {
+    if (touchStartYRef.current == null) return;
+    const endY = e.changedTouches[0].clientY;
+    const deltaY = endY - touchStartYRef.current;
+    touchStartYRef.current = null;
+    if (Math.abs(deltaY) < SWIPE_THRESHOLD) return;
+    const delta = deltaY > 0 ? 1 : -1; // Swipe down = next, swipe up = prev (same as wheel)
+    applyScrollDelta(type, delta);
+  };
+
+  const applyScrollDelta = (type, delta) => {
     const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
-    
     if (type === 'day') {
       if (delta > 0) {
         setSelectedDay((prev) => (prev === daysInMonth ? 1 : prev + 1));
@@ -122,7 +141,6 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
         setSelectedMonth((prev) => (prev === 0 ? 11 : prev - 1));
       }
     } else if (type === 'year') {
-      // Unlimited year selection - no bounds
       if (delta > 0) {
         setSelectedYear(selectedYear + 1);
       } else if (delta < 0) {
@@ -178,9 +196,11 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
         <div className="flex justify-center gap-8 mb-6">
           {/* Day */}
           <div 
-            className="flex flex-col items-center relative"
+            className="flex flex-col items-center relative touch-none select-none"
             onFocus={() => setFocusedColumn('day')}
             onWheel={(e) => handleWheel(e, 'day')}
+            onTouchStart={(e) => handleTouchStart(e, 'day')}
+            onTouchEnd={(e) => handleTouchEnd(e, 'day')}
             tabIndex={0}
           >
             {visibleDays.map((day, idx) => (
@@ -211,9 +231,11 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
           
           {/* Month */}
           <div 
-            className="flex flex-col items-center relative"
+            className="flex flex-col items-center relative touch-none select-none"
             onFocus={() => setFocusedColumn('month')}
             onWheel={(e) => handleWheel(e, 'month')}
+            onTouchStart={(e) => handleTouchStart(e, 'month')}
+            onTouchEnd={(e) => handleTouchEnd(e, 'month')}
             tabIndex={0}
           >
             {visibleMonths.map((month, idx) => (
@@ -244,9 +266,11 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
           
           {/* Year */}
           <div 
-            className="flex flex-col items-center relative"
+            className="flex flex-col items-center relative touch-none select-none"
             onFocus={() => setFocusedColumn('year')}
             onWheel={(e) => handleWheel(e, 'year')}
+            onTouchStart={(e) => handleTouchStart(e, 'year')}
+            onTouchEnd={(e) => handleTouchEnd(e, 'year')}
             tabIndex={0}
           >
             {visibleYears.map((year, idx) => (

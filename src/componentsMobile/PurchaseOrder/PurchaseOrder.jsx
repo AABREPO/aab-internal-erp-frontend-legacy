@@ -88,7 +88,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // State for project name options from API
   const [siteOptions, setSiteOptions] = useState([]);
   // Cache for quick employee lookups by ID (prevents repeated network calls when opening multiple POs)
-  const quickEmployeeCacheRef = useRef(new Map());  
+  const quickEmployeeCacheRef = useRef(new Map());
   // State for employee list options from API - initialize from module-level cache immediately
   const [employeeList, setEmployeeList] = useState(() => {
     return siteEngineersCache.data || [];
@@ -127,6 +127,13 @@ const PurchaseOrder = ({ user, onLogout }) => {
   useEffect(() => {
     expandedItemIdRef.current = expandedItemId;
   }, [expandedItemId]);
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
   // Global mouse handlers for desktop support (like History.jsx)
   useEffect(() => {
     if (items.length === 0) return;
@@ -207,7 +214,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     return found ? (found.id || found._id || null) : null;
   };
   // Ref to track if we're currently loading from editPO event (prevents clearing items when effect re-runs)
-  const isLoadingFromEventRef = useRef(false);  
+  const isLoadingFromEventRef = useRef(false);
   // Listen for editPO event from History component
   useEffect(() => {
     const handleEditPO = (event) => {
@@ -220,7 +227,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setSelectedIncharge(null);
         setHasOpenedAdd(false);
         setIsPdfGenerated(false);
-        setPdfBlob(null);        
+        setPdfBlob(null);
         // Restore selected vendor quickly (prefer ID from history/clone; avoids waiting for vendorNameOptions getAll)
         const vendorId = po.vendor_id || po.vendorId || null;
         if (vendorId) {
@@ -284,9 +291,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
         }
         // Load PO data into form, preserving original ID and creation date
         // For clone with prefetched PO number, use it immediately (faster than waiting for useEffect)
+        // For clone mode, use current date instead of the cloned PO's date
         setPoData({
           poNumber: displayPoNumber || (po.isClone && po.prefetchedPoNumber ? po.prefetchedPoNumber : ''),
-          date: po.date || '10/11/2025',
+          date: po.isClone ? formatDate(getTodayDate()) : (po.date || '10/11/2025'),
           vendorName: po.vendorName || '',
           projectName: po.projectName || '',
           projectIncharge: po.projectIncharge || '',
@@ -431,7 +439,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
             } else {
               itemName = nameStr;
             }
-          }          
+          }
           let category = item.categoryName || item.category || '';
           const existingCategoryId = item.categoryId || item.category_id || null;
           // If name includes comma, split it (format: "ItemName, Category")
@@ -444,7 +452,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
             }
           }
           // Check if this is TILE category (category_id = 10)
-          const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';          
+          const isTileCategory = existingCategoryId === 10 || String(existingCategoryId) === '10';
           // If name is still empty but we have itemId, look it up from appropriate API data
           // Only do this if arrays are loaded (don't block on empty arrays)
           if (!itemName && rawItemId) {
@@ -458,11 +466,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
               itemName = findNameById(poItemName, rawItemId, 'itemName') ||
                 findNameById(poItemName, rawItemId, 'name') || '';
             }
-          }          
+          }
           // Ensure itemId is set from rawItemId if available
           if (!itemId && rawItemId) {
             itemId = rawItemId;
-          }          
+          }
           // Only try to find ID from name if we don't have itemId yet AND arrays are loaded
           if (!itemId && itemName) {
             if (isTileCategory && tileData && tileData.length > 0) {
@@ -595,7 +603,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         // IMPORTANT: Reset previousVendorId for clone to ensure PO number generation triggers
         if (po.isClone) {
           previousVendorId.current = null;
-        }        
+        }
         // Check if this is a clone operation - if so, don't set isEditFromHistory to show "Generate PO" instead of "Update PO"
         if (po.isClone) {
           setIsEditFromHistory(false); // Clone should show "Generate PO"
@@ -610,7 +618,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setIsPdfGenerated(false);
         setPdfBlob(null);
         // Switch to create tab
-        setActiveTab('create');        
+        setActiveTab('create');
         // Reset flag after a short delay to allow state updates to complete
         setTimeout(() => {
           isLoadingFromEventRef.current = false;
@@ -655,9 +663,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
           }
         }
         // Load PO data into form
+        // For clone mode, use current date instead of the cloned PO's date
         setPoData({
           poNumber: displayPoNumber,
-          date: po.date || '10/11/2025',
+          date: po.isClone ? formatDate(getTodayDate()) : (po.date || '10/11/2025'),
           vendorName: po.vendorName || '',
           projectName: po.projectName || '',
           projectIncharge: po.projectIncharge || '',
@@ -1838,10 +1847,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
       }
       const data = await response.json();
       const normalizedVendorId = String(vendorId);
-      const normalizedClientId = String(clientId);      
+      const normalizedClientId = String(clientId);
       // Filter POs for the same vendor and project, sorted by eno descending (most recent first)
       const matchingPOs = data
-        .filter(order => 
+        .filter(order =>
           String(order.vendor_id ?? order.vendorId) === normalizedVendorId &&
           String(order.client_id ?? order.clientId) === normalizedClientId
         )
@@ -1849,7 +1858,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           const enoA = getNumericEno(a);
           const enoB = getNumericEno(b);
           return enoB - enoA; // Descending order
-        });      
+        });
       // Return the most recent PO (first in sorted array)
       return matchingPOs.length > 0 ? matchingPOs[0] : null;
     } catch (error) {
@@ -1861,7 +1870,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const areItemsSame = (items1, items2) => {
     if (!items1 || !items2 || items1.length !== items2.length) {
       return false;
-    }    
+    }
     // Create normalized item sets (ignoring quantity)
     const normalizeItem = (item) => {
       return {
@@ -1871,22 +1880,22 @@ const PurchaseOrder = ({ user, onLogout }) => {
         brand_id: item.brand_id || null,
         type_id: item.type_id || null,
       };
-    };    
+    };
     const normalizedItems1 = items1.map(normalizeItem).sort((a, b) => {
       // Sort by item_id, then category_id, etc. for consistent comparison
       const keyA = `${a.item_id || ''}-${a.category_id || ''}-${a.model_id || ''}-${a.brand_id || ''}-${a.type_id || ''}`;
       const keyB = `${b.item_id || ''}-${b.category_id || ''}-${b.model_id || ''}-${b.brand_id || ''}-${b.type_id || ''}`;
       return keyA.localeCompare(keyB);
-    });    
+    });
     const normalizedItems2 = items2.map(normalizeItem).sort((a, b) => {
       const keyA = `${a.item_id || ''}-${a.category_id || ''}-${a.model_id || ''}-${a.brand_id || ''}-${a.type_id || ''}`;
       const keyB = `${b.item_id || ''}-${b.category_id || ''}-${b.model_id || ''}-${b.brand_id || ''}-${b.type_id || ''}`;
       return keyA.localeCompare(keyB);
-    });    
+    });
     // Compare each item
     for (let i = 0; i < normalizedItems1.length; i++) {
       const item1 = normalizedItems1[i];
-      const item2 = normalizedItems2[i];      
+      const item2 = normalizedItems2[i];
       if (
         item1.item_id !== item2.item_id ||
         item1.category_id !== item2.category_id ||
@@ -1896,7 +1905,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       ) {
         return false;
       }
-    }    
+    }
     return true;
   };
   const proceedWithPOGeneration = async () => {
@@ -2031,15 +2040,15 @@ const PurchaseOrder = ({ user, onLogout }) => {
         alert("Please select a Vendor before generating a PO.");
         return;
       }
-      
+
       // Check for duplicate PO only when creating new PO (not editing)
       if (!isEditMode || !poData.originalId) {
         const clientIdForCheck = selectedSite?.id ?? poData.originalClientId ?? null;
-        
+
         if (clientIdForCheck && items.length > 0) {
           // Fetch previous PO for same vendor and project
           const previousPO = await fetchPreviousPO(selectedVendor.id, clientIdForCheck);
-          
+
           if (previousPO && previousPO.purchaseTable && previousPO.purchaseTable.length > 0) {
             // Prepare current items for comparison (same structure as payload.purchaseTable)
             const currentItemsForComparison = items.map(item => {
@@ -2051,7 +2060,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
               let modelId = item.modelId;
               let typeId = item.typeId;
               let categoryId = item.categoryId;
-              
+
               if (!itemId && itemNameOnly && poItemName && poItemName.length > 0) {
                 const foundItem = poItemName.find(i =>
                   (i.itemName || i.name || '').toLowerCase() === itemNameOnly.toLowerCase()
@@ -2079,7 +2088,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
               if (!categoryId && categoryName && categoryOptions && categoryOptions.length > 0) {
                 categoryId = resolveCategoryId(categoryName);
               }
-              
+
               return {
                 item_id: itemId || null,
                 category_id: categoryId || null,
@@ -2088,7 +2097,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 type_id: typeId || null,
               };
             });
-            
+
             // Compare items (ignoring quantity)
             if (areItemsSame(currentItemsForComparison, previousPO.purchaseTable)) {
               // Items are the same - show custom confirmation modal
@@ -2103,7 +2112,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           }
         }
       }
-      
+
       // No duplicate detected or editing mode - proceed directly
       await proceedWithPOGeneration();
     } catch (error) {
@@ -2126,11 +2135,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
       return match[key] || match.label || match.name || '';
     };
     const vendorName = findNameById(vendorNameOptions, payload.vendor_id, "label");
-    const clientName = findNameById(siteOptions, payload.client_id, "label");    
+    const clientName = findNameById(siteOptions, payload.client_id, "label");
     // Find site incharge name based on site_incharge_type
     let siteInchargeName = '';
     const siteInchargeType = payload.site_incharge_type || payload.siteInchargeType;
-    const siteInchargeId = payload.site_incharge_id;    
+    const siteInchargeId = payload.site_incharge_id;
     if (siteInchargeId) {
       if (siteInchargeType === 'support staff' || siteInchargeType === 'support_staff') {
         // Look up from supportStaffList
@@ -2220,10 +2229,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
       let model = '';
       let brand = '';
       let type = '';
-      
+
       // Check if this is TILE category (category_id = 10)
       const isTileCategory = item.category_id === 10 || String(item.category_id) === '10';
-      
+
       if (item.item_id) {
         if (isTileCategory && tileData && tileData.length > 0) {
           // For TILE category, look up from tileData
@@ -2314,7 +2323,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         tableBody.push(["", "", "", "", "", "", ""]);
       } else if (isVATradersVendor) {
         tableBody.push(["", "", "", "", "", "", "", ""]);
-      } 
+      }
       else {
         tableBody.push(["", "", "", "", "", "", "", ""]);
       }
@@ -2323,12 +2332,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const totalAmount = purchaseTableData.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     if (isRajaganapathyVendor) {
       tableBody.push([
-        "", "", "", 
+        "", "", "",
         { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
         { content: `${totalQty}`, styles: { fontStyle: "bold", halign: "center" } },
         { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
       ]);
-    }if (isVATradersVendor) {
+    } if (isVATradersVendor) {
       tableBody.push([
         "", "", "",
         { content: `TOTAL`, styles: { fontStyle: "bold", halign: "center" } },
@@ -2336,7 +2345,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         "", "",
         { content: `${totalAmount}`, styles: { fontStyle: "bold", halign: "center" } }
       ]);
-    } 
+    }
     else {
       tableBody.push([
         "", "", "", "", "",
@@ -2349,7 +2358,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       ? [["SNO", "BRAND", "ITEM NAME", "MODEL", "TYPE", "QTY", "PRICE"]]
       : isVATradersVendor
         ? [["SNO", "BRAND", "ITEM NAME", "TYPE", "QTY", "WEIGHT", "RATE", "AMOUNT"]]
-      : [["SNO", "ITEM NAME", "CATEGORY", "MODEL", "BRAND", "TYPE", "QTY", "PRICE"]];
+        : [["SNO", "ITEM NAME", "CATEGORY", "MODEL", "BRAND", "TYPE", "QTY", "PRICE"]];
     const columnStylesConfig = isRajaganapathyVendor
       ? {
         0: { cellWidth: 12 }, // SNO
@@ -2371,16 +2380,16 @@ const PurchaseOrder = ({ user, onLogout }) => {
           6: { cellWidth: 17 }, // RATE
           7: { cellWidth: 21 }  // AMOUNT
         }
-      : {
-        0: { cellWidth: 12 }, // SNO
-        1: { cellWidth: 50 }, // ITEM NAME
-        2: { cellWidth: 30 }, // CATEGORY
-        3: { cellWidth: 28 }, // MODEL
-        4: { cellWidth: 20 }, // BRAND
-        5: { cellWidth: 20 }, // TYPE
-        6: { cellWidth: 13 }, // QTY
-        7: { cellWidth: 17 }  // PRICE
-      };
+        : {
+          0: { cellWidth: 12 }, // SNO
+          1: { cellWidth: 50 }, // ITEM NAME
+          2: { cellWidth: 30 }, // CATEGORY
+          3: { cellWidth: 28 }, // MODEL
+          4: { cellWidth: 20 }, // BRAND
+          5: { cellWidth: 20 }, // TYPE
+          6: { cellWidth: 13 }, // QTY
+          7: { cellWidth: 17 }  // PRICE
+        };
     autoTable(doc, {
       startY: 52,
       margin: { left: 10, right: 10 },
@@ -2578,6 +2587,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
     } else if (page === 'project-advance') {
       setCurrentPage('project-advance');
       navigate('/portal');
+    } else if (page === 'loan-portal') {
+      setCurrentPage('loan-portal');
+      navigate('/loan');
     }
   };
   return (
@@ -2803,43 +2815,43 @@ const PurchaseOrder = ({ user, onLogout }) => {
             {/* Summary details card - Show AFTER clicking + button (when hasOpenedAdd is true) for edit/clone mode */}
             {/* For regular flow: show summary card AFTER clicking + button */}
             {/* These two views are mutually exclusive - never show both at the same time */}
-            {((hasOpenedAdd && isEditMode && (poData.vendorName || poData.projectName || poData.projectIncharge)) || 
+            {((hasOpenedAdd && isEditMode && (poData.vendorName || poData.projectName || poData.projectIncharge)) ||
               (hasOpenedAdd && !isEmptyState && (poData.vendorName || poData.projectName || poData.projectIncharge) && !isEditMode)) && (
-              <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
-                <div className="flex flex-col gap-2 px-2">
-                  {poData.vendorName && (
-                    <div className="flex items-start">
-                      <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Vendor Name</p>
-                      <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
-                      <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">{poData.vendorName}</p>
-                    </div>
-                  )}
-                  {poData.projectName && (
-                    <div className="flex items-start">
-                      <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Project Name</p>
-                      <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
-                      <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">{poData.projectName}</p>
-                    </div>
-                  )}
-                  {poData.projectIncharge && (
-                    <div className="flex items-start">
-                      <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Project Incharge</p>
-                      <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
-                      <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">{poData.projectIncharge}</p>
-                    </div>
-                  )}
-                  {(poData.contact || (selectedIncharge && (selectedIncharge.mobileNumber || selectedIncharge.mobile_number || selectedIncharge.contact))) && (
-                    <div className="flex items-start">
-                      <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Contact</p>
-                      <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
-                      <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">
-                        {poData.contact || selectedIncharge?.mobileNumber || selectedIncharge?.mobile_number || selectedIncharge?.contact}
-                      </p>
-                    </div>
-                  )}
+                <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
+                  <div className="flex flex-col gap-2 px-2">
+                    {poData.vendorName && (
+                      <div className="flex items-start">
+                        <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Vendor Name</p>
+                        <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
+                        <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">{poData.vendorName}</p>
+                      </div>
+                    )}
+                    {poData.projectName && (
+                      <div className="flex items-start">
+                        <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Project Name</p>
+                        <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
+                        <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">{poData.projectName}</p>
+                      </div>
+                    )}
+                    {poData.projectIncharge && (
+                      <div className="flex items-start">
+                        <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Project Incharge</p>
+                        <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
+                        <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">{poData.projectIncharge}</p>
+                      </div>
+                    )}
+                    {(poData.contact || (selectedIncharge && (selectedIncharge.mobileNumber || selectedIncharge.mobile_number || selectedIncharge.contact))) && (
+                      <div className="flex items-start">
+                        <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Contact</p>
+                        <p className="text-[12px] font-medium text-black leading-normal mx-1">:</p>
+                        <p className="text-[12px] font-medium text-[#a6a6a6] leading-normal flex-1">
+                          {poData.contact || selectedIncharge?.mobileNumber || selectedIncharge?.mobile_number || selectedIncharge?.contact}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             {/* Filled State extras (items) - Show when fields are filled OR after opening add items OR in edit mode */}
             {(hasOpenedAdd || !isEmptyState || isEditMode) && (
               <>
@@ -2868,7 +2880,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                             // Use item.id as-is (can be string or number) for consistent swipe state lookup
                             if (!item || !item.id) return null;
                             const itemId = item.id; // Use ID as-is, don't force to number
-                            
+
                             const minSwipeDistance = 50;
                             const handleTouchStart = (e, id) => {
                               if (!id) return;

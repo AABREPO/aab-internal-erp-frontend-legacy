@@ -45,6 +45,10 @@ const Inventory = ({ user, onLogout }) => {
       setCurrentPage('project-advance');
       navigate('/portal');
     }
+    else if (page === 'loan-portal') {
+      setCurrentPage('loan-portal');
+      navigate('/loan');
+    }
   };
   const handleTabChange = (tab) => {
     setActiveTab(tab);

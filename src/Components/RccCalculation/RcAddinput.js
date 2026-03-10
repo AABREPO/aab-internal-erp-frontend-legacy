@@ -55,6 +55,15 @@ const RcAddInput = () => {
   const [rccBeamTypes, setRccBeamTypes] = useState([]);
   const [isAreaModalOpens, setIsAreaModalOpens] = useState(false);
   const [message, setMessage] = useState('');
+  const [aField, setAField] = useState('');
+  const [isAEditable, setIsAEditable] = useState(false);
+  const [isAMultiple, setIsAMultiple] = useState(false);
+  const [bField, setBField] = useState('');
+  const [isBEditable, setIsBEditable] = useState(false);
+  const [isBMultiple, setIsBMultiple] = useState(false);
+  const [cField, setCField] = useState('');
+  const [isCEditable, setIsCEditable] = useState(false);
+  const [isCMultiple, setIsCMultiple] = useState(false);
   console.log(message);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [areaEdit, setAreaEdit] = useState(null);
@@ -586,11 +595,37 @@ const RcAddInput = () => {
       console.error('Error updating item:', error);
     }
   };
+  const parseBool = (obj, ...keyVariants) => {
+    if (!obj) return false;
+    const objKeys = Object.keys(obj);
+    for (const objKey of objKeys) {
+      const objKeyLower = objKey.toLowerCase();
+      for (const variant of keyVariants) {
+        if (objKeyLower === String(variant).toLowerCase()) {
+          const val = obj[objKey];
+          if (typeof val === 'boolean') return val;
+          if (val === '1' || val === 1 || val === 'true' || val === true) return true;
+          if (val === '0' || val === 0 || val === 'false' || val === false) return false;
+          return false;
+        }
+      }
+    }
+    return false;
+  };
   const handleEditClick = (variantId, variantData) => {
     setSelectedVariantId(variantId);
     setBeamName(variantData.beamName);
     setFormula(variantData.formula);
     setBeamRate(variantData.rate);
+    setAField(variantData.a || '');
+    setIsAEditable(parseBool(variantData, 'isAEditable', 'isaeditable', 'aEditable', 'is_a_editable'));
+    setIsAMultiple(parseBool(variantData, 'isAMultiple', 'isamultiple', 'aMultiple', 'is_a_multiple'));
+    setBField(variantData.b || '');
+    setIsBEditable(parseBool(variantData, 'isBEditable', 'isbeditable', 'bEditable', 'is_b_editable'));
+    setIsBMultiple(parseBool(variantData, 'isBMultiple', 'isbmultiple', 'bMultiple', 'is_b_multiple'));
+    setCField(variantData.c || '');
+    setIsCEditable(parseBool(variantData, 'isCEditable', 'isceditable', 'cEditable', 'is_c_editable'));
+    setIsCMultiple(parseBool(variantData, 'isCMultiple', 'iscmultiple', 'cMultiple', 'is_c_multiple'));
     setMeasurementImage(variantData.image);
     setIsEditModalOpen(true);
   };
@@ -600,6 +635,15 @@ const RcAddInput = () => {
     formData.append("beamName", beamNamess);
     formData.append("formula", formula);
     formData.append("rate", rate);
+    if (aField) formData.append("a", aField);
+    formData.append("isAEditable", isAEditable);
+    formData.append("isAMultiple", isAMultiple);
+    if (bField) formData.append("b", bField);
+    formData.append("isBEditable", isBEditable);
+    formData.append("isBMultiple", isBMultiple);
+    if (cField) formData.append("c", cField);
+    formData.append("isCEditable", isCEditable);
+    formData.append("isCMultiple", isCMultiple);
 
     if (measurementImage && measurementImage.startsWith("data:image")) {
       const base64Data = measurementImage.split(',')[1];
@@ -836,6 +880,15 @@ const RcAddInput = () => {
     formData.append("beamName", beamNamess);
     formData.append("formula", formula);
     formData.append("rate", rate);
+    if (aField) formData.append("a", aField);
+    formData.append("isAEditable", isAEditable);
+    formData.append("isAMultiple", isAMultiple);
+    if (bField) formData.append("b", bField);
+    formData.append("isBEditable", isBEditable);
+    formData.append("isBMultiple", isBMultiple);
+    if (cField) formData.append("c", cField);
+    formData.append("isCEditable", isCEditable);
+    formData.append("isCMultiple", isCMultiple);
     if (measurementImage) formData.append("measurementImage", measurementImage);
     try {
       const response = await fetch("https://backendaab.in/aabuilderDash/api/rcc/upload/beamName", {
@@ -1458,6 +1511,103 @@ const RcAddInput = () => {
                   </span>
                 )}
               </div>
+              <div className="mt-4 lg:ml-12 ml-5">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">A</label>
+                    <select
+                      className="w-full border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-11 focus:outline-none"
+                      value={aField}
+                      onChange={(e) => setAField(e.target.value)}
+                    >
+                      <option value="">Blank</option>
+                      <option value="Length">Length</option>
+                      <option value="Breadth">Breadth</option>
+                      <option value="Height">Height</option>
+                    </select>
+                    <div className="flex items-center space-x-3 mt-2 text-sm">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isAEditable}
+                          onChange={(e) => setIsAEditable(e.target.checked)}
+                        />
+                        <span>Editable</span>
+                      </label>
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isAMultiple}
+                          onChange={(e) => setIsAMultiple(e.target.checked)}
+                        />
+                        <span>Multiple</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">B</label>
+                    <select
+                      className="w-full border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-11 focus:outline-none"
+                      value={bField}
+                      onChange={(e) => setBField(e.target.value)}
+                    >
+                      <option value="">Blank</option>
+                      <option value="Length">Length</option>
+                      <option value="Breadth">Breadth</option>
+                      <option value="Height">Height</option>
+                    </select>
+                    <div className="flex items-center space-x-3 mt-2 text-sm">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isBEditable}
+                          onChange={(e) => setIsBEditable(e.target.checked)}
+                        />
+                        <span>Editable</span>
+                      </label>
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isBMultiple}
+                          onChange={(e) => setIsBMultiple(e.target.checked)}
+                        />
+                        <span>Multiple</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">C</label>
+                    <select
+                      className="w-full border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-11 focus:outline-none"
+                      value={cField}
+                      onChange={(e) => setCField(e.target.value)}
+                    >
+                      <option value="">Blank</option>
+                      <option value="Length">Length</option>
+                      <option value="Breadth">Breadth</option>
+                      <option value="Height">Height</option>
+                    </select>
+                    <div className="flex items-center space-x-3 mt-2 text-sm">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isCEditable}
+                          onChange={(e) => setIsCEditable(e.target.checked)}
+                        />
+                        <span>Editable</span>
+                      </label>
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isCMultiple}
+                          onChange={(e) => setIsCMultiple(e.target.checked)}
+                        />
+                        <span>Multiple</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="flex space-x-5 lg:mt-4 mt-2 lg:ml-12 ml-5 lg:mb-4 mb-2">
                 <button
                   type="submit"
@@ -1732,6 +1882,103 @@ const RcAddInput = () => {
                     onChange={(e) => setBeamRate(e.target.value)}
                     required
                   />
+                </div>
+              </div>
+              <div className="mt-2 ml-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">A</label>
+                    <select
+                      className="w-full border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-11 focus:outline-none"
+                      value={aField}
+                      onChange={(e) => setAField(e.target.value)}
+                    >
+                      <option value="">Blank</option>
+                      <option value="Length">Length</option>
+                      <option value="Breadth">Breadth</option>
+                      <option value="Height">Height</option>
+                    </select>
+                    <div className="flex items-center space-x-3 mt-2 text-xs">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isAEditable}
+                          onChange={(e) => setIsAEditable(e.target.checked)}
+                        />
+                        <span>Editable</span>
+                      </label>
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isAMultiple}
+                          onChange={(e) => setIsAMultiple(e.target.checked)}
+                        />
+                        <span>Multiple</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">B</label>
+                    <select
+                      className="w-full border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-11 focus:outline-none"
+                      value={bField}
+                      onChange={(e) => setBField(e.target.value)}
+                    >
+                      <option value="">Blank</option>
+                      <option value="Length">Length</option>
+                      <option value="Breadth">Breadth</option>
+                      <option value="Height">Height</option>
+                    </select>
+                    <div className="flex items-center space-x-3 mt-2 text-xs">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isBEditable}
+                          onChange={(e) => setIsBEditable(e.target.checked)}
+                        />
+                        <span>Editable</span>
+                      </label>
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isBMultiple}
+                          onChange={(e) => setIsBMultiple(e.target.checked)}
+                        />
+                        <span>Multiple</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">C</label>
+                    <select
+                      className="w-full border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-11 focus:outline-none"
+                      value={cField}
+                      onChange={(e) => setCField(e.target.value)}
+                    >
+                      <option value="">Blank</option>
+                      <option value="Length">Length</option>
+                      <option value="Breadth">Breadth</option>
+                      <option value="Height">Height</option>
+                    </select>
+                    <div className="flex items-center space-x-3 mt-2 text-xs">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isCEditable}
+                          onChange={(e) => setIsCEditable(e.target.checked)}
+                        />
+                        <span>Editable</span>
+                      </label>
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={isCMultiple}
+                          onChange={(e) => setIsCMultiple(e.target.checked)}
+                        />
+                        <span>Multiple</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="mb-4 ml-6">

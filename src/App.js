@@ -1,8 +1,8 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
-import Sidebar from './Components/Bars/Sidebar';
 import Navbar from './Components/Bars/Navbar';
+import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import Home from './Components/Home/HomePage';
 import Heading from './Components/Heading';
 import DHeading from './Components/TileCalculation/DHeading';
@@ -36,6 +36,15 @@ import DirectoryHeading from './Components/Directory/DirectoryHeading';
 import ToolsTrackerHeading from './Components/ToolsTracker/ToolsTrackerHeading';
 import TestToolsTrackerHeading from './Components/TestToolsTracker/TestToolsTrackerHeading';
 
+function MainContentWithSidebarMargin({ children }) {
+  const { isSidebarVisible } = useSidebar();
+  return (
+    <div className={`min-h-screen transition-all duration-1000 ease-in-out ${isSidebarVisible ? 'ml-[250px]' : ''}`}>
+      {children}
+    </div>
+  );
+}
+
 function AppContent({ user, handleLogout }) {
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(() => {
@@ -51,14 +60,14 @@ function AppContent({ user, handleLogout }) {
     };
   }, []);
 
-  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory') || location.pathname.startsWith('/toolsTracker') || location.pathname.startsWith('/portal');
+  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory') || location.pathname.startsWith('/toolsTracker') 
+  || location.pathname.startsWith('/portal') || location.pathname.startsWith('/loan');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
 
   return (
-
-    <div>
-      {!shouldHideDesktopBars && (
-        <>
+    <SidebarProvider>
+      <div>
+        {!shouldHideDesktopBars && (
           <Navbar
             username={user.username}
             userImage={user.userImage}
@@ -68,10 +77,9 @@ function AppContent({ user, handleLogout }) {
             branchId={user?.branchId ?? user?.branch_id ?? user?.brachId ?? ''}
             onLogout={handleLogout}
           />
-          <Sidebar userRoles={user?.userRoles || []} />
-        </>
-      )}
-      <Routes>
+        )}
+        <MainContentWithSidebarMargin>
+          <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []} />} />
@@ -104,8 +112,10 @@ function AppContent({ user, handleLogout }) {
         <Route path="/toolsTracker/*" element={<ToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path="/testtoolsTracker/*" element={<TestToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </div>
+          </Routes>
+        </MainContentWithSidebarMargin>
+      </div>
+    </SidebarProvider>
   );
 }
 function App() {

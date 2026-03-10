@@ -781,6 +781,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         description: description,
         file_url: fileUrl,
         branch_id: activeBranchId,
+        enteredBy: username,
         ...overrides
       });
       if (selectedType === 'Transfer') {
@@ -805,7 +806,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             project_id: 0,
             description: "Transfer from Advance Portal",
             file_url: "",
-            branch_id: activeBranchId
+            branch_id: activeBranchId,
+            enteredBy: username,
           };
           // Save to LoanPortal
           const loanResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
@@ -821,7 +823,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           // Now save advance portal entry with negative amount and loan_portal_id
           const advancePayload = createPayload({
             amount: -Math.abs(amountValue),
-            loan_portal_id: loanPortalId
+            loan_portal_id: loanPortalId,
+            enteredBy: username,
           });
           await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
             method: 'POST',
@@ -854,7 +857,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           // Now save advance portal entry with negative amount and vendor_carry_forward_id
           const advancePayload = createPayload({
             amount: -Math.abs(amountValue),
-            vendor_carry_forward_id: vendorCarryForwardId
+            vendor_carry_forward_id: vendorCarryForwardId,
+            enteredBy: username,
           });
           await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
             method: 'POST',
@@ -916,6 +920,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             billCopyUrl: fileUrl || '',
             source: "Advance Portal",
             branchId: activeBranchId,
+            enteredBy: username,
           };
           const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
             method: "POST",
@@ -1431,6 +1436,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         description: description,
         file_url: fileUrl,
         branch_id: activeBranchId,
+        enteredBy: username,
       };
       // Save to advance portal
       const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
@@ -1466,7 +1472,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           cheque_date: paymentModalData.chequeDate || null,
           transaction_number: paymentModalData.transactionNumber || null,
           account_number: paymentModalData.accountNumber || null,
-          branch_id: activeBranchId
+          branch_id: activeBranchId,
+          enteredBy: username,
         };
         // Save to weekly payment bills
         const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save'), {
@@ -1504,7 +1511,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           comments: description,
           machineTools: '',
           billCopyUrl: fileUrl || '',
-          branchId: activeBranchId
+          branchId: activeBranchId,
+          enteredBy: username,
         };
         const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
           method: "POST",

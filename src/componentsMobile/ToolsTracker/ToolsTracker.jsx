@@ -27,7 +27,10 @@ const ToolsTracker = ({ user, onLogout }) => {
     setSidebarOpen(false);
   };
   const handleNavigate = (page) => {
-    if (page === 'purchase-order') {
+    if (page === 'request-for-quotation') {
+      setCurrentPage('request-for-quotation');
+      navigate('/requestforquotation');
+    } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
     } else if (page === 'inventory') {
@@ -39,6 +42,9 @@ const ToolsTracker = ({ user, onLogout }) => {
     } else if (page === 'project-advance') {
       setCurrentPage('project-advance');
       navigate('/portal');
+    } else if (page === 'loan-portal') {
+      setCurrentPage('loan-portal');
+      navigate('/loan');
     }
   };
   const handleTabChange = (tab) => {

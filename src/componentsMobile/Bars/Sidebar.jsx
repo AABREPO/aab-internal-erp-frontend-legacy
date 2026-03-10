@@ -5,7 +5,7 @@ import logo from '../Images/AABBlack.png'
 const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) => {
   const [expandedItems, setExpandedItems] = useState({
     procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker',
-    account: currentPage === 'project-advance'
+    account: currentPage === 'project-advance' || currentPage === 'loan-portal'
   });
   const [roleModels, setRoleModels] = useState([]);
   const buildTime = process.env.REACT_APP_BUILD_TIME;
@@ -14,7 +14,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
   useEffect(() => {
     setExpandedItems({
       procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker',
-      account: currentPage === 'project-advance'
+      account: currentPage === 'project-advance' || currentPage === 'loan-portal'
     });
   }, [currentPage]);
   
@@ -38,7 +38,6 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       fetchUserRoles();
     }
   }, [userRoles]);
-
   // Utility to check if user has access to a model
   const hasAccessToModel = (modelName) => {
     return roleModels.some(model => model.models === modelName);
@@ -80,7 +79,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       label: 'Account', 
       icon: 'document',
       subItems: [
-        { id: 'project-advance', label: 'Advance Portal', modelName: 'Advance Portal' }
+        { id: 'project-advance', label: 'Advance Portal', modelName: 'Advance Portal' },
+        { id: 'loan-portal', label: 'Loan Portal', modelName: 'Loan Portal' }
       ]
     },
     { 

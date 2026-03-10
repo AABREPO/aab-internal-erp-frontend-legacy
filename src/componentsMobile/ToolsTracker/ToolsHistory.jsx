@@ -60,12 +60,10 @@ const ToolsHistory = ({ user }) => {
     brandId: null,
     purchaseDate: '',
     warrantyDate: '',
-    contact: '',
     purchaseStore: '',
     purchaseStoreId: null,
     homeLocation: '',
     homeLocationId: null,
-    shopAddress: ''
   });
 
   const [itemNameOptions, setItemNameOptions] = useState([]);
@@ -630,6 +628,141 @@ const ToolsHistory = ({ user }) => {
     return '';
   };
 
+  // --- Location helpers (copied from NetStock.jsx) ---
+
+  // Get the most recent home_location_id for an item from tools_tracker_management,
+  // falling back to stock_management when needed.
+  const getHomeLocationId = (itemIdsId, brandId, machineNumber, stockHomeLocationId) => {
+    const matchingEntries = [];
+
+    for (const entry of toolsTrackerManagementData) {
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+
+      for (const entryItem of entryItems) {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
+        const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
+        const machineMatch = !machineNumber || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumber.trim());
+
+        if (itemIdsMatch && brandMatch && machineMatch) {
+          let itemHomeLocationId = entryItem.home_location_id || entryItem.homeLocationId;
+
+          if (!itemHomeLocationId) {
+            const stockItem = stockManagementData.find(stock => {
+              const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+              const stockBrandId = stock.brand_name_id || stock.brandNameId;
+              const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+
+              const sItemIdsMatch = stockItemIdsId && String(stockItemIdsId) === String(itemIdsId);
+              const sBrandMatch = !brandId || (stockBrandId && String(stockBrandId) === String(brandId));
+              const sMachineMatch = !machineNumber || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumber.trim());
+
+              return sItemIdsMatch && sBrandMatch && sMachineMatch;
+            });
+
+            if (stockItem) {
+              itemHomeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+            }
+          }
+
+          if (itemHomeLocationId) {
+            const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+            matchingEntries.push({
+              homeLocationId: itemHomeLocationId,
+              date: entryDate
+            });
+          }
+        }
+      }
+    }
+
+    if (matchingEntries.length > 0) {
+      matchingEntries.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA;
+      });
+      return matchingEntries[0].homeLocationId;
+    }
+
+    const stockItem = stockManagementData.find(stock => {
+      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+      const stockBrandId = stock.brand_name_id || stock.brandNameId;
+      const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+      const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === String(itemIdsId);
+      const brandMatch = !brandId || (stockBrandId && String(stockBrandId) === String(brandId));
+      const machineMatch = !machineNumber || (stockMachineNumber && String(stockMachineNumber).trim() === machineNumber.trim());
+      return itemIdsMatch && brandMatch && machineMatch;
+    });
+
+    if (stockItem) {
+      return stockItem.home_location_id || stockItem.homeLocationId;
+    }
+
+    return stockHomeLocationId;
+  };
+
+  // Get current "To" location from tools_tracker_management, falling back to home location.
+  const getCurrentToLocation = (itemIdsId, brandId, machineNumber, homeLocationId) => {
+    if (!itemIdsId) return homeLocationId;
+
+    let latestEntry = null;
+    let latestDate = null;
+
+    for (const entry of toolsTrackerManagementData) {
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+
+      for (const entryItem of entryItems) {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumber = (entryItem.machine_number || entryItem.machineNumber || '').trim();
+
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
+        const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
+        const machineMatch = !machineNumber || (entryMachineNumber && entryMachineNumber === String(machineNumber).trim());
+
+        if (itemIdsMatch && brandMatch && machineMatch) {
+          const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+          if (!latestDate || entryDate > latestDate) {
+            latestDate = entryDate;
+            latestEntry = { entry, entryItem };
+          }
+        }
+      }
+    }
+
+    if (latestEntry) {
+      const entryType = String(latestEntry.entry.tools_entry_type || latestEntry.entry.toolsEntryType || '').toLowerCase();
+
+      if (entryType === 'entry') {
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+        const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
+        if (serviceStoreId) return serviceStoreId;
+      } else if (entryType === 'relocate' || entryType === 'relocation') {
+        const itemHomeLocationId = latestEntry.entryItem.home_location_id || latestEntry.entryItem.homeLocationId;
+        if (itemHomeLocationId) return itemHomeLocationId;
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+      } else if (entryType === 'service_return') {
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+        const fromProjectId = latestEntry.entry.from_project_id || latestEntry.entry.fromProjectId;
+        if (fromProjectId) return fromProjectId;
+      } else {
+        const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
+        if (serviceStoreId) return serviceStoreId;
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+      }
+    }
+
+    return homeLocationId;
+  };
+
   const getEntryTypeNormalized = (entry) => {
     return String(entry?.tools_entry_type || entry?.toolsEntryType || '').toLowerCase();
   };
@@ -703,12 +836,14 @@ const ToolsHistory = ({ user }) => {
   };
 
   // Matching stock management record for details card (from TOOLS_STOCK_MANAGEMENT_BASE_URL/getAll)
-  // Stock API returns machine_number_id, not machine_number text - match by machine_number_id when available
+  // Stock API returns machine_number_id, not machine_number text - match by machine_number_id when available.
+  // If no Machine Number is selected, fall back to the first stock row that matches Item ID (+ Brand),
+  // mirroring NetStock.jsx behavior for per-item selection.
   const selectedStockForCard = useMemo(() => {
-    if (!selectedItemIdDbId || !selectedMachineNumber || stockManagementData.length === 0) return null;
+    if (!selectedItemIdDbId || stockManagementData.length === 0) return null;
     const idStr = String(selectedItemIdDbId);
     const brandStr = selectedBrandId != null ? String(selectedBrandId) : null;
-    const mnTrimmed = selectedMachineNumber.trim();
+    const mnTrimmed = (selectedMachineNumber || '').trim();
     return stockManagementData.find(stock => {
       const stockItemIdsId = stock.item_ids_id ?? stock.itemIdsId;
       const stockBrandId = stock.brand_name_id ?? stock.brandNameId;
@@ -717,10 +852,15 @@ const ToolsHistory = ({ user }) => {
       const itemBrandMatch = stockItemIdsId != null && String(stockItemIdsId) === idStr &&
         (!brandStr || (stockBrandId != null && String(stockBrandId) === brandStr));
       if (!itemBrandMatch) return false;
-      if (selectedMachineNumberId != null && stockMachineNumberId != null) {
-        return String(stockMachineNumberId) === String(selectedMachineNumberId);
+      // If a specific machine is selected, match by machine number / id
+      if (mnTrimmed) {
+        if (selectedMachineNumberId != null && stockMachineNumberId != null) {
+          return String(stockMachineNumberId) === String(selectedMachineNumberId);
+        }
+        return stockMachineNumber === mnTrimmed;
       }
-      return stockMachineNumber === mnTrimmed;
+      // No machine selected: any matching Item ID (+ Brand) is acceptable
+      return true;
     }) || null;
   }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, stockManagementData]);
 
@@ -743,31 +883,32 @@ const ToolsHistory = ({ user }) => {
     return false;
   }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, toolsTrackerManagementData]);
 
-  // Current location for selected item set (output field)
-  // Home location comes from stock management API (TOOLS_STOCK_MANAGEMENT_BASE_URL/getAll) - match by machine_number_id
+  // Current location for selected item (output field)
+  // Mirrors NetStock.jsx logic: use most recent home location, then latest movement "To" location.
   const currentLocation = useMemo(() => {
-    if (!selectedItemIdDbId || !selectedMachineNumber) return '';
-    const idStr = String(selectedItemIdDbId);
-    const mnTrimmed = selectedMachineNumber.trim();
-    const stockItem = stockManagementData.find(stock => {
-      const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
-      const stockBrandId = stock.brand_name_id || stock.brandNameId;
-      const stockMachineNumberId = stock.machine_number_id || stock.machineNumberId;
-      const stockMachineNumber = (stock.machine_number || stock.machineNumber || '').trim();
-      const itemBrandMatch = stockItemIdsId && String(stockItemIdsId) === idStr &&
-        (!selectedBrandId || (stockBrandId && String(stockBrandId) === String(selectedBrandId)));
-      if (!itemBrandMatch) return false;
-      if (selectedMachineNumberId != null && stockMachineNumberId != null) {
-        return String(stockMachineNumberId) === String(selectedMachineNumberId);
-      }
-      return stockMachineNumber && stockMachineNumber.trim() === mnTrimmed;
-    });
-    const homeLocationId = stockItem ? (stockItem.home_location_id || stockItem.homeLocationId) : null;
-    const locationId = isItemInToolsTrackerManagement
-      ? getCurrentLocationId(selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, homeLocationId)
-      : homeLocationId;
-    return getLocationName(locationId) || '';
-  }, [selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, stockManagementData, toolsTrackerManagementData, projectsMap, vendorsMap, isItemInToolsTrackerManagement]);
+    if (!selectedStockForCard) return '';
+
+    const stock = selectedStockForCard;
+    const itemIdsId = stock.item_ids_id ?? stock.itemIdsId;
+    const brandId = stock.brand_name_id ?? stock.brandNameId ?? stock.brand_id ?? stock.brandId;
+    const stockHomeLocationId = stock.home_location_id ?? stock.homeLocationId;
+    const machineNumberId = stock.machine_number_id ?? stock.machineNumberId;
+    const machineNumberRaw = stock.machine_number ?? stock.machineNumber ?? '';
+    const machineNumber = machineNumberId ? resolveMachineNumberText(machineNumberId) : machineNumberRaw;
+
+    if (!itemIdsId) return getLocationName(stockHomeLocationId) || '';
+
+    const actualHomeLocationId = getHomeLocationId(itemIdsId, brandId, machineNumber, stockHomeLocationId);
+    const currentLocationId = getCurrentToLocation(itemIdsId, brandId, machineNumber, actualHomeLocationId);
+
+    return getLocationName(currentLocationId || actualHomeLocationId) || '';
+  }, [
+    selectedStockForCard,
+    toolsTrackerManagementData,
+    stockManagementData,
+    projectsMap,
+    vendorsMap
+  ]);
 
   // When Item Name is cleared, clear dependent Brand, Item ID, Machine Number
   useEffect(() => {
@@ -804,7 +945,10 @@ const ToolsHistory = ({ user }) => {
   };
 
   const handleSelectItemId = (value) => {
+    // When Item ID changes, always clear the previously selected machine number and log history
     setSelectedItemId(value || '');
+    setSelectedMachineNumber('');
+    setMachineStatusHistory([]);
     const found = toolsItemIdFullData.find(
       i => (i?.item_id ?? i?.itemId ?? '').trim() === value
     );
@@ -820,10 +964,10 @@ const ToolsHistory = ({ user }) => {
       );
       const detail = matches.length > 0
         ? matches.sort((a, b) => {
-            const ta = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
-            const tb = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
-            return tb - ta; // latest first
-          })[0]
+          const ta = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const tb = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return tb - ta; // latest first
+        })[0]
         : null;
       if (detail) {
         const brandId = detail?.brand_id ?? detail?.brandId;
@@ -896,72 +1040,87 @@ const ToolsHistory = ({ user }) => {
     </div>
   );
 
+  // Resolve stock item for edit: use selectedStockForCard if available, else first stock matching selectedItemIdDbId (and optional brand/machine)
+  const stockItemForEdit = useMemo(() => {
+    if (selectedStockForCard) return selectedStockForCard;
+    if (!selectedItemIdDbId || stockManagementData.length === 0) return null;
+    const idStr = String(selectedItemIdDbId);
+    const brandStr = selectedBrandId != null ? String(selectedBrandId) : null;
+    const mnTrimmed = (selectedMachineNumber || '').trim();
+    const matching = stockManagementData.filter(stock => {
+      const stockItemIdsId = stock.item_ids_id ?? stock.itemIdsId;
+      if (!stockItemIdsId || String(stockItemIdsId) !== idStr) return false;
+      if (brandStr && (stock.brand_name_id ?? stock.brandNameId) != null && String(stock.brand_name_id ?? stock.brandNameId) !== brandStr) return false;
+      if (mnTrimmed) {
+        const stockMnId = stock.machine_number_id ?? stock.machineNumberId;
+        const stockMn = (stock.machine_number ?? stock.machineNumber ?? '').trim();
+        if (selectedMachineNumberId != null && stockMnId != null) return String(stockMnId) === String(selectedMachineNumberId);
+        return stockMn === mnTrimmed;
+      }
+      return true;
+    });
+    return matching.length > 0 ? matching[0] : null;
+  }, [selectedStockForCard, selectedItemIdDbId, selectedBrandId, selectedMachineNumber, selectedMachineNumberId, stockManagementData]);
+
   // Handle Edit button click - open bottom sheet with pre-populated data
   const handleEditClick = () => {
-    if (!selectedStockForCard) {
-      alert('Please select an item to edit');
+    if (!selectedItemName || !selectedItemId) {
+      alert('Please select Item Name and Item ID');
       return;
     }
-    
-    // Pre-populate form with selectedStockForCard data
-    const stockItem = selectedStockForCard;
-    
-    // Get item name
-    const itemNameId = stockItem.item_name_id || stockItem.itemNameId;
+
+    const stockItem = stockItemForEdit;
+    const itemNameId = selectedItemNameId || (stockItem && (stockItem.item_name_id || stockItem.itemNameId));
     const itemNameObj = toolsItemNameListData.find(item => String(item?.id) === String(itemNameId));
-    const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
-    
-    // Get brand
-    const brandId = stockItem.brand_name_id || stockItem.brandNameId;
-    const brandObj = toolsBrandFullData.find(b => String(b?.id) === String(brandId));
-    const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
-    
-    // Get item ID
-    const itemIdsId = stockItem.item_ids_id || stockItem.itemIdsId;
+    const itemName = itemNameObj?.item_name || itemNameObj?.itemName || selectedItemName || '';
+    const itemIdsId = selectedItemIdDbId || (stockItem && (stockItem.item_ids_id || stockItem.itemIdsId));
     const itemIdObj = toolsItemIdFullData.find(i => String(i?.id) === String(itemIdsId));
-    const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
-    
-    // Get purchase store
-    const purchaseStoreId = stockItem.purchase_store_id || stockItem.purchaseStoreId;
+    const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || selectedItemId || '';
+
+    let brandId = stockItem ? (stockItem.brand_name_id || stockItem.brandNameId) : selectedBrandId;
+    let brandName = '';
+    if (brandId != null) {
+      const brandObj = toolsBrandFullData.find(b => String(b?.id) === String(brandId));
+      brandName = brandObj?.tools_brand || brandObj?.toolsBrand || selectedBrand || '';
+    } else
+      brandName = selectedBrand || '';
+
+    let machineNumberId = stockItem ? (stockItem.machine_number_id || stockItem.machineNumberId) : selectedMachineNumberId;
+    let machineNumberText = '';
+    if (machineNumberId != null && machineNumbersList.length > 0) {
+      const machineNumberRecord = machineNumbersList.find(m => String(m?.id ?? m?._id) === String(machineNumberId));
+      machineNumberText = machineNumberRecord ? (machineNumberRecord.machine_number || machineNumberRecord.machineNumber || '').trim() : (stockItem?.machine_number ?? stockItem?.machineNumber ?? selectedMachineNumber ?? '').trim();
+    } else
+      machineNumberText = (stockItem?.machine_number ?? stockItem?.machineNumber ?? selectedMachineNumber ?? '').trim();
+
+    const purchaseStoreId = stockItem?.purchase_store_id ?? stockItem?.purchaseStoreId;
     const purchaseStoreObj = purchaseStoreFullData.find(s => String(s?.id) === String(purchaseStoreId));
     const purchaseStoreName = purchaseStoreObj?.vendorName || purchaseStoreObj?.vendor_name || '';
-    
-    // Get home location
-    const homeLocationId = stockItem.home_location_id || stockItem.homeLocationId;
+
+    const homeLocationId = stockItem?.home_location_id ?? stockItem?.homeLocationId;
     const homeLocationObj = homeLocationFullData.find(l => String(l?.id) === String(homeLocationId));
     const homeLocationName = homeLocationObj?.siteName || homeLocationObj?.site_name || homeLocationObj?.projectName || homeLocationObj?.project_name || '';
-    
-    // Resolve machine_number from machine_number_id (stock API returns machine_number_id, not machine_number text)
-    const machineNumberId = stockItem.machine_number_id || stockItem.machineNumberId;
-    const machineNumberRecord = machineNumberId && machineNumbersList.length > 0
-      ? machineNumbersList.find(m => String(m?.id ?? m?._id) === String(machineNumberId))
-      : null;
-    const machineNumberText = machineNumberRecord
-      ? (machineNumberRecord.machine_number || machineNumberRecord.machineNumber || '').trim()
-      : (stockItem.machine_number || stockItem.machineNumber || '').trim();
-    
+
     setEditFormData({
-      itemName: itemName,
+      itemName,
       itemNameId: itemNameId || null,
-      quantity: String(stockItem.quantity || '0'),
+      quantity: String(stockItem?.quantity ?? '0'),
       itemId: itemIdName,
       itemIdDbId: itemIdsId || null,
-      model: stockItem.model || '',
+      model: stockItem?.model ?? '',
       machineNumber: machineNumberText,
       machineNumberId: machineNumberId || null,
       brand: brandName,
       brandId: brandId || null,
-      purchaseDate: stockItem.purchase_date || stockItem.purchaseDate || '',
-      warrantyDate: stockItem.warranty_date || stockItem.warrantyDate || '',
-      contact: stockItem.contact || '',
+      purchaseDate: stockItem?.purchase_date ?? stockItem?.purchaseDate ?? '',
+      warrantyDate: stockItem?.warranty_date ?? stockItem?.warrantyDate ?? '',
       purchaseStore: purchaseStoreName,
       purchaseStoreId: purchaseStoreId || null,
       homeLocation: homeLocationName,
-      homeLocationId: homeLocationId || null,
-      shopAddress: stockItem.shop_address || stockItem.shopAddress || ''
+      homeLocationId: homeLocationId || null
     });
-    
-    setFileUrl(stockItem.file_url || stockItem.fileUrl || '');
+
+    setFileUrl(stockItem?.file_url ?? stockItem?.fileUrl ?? '');
     setSelectedFile(null);
     setShowEditSheet(true);
   };
@@ -1093,12 +1252,13 @@ const ToolsHistory = ({ user }) => {
   };
 
   const handleUpdateStock = async () => {
-    if (!selectedStockForCard) {
+    const stockToUpdate = stockItemForEdit;
+    if (!stockToUpdate) {
       alert('No item selected to update');
       return;
     }
-    
-    const stockId = selectedStockForCard.id || selectedStockForCard._id;
+
+    const stockId = stockToUpdate.id || stockToUpdate._id;
     if (!stockId) {
       alert('Cannot update: Item ID not found');
       return;
@@ -1124,7 +1284,7 @@ const ToolsHistory = ({ user }) => {
       }
 
       const editedBy = user?.name || user?.username || 'mobile';
-      const stockItem = selectedStockForCard;
+      const stockItem = stockToUpdate;
 
       // Original values for comparison
       const origItemNameId = stockItem.item_name_id || stockItem.itemNameId;
@@ -1153,8 +1313,6 @@ const ToolsHistory = ({ user }) => {
         String(editFormData.homeLocationId || '') === String(stockItem.home_location_id || stockItem.homeLocationId || '') &&
         (editFormData.purchaseDate || '') === (stockItem.purchase_date || stockItem.purchaseDate || '') &&
         (editFormData.warrantyDate || '') === (stockItem.warranty_date || stockItem.warrantyDate || '') &&
-        (editFormData.contact || '').trim() === (stockItem.contact || '').trim() &&
-        (editFormData.shopAddress || '').trim() === (stockItem.shop_address || stockItem.shopAddress || '').trim() &&
         String(editFormData.quantity || '0') === String(stockItem.quantity || '0') &&
         (fileUrl || '') === (stockItem.file_url || stockItem.fileUrl || '')
       );
@@ -1241,8 +1399,6 @@ const ToolsHistory = ({ user }) => {
         home_location_id: editFormData.homeLocationId ? String(editFormData.homeLocationId) : null,
         purchase_date: editFormData.purchaseDate || null,
         warranty_date: editFormData.warrantyDate || null,
-        contact: editFormData.contact?.trim() || null,
-        shop_address: editFormData.shopAddress?.trim() || null,
         quantity: editFormData.quantity || '0',
         file_url: fileUrl || null,
         tool_status: stockItem.tool_status || stockItem.toolStatus || 'Available'
@@ -1351,16 +1507,16 @@ const ToolsHistory = ({ user }) => {
               {selectedItemName ? selectedItemName : 'Item Name'}
             </button>
           )}
-          {/* Show Edit button only when item is selected and NOT in tools_tracker_management (so user can edit stock management data) */}
-          {activeSegment === 'item' && selectedStockForCard && !isItemInToolsTrackerManagement && (
+          {/* Show Edit button when Item Name and Item ID are selected (details auto-fill from selected itemId) */}
+          {activeSegment === 'item' && selectedItemName && selectedItemId && !isItemInToolsTrackerManagement && (
             <button
               type="button"
               onClick={handleEditClick}
               className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 p-0 border-0 bg-transparent text-right flex-shrink-0 flex items-center gap-1"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Edit
             </button>
@@ -1385,18 +1541,16 @@ const ToolsHistory = ({ user }) => {
         <div className="flex bg-[#F2F4F7] items-center h-9 shadow-sm rounded-md mt-2">
           <button
             type="button" onClick={() => setActiveSegment('item')}
-            className={`flex-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
-              activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
-            }`}
+            className={`flex-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
+              }`}
           >
             Item
           </button>
           <button
             type="button"
             onClick={() => setActiveSegment('log')}
-            className={`flex-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
-              activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
-            }`}
+            className={`flex-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
+              }`}
           >
             Log
           </button>
@@ -1408,20 +1562,21 @@ const ToolsHistory = ({ user }) => {
         <>
           <div className="flex-shrink-0 px-4 mt-2 pb-2 space-y-[6px]">
             <div className="flex gap-3">
-              {renderDropdownTrigger('Brand', selectedBrand, 'Select', () => {
-                setShowBrandPopup(true);
-                setShowItemNamePopup(false);
-                setShowItemIdPopup(false);
-                setShowMachineNumberPopup(false);
-              })}
               {renderDropdownTrigger('Item ID', selectedItemId, 'Select', () => {
                 setShowItemIdPopup(true);
                 setShowItemNamePopup(false);
                 setShowBrandPopup(false);
                 setShowMachineNumberPopup(false);
               })}
+              {renderDropdownTrigger('Brand', selectedBrand, 'Select', () => {
+                setShowBrandPopup(true);
+                setShowItemNamePopup(false);
+                setShowItemIdPopup(false);
+                setShowMachineNumberPopup(false);
+              })}
+
             </div>
-            <div className="flex gap-3">
+            <div className="space-y-[6px]">
               {renderDropdownTrigger(
                 'Machine Number',
                 selectedMachineNumber,
@@ -1435,7 +1590,7 @@ const ToolsHistory = ({ user }) => {
                 },
                 !selectedItemIdDbId
               )}
-              <div className="flex-1 relative">
+              <div className="relative">
                 <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Location</p>
                 <div
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 text-[12px] font-medium bg-[#E0E0E0] text-black flex items-center"
@@ -1449,41 +1604,41 @@ const ToolsHistory = ({ user }) => {
 
           {/* Details card + image from stock management API */}
           {selectedItemName && selectedBrand && selectedItemId && selectedMachineNumber && selectedStockForCard && (
-        <div className="flex-1 px-4 pb-4 mt-2">
-          <div className="rounded-[8px] border border-[rgba(0,0,0,0.16)] p-3 bg-white">
-            {selectedStockForCard.model != null && String(selectedStockForCard.model).trim() !== '' && (
-              <p className="text-[12px] text-black mb-1"><span className="font-medium">Model:</span> {selectedStockForCard.model}</p>
-            )}
-            {(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate) != null && String(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate).trim() !== '' && (
-              <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Date:</span> {selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate}</p>
-            )}
-            {(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate) != null && String(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate).trim() !== '' && (
-              <p className="text-[12px] text-black mb-1"><span className="font-medium">Warranty Date:</span> {selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate}</p>
-            )}
-            {(selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId) != null && (() => {
-              const storeId = selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId;
-              const storeName = getLocationName(storeId) || storeId;
-              return String(storeName).trim() !== '' ? (
-                <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Store:</span> {storeName}</p>
-              ) : null;
-            })()}
-            {(selectedStockForCard.contact) != null && String(selectedStockForCard.contact).trim() !== '' && (
-              <p className="text-[12px] text-black mb-1"><span className="font-medium">Contact:</span> {selectedStockForCard.contact}</p>
-            )}
-            {(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress) != null && String(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress).trim() !== '' && (
-              <p className="text-[12px] text-black mb-1"><span className="font-medium">Shop Address:</span> {selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress}</p>
-            )}
-            {(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus) != null && String(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus).trim() !== '' && (
-              <p className="text-[12px] text-black mb-1"><span className="font-medium">Status:</span> {selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus}</p>
-            )}
-          </div>
-          {(selectedStockForCard.file_url ?? selectedStockForCard.fileUrl) && (
-            <div className="mt-3 rounded-[8px] overflow-hidden border border-[rgba(0,0,0,0.16)]">
-              <img src={selectedStockForCard.file_url ?? selectedStockForCard.fileUrl} alt={selectedItemName} className="w-full h-auto object-contain max-h-[280px]" />
+            <div className="flex-1 px-4 pb-4 mt-2">
+              <div className="rounded-[8px] border border-[rgba(0,0,0,0.16)] p-3 bg-white">
+                {selectedStockForCard.model != null && String(selectedStockForCard.model).trim() !== '' && (
+                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Model:</span> {selectedStockForCard.model}</p>
+                )}
+                {(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate) != null && String(selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate).trim() !== '' && (
+                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Date:</span> {selectedStockForCard.purchase_date ?? selectedStockForCard.purchaseDate}</p>
+                )}
+                {(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate) != null && String(selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate).trim() !== '' && (
+                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Warranty Date:</span> {selectedStockForCard.warranty_date ?? selectedStockForCard.warrantyDate}</p>
+                )}
+                {(selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId) != null && (() => {
+                  const storeId = selectedStockForCard.purchase_store_id ?? selectedStockForCard.purchaseStoreId;
+                  const storeName = getLocationName(storeId) || storeId;
+                  return String(storeName).trim() !== '' ? (
+                    <p className="text-[12px] text-black mb-1"><span className="font-medium">Purchase Store:</span> {storeName}</p>
+                  ) : null;
+                })()}
+                {(selectedStockForCard.contact) != null && String(selectedStockForCard.contact).trim() !== '' && (
+                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Contact:</span> {selectedStockForCard.contact}</p>
+                )}
+                {(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress) != null && String(selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress).trim() !== '' && (
+                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Shop Address:</span> {selectedStockForCard.shop_address ?? selectedStockForCard.shopAddress}</p>
+                )}
+                {(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus) != null && String(selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus).trim() !== '' && (
+                  <p className="text-[12px] text-black mb-1"><span className="font-medium">Status:</span> {selectedStockForCard.tool_status ?? selectedStockForCard.toolStatus}</p>
+                )}
+              </div>
+              {(selectedStockForCard.file_url ?? selectedStockForCard.fileUrl) && (
+                <div className="mt-3 rounded-[8px] overflow-hidden border border-[rgba(0,0,0,0.16)]">
+                  <img src={selectedStockForCard.file_url ?? selectedStockForCard.fileUrl} alt={selectedItemName} className="w-full h-auto object-contain max-h-[280px]" />
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
         </>
       )}
 
@@ -1514,8 +1669,8 @@ const ToolsHistory = ({ user }) => {
               {/* Table Body */}
               <div>
                 {machineStatusHistory.map((logEntry, index) => (
-                  <div 
-                    key={logEntry.key || logEntry.id || index} 
+                  <div
+                    key={logEntry.key || logEntry.id || index}
                     className="border-b border-gray-100 last:border-b-0"
                   >
                     <div className="grid grid-cols-2 gap-2 px-3 py-3">
@@ -1730,8 +1885,8 @@ const ToolsHistory = ({ user }) => {
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
                   </div>
@@ -1752,37 +1907,11 @@ const ToolsHistory = ({ user }) => {
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M11 1V4M5 1V4M2 7H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
                   </div>
-                </div>
-              </div>
-              {/* Contact */}
-              <div className="flex gap-3 mb-2">
-                <div className="flex-1">
-                  <p className="text-[12px] font-medium text-black mb-1">Contact</p>
-                  <input
-                    type="text"
-                    value={editFormData.contact}
-                    onChange={(e) => handleEditFieldChange('contact', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
-                    placeholder="Enter"
-                  />
-                </div>
-              </div>
-              {/* Shop Address */}
-              <div className="flex gap-3 mb-2">
-                <div className="flex-1">
-                  <p className="text-[12px] font-medium text-black mb-1">Shop Address</p>
-                  <input
-                    type="text"
-                    value={editFormData.shopAddress}
-                    onChange={(e) => handleEditFieldChange('shopAddress', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
-                    placeholder="Enter"
-                  />
                 </div>
               </div>
               {/* Attach File */}

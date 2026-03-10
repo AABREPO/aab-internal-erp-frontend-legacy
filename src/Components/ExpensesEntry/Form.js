@@ -980,7 +980,8 @@ const Form = ({ username, userRoles = [] }) => {
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
                 utilityValidityDays: thirdInput || '',
-                branchId: activeBranchId
+                branchId: activeBranchId,
+                enteredBy: username
             };
             const formResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
                 method: "POST",
@@ -1072,7 +1073,8 @@ const Form = ({ username, userRoles = [] }) => {
                     expenses_entry_id: expensesId,
                     send_to_expenses_entry: false,
                     bill_copy_url: pdfUrl || '',
-                    branch_id: activeBranchId
+                    branch_id: activeBranchId,
+                    enteredBy: username,
                 };
                 try {
                     const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
@@ -1229,7 +1231,8 @@ const Form = ({ username, userRoles = [] }) => {
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
                 utilityValidityDays: thirdInput || '',
-                branchId: activeBranchId
+                branchId: activeBranchId,
+                enteredBy: username
             };
             const expensesResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
                 method: "POST",
@@ -1326,7 +1329,8 @@ const Form = ({ username, userRoles = [] }) => {
                 cheque_date: paymentModalData.chequeDate || null,
                 transaction_number: paymentModalData.transactionNumber || null,
                 account_number: paymentModalData.accountNumber || null,
-                branch_id: activeBranchId
+                branch_id: activeBranchId,
+                enteredBy: username,
             };
             const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
                 method: 'POST',

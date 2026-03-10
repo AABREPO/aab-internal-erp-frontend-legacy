@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import EditIcon from '../Images/edit1.png';
+import SelectOptionModal from '../PurchaseOrder/SelectOptionModal';
 
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
@@ -14,19 +15,26 @@ const NetStock = ({ user }) => {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
   const [selectedItemName, setSelectedItemName] = useState(null);
   const [selectedItemId, setSelectedItemId] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState(null);
   const [showItemNameDropdown, setShowItemNameDropdown] = useState(false);
   const [showItemIdDropdown, setShowItemIdDropdown] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
   const [stockManagementData, setStockManagementData] = useState([]);
   const [toolsTrackerManagementData, setToolsTrackerManagementData] = useState([]);
   const [itemNamesMap, setItemNamesMap] = useState({});
   const [itemIdsMap, setItemIdsMap] = useState({});
   const [brandsMap, setBrandsMap] = useState({});
+  const [toolsItemIdFullData, setToolsItemIdFullData] = useState([]);
+  const [toolsBrandFullData, setToolsBrandFullData] = useState([]);
+  const [toolsItemNameFullData, setToolsItemNameFullData] = useState([]);
   const [projectsMap, setProjectsMap] = useState({});
   const [vendorsMap, setVendorsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [itemIdOptions, setItemIdOptions] = useState([]);
+  const [brandOptions, setBrandOptions] = useState([]);
   const [machineNumbersList, setMachineNumbersList] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Edit stock bottom sheet state
   const [showEditStockModal, setShowEditStockModal] = useState(false);
@@ -39,6 +47,65 @@ const NetStock = ({ user }) => {
     expandedItemIdRef.current = expandedItemId;
   }, [expandedItemId]);
 
+  // Helper to extract array from API response (handles wrapped responses like { data: [...] })
+  const extractArrayFromResponse = useCallback((data) => {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+      return data.data ?? data.content ?? data.records ?? data.items ?? [];
+    }
+    return [];
+  }, []);
+
+  // Resolve item_id from tools_item_id API using item_ids_id - never show raw item_ids_id
+  const resolveItemIdDisplay = useCallback((itemIdsId) => {
+    if (itemIdsId === null || itemIdsId === undefined || itemIdsId === '') return '-';
+    const idStr = String(itemIdsId).trim();
+    if (!idStr) return '-';
+    // Look up by id, _id, or item_ids_id (support various API response structures)
+    const found = toolsItemIdFullData.find((i) => {
+      const pk = i?.id ?? i?._id ?? i?.item_ids_id ?? i?.itemIdsId;
+      return String(pk) === idStr || Number(pk) === Number(itemIdsId);
+    });
+    if (found) {
+      const display = found.item_id ?? found.itemId ?? '';
+      const displayStr = String(display).trim();
+      if (displayStr) return displayStr;
+    }
+    const fromMap = itemIdsMap[idStr] ?? itemIdsMap[Number(itemIdsId)];
+    if (fromMap) return String(fromMap).trim();
+    return '-';
+  }, [toolsItemIdFullData, itemIdsMap]);
+
+  // Resolve brand display from brand_id using full API data
+  const resolveBrandDisplay = useCallback((brandId) => {
+    if (brandId === null || brandId === undefined || brandId === '') return '-';
+    const idStr = String(brandId).trim();
+    if (!idStr) return '-';
+    const found = toolsBrandFullData.find(
+      (b) => String(b?.id ?? b?._id ?? '') === idStr
+    );
+    if (found) {
+      const display = found.tools_brand ?? found.toolsBrand ?? '';
+      return String(display).trim() || '-';
+    }
+    return brandsMap[idStr] ?? brandsMap[Number(brandId)] ?? '-';
+  }, [toolsBrandFullData, brandsMap]);
+
+  // Resolve item name display from item_name_id using full API data
+  const resolveItemNameDisplay = useCallback((itemNameId) => {
+    if (itemNameId === null || itemNameId === undefined || itemNameId === '') return '-';
+    const idStr = String(itemNameId).trim();
+    if (!idStr) return '-';
+    const found = toolsItemNameFullData.find(
+      (i) => String(i?.id ?? i?._id ?? '') === idStr
+    );
+    if (found) {
+      const display = found.item_name ?? found.itemName ?? '';
+      return String(display).trim() || '-';
+    }
+    return itemNamesMap[idStr] ?? itemNamesMap[Number(itemNameId)] ?? '-';
+  }, [toolsItemNameFullData, itemNamesMap]);
+
   // Fetch lookup data
   useEffect(() => {
     const fetchLookupData = async () => {
@@ -50,16 +117,21 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (itemNamesRes.ok) {
-          const data = await itemNamesRes.json();
+          const raw = await itemNamesRes.json();
+          const data = extractArrayFromResponse(raw);
           const map = {};
           const names = [];
-          (Array.isArray(data) ? data : []).forEach(i => {
-            const itemName = i.item_name || i.itemName || '';
-            map[i.id] = itemName;
-            map[String(i.id)] = itemName;
+          data.forEach((i) => {
+            const pk = i.id ?? i._id;
+            const itemName = (i.item_name ?? i.itemName ?? '').toString().trim();
+            if (pk != null) {
+              map[pk] = itemName;
+              map[String(pk)] = itemName;
+            }
             if (itemName) names.push(itemName);
           });
           setItemNamesMap(map);
+          setToolsItemNameFullData(data);
           setItemNameOptions([...new Set(names)].sort());
         }
 
@@ -70,16 +142,21 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (itemIdsRes.ok) {
-          const data = await itemIdsRes.json();
+          const raw = await itemIdsRes.json();
+          const data = extractArrayFromResponse(raw);
           const map = {};
           const ids = [];
-          (Array.isArray(data) ? data : []).forEach(i => {
-            const itemId = i.item_id || i.itemId || '';
-            map[i.id] = itemId;
-            map[String(i.id)] = itemId;
-            if (itemId && !/^\d+$/.test(itemId)) ids.push(itemId);
+          data.forEach((i) => {
+            const pk = i.id ?? i._id;
+            const itemId = (i.item_id ?? i.itemId ?? i.item_ids_id ?? i.itemIdsId ?? '').toString().trim();
+            if (pk != null) {
+              map[pk] = itemId;
+              map[String(pk)] = itemId;
+            }
+            if (itemId) ids.push(itemId);
           });
           setItemIdsMap(map);
+          setToolsItemIdFullData(data);
           setItemIdOptions([...new Set(ids)].sort());
         }
 
@@ -90,14 +167,22 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (brandsRes.ok) {
-          const data = await brandsRes.json();
+          const raw = await brandsRes.json();
+          const data = extractArrayFromResponse(raw);
           const map = {};
-          (Array.isArray(data) ? data : []).forEach(b => {
-            const brandName = b.tools_brand || b.toolsBrand || '';
-            map[b.id] = brandName;
-            map[String(b.id)] = brandName;
+          const brands = [];
+          data.forEach((b) => {
+            const pk = b.id ?? b._id;
+            const brandName = (b.tools_brand ?? b.toolsBrand ?? '').toString().trim();
+            if (pk != null) {
+              map[pk] = brandName;
+              map[String(pk)] = brandName;
+            }
+            if (brandName) brands.push(brandName);
           });
           setBrandsMap(map);
+          setToolsBrandFullData(data);
+          setBrandOptions([...new Set(brands)].sort());
         }
 
         // Fetch projects
@@ -107,12 +192,16 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (projectsRes.ok) {
-          const data = await projectsRes.json();
+          const raw = await projectsRes.json();
+          const data = extractArrayFromResponse(raw);
           const map = {};
-          (Array.isArray(data) ? data : []).forEach(p => {
-            const projectName = p.siteName || p.site_name || p.projectName || p.project_name || '';
-            map[p.id] = projectName;
-            map[String(p.id)] = projectName;
+          data.forEach((p) => {
+            const pk = p.id ?? p._id;
+            const projectName = (p.siteName ?? p.site_name ?? p.projectName ?? p.project_name ?? '').toString().trim();
+            if (pk != null) {
+              map[pk] = projectName;
+              map[String(pk)] = projectName;
+            }
           });
           setProjectsMap(map);
         }
@@ -124,12 +213,16 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (vendorsRes.ok) {
-          const data = await vendorsRes.json();
+          const raw = await vendorsRes.json();
+          const data = extractArrayFromResponse(raw);
           const map = {};
-          (Array.isArray(data) ? data : []).forEach(v => {
-            const vendorName = v.vendorName || v.vendor_name || '';
-            map[v.id] = vendorName;
-            map[String(v.id)] = vendorName;
+          data.forEach((v) => {
+            const pk = v.id ?? v._id;
+            const vendorName = (v.vendorName ?? v.vendor_name ?? '').toString().trim();
+            if (pk != null) {
+              map[pk] = vendorName;
+              map[String(pk)] = vendorName;
+            }
           });
           setVendorsMap(map);
         }
@@ -141,15 +234,15 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (machineNumbersRes.ok) {
-          const data = await machineNumbersRes.json();
-          setMachineNumbersList(Array.isArray(data) ? data : []);
+          const raw = await machineNumbersRes.json();
+          setMachineNumbersList(extractArrayFromResponse(raw));
         }
       } catch (error) {
         console.error('Error fetching lookup data:', error);
       }
     };
     fetchLookupData();
-  }, []);
+  }, [extractArrayFromResponse]);
 
   // Resolve machine number id/text to display text (same idea as ToolsHistory Log tab)
   const resolveMachineNumberText = useCallback((machineNumberOrId) => {
@@ -179,7 +272,8 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (stockRes.ok) {
-          const data = await stockRes.json();
+          const raw = await stockRes.json();
+          const data = extractArrayFromResponse(raw);
           setStockManagementData(Array.isArray(data) ? data : []);
         }
 
@@ -189,8 +283,9 @@ const NetStock = ({ user }) => {
           headers: { 'Content-Type': 'application/json' }
         });
         if (trackerRes.ok) {
-          const data = await trackerRes.json();
-          const entries = (Array.isArray(data) ? data : []).filter(entry => {
+          const raw = await trackerRes.json();
+          const data = extractArrayFromResponse(raw);
+          const entries = (Array.isArray(data) ? data : []).filter((entry) => {
             const entryType = entry.tools_entry_type || entry.toolsEntryType || 'Entry';
             return entryType.toLowerCase() === 'entry' || entryType.toLowerCase() === 'relocation';
           });
@@ -203,7 +298,7 @@ const NetStock = ({ user }) => {
       }
     };
     fetchData();
-  }, []);
+  }, [extractArrayFromResponse]);
 
   // Helper to get location name
   const getLocationName = (id) => {
@@ -310,16 +405,76 @@ const NetStock = ({ user }) => {
     return correctHomeLocationId || stockHomeLocationId;
   };
 
+  // Helper to get current location (To location) from tools_tracker_management - similar to History.jsx logic
+  const getCurrentToLocation = (itemIdsId, brandId, machineNumber, homeLocationId) => {
+    if (!itemIdsId) return homeLocationId;
+
+    let latestEntry = null;
+    let latestDate = null;
+
+    // Find the most recent entry in tools_tracker_management for this item
+    for (const entry of toolsTrackerManagementData) {
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+      
+      for (const entryItem of entryItems) {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumber = (entryItem.machine_number || entryItem.machineNumber || '').trim();
+        
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
+        const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
+        const machineMatch = !machineNumber || (entryMachineNumber && entryMachineNumber === String(machineNumber).trim());
+        
+        if (itemIdsMatch && brandMatch && machineMatch) {
+          const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+          if (!latestDate || entryDate > latestDate) {
+            latestDate = entryDate;
+            latestEntry = { entry, entryItem };
+          }
+        }
+      }
+    }
+
+    if (latestEntry) {
+      const entryType = String(latestEntry.entry.tools_entry_type || latestEntry.entry.toolsEntryType || '').toLowerCase();
+      
+      if (entryType === 'entry') {
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+        const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
+        if (serviceStoreId) return serviceStoreId;
+      } else if (entryType === 'relocate' || entryType === 'relocation') {
+        const itemHomeLocationId = latestEntry.entryItem.home_location_id || latestEntry.entryItem.homeLocationId;
+        if (itemHomeLocationId) return itemHomeLocationId;
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+      } else if (entryType === 'service_return') {
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+        const fromProjectId = latestEntry.entry.from_project_id || latestEntry.entry.fromProjectId;
+        if (fromProjectId) return fromProjectId;
+      } else {
+        const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
+        if (serviceStoreId) return serviceStoreId;
+        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+        if (toProjectId) return toProjectId;
+      }
+    }
+
+    // Fallback to home location
+    return homeLocationId;
+  };
+
   // Process data for table view (individual items) - merge items with same location, itemName, brand
   const tableData = useMemo(() => {
     const itemsMap = new Map(); // Use Map to merge items
     const processedItemIds = new Set();
 
     // Process items from stock management
-    stockManagementData.forEach(stock => {
-      const itemNameId = stock.item_name_id || stock.itemNameId;
-      const itemIdsId = stock.item_ids_id || stock.itemIdsId;
-      const brandId = stock.brand_name_id || stock.brandNameId;
+    stockManagementData.forEach((stock) => {
+      const itemNameId = stock.item_name_id ?? stock.itemNameId;
+      const itemIdsId = stock.item_ids_id ?? stock.itemIdsId;
+      const brandId = stock.brand_name_id ?? stock.brandNameId ?? stock.brand_id ?? stock.brandId;
       const homeLocationId = stock.home_location_id || stock.homeLocationId;
       const quantity = parseInt(stock.quantity || 0, 10);
       // Resolve machine number: check machine_number_id first, then machine_number
@@ -328,47 +483,42 @@ const NetStock = ({ user }) => {
       const machineNumber = machineNumberId ? resolveMachineNumberText(machineNumberId) : machineNumberRaw;
       const status = stock.machine_status || stock.machineStatus || 'Working';
 
-      const itemName = itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || '-';
-      const brand = brandsMap[brandId] || brandsMap[String(brandId)] || '-';
+      const itemName = resolveItemNameDisplay(itemNameId);
+      const brand = resolveBrandDisplay(brandId);
 
-      if (itemIdsId) {
-        // Item with itemId - get home location first, then current location
+      const hasItemIdsId = itemIdsId != null && itemIdsId !== '';
+      if (hasItemIdsId) {
+        // Item with itemId - each unique (item_ids_id, brand, machine_number) is a separate row
         const itemKey = `${itemIdsId}_${brandId || ''}_${machineNumber}`;
         if (!processedItemIds.has(itemKey)) {
           processedItemIds.add(itemKey);
-          const itemId = itemIdsMap[itemIdsId] || itemIdsMap[String(itemIdsId)] || '-';
+          const itemId = resolveItemIdDisplay(itemIdsId);
           // Get most recent home location from tools_tracker_management, fallback to stock_management
           const actualHomeLocationId = getHomeLocationId(itemIdsId, brandId, machineNumber, homeLocationId);
-          // Get current location (which is the home location)
-          const currentLocationId = getCurrentLocationForItem(itemIdsId, brandId, machineNumber, actualHomeLocationId);
+          const homeLocation = getLocationName(actualHomeLocationId);
+          // Get current location (To location) from tools_tracker_management
+          const currentLocationId = getCurrentToLocation(itemIdsId, brandId, machineNumber, actualHomeLocationId);
           const currentLocation = getLocationName(currentLocationId);
 
-          // Create merge key: location + itemName + brand + machineNumber + status
-          const mergeKey = `${currentLocation}_${itemName}_${brand}_${machineNumber}_${status}`;
+          // Use itemKey as mergeKey so each item shows as its own row (no merging of different tools)
+          const mergeKey = itemKey;
 
-          if (itemsMap.has(mergeKey)) {
-            // Merge: increment itemId count
-            const existing = itemsMap.get(mergeKey);
-            existing.itemIdCount = (existing.itemIdCount || 0) + 1;
-            existing.itemIds = existing.itemIds || [];
-            existing.itemIds.push(itemId);
-          } else {
-            itemsMap.set(mergeKey, {
-              id: itemKey,
-              itemName,
-              itemId,
-              itemIds: [itemId],
-              itemIdCount: 1,
-              location: currentLocation,
-              brand,
-              machineNumber,
-              status,
-              quantity: 0,
-              hasItemId: true
-            });
-          }
+          itemsMap.set(mergeKey, {
+            id: itemKey,
+            itemName,
+            itemId,
+            itemIds: [itemId],
+            itemIdCount: 1,
+            location: homeLocation,
+            currentLocation: currentLocation,
+            brand,
+            machineNumber,
+            status,
+            quantity: 0,
+            hasItemId: true
+          });
         }
-      } else if (!itemIdsId) {
+      } else if (!hasItemIdsId) {
         // Item with quantity only (can be positive or negative) - use home location
         const homeLocation = getLocationName(homeLocationId);
 
@@ -396,6 +546,7 @@ const NetStock = ({ user }) => {
             itemName,
             itemId: '-',
             location: homeLocation,
+            currentLocation: '-',
             brand,
             machineNumber: '-',
             status: '-',
@@ -444,9 +595,33 @@ const NetStock = ({ user }) => {
         return item.itemId === selectedItemId;
       });
     }
+    if (selectedBrand) {
+      filtered = filtered.filter(item => item.brand === selectedBrand);
+    }
 
     return filtered;
-  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getLocationName, resolveMachineNumberText]);
+  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, selectedBrand, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getCurrentToLocation, getLocationName, resolveMachineNumberText, resolveItemIdDisplay, resolveBrandDisplay, resolveItemNameDisplay]);
+
+  // Apply universal search filter to tableData
+  const filteredTableData = useMemo(() => {
+    if (!searchQuery.trim()) return tableData;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return tableData.filter(item => {
+      const searchableText = [
+        item.itemName || '',
+        item.itemId || '',
+        item.location || '',
+        item.currentLocation || '',
+        item.brand || '',
+        item.machineNumber || '',
+        item.status || '',
+        item.quantity?.toString() || ''
+      ].join(' ').toLowerCase();
+      
+      return searchableText.includes(query);
+    });
+  }, [tableData, searchQuery]);
 
   // Calculate aggregated summary for List view table display
   const aggregatedSummary = useMemo(() => {
@@ -454,16 +629,16 @@ const NetStock = ({ user }) => {
     const processedItemIds = new Set();
 
     // Process stock management data directly
-    stockManagementData.forEach(stock => {
-      const itemNameId = stock.item_name_id || stock.itemNameId;
-      const itemIdsId = stock.item_ids_id || stock.itemIdsId;
-      const brandId = stock.brand_name_id || stock.brandNameId;
+    stockManagementData.forEach((stock) => {
+      const itemNameId = stock.item_name_id ?? stock.itemNameId;
+      const itemIdsId = stock.item_ids_id ?? stock.itemIdsId;
+      const brandId = stock.brand_name_id ?? stock.brandNameId ?? stock.brand_id ?? stock.brandId;
       const quantity = parseInt(stock.quantity || 0, 10);
 
       if (!itemNameId) return;
 
-      const itemName = itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || '-';
-      const brand = brandsMap[brandId] || brandsMap[String(brandId)] || '-';
+      const itemName = resolveItemNameDisplay(itemNameId);
+      const brand = resolveBrandDisplay(brandId);
       const key = `${itemName}_${brand}`;
 
       if (!aggregated[key]) {
@@ -478,8 +653,8 @@ const NetStock = ({ user }) => {
 
       if (itemIdsId) {
         // Track unique itemIds
-        const itemId = itemIdsMap[itemIdsId] || itemIdsMap[String(itemIdsId)];
-        if (itemId) {
+        const itemId = resolveItemIdDisplay(itemIdsId);
+        if (itemId && itemId !== '-') {
           aggregated[key].itemIdSet.add(itemId);
         }
       } else {
@@ -489,17 +664,17 @@ const NetStock = ({ user }) => {
     });
 
     // Also check tools_tracker_management for items that might have been transferred
-    toolsTrackerManagementData.forEach(entry => {
-      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
-      entryItems.forEach(entryItem => {
-        const itemNameId = entryItem.item_name_id || entryItem.itemNameId;
-        const itemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
-        const brandId = entryItem.brand_id || entryItem.brandId;
+    toolsTrackerManagementData.forEach((entry) => {
+      const entryItems = entry.tools_tracker_item_name_table ?? entry.toolsTrackerItemNameTable ?? [];
+      entryItems.forEach((entryItem) => {
+        const itemNameId = entryItem.item_name_id ?? entryItem.itemNameId;
+        const itemIdsId = entryItem.item_ids_id ?? entryItem.itemIdsId;
+        const brandId = entryItem.brand_id ?? entryItem.brandId;
 
         if (!itemNameId) return;
 
-        const itemName = itemNamesMap[itemNameId] || itemNamesMap[String(itemNameId)] || '-';
-        const brand = brandsMap[brandId] || brandsMap[String(brandId)] || '-';
+        const itemName = resolveItemNameDisplay(itemNameId);
+        const brand = resolveBrandDisplay(brandId);
         const key = `${itemName}_${brand}`;
 
         if (!aggregated[key]) {
@@ -514,8 +689,8 @@ const NetStock = ({ user }) => {
 
         if (itemIdsId) {
           // Track unique itemIds
-          const itemId = itemIdsMap[itemIdsId] || itemIdsMap[String(itemIdsId)];
-          if (itemId) {
+          const itemId = resolveItemIdDisplay(itemIdsId);
+          if (itemId && itemId !== '-') {
             aggregated[key].itemIdSet.add(itemId);
           }
         }
@@ -538,6 +713,9 @@ const NetStock = ({ user }) => {
     if (selectedItemName) {
       filtered = filtered.filter(item => item.itemName === selectedItemName);
     }
+    if (selectedBrand) {
+      filtered = filtered.filter(item => item.brand === selectedBrand);
+    }
 
     return filtered.sort((a, b) => {
       if (a.itemName !== b.itemName) {
@@ -545,7 +723,25 @@ const NetStock = ({ user }) => {
       }
       return a.brand.localeCompare(b.brand);
     });
-  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, selectedItemName]);
+  }, [stockManagementData, toolsTrackerManagementData, resolveItemNameDisplay, resolveBrandDisplay, resolveItemIdDisplay, selectedItemName, selectedBrand]);
+
+  // Apply universal search filter to aggregatedSummary
+  const filteredAggregatedSummary = useMemo(() => {
+    if (!searchQuery.trim()) return aggregatedSummary;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return aggregatedSummary.filter(item => {
+      const searchableText = [
+        item.itemName || '',
+        item.brand || '',
+        item.itemIdCount?.toString() || '',
+        item.quantitySum?.toString() || '',
+        item.total?.toString() || ''
+      ].join(' ').toLowerCase();
+      
+      return searchableText.includes(query);
+    });
+  }, [aggregatedSummary, searchQuery]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -768,22 +964,16 @@ const NetStock = ({ user }) => {
       }
 
       // Refresh data
-      const fetchData = async () => {
-        try {
-          const stockRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (stockRes.ok) {
-            const data = await stockRes.json();
-            setStockManagementData(Array.isArray(data) ? data : []);
-          }
-        } catch (error) {
-          console.error('Error refreshing data:', error);
-        }
-      };
-      await fetchData();
+      const refreshRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (refreshRes.ok) {
+        const raw = await refreshRes.json();
+        const data = extractArrayFromResponse(raw);
+        setStockManagementData(Array.isArray(data) ? data : []);
+      }
 
       alert('Stock updated successfully');
       setShowEditStockModal(false);
@@ -796,11 +986,16 @@ const NetStock = ({ user }) => {
   };
 
   return (
-    <div className="flex flex-col bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Category and Brand Section */}
-      <div className="flex justify-between mt-1.5">
-        <p className="text-[12px] text-black font-semibold leading-normal mb-2">Category</p>
-        <p className="text-[12px] text-black font-semibold leading-normal mb-2">Brand</p>
+      <div className="flex justify-end mt-1.5">
+        <button
+          type="button"
+          onClick={() => setShowBrandModal(true)}
+          className="text-[12px] text-black font-semibold leading-normal mb-2 cursor-pointer hover:underline p-0 border-0 bg-transparent text-right"
+        >
+          {selectedBrand ? selectedBrand : 'Brand'}
+        </button>
       </div>
 
       {/* Table/List Segmented Control */}
@@ -929,8 +1124,29 @@ const NetStock = ({ user }) => {
           </div>
         </div>
       </div>
+
+      {/* Universal Search and Download */}
+      <div className="flex items-center gap-2 mt-2">
+        <div className="flex-1 relative">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
+              <path d="M11 11L14 14" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-[36px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
+          />
+        </div>
+        <span className="text-[12px] text-gray-400 font-semibold cursor-pointer whitespace-nowrap">Download</span>
+      </div>
+
       {/* Main Content Area */}
-      <div key={viewMode} className="flex-1 pb-4">
+      <div key={viewMode} className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pb-4">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <p className="text-[14px] text-gray-500">Loading...</p>
@@ -938,16 +1154,12 @@ const NetStock = ({ user }) => {
         ) : viewMode === 'table' ? (
           /* Table View - Individual Items */
           <div className="mt-1.5">
-            {tableData.length === 0 ? (
+            {filteredTableData.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
               <>
-                {/* Download Link */}
-                <div className="flex justify-end mb-1">
-                  <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
-                </div>
-                <div className=" max-h-[410px] overflow-y-auto scrollbar-none no-scrollbar">
-                  {tableData.map((item, index) => {
+                <div className="overflow-y-auto scrollbar-none no-scrollbar scrollbar-none">
+                  {filteredTableData.map((item, index) => {
                     const itemId = item.id || index;
                     const swipeState = swipeStates[itemId];
                     const isExpanded = expandedItemId === itemId;
@@ -1001,15 +1213,16 @@ const NetStock = ({ user }) => {
                               )}
                             </div>
                             <div className="flex justify-between items-start mb-0.5">
-                              <p className="text-[11px] leading-tight">
-                                {item.location !== '-' ? (
-                                  <>
-                                    <span className="text-[#848484] font-medium">{item.location} </span>
-                                  </>
-                                ) : (
-                                  <span className="text-[#848484] font-medium">{item.location} </span>
-                                )}
-                              </p>
+                              <div className="flex flex-col">
+                                <p className="text-[11px] leading-tight">
+                                  <span className="text-[#848484] font-medium">Home: </span>
+                                  <span className="text-[#848484] font-medium">{item.location !== '-' ? item.location : '-'}</span>
+                                </p>
+                                <p className="text-[11px] leading-tight text-[#BF9853] mt-0.5">
+                                  <span className=" font-medium">Current: </span>
+                                  <span className=" font-medium">{item.currentLocation && item.currentLocation !== '-' ? item.currentLocation : '-'}</span>
+                                </p>
+                              </div>
                             </div>
                             {/* Middle line: Machine number - empty opposite */}
                             <div className="flex justify-between items-start mb-0.5">
@@ -1069,14 +1282,10 @@ const NetStock = ({ user }) => {
         ) : (
           /* List View - Aggregated Summary Table Only */
           <div className="mt-1.5">
-            {aggregatedSummary.length === 0 ? (
+            {filteredAggregatedSummary.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
               <>
-                {/* Download Link */}
-                <div className="flex justify-end mb-1">
-                  <span className="text-[12px] text-gray-400 font-semibold cursor-pointer">Download</span>
-                </div>
                 <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                   {/* Table Header */}
                   <div className="bg-gray-50 border-b border-gray-200">
@@ -1089,7 +1298,7 @@ const NetStock = ({ user }) => {
                   </div>
                   {/* Table Body */}
                   <div>
-                    {aggregatedSummary.map((item, index) => (
+                    {filteredAggregatedSummary.map((item, index) => (
                       <div
                         key={`${item.itemName}_${item.brand}_${index}`}
                         className="border-b border-gray-100 last:border-b-0"
@@ -1210,6 +1419,18 @@ const NetStock = ({ user }) => {
           </div>
         </>
       )}
+      {/* Brand Modal */}
+      <SelectOptionModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onSelect={(value) => {
+          setSelectedBrand(value);
+          setShowBrandModal(false);
+        }}
+        selectedValue={selectedBrand}
+        options={brandOptions}
+        fieldName="Brand"
+      />
     </div>
   );
 };

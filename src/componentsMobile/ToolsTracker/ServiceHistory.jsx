@@ -17,7 +17,9 @@ const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/
 const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
 
 const ServiceHistory = ({ user, onTabChange }) => {
+  const [viewMode, setViewMode] = useState('live'); // 'live' or 'history'
   const [historyData, setHistoryData] = useState([]);
+  const [serviceReturnData, setServiceReturnData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projectsMap, setProjectsMap] = useState({});
   const [vendorsMap, setVendorsMap] = useState({});
@@ -320,15 +322,24 @@ const ServiceHistory = ({ user, onTabChange }) => {
               });
             }
           });
-          // Sort by created_date_time (newest first)
-          flattenedData.sort((a, b) => {
+          // Separate service and service return entries
+          const serviceEntries = [];
+          const serviceReturnEntries = [];
+          flattenedData.forEach((entry) => {
+            const type = String(entry.toolsEntryType || '').toLowerCase();
+            if (type === 'service') {
+              serviceEntries.push(entry);
+            } else if (type === 'service_return') {
+              serviceReturnEntries.push(entry);
+            }
+          });
+
+          // Sort service entries by created_date_time (newest first)
+          serviceEntries.sort((a, b) => {
             const dateA = new Date(a.createdDateTime);
             const dateB = new Date(b.createdDateTime);
             return dateB - dateA;
           });
-
-          // Filter to only show 'Service' type data (exclude Entry and other types)
-          const filteredData = flattenedData.filter(entry => entry.toolsEntryType === 'service');
 
           // Fetch latest status list once and resolve current status by item_ids_id + machine_number_id
           let machineStatusList = [];
@@ -362,7 +373,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
             }
           });
 
-          const enrichedData = filteredData.map((entry) => {
+          const enrichedData = serviceEntries.map((entry) => {
             const key = getMachineStatusKey(entry.itemIdsId, entry.machineNumberId, entry.machineNumber);
             const latestStatusRow = key ? latestStatusByKey.get(key) : null;
             const apiStatus = latestStatusRow
@@ -380,8 +391,8 @@ const ServiceHistory = ({ user, onTabChange }) => {
 
             return { ...entry, machineStatus: entry.machineStatus || 'Working' };
           });
-
           setHistoryData(enrichedData);
+          setServiceReturnData(serviceReturnEntries);
         } else {
           console.error('Failed to fetch history data');
           setHistoryData([]);
@@ -736,6 +747,14 @@ const ServiceHistory = ({ user, onTabChange }) => {
     };
   }, [historyData]);
 
+  const buildItemKey = (entry) => {
+    const itemNameId = entry?.itemNameId || '';
+    const itemIdsId = entry?.itemIdsId || '';
+    const machineNumberId = entry?.machineNumberId || '';
+    const machineNumber = entry?.machineNumber || '';
+    return [itemNameId, itemIdsId, machineNumberId, machineNumber].join('::');
+  };
+
   // Get status display text and color
   const getStatusDisplay = (status) => {
     const normalized = String(status || '').trim();
@@ -761,6 +780,13 @@ const ServiceHistory = ({ user, onTabChange }) => {
   );
   const filterItemIdOptions = Object.values(itemIdsMap).filter(Boolean);
   const filterProjectInchargeOptions = Object.values(employeesMap).filter(Boolean);
+
+  // Pre-compute returned item keys (items that have been returned to any project)
+  const returnedItemKeys = new Set(
+    serviceReturnData
+      .filter((retEntry) => retEntry.toProjectId)
+      .map(buildItemKey)
+  );
 
   // Filter bottom sheet handlers
   const handleCloseFilterBottomSheet = () => {
@@ -799,13 +825,88 @@ const ServiceHistory = ({ user, onTabChange }) => {
           </div>
         </div>
       </div>
+      {/* Live/History Toggle */}
+      <div className="flex-shrink-0 px-4 pt-3 pb-2">
+        <div className="flex bg-[#F2F4F7] items-center h-9 rounded-md">
+          <button
+            onClick={() => setViewMode('live')}
+            className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${
+              viewMode === 'live'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-black'
+            }`}
+          >
+            Live
+          </button>
+          <button
+            onClick={() => setViewMode('history')}
+            className={`flex-1 mr-0.5 h-8 rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${
+              viewMode === 'history'
+                ? 'bg-white text-black'
+                : 'bg-transparent text-black'
+            }`}
+          >
+            History
+          </button>
+        </div>
+      </div>
       {/* Filter and Download Row */}
-      <div className="flex justify-between items-center px-4 pb-1 mt-2">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowFilterBottomSheet(true)}>
+      <div className="flex justify-between items-center gap-2 px-4 pb-1 mt-2 min-h-[32px]">
+        <div className="flex items-center gap-2 cursor-pointer flex-shrink-0" onClick={() => setShowFilterBottomSheet(true)}>
           <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
           <span className="text-[12px] font-medium text-gray-500">Filter</span>
         </div>
-        <button className="text-[12px] font-semibold text-gray-500 cursor-pointer hover:opacity-80">
+        <div className="flex-1 flex flex-wrap items-center gap-1.5 min-w-0 overflow-hidden">
+          {filterItemName && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-200 text-[11px] font-medium text-black">
+              <span className="truncate max-w-[80px]">{filterItemName}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFilterItemName(''); }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-300" aria-label="Clear Item Name">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          )}
+          {filterMachineNumber && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-200 text-[11px] font-medium text-black">
+              <span className="truncate max-w-[80px]">{filterMachineNumber}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFilterMachineNumber(''); }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-300" aria-label="Clear Machine Number">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          )}
+          {filterItemId && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-200 text-[11px] font-medium text-black">
+              <span className="truncate max-w-[80px]">{filterItemId}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFilterItemId(''); }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-300" aria-label="Clear Item ID">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          )}
+          {filterProjectIncharge && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-200 text-[11px] font-medium text-black">
+              <span className="truncate max-w-[80px]">{filterProjectIncharge}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFilterProjectIncharge(''); }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-300" aria-label="Clear Project Incharge">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          )}
+          {filterDate && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-200 text-[11px] font-medium text-black">
+              <span className="truncate max-w-[80px]">{filterDate}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFilterDate(''); }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-300" aria-label="Clear Date">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          )}
+          {filterStatus && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-200 text-[11px] font-medium text-black">
+              <span className="truncate max-w-[80px]">{(statusOptions.find(o => o.value === filterStatus)?.label) || filterStatus}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFilterStatus(''); }} className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-300" aria-label="Clear Status">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </span>
+          )}
+        </div>
+        <button className="text-[12px] font-semibold text-gray-500 cursor-pointer hover:opacity-80 flex-shrink-0">
           Download
         </button>
       </div>
@@ -822,7 +923,30 @@ const ServiceHistory = ({ user, onTabChange }) => {
           </div>
         ) : (
           <div className="space-y-0.5">
-            {historyData.map((entry) => {
+            {historyData.filter((entry) => {
+              // Apply Live vs History view filtering
+              if (viewMode === 'live') {
+                // Build a set of item keys that have been returned to any project
+                const returnedItemKeys = new Set(
+                  serviceReturnData
+                    .filter(retEntry => retEntry.toProjectId)
+                    .map(buildItemKey)
+                );
+                const key = buildItemKey(entry);
+                if (key && returnedItemKeys.has(key)) {
+                  return false;
+                }
+              }
+
+              // Filter by Item ID
+              if (filterItemId) {
+                const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
+                if (!itemIdName || String(itemIdName).toLowerCase() !== String(filterItemId).toLowerCase()) {
+                  return false;
+                }
+              }
+              return true;
+            }).map((entry) => {
               const { date, time } = formatDateTime(entry.createdDateTime);
 
               // For Service type: check serviceStoreId first (vendors), then toProjectId
@@ -1223,7 +1347,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
       {/* Filter Bottom Sheet Modal */}
       {showFilterBottomSheet && (
         <div
-          className="fixed inset-0 z-50 flex items-end"
+          className="fixed inset-0 z-50 flex items-end justify-center"
           onClick={handleCloseFilterBottomSheet}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
@@ -1232,11 +1356,11 @@ const ServiceHistory = ({ user, onTabChange }) => {
 
           {/* Bottom Sheet */}
           <div
-            className="relative z-10 w-full bg-white rounded-t-[20px] shadow-lg max-h-[80vh] overflow-y-auto"
+            className="relative z-10 w-full max-w-[360px] bg-white rounded-tl-[16px] rounded-tr-[16px] shadow-lg max-h-[70vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5">
+            <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
               <p className="text-[16px] font-bold text-black">Select Filters</p>
               <button
                 onClick={handleCloseFilterBottomSheet}
@@ -1246,8 +1370,8 @@ const ServiceHistory = ({ user, onTabChange }) => {
               </button>
             </div>
 
-            {/* Content */}
-            <div className="px-6 py-4 space-y-[6px]">
+            {/* Content - scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-[6px]">
               {/* Item Name */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Item Name</p>
@@ -1263,14 +1387,16 @@ const ServiceHistory = ({ user, onTabChange }) => {
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setFilterItemName(''); }}
-                      className="absolute right-8 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                     >
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
                   )}
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </div>
+                  {!filterItemName && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1315,14 +1441,16 @@ const ServiceHistory = ({ user, onTabChange }) => {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setFilterItemId(''); }}
-                        className="absolute right-8 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                     )}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </div>
+                    {!filterItemId && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Project Incharge */}
@@ -1340,14 +1468,16 @@ const ServiceHistory = ({ user, onTabChange }) => {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setFilterProjectIncharge(''); }}
-                        className="absolute right-8 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                     )}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </div>
+                    {!filterProjectIncharge && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1389,21 +1519,23 @@ const ServiceHistory = ({ user, onTabChange }) => {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setFilterStatus(''); }}
-                        className="absolute right-8 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                     )}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </div>
+                    {!filterStatus && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4 px-6 pb-6 pt-2">
+            <div className="flex-shrink-0 flex gap-4 px-6 pb-6 pt-2">
               <button
                 onClick={handleCloseFilterBottomSheet}
                 className="flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white"

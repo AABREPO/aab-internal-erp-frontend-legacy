@@ -11,6 +11,8 @@ import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import XL from '../Images/sheets.png'
+import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
 
 const DatabaseExpenses = ({ username, userRoles = [] }) => {
@@ -48,6 +50,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [machineToolsOption, setMachineToolsOption] = useState([]);
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
+    const [branchOptions, setBranchOptions] = useState([]);
     // Initialize filter states from localStorage or defaults
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
         return localStorage.getItem('expenseFilter_siteName') || '';
@@ -606,6 +609,24 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         };
         fetchEmployeeDetails();
     }, []);
+    useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!response.ok) throw new Error('Failed to fetch branches');
+                const data = await response.json();
+                setBranchOptions(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error('Error fetching branches:', error);
+                setBranchOptions([]);
+            }
+        };
+        fetchBranches();
+    }, []);
     const generateTodayPDF = () => {
         const today = new Date().toISOString().slice(0, 10);
         const todayExpenses = expenses.filter(exp => {
@@ -694,9 +715,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
                 (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
-                (selectedAccountType ? 
-                    (selectedAccountType === 'Unknown' ? 
-                        (!expense.accountType || expense.accountType === '') : 
+                (selectedAccountType ?
+                    (selectedAccountType === 'Unknown' ?
+                        (!expense.accountType || expense.accountType === '') :
                         expense.accountType === selectedAccountType
                     ) : true) &&
                 (selectedDate ? expense.date === selectedDate : true) &&
@@ -758,7 +779,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: true
-                  })
+                })
                     .replace(",", "")
                     .replace(/\s/g, "-");
                 const finalName = `${timestamp} - ${formData.siteName} - ${formData.vendor || formData.contractor}`;
@@ -1005,27 +1026,29 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         // Check all possible field name variations
         const labourId = expense.labourId || expense.labour_id || expense.labourID || expense.labour_ID;
         const employeeId = expense.employeeId || expense.employee_id || expense.employeeID || expense.employee_ID;
-        
+
         if (labourId) {
             // Try both string and number conversion for ID matching
-            const labourName = labourIdToName[labourId] || 
-                              labourIdToName[String(labourId)] || 
-                              labourIdToName[Number(labourId)];
+            const labourName = labourIdToName[labourId] ||
+                labourIdToName[String(labourId)] ||
+                labourIdToName[Number(labourId)];
             if (labourName) {
                 return labourName;
             }
         }
         if (employeeId) {
             // Try both string and number conversion for ID matching
-            const employeeName = employeeIdToName[employeeId] || 
-                                employeeIdToName[String(employeeId)] || 
-                                employeeIdToName[Number(employeeId)];
+            const employeeName = employeeIdToName[employeeId] ||
+                employeeIdToName[String(employeeId)] ||
+                employeeIdToName[Number(employeeId)];
             if (employeeName) {
                 return employeeName;
             }
         }
         return '';
     };
+    const getBranchName = (id) =>
+        branchOptions.find(b => String(b.id) === String(id))?.branch || "";
     const handleEditClick = (expense) => {
         setEditId(expense.id);
         setFormData({
@@ -1187,14 +1210,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     return (
         <body className=' bg-[#FAF6ED]'>
             <div>
-                <div className='mt-[-35px] mb-3 text-right items-center cursor-default flex justify-between max-w-screen-2xl table-auto min-w-full overflow-auto w-screen'>
-                    <div></div>
-                    <div>
-                        <span className='text-[#E4572E] mr-9 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>Export pdf</span>
-                        <span className='text-[#007233] mr-9 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>Export XL</span>
-                        <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
-                    </div>
-                </div>
+
                 {Object.keys(accountTypeSummary).length > 0 && (
                     <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
                         <div className="flex flex-wrap gap-5 items-end">
@@ -1229,27 +1245,26 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     return a.localeCompare(b);
                                 })
                                 .map(([accountType, data]) => (
-                                <div key={accountType} className="cursor-pointer transition-all duration-200 hover:scale-105" onClick={() => setSelectedAccountType(accountType)}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className={`font-semibold transition-colors duration-200 ${selectedAccountType === accountType ? 'text-[#E4572E]' : 'text-[#BF9853] hover:text-[#E4572E]'}`}>
-                                            {accountType}
-                                        </label>
-                                        <span className="text-sm text-red-500 font-medium">
-                                            {data.entryCount}
-                                        </span>
+                                    <div key={accountType} className="cursor-pointer transition-all duration-200 hover:scale-105" onClick={() => setSelectedAccountType(accountType)}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className={`font-semibold transition-colors duration-200 ${selectedAccountType === accountType ? 'text-[#E4572E]' : 'text-[#BF9853] hover:text-[#E4572E]'}`}>
+                                                {accountType}
+                                            </label>
+                                            <span className="text-sm text-red-500 font-medium">
+                                                {data.entryCount}
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                            readOnly
+                                            className={`w-[200px] h-[45px] cursor-pointer rounded-lg border-2 focus:outline-none p-2 text-lg font-bold text-center transition-all duration-200 ${selectedAccountType === accountType
+                                                    ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md'
+                                                    : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
+                                                }`}
+                                        />
                                     </div>
-                                    <input
-                                        type="text"
-                                        value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                        readOnly
-                                        className={`w-[200px] h-[45px] cursor-pointer rounded-lg border-2 focus:outline-none p-2 text-lg font-bold text-center transition-all duration-200 ${
-                                            selectedAccountType === accountType 
-                                                ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md' 
-                                                : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
-                                        }`}
-                                    />
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     </div>
                 )}
@@ -1379,11 +1394,16 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 </div>
                             )}
                         </div>
-                        <div>
-                            <button onClick={clearFilters} className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'>
+                        <div className='flex items-center gap-2'>
+                            <button onClick={clearFilters} className='w-10 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'>
                                 <img className='w-4 h-4' src={Reload} alt="Reload" />
-                                Reset Table
                             </button>
+                            <div className=' text-left md:text-right md:items-center items-start cursor-default flex max-w-screen-2xl table-auto overflow-auto w-full'>
+                                <div className='flex items-center'>
+                                    <span className='text-[#E4572E] mr-3 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                                    <span className='text-[#007233] mr-1 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -1394,8 +1414,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}>
-                            <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
-                                <thead className="sticky top-0 z-9 bg-white ">
+                            <table className="table-fixed  min-w-[1765px] w-full border-collapse">
+                                <thead className="sticky top-0 z-10 bg-white ">
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="px-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('timestamp')}>
                                             Time stamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1416,7 +1436,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
-                                            Comments {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
                                             Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1428,6 +1448,10 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[150px] font-bold text-left">Source From</th>
+                                        <th className="px-0.5 w-[150px] font-bold text-left">Branch</th>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('enteredBy')}>
+                                            Entered By {sortField === 'enteredBy' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -1533,6 +1557,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 />
                                             </th>
                                             <th></th>
+                                            <th>
+                                            </th>
+                                            <th></th>
                                             <th></th>
                                             <th></th>
                                             <th></th>
@@ -1554,9 +1581,11 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             </td>
                                             <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
-                                            <td className=" text-sm text-left ">{expense.accountType}</td>                                            
+                                            <td className=" text-sm text-left ">{expense.accountType}</td>
                                             <td className=" text-sm text-left ">{expense.machineTools}</td>
                                             <td className=" text-sm text-left ">{expense.source}</td>
+                                            <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
+                                            <td className=" text-sm text-left ">{expense.enteredBy || 'Sivaprakasm'}</td>
                                             <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
                                             <td className=" flex w-[100px] justify-between py-2">
                                                 <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
@@ -1624,18 +1653,18 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     <option value={900}>900</option>
                                     <option value={1000}>1000</option>
                                 </select>
-                            </div>                            
+                            </div>
                             <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-700">
                                     Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
                                 </span>
-                            </div>                            
+                            </div>
                             <div className="flex items-center space-x-1">
                                 <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
                                     className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Previous
-                                </button>                                
+                                </button>
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                     let pageNum;
                                     if (totalPages <= 5) {
@@ -1646,29 +1675,28 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         pageNum = totalPages - 4 + i;
                                     } else {
                                         pageNum = currentPage - 2 + i;
-                                    }                                    
+                                    }
                                     return (
                                         <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
-                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
-                                                currentPage === pageNum
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
                                                     ? 'bg-[#BF9853] text-white border-[#BF9853]'
                                                     : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
-                                            }`}
+                                                }`}
                                         >
                                             {pageNum}
                                         </button>
                                     );
-                                })}                             
+                                })}
                                 <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}
                                     className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
                                     Next
                                 </button>
                             </div>
-                        </div>                        
+                        </div>
                         <Modal isOpen={modalIsOpen} onRequestClose={handleCancel}
-                            contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50"
-                            overlayClassName="fixed inset-0">
+                            contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
+                            overlayClassName="fixed inset-0 z-[9999]">
                             <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
                                 <h2 className="text-xl font-bold mb-6 border-b-2">Edit Expense</h2>
                                 <form className="grid grid-cols-2 gap-4">
@@ -1703,8 +1731,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             name="siteName"
                                             value={siteOption.find(option => option.value === formData.siteName)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ 
-                                                    ...formData, 
+                                                setFormData({
+                                                    ...formData,
                                                     siteName: selectedOption?.value || '',
                                                     projectId: selectedOption?.id || ''
                                                 })
@@ -1740,8 +1768,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             options={vendorOption}
                                             value={vendorOption.find(opt => opt.value === formData.vendor)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ 
-                                                    ...formData, 
+                                                setFormData({
+                                                    ...formData,
                                                     vendor: selectedOption?.value || '',
                                                     vendorId: selectedOption?.id || '',
                                                     contractor: selectedOption ? '' : formData.contractor,
@@ -1795,8 +1823,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             options={contractorOption}
                                             value={contractorOption.find(opt => opt.value === formData.contractor)}
                                             onChange={(selectedOption) =>
-                                                setFormData({ 
-                                                    ...formData, 
+                                                setFormData({
+                                                    ...formData,
                                                     contractor: selectedOption?.value || '',
                                                     contractorId: selectedOption?.id || '',
                                                     vendor: selectedOption ? '' : formData.vendor,
@@ -1853,7 +1881,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     <div>
                                         <label className="block text-gray-500 font-semibold text-left">Category *</label>
                                         <Select name="category" value={categoryOption.find(option => option.value === formData.category)}
-                                            onChange={(selectedOption) => setFormData({...formData, category: selectedOption?.value || '' })}
+                                            onChange={(selectedOption) => setFormData({ ...formData, category: selectedOption?.value || '' })}
                                             options={categoryOption}
                                             placeholder="--- Select Category ---"
                                             styles={{
@@ -1901,7 +1929,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
                                         />
                                         <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
-                                    </div>                                    
+                                    </div>
                                     {/* Conditional fields based on Account Type */}
                                     {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills' || formData.accountType === 'Weekly Payment') && (
                                         <div>
@@ -1918,7 +1946,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 <option value="Cheque">Cheque</option>
                                             </select>
                                         </div>
-                                    )}                                    
+                                    )}
                                     {formData.accountType === 'Utility Bills' && (
                                         <>
                                             <div>
@@ -1935,24 +1963,24 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     <option value="Telecom">Telecom</option>
                                                     <option value="Subscription">Subscription</option>
                                                 </select>
-                                            </div>                                            
+                                            </div>
                                             <div>
                                                 <label className="block text-gray-500 font-semibold text-left">
-                                                    {formData.utilityType === 'Electricity' ? 'EB Number' : 
-                                                     formData.utilityType === 'Property' ? 'Property Tax Number' : 
-                                                     formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                                    {formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
+                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
                                                 </label>
                                                 <input
                                                     type="text"
                                                     name="utilityTypeNumber"
                                                     value={formData.utilityTypeNumber}
                                                     onChange={handleChange}
-                                                    placeholder={`Enter ${formData.utilityType === 'Electricity' ? 'EB Number' : 
-                                                                   formData.utilityType === 'Property' ? 'Property Tax Number' : 
-                                                                   formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                    placeholder={`Enter ${formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
+                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
                                                     className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
                                                 />
-                                            </div>                                            
+                                            </div>
                                             <div>
                                                 <label className="block text-gray-500 font-semibold text-left">Months</label>
                                                 <input
@@ -1963,7 +1991,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     placeholder="Enter months..."
                                                     className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
                                                 />
-                                            </div>                                            
+                                            </div>
                                             {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
                                                 <div>
                                                     <label className="block text-gray-500 font-semibold text-left">Additional Input</label>
@@ -1992,121 +2020,121 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 </form>
                             </div>
                         </Modal>
-            {showPaymentModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
-                    <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
-                        <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
-                        <div className="flex-1 overflow-hidden">
-                            <div className="space-y-4 mb-4">
-                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="date"
-                                                    value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                    readOnly
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full bg-gray-100 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                                />
-                                                <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                            <input
-                                                type="text"
-                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
-                                            <input
-                                                type="text"
-                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                {(formData.paymentMode === 'GPay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
-                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                        <div className="space-y-4">
-                                            {formData.paymentMode === 'Cheque' && (
-                                                <div className="grid grid-cols-2 gap-4">
+                        {showPaymentModal && (
+                            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
+                                <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
+                                    <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="space-y-4 mb-4">
+                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                <div className="grid grid-cols-3 gap-4">
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
-                                                        <input
-                                                            type="text"
-                                                            value={paymentModalData.chequeNo}
-                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                            placeholder="Enter cheque number"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                                                         <div className="relative">
                                                             <input
                                                                 type="date"
-                                                                value={paymentModalData.chequeDate}
-                                                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full focus:outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full bg-gray-100 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                                                             />
                                                             <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )}
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                    <input
-                                                        type="text"
-                                                        value={paymentModalData.transactionNumber}
-                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                        placeholder="Enter transaction number (optional)"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
-                                                    <select
-                                                        value={paymentModalData.accountNumber}
-                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    >
-                                                        <option value="">Select Account</option>
-                                                        {accountDetails.map((account) => (
-                                                            <option key={account.id} value={account.account_number}>
-                                                                {account.account_number}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                        <input
+                                                            type="text"
+                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                                        <input
+                                                            type="text"
+                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
+                                            {(formData.paymentMode === 'GPay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                    <div className="space-y-4">
+                                                        {formData.paymentMode === 'Cheque' && (
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={paymentModalData.chequeNo}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                                        placeholder="Enter cheque number"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                                    <div className="relative">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={paymentModalData.chequeDate}
+                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full focus:outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                                                        />
+                                                                        <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={paymentModalData.transactionNumber}
+                                                                    onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                                    placeholder="Enter transaction number (optional)"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
+                                                                <select
+                                                                    value={paymentModalData.accountNumber}
+                                                                    onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                >
+                                                                    <option value="">Select Account</option>
+                                                                    {accountDetails.map((account) => (
+                                                                        <option key={account.id} value={account.account_number}>
+                                                                            {account.account_number}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                )}
+                                    <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
+                                        <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
+                                            Cancel
+                                        </button>
+                                        <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
+                                            {isSubmitting ? 'Saving...' : 'Submit'}
+                                        </button>
+                                    </div>
+                                    <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
+                                        ×
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
-                            <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
-                                Cancel
-                            </button>
-                            <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
-                                {isSubmitting ? 'Saving...' : 'Submit'}
-                            </button>
-                        </div>
-                        <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
-                            ×
-                        </button>
-                    </div>
-                </div>
-            )}
+                        )}
                         <AuditModal show={showModal} onClose={() => setShowModal(false)} audits={audits} />
                     </div>
                 </div>

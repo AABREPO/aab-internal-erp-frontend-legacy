@@ -47,6 +47,9 @@ const ProjectAdvance = ({ user, onLogout }) => {
     } else if (page === 'project-advance') {
       setCurrentPage('project-advance');
       navigate('/portal');
+    }else if (page === 'loan-portal') {
+      setCurrentPage('loan-portal');
+      navigate('/loan');
     }
   };
 

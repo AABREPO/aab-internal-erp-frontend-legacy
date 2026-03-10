@@ -7,6 +7,8 @@ import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import XL from '../Images/sheets.png'
+import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
 // Date Range Picker Component
 const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChange }) => {
@@ -77,7 +79,7 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
                 finalEndDate = tempStartDate;
             }
             setTempStartDate(finalStartDate);
-            setTempEndDate(finalEndDate);        
+            setTempEndDate(finalEndDate);
             // Auto-apply when both dates are selected
             setTimeout(() => {
                 onStartDateChange(finalStartDate);
@@ -119,7 +121,7 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
         if (!tempStartDate || !isCurrentMonth) return false;
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
-        const dateString = formatDateToString(year, month, day);        
+        const dateString = formatDateToString(year, month, day);
         if (tempStartDate && tempEndDate) {
             return dateString >= tempStartDate && dateString <= tempEndDate;
         } else if (tempStartDate) {
@@ -211,7 +213,7 @@ const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChang
                             const inRange = isDateInRange(day, isCurrentMonth);
                             const isStart = isStartDate(day, isCurrentMonth);
                             const isEnd = isEndDate(day, isCurrentMonth);
-                            
+
                             return (
                                 <button
                                     key={idx}
@@ -286,6 +288,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
+    const [branchOptions, setBranchOptions] = useState([]);
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
@@ -679,6 +682,24 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             }
         };
         fetchMachinTools();
+    }, []);
+    useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!response.ok) throw new Error('Failed to fetch branches');
+                const data = await response.json();
+                setBranchOptions(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error('Error fetching branches:', error);
+                setBranchOptions([]);
+            }
+        };
+        fetchBranches();
     }, []);
     useEffect(() => {
         const fetchAccountType = async () => {
@@ -1204,12 +1225,14 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         }
         return expense.contractor || '';
     };
+    const getBranchName = (id) =>
+        branchOptions.find(b => String(b.id) === String(id))?.branch || "";
     const getDisplayStaffName = (expense) => {
         // Prioritize labour over employee
         // Check all possible field name variations
         const labourId = expense.labourId || expense.labour_id || expense.labourID || expense.labour_ID;
         const employeeId = expense.employeeId || expense.employee_id || expense.employeeID || expense.employee_ID;
-        
+
         // Debug: log first expense with staff data to see what we're working with
         if ((labourId || employeeId) && !window.staffDebugLogged) {
             window.staffDebugLogged = true;
@@ -1222,13 +1245,13 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 labourIdToNameSample: Object.keys(labourIdToName).slice(0, 3),
                 employeeIdToNameSample: Object.keys(employeeIdToName).slice(0, 3),
                 allExpenseKeys: Object.keys(expense),
-                expenseSample: Object.keys(expense).filter(k => 
-                    k.toLowerCase().includes('labour') || 
-                    k.toLowerCase().includes('employee') || 
+                expenseSample: Object.keys(expense).filter(k =>
+                    k.toLowerCase().includes('labour') ||
+                    k.toLowerCase().includes('employee') ||
                     k.toLowerCase().includes('staff')
                 )
             });
-        }        
+        }
         if (labourId) {
             const labourName = labourIdToName[labourId] || labourIdToName[String(labourId)] || labourIdToName[Number(labourId)];
             if (labourName) {
@@ -1236,9 +1259,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             }
         }
         if (employeeId) {
-            const employeeName = employeeIdToName[employeeId] || 
-                                employeeIdToName[String(employeeId)] || 
-                                employeeIdToName[Number(employeeId)];
+            const employeeName = employeeIdToName[employeeId] ||
+                employeeIdToName[String(employeeId)] ||
+                employeeIdToName[Number(employeeId)];
             if (employeeName) {
                 return employeeName;
             }
@@ -1339,14 +1362,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     return (
         <body className=' bg-[#FAF6ED]'>
             <div>
-                <div className='md:mt-[-35px] mb-3 text-left md:text-right md:items-center items-start cursor-default flex justify-between max-w-screen-2xl table-auto min-w-full overflow-auto w-screen'>
-                    <div></div>
-                    <div>
-                        <span className='text-[#E4572E] mr-9 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>Export pdf</span>
-                        <span className='text-[#007233] mr-9 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>Export XL</span>
-                        <span className=' text-[#BF9853] mr-9 font-semibold hover:underline'>Print</span>
-                    </div>
-                </div>
+
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
                     <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
                         ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>
@@ -1419,12 +1435,17 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 </div>
                             )}
                         </div>
-                        <div>
+                        <div className='flex items-center gap-2'>
                             <button onClick={clearFilters}
-                                className='w-36 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2' >
+                                className='w-10 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2' >
                                 <img className='w-4 h-4' src={Reload} alt="Reload" />
-                                Reset Table
                             </button>
+                            <div className=' text-left md:text-right md:items-center items-start cursor-default flex max-w-screen-2xl table-auto overflow-auto w-full'>
+                                <div className='flex items-center'>
+                                    <span className='text-[#E4572E] mr-4 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                                    <span className='text-[#007233] mr-1 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -1432,8 +1453,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                             className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
-                                <thead className="sticky top-0 z-9 bg-white ">
+                            <table className="table-fixed min-w-[1765px] w-full border-collapse">
+                                <thead className="sticky top-0 z-20 bg-white ">
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
                                             Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1453,7 +1474,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
-                                            Comments {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
                                             Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1465,6 +1486,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[150px] font-bold text-left">Source From</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left">Branch</th>
                                         <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -1554,6 +1576,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 />
                                             </th>
                                             <th></th>
+                                            <th>
+                                            </th>
                                             <th></th>
                                             <th></th>
                                             <th></th>
@@ -1577,6 +1601,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left ">{expense.accountType}</td>
                                             <td className=" text-sm text-left ">{expense.machineTools}</td>
                                             <td className=" text-sm text-left ">{expense.source}</td>
+                                            <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
                                             <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
                                             <td className=" py-1.5">
                                                 {userPermissions.includes("Edit") && (
@@ -1679,8 +1704,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                             isOpen={modalIsOpen}
                             onRequestClose={handleCancel}
                             contentLabel="Edit Expense"
-                            className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50"
-                            overlayClassName="fixed inset-0">
+                            className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
+                            overlayClassName="fixed inset-0 z-[9999]">
                             <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
                                 <h2 className="text-xl font-bold mb-6 border-b-2">Edit Expense</h2>
                                 <form className="grid grid-cols-2 gap-4">
@@ -2023,115 +2048,115 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                 </form>
                             </div>
                         </Modal>
-            {showPaymentModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
-                    <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
-                        <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
-                        <div className="flex-1 overflow-hidden">
-                            <div className="space-y-4 mb-4">
-                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                            <input
-                                                type="date"
-                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full bg-gray-100"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                            <input
-                                                type="text"
-                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
-                                            <input
-                                                type="text"
-                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                {(formData.paymentMode === 'GPay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
-                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                        <div className="space-y-4">
-                                            {formData.paymentMode === 'Cheque' && (
-                                                <div className="grid grid-cols-2 gap-4">
+                        {showPaymentModal && (
+                            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
+                                <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
+                                    <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="space-y-4 mb-4">
+                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                <div className="grid grid-cols-3 gap-4">
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                                                         <input
-                                                            type="text"
-                                                            value={paymentModalData.chequeNo}
-                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                            placeholder="Enter cheque number"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                            type="date"
+                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full bg-gray-100"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                                                         <input
-                                                            type="date"
-                                                            value={paymentModalData.chequeDate}
-                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                            type="text"
+                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
                                                         />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                                        <input
+                                                            type="text"
+                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
+                                                            readOnly
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {(formData.paymentMode === 'GPay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                    <div className="space-y-4">
+                                                        {formData.paymentMode === 'Cheque' && (
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={paymentModalData.chequeNo}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                                        placeholder="Enter cheque number"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                                    <input
+                                                                        type="date"
+                                                                        value={paymentModalData.chequeDate}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={paymentModalData.transactionNumber}
+                                                                    onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                                    placeholder="Enter transaction number (optional)"
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
+                                                                <select
+                                                                    value={paymentModalData.accountNumber}
+                                                                    onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                >
+                                                                    <option value="">Select Account</option>
+                                                                    {accountDetails.map((account) => (
+                                                                        <option key={account.id} value={account.account_number}>
+                                                                            {account.account_number}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                    <input
-                                                        type="text"
-                                                        value={paymentModalData.transactionNumber}
-                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                        placeholder="Enter transaction number (optional)"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
-                                                    <select
-                                                        value={paymentModalData.accountNumber}
-                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    >
-                                                        <option value="">Select Account</option>
-                                                        {accountDetails.map((account) => (
-                                                            <option key={account.id} value={account.account_number}>
-                                                                {account.account_number}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
                                         </div>
                                     </div>
-                                )}
+                                    <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
+                                        <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
+                                            Cancel
+                                        </button>
+                                        <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
+                                            {isSubmitting ? 'Saving...' : 'Submit'}
+                                        </button>
+                                    </div>
+                                    <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
+                                        ×
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
-                            <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
-                                Cancel
-                            </button>
-                            <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
-                                {isSubmitting ? 'Saving...' : 'Submit'}
-                            </button>
-                        </div>
-                        <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
-                            ×
-                        </button>
-                    </div>
-                </div>
-            )}
+                        )}
                     </div>
                 </div>
             </div>

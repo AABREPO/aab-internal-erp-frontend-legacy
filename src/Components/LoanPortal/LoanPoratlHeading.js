@@ -5,6 +5,7 @@ import LoanAddInput from './LoanAddInput';
 import LoanPortal from './LoanPortal';
 import LoanReport from './LoanReport';
 import LoanSummary from './LoanSummary';
+import MobileLoanPortal from '../../componentsMobile/LoanPortal/LoanPortal';
 
 // Payment Mode options
 const paymentModeOptions = [
@@ -17,6 +18,20 @@ const paymentModeOptions = [
 ];
 
 const LoanPoratlHeading = ({ username, userRoles = [] }) => {
+    const [isMobile, setIsMobile] = useState(() => {
+        return window.innerWidth <= 768;
+    });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activePaintTab');
         if (savedTab === 'loandatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
@@ -44,6 +59,16 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
         setActiveTab(tab);
         setIsMobileMenuOpen(false); // Close menu after selection on mobile
     };
+
+    if (isMobile) {
+        const storedUser = localStorage.getItem('user');
+        const user = storedUser ? JSON.parse(storedUser) : { username, userRoles };
+        return (
+            <div style={{ textAlign: 'left' }}>
+                <MobileLoanPortal user={user} onLogout={() => { }} />
+            </div>
+        );
+    }
 
     const renderContent = () => {
         switch (activeTab) {

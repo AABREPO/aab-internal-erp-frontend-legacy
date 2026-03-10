@@ -494,6 +494,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             const finalPaymentData = {
                 ...paymentData,
                 branch_id: paymentData?.branch_id ?? activeBranchId ?? null,
+                enteredBy: username,
             };
             const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save", {
                 method: "POST",
@@ -1305,11 +1306,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             vendor_id: vendorId || 0,
             contractor_id: contractorId || 0,
             employee_id: employeeId || 0,
-            project_id: projectId || 0,
+            project_id: 0,
             source: "Cash Register",
             description: description || "",
             file_url: "",
             branch_id: activeBranchId ?? null,
+            enteredBy: username,
         };
         const response = await fetch("https://backendaab.in/aabuildersDash/api/loans/save", {
             method: "POST",
@@ -1365,6 +1367,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 projectId: pendingLoanData.project_id || 0,
                 purposeId: selectedPurpose.id,
                 description: trimmedDescription,
+                enteredBy: username,
             });
             expenseForBackend.loan_portal_id = loanResponse?.id || loanResponse?.loanPortalId || null;
             const res = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
@@ -1623,6 +1626,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 staff_advance_portal_id: null,
                 loan_portal_id: null,
                 branch_id: activeBranchId,
+                enteredBy: username,
             };
             if (newExpense.type === "Loan") {
                 const loanProjectId = selectedProjectName ? Number(selectedProjectName.id) : 0;
@@ -1665,6 +1669,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     source: "Cash Register",
                     file_url: "",
                     branch_id: activeBranchId ?? null,
+                    enteredBy: username,
                 };
                 expenseForBackend.employee_id = null;
                 const saveAdvance = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
@@ -1708,6 +1713,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     entry_no: nextEntryNo,
                     source: "Cash Register",
                     branch_id: activeBranchId ?? null,
+                    enteredBy: username,
                 };
                 const saveStaffAdvance = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/save", {
                     method: "POST",
@@ -1820,6 +1826,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             weekly_number: operationalWeekNumber,
             status: false,
             branch_id: activeBranchId,
+            enteredBy: username,
         };
         fetch("https://backendaab.in/aabuildersDash/api/payments-received/save", {
             method: "POST",
@@ -1978,6 +1985,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         description: editFormData.description || "",
                         file_url: editFormData.file_url || "",
                         branch_id: activeBranchId ?? null,
+                        enteredBy: username
                     };
                     const saveAdvance = await fetch(
                         "https://backendaab.in/aabuildersDash/api/advance_portal/save",
@@ -2030,6 +2038,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         staff_refund_amount: 0,
                         file_url: null,
                         branch_id: activeBranchId ?? null,
+                        enteredBy: username
                     };
                     const saveStaffAdvance = await fetch(
                         "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -4677,6 +4686,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             not_allow_to_edit: true,
                                                             source: "Cash Register",
                                                             branch_id: activeBranchId ?? null,
+                                                            enteredBy: username
                                                         };
                                                         const advanceResponse = await fetch(
                                                             "https://backendaab.in/aabuildersDash/api/advance_portal/save",
@@ -4726,6 +4736,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             labour_id: 0,
                                                             not_allow_to_edit: true,
                                                             branch_id: activeBranchId ?? null,
+                                                            enteredBy: username
                                                         };
                                                         const staffAdvanceResponse = await fetch(
                                                             "https://backendaab.in/aabuildersDash/api/staff-advance/save",
@@ -5023,7 +5034,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             throw new Error('Failed to fetch ENo');
                                         }
                                         const enoData = await enoResponse.json();
-                                        const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
+                                        const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;                                        
                                         const expensesFormData = {
                                             accountType: "Claim",
                                             eno: nextEno,
@@ -5039,6 +5050,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             source: "Cash Register",
                                             billCopyUrl: currentProjectAdvanceRow.bill_copy_url,
                                             branchId: activeBranchId ?? null,
+                                            enteredBy: username
                                         };
                                         const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
                                             method: 'POST',

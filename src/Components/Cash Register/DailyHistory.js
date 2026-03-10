@@ -735,6 +735,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 amount: Number(newRefundReceived.amount),
                 weekly_number: Number(selectedWeek),
                 branch_id: activeBranchId,
+                enteredBy: username,
             };
             const response = await axios.post(
                 'https://backendaab.in/aabuildersDash/api/refund_received/save',
@@ -789,6 +790,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 description: newDailyExpense.description || "",
                 weekly_number: Number(selectedWeek),
                 branch_id: activeBranchId,
+                enteredBy: username,
             };
             await axios.post(
                 'https://backendaab.in/aabuildersDash/api/daily-payments/save',
@@ -2179,6 +2181,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                         source: "Cash Register",
                         paymentMode: "Cash",
                         branchId: expense.branch_id ?? expense.branchId ?? activeBranchId,
+                        enteredBy: username,
                     };
                     const expensesResponse = await fetch(
                         "https://backendaab.in/aabuilderDash/expenses_form/save",

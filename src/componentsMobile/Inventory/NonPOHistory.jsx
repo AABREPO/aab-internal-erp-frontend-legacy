@@ -570,14 +570,14 @@ const NonPOHistory = ({ onTabChange }) => {
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
       {/* Search Bar */}
-      <div className="flex-shrink-0 px-4 pt-3 pb-2">
+      <div className="flex-shrink-0 pt-[8px] pb-[6px]">
         <div className="relative">
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-10 pr-4 border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
+            className="w-full h-[40px] pl-[40px] pr-[16px] border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
           />
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -589,14 +589,13 @@ const NonPOHistory = ({ onTabChange }) => {
           </svg>
         </div>
       </div>
-
       {/* Filter Button */}
-      <div className="flex-shrink-0 px-4 pb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex-shrink-0 pb-[6px]">
+        <div className="flex items-center gap-[8px]">
           <button
             onClick={() => setShowFilterSheet(true)}
             type="button"
-            className="flex items-center gap-2 text-[14px] font-medium text-gray-700 flex-shrink-0"
+            className="flex items-center gap-[8px] text-[14px] font-medium text-gray-700 flex-shrink-0"
           >
             <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
             {!(filterData.projectName || filterData.stockingLocation || filterData.date || filterData.entryNo || filterData.category) && (
@@ -604,11 +603,11 @@ const NonPOHistory = ({ onTabChange }) => {
             )}
           </button>
           {/* Active Filter Tags - Next to Filter button */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {(filterData.projectName || filterData.stockingLocation || filterData.date || filterData.entryNo || filterData.category) && (
-              <div className="flex items-center gap-2 flex-nowrap">
+              <div className="flex items-center gap-[4px] flex-nowrap">
                 {filterData.projectName && (
-                  <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Project</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, projectName: '' })}
@@ -621,7 +620,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.stockingLocation && (
-                  <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Location</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, stockingLocation: '' })}
@@ -634,7 +633,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.date && (
-                  <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Date</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, date: '' })}
@@ -647,7 +646,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.entryNo && (
-                  <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Entry.No</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, entryNo: '' })}
@@ -660,7 +659,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.category && (
-                  <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Category</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, category: '' })}
@@ -677,9 +676,8 @@ const NonPOHistory = ({ onTabChange }) => {
           </div>
         </div>
       </div>
-
       {/* Records List */}
-      <div className="flex-1 overflow-y-auto px-4 scrollbar-hide no-scrollbar scrollbar-none">
+      <div className="flex-1 overflow-y-auto scrollbar-hide no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex items-center justify-center py-">
             <p className="text-gray-500">Loading...</p>
@@ -719,7 +717,7 @@ const NonPOHistory = ({ onTabChange }) => {
                         delete cardRefs.current[recordId];
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-2 transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[8px] transition-all duration-300 ease-out"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -781,7 +779,7 @@ const NonPOHistory = ({ onTabChange }) => {
 
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
-                    className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                       transform: swipeOffset < 0
@@ -796,7 +794,7 @@ const NonPOHistory = ({ onTabChange }) => {
                         e.stopPropagation();
                         handleEdit(record);
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                       title="Edit"
                     >
                       <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -806,7 +804,7 @@ const NonPOHistory = ({ onTabChange }) => {
                         e.stopPropagation();
                         handleDelete(recordId);
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
                       title="Delete"
                     >
                       <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
@@ -839,12 +837,12 @@ const NonPOHistory = ({ onTabChange }) => {
           >
             {/* Header */}
             <div className="flex-shrink-0">
-              <div className="flex justify-between items-center px-6 mt-3">
+              <div className="flex justify-between items-center px-[24px] mt-3">
                 <h2 className="text-md font-semibold">
                   Select Filters
                 </h2>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-[16px]">
                   <button
                     onClick={() => setShowCategoryModal(true)}
                     className="text-[16px] font-semibold text-black decoration-solid"
@@ -856,7 +854,7 @@ const NonPOHistory = ({ onTabChange }) => {
               </div>
             </div>
             {/* Filter Form */}
-            <div className="px-6 py-4 space-y-1 overflow-visible flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
+            <div className="px-[24px] py-[16px] space-y-1 overflow-visible flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Project Name */}
               <div className="relative" data-dropdown="projectName">
                 <label className="block text-[13px] font-medium text-black mb-0.5">
@@ -896,7 +894,7 @@ const NonPOHistory = ({ onTabChange }) => {
               </div>
 
               {/* Date and Entry No */}
-              <div className="grid grid-cols-2 gap-4" style={{ overflow: 'visible' }}>
+              <div className="grid grid-cols-2 gap-[16px]" style={{ overflow: 'visible' }}>
                 <div className="relative">
                   <label className="block text-[13px] font-medium text-black mb-0.5 mt-2">
                     Date
@@ -904,7 +902,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   <button
                     type="button"
                     onClick={() => setShowDatePicker(true)}
-                    className="w-full h-[32px] px-4 text-[12px] font-medium py-2 border border-gray-300 rounded text-black focus:outline-none focus:border-gray-400 bg-white flex items-center justify-between"
+                    className="w-full h-[32px] px-[16px] text-[12px] font-medium py-[8px] border border-gray-300 rounded text-black focus:outline-none focus:border-gray-400 bg-white flex items-center justify-between"
                   >
                     <span className={`${filterData.date ? 'text-black' : 'text-[#9E9E9E]'} truncate`}>
                       {filterData.date ? formatDDMMYYYYFromISO(filterData.date) : 'Select Date'}
@@ -923,23 +921,23 @@ const NonPOHistory = ({ onTabChange }) => {
                     placeholder="Enter"
                     value={filterData.entryNo}
                     onChange={(e) => setFilterData({ ...filterData, entryNo: e.target.value })}
-                    className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-black focus:outline-none focus:border-gray-400 bg-white placeholder:text-[12px]"
+                    className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-black focus:outline-none focus:border-gray-400 bg-white placeholder:text-[12px]"
                   />
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex-shrink-0 flex gap-3 px-6 py-4">
+            <div className="flex-shrink-0 flex gap-[12px] px-[24px] py-[16px]">
               <button
                 onClick={() => setShowFilterSheet(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+                className="flex-1 px-[16px] py-[8px] border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={() => setShowFilterSheet(false)}
-                className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900"
+                className="flex-1 px-[16px] py-[8px] bg-black text-white rounded-lg font-medium hover:bg-gray-900"
               >
                 Save
               </button>

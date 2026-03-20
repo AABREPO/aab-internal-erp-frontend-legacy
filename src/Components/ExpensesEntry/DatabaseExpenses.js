@@ -807,7 +807,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         };
         const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
         const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
-        if (isPaymentType && isNonCashPaymentMode) {
+        const previousPaymentMode = expenses.find(e => e.id === editId)?.paymentMode || '';
+        const isChangingFromCashToOnline = previousPaymentMode === 'Cash' && isNonCashPaymentMode;
+        if (isPaymentType && isNonCashPaymentMode && isChangingFromCashToOnline) {
             pendingUpdateFormDataRef.current = updatedFormData;
             setPaymentModalData({ chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
             setShowPaymentModal(true);

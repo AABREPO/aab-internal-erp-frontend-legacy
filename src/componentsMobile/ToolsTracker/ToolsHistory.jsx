@@ -372,18 +372,20 @@ const ToolsHistory = ({ user }) => {
         const second = Number(ddMmYyyyMatch[6] || 0);
         const parsedDdMm = new Date(year, month, day, hour, minute, second);
         if (!Number.isNaN(parsedDdMm.getTime())) {
+          const t = parsedDdMm.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
           return {
             date: parsedDdMm.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-            time: parsedDdMm.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            time: t ? t.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()) : '',
             sortTime: parsedDdMm.getTime()
           };
         }
       }
       const parsed = new Date(rawValue);
       if (Number.isNaN(parsed.getTime())) return { date: '', time: '', sortTime: 0 };
+      const t = parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
       return {
         date: parsed.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        time: parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        time: t ? t.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()) : '',
         sortTime: parsed.getTime()
       };
     };
@@ -1015,21 +1017,36 @@ const ToolsHistory = ({ user }) => {
     setShowMachineNumberPopup(false);
   };
 
-  const renderDropdownTrigger = (label, value, placeholder, onClick, disabled = false) => (
+  const renderDropdownTrigger = (label, value, placeholder, onClick, disabled = false, onClear = null) => (
     <div className="flex-1">
       <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">{label}</p>
       <div className="relative">
         <div
           onClick={disabled ? undefined : onClick}
-          className={`w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center ${disabled ? 'bg-[#E0E0E0] cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center ${disabled ? 'bg-[#E0E0E0] cursor-not-allowed' : 'cursor-pointer'}`}
           style={{
             color: value ? '#000' : '#9E9E9E',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            paddingRight: value && onClear ? '40px' : '40px'
           }}
         >
           {value || placeholder}
         </div>
-        {!disabled && (
+        {!disabled && value && onClear && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+        {!disabled && !value && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
             <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1442,7 +1459,7 @@ const ToolsHistory = ({ user }) => {
         setSheetOpenPicker(field);
         setSheetPickerSearch('');
       }}
-        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
         style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box', paddingRight: '40px' }}
       >
         {value || placeholder}
@@ -1490,89 +1507,141 @@ const ToolsHistory = ({ user }) => {
   return (
     <div className="flex flex-col bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Top row: Item Name (left) + Edit button (right) when Item tab active, Item Name (left) + Item ID (right) when Log tab active */}
-      <div className="flex-shrink-0 px-4 pt-1.5">
-        <div className="flex justify-between items-center gap-2">
-          {/* Show Item Name button when Item tab or Log tab is active */}
-          {(activeSegment === 'item' || activeSegment === 'log') && (
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        <div className="">
+          <div className="flex justify-between items-center border-b border-gray-200 pb-[8px] gap-[8px]">
+            {/* Show Item Name button when Item tab or Log tab is active */}
+            {(activeSegment === 'item' || activeSegment === 'log') && (
+              <div className="flex items-center gap-[4px] min-w-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowItemNamePopup(true);
+                    setShowBrandPopup(false);
+                    setShowItemIdPopup(false);
+                    setShowMachineNumberPopup(false);
+                  }}
+                  className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-[0px] border-0 bg-transparent text-left"
+                >
+                  {selectedItemName ? selectedItemName : 'Item Name'}
+                </button>
+                {selectedItemName && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedItemName('');
+                      setSelectedItemNameId(null);
+                      setSelectedBrand('');
+                      setSelectedBrandId(null);
+                      setSelectedItemId('');
+                      setSelectedItemIdDbId(null);
+                      setSelectedMachineNumber('');
+                      setMachineStatusHistory([]);
+                    }}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Show Edit button when Item Name and Item ID are selected (details auto-fill from selected itemId) */}
+            {activeSegment === 'item' && selectedItemName && selectedItemId && !isItemInToolsTrackerManagement && (
+              <button
+                type="button"
+                onClick={handleEditClick}
+                className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 p-[0px] border-0 bg-transparent text-right flex-shrink-0 flex items-center gap-[4px]"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Edit
+              </button>
+            )}
+            {/* Show Item ID button when Log tab is active */}
+            {activeSegment === 'log' && (
+              <div className="flex items-center gap-[4px] flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowItemIdPopup(true);
+                    setShowItemNamePopup(false);
+                    setShowBrandPopup(false);
+                    setShowMachineNumberPopup(false);
+                  }}
+                  className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-[0px] border-0 bg-transparent text-right"
+                >
+                  {selectedItemId || 'Item ID'}
+                </button>
+                {selectedItemId && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedItemId('');
+                      setSelectedItemIdDbId(null);
+                      setSelectedMachineNumber('');
+                      setMachineStatusHistory([]);
+                    }}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Item / Log segmented control */}
+          <div className="flex bg-[#F2F4F7] items-center h-[32px] shadow-sm rounded-md mt-[8px]">
+            <button
+              type="button" onClick={() => setActiveSegment('item')}
+              className={`flex-1 px-[16px] ml-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Item
+            </button>
             <button
               type="button"
-              onClick={() => {
-                setShowItemNamePopup(true);
-                setShowBrandPopup(false);
-                setShowItemIdPopup(false);
-                setShowMachineNumberPopup(false);
-              }}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-left"
+              onClick={() => setActiveSegment('log')}
+              className={`flex-1 px-[16px] mr-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
+                }`}
             >
-              {selectedItemName ? selectedItemName : 'Item Name'}
+              Log
             </button>
-          )}
-          {/* Show Edit button when Item Name and Item ID are selected (details auto-fill from selected itemId) */}
-          {activeSegment === 'item' && selectedItemName && selectedItemId && !isItemInToolsTrackerManagement && (
-            <button
-              type="button"
-              onClick={handleEditClick}
-              className="text-[12px] font-medium text-black leading-normal cursor-pointer hover:opacity-80 p-0 border-0 bg-transparent text-right flex-shrink-0 flex items-center gap-1"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Edit
-            </button>
-          )}
-          {/* Show Item ID button when Log tab is active */}
-          {activeSegment === 'log' && (
-            <button
-              type="button"
-              onClick={() => {
-                setShowItemIdPopup(true);
-                setShowItemNamePopup(false);
-                setShowBrandPopup(false);
-                setShowMachineNumberPopup(false);
-              }}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right flex-shrink-0"
-            >
-              {selectedItemId || 'Item ID'}
-            </button>
-          )}
-        </div>
-        {/* Item / Log segmented control */}
-        <div className="flex bg-[#F2F4F7] items-center h-9 shadow-sm rounded-md mt-2">
-          <button
-            type="button" onClick={() => setActiveSegment('item')}
-            className={`flex-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeSegment === 'item' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            Item
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSegment('log')}
-            className={`flex-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeSegment === 'log' ? 'bg-white text-black' : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            Log
-          </button>
+          </div>
         </div>
       </div>
 
       {/* Item tab: Brand, Item ID, Machine Number, Location dropdowns + details card */}
       {activeSegment === 'item' && (
         <>
-          <div className="flex-shrink-0 px-4 mt-2 pb-2 space-y-[6px]">
-            <div className="flex gap-3">
+          <div className="flex-shrink-0 mt-[8px] pb-[8px] space-y-[6px]">
+            <div className="flex gap-[12px]">
               {renderDropdownTrigger('Item ID', selectedItemId, 'Select', () => {
                 setShowItemIdPopup(true);
                 setShowItemNamePopup(false);
                 setShowBrandPopup(false);
                 setShowMachineNumberPopup(false);
+              }, false, () => {
+                setSelectedItemId('');
+                setSelectedItemIdDbId(null);
+                setSelectedMachineNumber('');
+                setMachineStatusHistory([]);
               })}
               {renderDropdownTrigger('Brand', selectedBrand, 'Select', () => {
                 setShowBrandPopup(true);
                 setShowItemNamePopup(false);
                 setShowItemIdPopup(false);
                 setShowMachineNumberPopup(false);
+              }, false, () => {
+                setSelectedBrand('');
+                setSelectedBrandId(null);
               })}
 
             </div>
@@ -1588,12 +1657,15 @@ const ToolsHistory = ({ user }) => {
                   setShowBrandPopup(false);
                   setShowItemIdPopup(false);
                 },
-                !selectedItemIdDbId
+                !selectedItemIdDbId,
+                !selectedItemIdDbId ? null : () => {
+                  setSelectedMachineNumber('');
+                }
               )}
               <div className="relative">
                 <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Location</p>
                 <div
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 text-[12px] font-medium bg-[#E0E0E0] text-black flex items-center"
+                  className="w-full h-[32px] border border-[#EDEDED] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-[#EDEDED] text-black flex items-center"
                   style={{ boxSizing: 'border-box' }}
                 >
                   {currentLocation || '—'}
@@ -1601,11 +1673,10 @@ const ToolsHistory = ({ user }) => {
               </div>
             </div>
           </div>
-
           {/* Details card + image from stock management API */}
           {selectedItemName && selectedBrand && selectedItemId && selectedMachineNumber && selectedStockForCard && (
-            <div className="flex-1 px-4 pb-4 mt-2">
-              <div className="rounded-[8px] border border-[rgba(0,0,0,0.16)] p-3 bg-white">
+            <div className="flex-1 pb-[16px] mt-2">
+              <div className="rounded-[8px] border border-[rgba(0,0,0,0.16)] p-[12px] bg-white">
                 {selectedStockForCard.model != null && String(selectedStockForCard.model).trim() !== '' && (
                   <p className="text-[12px] text-black mb-1"><span className="font-medium">Model:</span> {selectedStockForCard.model}</p>
                 )}
@@ -1644,26 +1715,26 @@ const ToolsHistory = ({ user }) => {
 
       {/* Log tab: no dropdowns, just log entries list (Item ID is already in top right as button) */}
       {activeSegment === 'log' && (
-        <div className="flex-1 px-4 pb-4 mt-4 min-h-[200px] overflow-y-auto">
+        <div className="flex-1 pb-[16px] mt-4 min-h-[200px] overflow-y-auto">
           {!selectedItemIdDbId ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-[32px]">
               <p className="text-[12px] text-gray-500">Please select an Item ID to view log history</p>
             </div>
           ) : loadingLog ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-[32px]">
               <p className="text-[12px] text-gray-500">Loading...</p>
             </div>
           ) : machineStatusHistory.length === 0 ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-[32px]">
               <p className="text-[12px] text-gray-500">No log history found for this Item ID</p>
             </div>
           ) : (
             <div className="bg-white rounded-lg overflow-hidden border border-gray-200 shadow-lg">
               {/* Table Header */}
               <div className="">
-                <div className="grid grid-cols-2 gap-2 px-3 py-2">
-                  <div className="text-[12px] font-medium text-[#848484]">Date</div>
-                  <div className="text-[12px] font-semibold text-[#848484] text-right">Machine Number</div>
+                <div className="grid grid-cols-2 gap-[8px] px-[16px] py-[8px]">
+                  <div className="text-[14px] font-semibold text-[#939393]">Date</div>
+                  <div className="text-[14px] font-semibold text-[#939393] text-right">Machine Number</div>
                 </div>
               </div>
               {/* Table Body */}
@@ -1673,13 +1744,13 @@ const ToolsHistory = ({ user }) => {
                     key={logEntry.key || logEntry.id || index}
                     className="border-b border-gray-100 last:border-b-0"
                   >
-                    <div className="grid grid-cols-2 gap-2 px-3 py-3">
+                    <div className="grid grid-cols-2 gap-[8px] px-[16px] py-[12px]">
                       {/* Left column: Event/Status and Date & Time */}
                       <div className="flex flex-col">
-                        <p className="text-[13px] font-semibold text-black leading-snug mb-1">
+                        <p className="text-[12px] font-semibold text-black leading-snug mb-[2px]">
                           {logEntry.status}
                         </p>
-                        <p className="text-[11px] text-[#848484] leading-snug">
+                        <p className="text-[10px] text-[#7B7B7B] font-semibold leading-snug">
                           {logEntry.date} • {logEntry.time}
                         </p>
                       </div>
@@ -1687,26 +1758,26 @@ const ToolsHistory = ({ user }) => {
                       <div className="text-right">
                         {logEntry.type === 'machine_number_changed' ? (
                           <div className="flex flex-col items-end">
-                            <p className="text-[13px] font-semibold text-black leading-snug mb-1">
+                            <p className="text-[12px] font-semibold text-[black] leading-snug mb-[2px]">
                               {logEntry.oldMachineNumber}
                             </p>
-                            <p className="text-[13px] font-semibold text-[#007233] leading-snug">
+                            <p className="text-[12px] font-semibold text-[#007233] leading-snug">
                               {logEntry.machineNumber}
                             </p>
                           </div>
                         ) : logEntry.type === 'home_location_changed' ? (
                           <div className="flex flex-col items-end">
-                            <p className="text-[13px] font-semibold text-[#007233] leading-snug mb-1">
+                            <p className="text-[12px] font-semibold text-[#007233] leading-snug mb-[2px]">
                               {logEntry.machineNumber || '-'}
                             </p>
-                            <p className="text-[11px] font-medium text-[#848484] leading-snug">
+                            <p className="text-[12px] font-medium text-[#848484] leading-snug">
                               {(logEntry.oldHomeLocation && logEntry.oldHomeLocation !== '-')
                                 ? `${logEntry.oldHomeLocation} -> ${logEntry.newHomeLocation || '-'}`
                                 : (logEntry.newHomeLocation || '-')}
                             </p>
                           </div>
                         ) : (
-                          <p className="text-[13px] font-semibold text-[#007233] leading-snug">
+                          <p className="text-[12px] font-semibold text-[#007233] leading-snug">
                             {logEntry.machineNumber || '-'}
                           </p>
                         )}
@@ -1721,7 +1792,7 @@ const ToolsHistory = ({ user }) => {
       )}
       {/* Main content area for Item tab (spacer when no details card) */}
       {activeSegment === 'item' && (
-        <div className="flex-1 px-4 pb-4 mt-4 min-h-[200px]" />
+        <div className="flex-1 px-[16px] pb-[16px] mt-4 min-h-[200px]" />
       )}
       {/* Popups */}
       <SelectOptionModal
@@ -1758,19 +1829,19 @@ const ToolsHistory = ({ user }) => {
       />
       {/* Edit Bottom Sheet Modal */}
       {showEditSheet && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleCloseEditSheet}>
-          <div className="bg-white w-full max-w-[360px] max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleCloseEditSheet}>
+          <div className="bg-white w-full max-w-[360px] max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
+            <div className="flex-shrink-0 flex items-center justify-between px-[24px] pt-[20px] pb-[4px]">
               <p className="text-[16px] font-bold text-black">Select Filters</p>
               <button type="button" onClick={handleCloseEditSheet} className="text-[#e06256] text-xl font-bold leading-none">
                 ×
               </button>
             </div>
             {/* Form - scrollable */}
-            <div className="flex-1 overflow-y-auto px-6 py-1">
+            <div className="flex-1 overflow-y-auto px-[24px] py-[4px]">
               {/* Row 1: Item Name* + Quantity */}
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
                     Item Name<span className="text-[#eb2f8e]">*</span>
@@ -1786,13 +1857,13 @@ const ToolsHistory = ({ user }) => {
                     value={editFormData.quantity}
                     onChange={(e) => handleEditFieldChange('quantity', e.target.value)}
                     disabled={!!editFormData.itemId}
-                    className={`w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 ${!!editFormData.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    className={`w-full h-[32px] border border-[#d6d6d6] px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 ${!!editFormData.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="0"
                   />
                 </div>
               </div>
               {/* Row 2: Item ID + Model* */}
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">Item ID</p>
                   <div className={editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '' ? 'opacity-50 pointer-events-none' : ''}>
@@ -1807,13 +1878,13 @@ const ToolsHistory = ({ user }) => {
                     type="text"
                     value={editFormData.model}
                     onChange={(e) => handleEditFieldChange('model', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
+                    className="w-full h-[32px] border border-[#d6d6d6] px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
                     placeholder="Enter"
                   />
                 </div>
               </div>
               {/* Row 3: Machine Number* + Brand* */}
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
                     Machine Number{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
@@ -1822,7 +1893,7 @@ const ToolsHistory = ({ user }) => {
                     type="text"
                     value={editFormData.machineNumber}
                     onChange={(e) => handleEditFieldChange('machineNumber', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-3 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
+                    className="w-full h-[32px] border border-[#d6d6d6] px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
                     placeholder="Enter"
                   />
                 </div>
@@ -1834,7 +1905,7 @@ const ToolsHistory = ({ user }) => {
                 </div>
               </div>
               {/* Home Location */}
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[12px] font-medium text-black">
@@ -1851,7 +1922,7 @@ const ToolsHistory = ({ user }) => {
                 </div>
               </div>
               {/* Purchase Store */}
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[12px] font-medium text-black">
@@ -1868,7 +1939,7 @@ const ToolsHistory = ({ user }) => {
                 </div>
               </div>
               {/* Purchase Date + Warranty Date */}
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
                     Purchase Date{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
@@ -1881,7 +1952,7 @@ const ToolsHistory = ({ user }) => {
                       onClick={() => handleDatePickerOpen('purchaseDate')}
                       onFocus={() => handleDatePickerOpen('purchaseDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1903,7 +1974,7 @@ const ToolsHistory = ({ user }) => {
                       onClick={() => handleDatePickerOpen('warrantyDate')}
                       onFocus={() => handleDatePickerOpen('warrantyDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1916,15 +1987,15 @@ const ToolsHistory = ({ user }) => {
               </div>
               {/* Attach File */}
               <div className="mb-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label htmlFor="edit-sheet-attach-file" className={`flex items-center gap-1 cursor-pointer text-[12px] font-medium text-[#E4572E] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex items-center gap-[8px] flex-wrap">
+                  <label htmlFor="edit-sheet-attach-file" className={`flex items-center gap-[4px] cursor-pointer text-[12px] font-medium text-[#E4572E] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
                     <svg width="16" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
                     </svg>
                     {isUploading ? 'Uploading...' : 'Attach File'}
                   </label>
                   {selectedFile && (
-                    <div className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-md max-w-[200px]">
+                    <div className="flex items-center gap-[4px] bg-gray-100 px-[8px] py-[4px] rounded-md max-w-[200px]">
                       <span className="text-[11px] text-gray-700 truncate">{selectedFile.name}</span>
                       <button
                         type="button"
@@ -1954,7 +2025,7 @@ const ToolsHistory = ({ user }) => {
               </div>
             </div>
             {/* Footer: Cancel + Update */}
-            <div className="flex-shrink-0 flex gap-4 px-6 pb-6 pt-2">
+            <div className="flex-shrink-0 flex gap-[16px] px-[24px] pb-[24px] pt-[8px]">
               <button type="button" onClick={handleCloseEditSheet} disabled={isSaving || isUploading}
                 className={`flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white ${(isSaving || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
@@ -1972,7 +2043,7 @@ const ToolsHistory = ({ user }) => {
       {/* Sheet dropdown picker modal */}
       {showEditSheet && sheetOpenPicker && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-[16px]"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setSheetOpenPicker(null);
@@ -1982,7 +2053,7 @@ const ToolsHistory = ({ user }) => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-6 pt-5">
+            <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">
                 Select {({ itemName: 'Item Name', itemId: 'Item ID', brand: 'Brand', purchaseStore: 'Purchase Store', homeLocation: 'Home Location' })[sheetOpenPicker] || sheetOpenPicker}
               </p>
@@ -1993,32 +2064,32 @@ const ToolsHistory = ({ user }) => {
                 ×
               </button>
             </div>
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[16px] pb-[16px]">
               <div className="relative">
                 <input
                   type="text"
                   value={sheetPickerSearch}
                   onChange={(e) => setSheetPickerSearch(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                 />
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" /><path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" /></svg>
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-6">
+            <div className="flex-1 overflow-y-auto mb-4 px-[24px]">
               <div className="shadow-md rounded-lg overflow-hidden">
                 {getPickerOptions().length > 0 ? (
                   getPickerOptions().map((opt) => (
                     <button key={opt} type="button" onClick={() => handleSheetPickerSelect(sheetOpenPicker, opt)}
-                      className="w-full h-[40px] px-6 flex items-center text-left hover:bg-[#F5F5F5] transition-colors text-[14px] font-medium text-black"
+                      className="w-full h-[40px] px-[24px] flex items-center text-left hover:bg-[#F5F5F5] transition-colors text-[14px] font-medium text-black"
                     >
                       {opt}
                     </button>
                   ))
                 ) : (
-                  <p className="text-[14px] font-medium text-[#9E9E9E] text-center py-4">
+                  <p className="text-[14px] font-medium text-[#9E9E9E] text-center py-[16px]">
                     {sheetPickerSearch.trim() ? 'No options found' : 'No options available'}
                   </p>
                 )}

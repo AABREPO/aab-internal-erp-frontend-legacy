@@ -646,8 +646,8 @@ const History = ({ onVendorClick }) => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Date and Category Section */}
-      <div className="px-4 pt-2">
-        <div className="flex items-center justify-end border-b border-[#E0E0E0] pb-2">
+      <div className="px-[16px] pt-[8px]">
+        <div className="flex items-center justify-end border-b border-[#E0E0E0] pb-[8px]">
 
           <button
             onClick={() => setShowTypeModal(true)}
@@ -658,13 +658,13 @@ const History = ({ onVendorClick }) => {
         </div>
       </div>
       {/* Filter */}
-      <div className="flex-shrink-0 px-4 pt-2">
-        <div className="flex items-center justify-between gap-5">
-          <div className="flex items-center gap-2 min-w-0">
+      <div className="flex-shrink-0 px-[16px] pt-[8px]">
+        <div className="flex items-center justify-between gap-[20px]">
+          <div className="flex items-center gap-[8px] min-w-0">
             <button
               type="button"
               onClick={() => setShowFilterModal(true)}
-              className="flex items-center gap-2 px-0 flex-shrink-0"
+              className="flex items-center gap-[8px] px-[0px] flex-shrink-0"
             >
               <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
               {!(typeFilter || vendorContractorFilter || entryNoFilter || projectNameFilter || paymentModeFilter) && (
@@ -674,10 +674,10 @@ const History = ({ onVendorClick }) => {
               )}
             </button>
             {/* Active Filter Tags - Next to Filter button */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {/* Type Filter Tag */}
               {typeFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">{typeFilter}</span>
                   <button
                     onClick={() => setTypeFilter('')}
@@ -691,7 +691,7 @@ const History = ({ onVendorClick }) => {
               )}
               {/* Contractor/Vendor Filter Tag */}
               {vendorContractorFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Contractor/Vendor</span>
                   <button
                     onClick={() => setVendorContractorFilter('')}
@@ -705,7 +705,7 @@ const History = ({ onVendorClick }) => {
               )}
               {/* Entry No Filter Tag */}
               {entryNoFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Entry. No</span>
                   <button
                     onClick={() => setEntryNoFilter('')}
@@ -719,7 +719,7 @@ const History = ({ onVendorClick }) => {
               )}
               {/* Project Name Filter Tag */}
               {projectNameFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Project</span>
                   <button
                     onClick={() => setProjectNameFilter('')}
@@ -733,7 +733,7 @@ const History = ({ onVendorClick }) => {
               )}
               {/* Mode Filter Tag */}
               {paymentModeFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Mode</span>
                   <button
                     onClick={() => setPaymentModeFilter('')}
@@ -765,11 +765,11 @@ const History = ({ onVendorClick }) => {
       </div>
       {/* Cards List - Scrollable */}
       <div
-        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 max-h-[calc(100vh-160px-80px)]"
+        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-[16px] mt-1 max-h-[calc(100vh-160px-80px)]"
         onClick={() => setUploadExpandedId(null)}
       >
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
+          <div className="flex flex-col items-center justify-center py-[48px]">
             <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
               <svg
                 width="32"
@@ -825,7 +825,7 @@ const History = ({ onVendorClick }) => {
                 >
                   {/* Upload button - behind card on left, revealed on right swipe (same as PO Clone) */}
                   <div
-                    className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute left-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
                       opacity: (isUploadExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20)) ? 1 : 0,
                       transition: 'opacity 0.2s ease-out',
@@ -850,7 +850,7 @@ const History = ({ onVendorClick }) => {
                       if (el) cardRefs.current[item.id] = el;
                       else delete cardRefs.current[item.id];
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -867,7 +867,7 @@ const History = ({ onVendorClick }) => {
                       if (!isUploadExpanded) e.stopPropagation();
                     }}
                   >
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-[2px]">
                       {/* Row 1: ref and payment mode */}
                       <div className="flex items-center justify-between">
                         <span
@@ -894,7 +894,7 @@ const History = ({ onVendorClick }) => {
                           {item.ref}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getTypeBadgeClass(
+                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getTypeBadgeClass(
                             item.type
                           )}`}
                         >
@@ -1033,29 +1033,29 @@ const History = ({ onVendorClick }) => {
       {/* Upload confirmation modal */}
       {showUploadConfirmModal && (
         <div
-          className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-[16px]"
           onClick={handleUploadCancel}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[320px] rounded-[12px] p-5 shadow-lg"
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-[16px] font-semibold text-black text-center mb-4">
               Upload file for this entry?
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-[12px]">
               <button
                 type="button"
                 onClick={handleUploadCancel}
-                className="flex-1 py-2.5 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.2)] rounded-[8px]"
+                className="flex-1 py-[10px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.2)] rounded-[8px]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleUploadConfirm}
-                className="flex-1 py-2.5 text-[14px] font-semibold text-white bg-[#BF9853] rounded-[8px]"
+                className="flex-1 py-[10px] text-[14px] font-semibold text-white bg-[#BF9853] rounded-[8px]"
               >
                 Upload
               </button>
@@ -1066,10 +1066,10 @@ const History = ({ onVendorClick }) => {
       {/* Uploading overlay */}
       {uploadStatus === 'uploading' && (
         <div
-          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-[16px]"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
-          <div className="bg-white rounded-[12px] p-6 flex flex-col items-center gap-4 min-w-[200px]">
+          <div className="bg-white rounded-[12px] p-[24px] flex flex-col items-center gap-[16px] min-w-[200px]">
             <div className="w-10 h-10 border-2 border-[#BF9853] border-t-transparent rounded-full animate-spin" />
             <p className="text-[14px] font-medium text-black">Uploading and updating...</p>
           </div>
@@ -1078,10 +1078,10 @@ const History = ({ onVendorClick }) => {
       {/* Upload completed toast */}
       {uploadStatus === 'completed' && (
         <div
-          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4 pointer-events-none"
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-[16px] pointer-events-none"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
-          <div className="bg-white rounded-[12px] px-6 py-4 flex items-center gap-3 shadow-lg">
+          <div className="bg-white rounded-[12px] px-[24px] py-[16px] flex items-center gap-[12px] shadow-lg">
             <div className="w-8 h-8 rounded-full bg-[#2E7D32] flex items-center justify-center flex-shrink-0">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1094,7 +1094,7 @@ const History = ({ onVendorClick }) => {
       {/* Select Type Modal */}
       {showTypeModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
           onClick={() => {
             setShowTypeModal(false);
             setTypeSearchQuery('');
@@ -1106,7 +1106,7 @@ const History = ({ onVendorClick }) => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex justify-between items-center px-6 pt-5">
+            <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select Type</p>
               <button
                 onClick={() => {
@@ -1122,14 +1122,14 @@ const History = ({ onVendorClick }) => {
             </div>
 
             {/* Search Bar */}
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[16px] pb-[16px]">
               <div className="relative">
                 <input
                   type="text"
                   value={typeSearchQuery}
                   onChange={(e) => setTypeSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                   autoFocus
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -1142,7 +1142,7 @@ const History = ({ onVendorClick }) => {
             </div>
 
             {/* Options List */}
-            <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Advance', 'Bill Settlement', 'Transfer', 'Refund']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
@@ -1157,11 +1157,11 @@ const History = ({ onVendorClick }) => {
                           setShowTypeModal(false);
                           setTypeSearchQuery('');
                         }}
-                        className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                        className={`w-full h-[40px] px-[24px] flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                           }`}
                       >
                         {/* Left: Option Text */}
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
                           <p className="text-[14px] font-medium text-black text-left truncate">{type}</p>
                         </div>
 
@@ -1190,9 +1190,9 @@ const History = ({ onVendorClick }) => {
       {/* Select Week & Year modal */}
       {showWeekYearModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center" onClick={() => setShowWeekYearModal(false)}>
-          <div className="bg-white w-[320px] rounded-[6px] p-6 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-[320px] rounded-[6px] p-[24px] relative" onClick={(e) => e.stopPropagation()}>
             <p className="text-[16px] font-medium text-black text-center mb-6">Select Week & Year</p>
-            <div className="flex justify-center gap-8 mb-6">
+            <div className="flex justify-center gap-[32px] mb-6">
               {/* Week column - show "Week 1", "Week 2", ... */}
               <div
                 className="flex flex-col items-center relative"
@@ -1200,7 +1200,7 @@ const History = ({ onVendorClick }) => {
               >
                 {getVisibleWeeks().map((w, idx) => (
                   <div key={`${w}-${idx}`} className="relative w-full flex flex-col items-center">
-                    {idx > 0 && <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                    {idx > 0 && <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
                     <button
                       type="button"
                       onClick={() => setModalWeek(w)}
@@ -1216,7 +1216,7 @@ const History = ({ onVendorClick }) => {
               <div className="flex flex-col items-center relative" onWheel={(e) => handleYearWheel(e, e.deltaY > 0 ? 1 : -1)}>
                 {getVisibleYears().map((y, idx) => (
                   <div key={`${y}-${idx}`} className="relative w-full flex flex-col items-center">
-                    {idx > 0 && <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                    {idx > 0 && <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
                     <button
                       type="button"
                       onClick={() => setModalYear(String(y))}
@@ -1229,7 +1229,7 @@ const History = ({ onVendorClick }) => {
                 ))}
               </div>
             </div>
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-[16px]">
               <button type="button" onClick={() => setShowWeekYearModal(false)} className="text-[#656565] text-[16px] font-semibold">
                 Cancel
               </button>
@@ -1249,7 +1249,7 @@ const History = ({ onVendorClick }) => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white rounded-t-2xl w-full max-w-[360px] p-4 relative"
+            className="bg-white rounded-t-2xl w-full max-w-[360px] p-[16px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-2">
@@ -1265,14 +1265,14 @@ const History = ({ onVendorClick }) => {
               </button>
             </div>
 
-            <div className="grid grid-cols-[2fr_1fr] gap-4 mb-3">
+            <div className="grid grid-cols-[2fr_1fr] gap-[16px] mb-3">
               {/* Contractor/Vendor Filter */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Contractor/Vendor</p>
                 <div className="relative">
                   <div
                     onClick={() => setShowVendorContractorModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: vendorContractorFilter ? '#000' : '#9E9E9E' }}
                   >
                     {vendorContractorFilter || 'Select'}
@@ -1306,7 +1306,7 @@ const History = ({ onVendorClick }) => {
                 <div className="relative">
                   <div
                     onClick={() => setShowEntryNoModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: entryNoFilter ? '#000' : '#9E9E9E' }}
                   >
                     {entryNoFilter || 'Select'}
@@ -1340,7 +1340,7 @@ const History = ({ onVendorClick }) => {
                 <div className="relative">
                   <div
                     onClick={() => setShowProjectNameModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: projectNameFilter ? '#000' : '#9E9E9E' }}
                   >
                     {projectNameFilter || 'Select'}
@@ -1374,7 +1374,7 @@ const History = ({ onVendorClick }) => {
                 <div className="relative">
                   <div
                     onClick={() => setShowPaymentModeModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: paymentModeFilter ? '#000' : '#9E9E9E' }}
                   >
                     {paymentModeFilter || 'Select'}
@@ -1403,7 +1403,7 @@ const History = ({ onVendorClick }) => {
               </div>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-[16px]">
               <button
                 type="button"
                 onClick={() => {
@@ -1413,14 +1413,14 @@ const History = ({ onVendorClick }) => {
                   setPaymentModeFilter('');
                   setShowFilterModal(false);
                 }}
-                className="px-6 w-full py-2 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
+                className="px-[24px] w-full py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => setShowFilterModal(false)}
-                className="px-6 py-2 w-full text-[14px] font-semibold text-white bg-black rounded-lg"
+                className="px-[24px] py-[8px] w-full text-[14px] font-semibold text-white bg-black rounded-lg"
               >
                 Save
               </button>
@@ -1492,12 +1492,12 @@ const History = ({ onVendorClick }) => {
       {/* Description Modal */}
       {showDescriptionModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-[16px]"
           onClick={() => setShowDescriptionModal(false)}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[320px] rounded-[12px] p-5 relative"
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Icon - image has its own background */}
@@ -1518,7 +1518,7 @@ const History = ({ onVendorClick }) => {
               <button
                 type="button"
                 onClick={() => setShowDescriptionModal(false)}
-                className="px-8 py-2 bg-black text-white text-[14px] font-semibold rounded-[8px] hover:opacity-90 transition-opacity"
+                className="px-[32px] py-[8px] bg-black text-white text-[14px] font-semibold rounded-[8px] hover:opacity-90 transition-opacity"
               >
                 Okay
               </button>

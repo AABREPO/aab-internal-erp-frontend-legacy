@@ -705,8 +705,8 @@ const Summary = () => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Date and Category Section */}
-      <div className="px-4 pt-2 mb-2">
-        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-2">
+      <div className="px-[16px] pt-[8px] mb-2">
+        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
           <button className="text-[12px] font-semibold text-black leading-normal">#Week</button>
           <button
             onClick={exportSummaryPDF}
@@ -719,14 +719,14 @@ const Summary = () => {
       </div>
 
       {/* View Mode Toggle */}
-      <div className="px-4 mb-3">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+      <div className="px-[16px] mb-3">
+        <div className="flex gap-[4px] bg-gray-100 rounded-lg p-[4px]">
           <button
             onClick={() => {
               setViewMode('Contractor/Vendor');
               setSelectedProject(null);
             }}
-            className={`flex-1 py-2 px-3 rounded text-[12px] font-semibold transition-colors ${viewMode === 'Contractor/Vendor'
+            className={`flex-1 py-[8px] px-[12px] rounded text-[12px] font-semibold transition-colors ${viewMode === 'Contractor/Vendor'
                 ? 'bg-white text-black shadow-sm'
                 : 'text-gray-600'
               }`}
@@ -738,7 +738,7 @@ const Summary = () => {
               setViewMode('Project');
               setSelectedContractorOrVendorOption(null);
             }}
-            className={`flex-1 py-2 px-3 rounded text-[12px] font-semibold transition-colors ${viewMode === 'Project'
+            className={`flex-1 py-[8px] px-[12px] rounded text-[12px] font-semibold transition-colors ${viewMode === 'Project'
                 ? 'bg-white text-black shadow-sm'
                 : 'text-gray-600'
               }`}
@@ -750,7 +750,7 @@ const Summary = () => {
 
       {/* Contractor/Vendor Selection */}
       {viewMode === 'Contractor/Vendor' && (
-        <div className="px-4 mb-1">
+        <div className="px-[16px] mb-1">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-[12px] font-semibold text-black leading-normal">
               Contractor/Vendor<span className="text-[#eb2f8e]">*</span>
@@ -762,7 +762,7 @@ const Summary = () => {
           <div className="relative">
             <div
               onClick={() => setShowContractorVendorModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 boxSizing: 'border-box',
                 color: selectedContractorOrVendorOption ? '#000' : '#9E9E9E'
@@ -796,7 +796,7 @@ const Summary = () => {
 
       {/* Project Selection */}
       {viewMode === 'Project' && (
-        <div className="px-4 mb-1">
+        <div className="px-[16px] mb-1">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-[12px] font-semibold text-black leading-normal">
               Project<span className="text-[#eb2f8e]">*</span>
@@ -808,7 +808,7 @@ const Summary = () => {
           <div className="relative">
             <div
               onClick={() => setShowProjectModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 boxSizing: 'border-box',
                 color: selectedProject ? '#000' : '#9E9E9E'
@@ -841,7 +841,7 @@ const Summary = () => {
       )}
 
       {/* Search Bar */}
-      <div className="px-4 mb-1">
+      <div className="px-[16px] mb-1">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -854,18 +854,18 @@ const Summary = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[36px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
+            className="w-full h-[36px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
           />
         </div>
       </div>
 
       {/* Filter and Pending Advance */}
-      <div className="px-4 pt-1 pb-2 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="px-[16px] pt-[4px] pb-[8px] flex items-center justify-between flex-wrap gap-[8px]">
+        <div className="flex items-center gap-[8px] min-w-0">
           <button
             type="button"
             onClick={() => setShowFilterModal(true)}
-            className="flex items-center gap-2 px-0 flex-shrink-0"
+            className="flex items-center gap-[8px] px-[0px] flex-shrink-0"
           >
             <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
             {!(projectNameFilter || billStatusFilter) && (
@@ -875,10 +875,10 @@ const Summary = () => {
             )}
           </button>
           {/* Active Filter Tags - Next to Filter button */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {/* Project Name Filter Tag */}
             {projectNameFilter && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+              <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">Project</span>
                 <button
                   onClick={() => setProjectNameFilter('')}
@@ -892,7 +892,7 @@ const Summary = () => {
             )}
             {/* Bill Status Filter Tag */}
             {billStatusFilter && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+              <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">Bill Status</span>
                 <button
                   onClick={() => setBillStatusFilter('')}
@@ -906,7 +906,7 @@ const Summary = () => {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[8px]">
           {(projectNameFilter || billStatusFilter) && (
             <button 
               onClick={() => {
@@ -926,7 +926,7 @@ const Summary = () => {
 
       {/* Cards List - Scrollable */}
       <div
-        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1 flex-1 max-h-[380px] pb-[110px]"
+        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-[16px] mt-1 flex-1 max-h-[380px] pb-[110px]"
       >
         {filteredSummaryData.length === 0 ? (
           <div className="flex flex-col items-center justify-center">
@@ -958,8 +958,8 @@ const Summary = () => {
                 key={index}
                 className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
               >
-                <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out">
-                  <div className="flex flex-col gap-0.5">
+                <div className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out">
+                  <div className="flex flex-col gap-[2px]">
                     {/* Row 1: Name and Status - Status clickable */}
                     <div className="flex items-center justify-between">
                       <p
@@ -973,7 +973,7 @@ const Summary = () => {
                         tabIndex={0}
                         onClick={() => handleStatusClick(item)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleStatusClick(item); }}
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium cursor-pointer active:opacity-80 ${isSettled
+                        className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium cursor-pointer active:opacity-80 ${isSettled
                             ? 'bg-[#E8F5E9] text-[#2E7D32]'
                             : 'bg-[#FFF3E0] text-[#F57C00]'
                           }`}
@@ -982,7 +982,7 @@ const Summary = () => {
                       </span>
                     </div>
                     {/* Row 2: Bill Amount and Pending Advance - flex layout */}
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-[8px]">
                       <p
                         role="button"
                         tabIndex={0}
@@ -1045,7 +1045,7 @@ const Summary = () => {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40" onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-[360px] p-4 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl w-full max-w-[360px] p-[16px] relative" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[16px] font-semibold text-black">Select Filters</p>
               <button
@@ -1059,14 +1059,14 @@ const Summary = () => {
               </button>
             </div>
 
-            <div className="flex flex-col gap-4 mb-3">
+            <div className="flex flex-col gap-[16px] mb-3">
               {/* Project Name Filter */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Project Name</p>
                 <div className="relative">
                   <div
                     onClick={() => setShowProjectNameModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: projectNameFilter ? '#000' : '#9E9E9E' }}
                   >
                     {projectNameFilter || 'Select'}
@@ -1100,7 +1100,7 @@ const Summary = () => {
                 <div className="relative">
                   <div
                     onClick={() => setShowBillStatusModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: billStatusFilter ? '#000' : '#9E9E9E' }}
                   >
                     {billStatusFilter || 'Select'}
@@ -1129,7 +1129,7 @@ const Summary = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-[16px]">
               <button
                 type="button"
                 onClick={() => {
@@ -1137,14 +1137,14 @@ const Summary = () => {
                   setBillStatusFilter('');
                   setShowFilterModal(false);
                 }}
-                className="px-6 py-2 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded"
+                className="px-[24px] py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => setShowFilterModal(false)}
-                className="px-6 py-2 text-[14px] font-semibold text-white bg-black rounded"
+                className="px-[24px] py-[8px] text-[14px] font-semibold text-white bg-black rounded"
               >
                 Save
               </button>
@@ -1239,13 +1239,13 @@ const Summary = () => {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header: title + download icon + close */}
-              <div className="flex items-start justify-between px-4 pt-4 pb-2 flex-shrink-0">
-                <div className="flex-1 min-w-0 pr-2">
-                  <h3 className="text-[14px] font-semibold leading-tight line-clamp-2">
+              <div className="flex items-start justify-between px-[16px] pt-[16px] pb-[8px] flex-shrink-0">
+                <div className="flex-1 min-w-0 pr-[8px]">
+                  <h3 className="text-[14px] font-semibold leading-tight line-clamp-[8px]">
                     {isStatus ? billStatusPopupContext : detailsPopupContext}
                   </h3>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-[4px] flex-shrink-0">
                   <button
                     onClick={exportDetailsPDF}
                     className="w-9 h-9 flex items-center justify-center rounded-full"
@@ -1257,13 +1257,13 @@ const Summary = () => {
               </div>
 
               {/* Content: single scrollable list with type codes (BS/RF/AD/TF) and transfer site for TF */}
-              <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
+              <div className="flex-1 overflow-y-auto px-[16px] py-[8px] min-h-0">
                 {!isStatus && listItems.map((entry, idx) => {
                 const typeCode = isBill ? 'BS' : getAdvanceTypeCode(entry);
                 const amountColor = entry.amount < 0 ? 'text-red-600' : (typeCode === 'RF' ? 'text-green-600' : 'text-black');
                 const displayAmount = Math.abs(entry.amount || 0).toLocaleString('en-IN');
                 return (
-                  <div key={idx} className="py-2 border-b border-gray-100 last:border-0">
+                  <div key={idx} className="py-[8px] border-b border-gray-100 last:border-0">
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-gray-800">#{typeCode} - {entry.advancePortalId || idx + 1} {entry.date}</span>
                       <span className={`text-[13px] font-semibold ${amountColor}`}>
@@ -1271,7 +1271,7 @@ const Summary = () => {
                       </span>
                     </div>
                     {isAdvance && typeCode === 'TF' && entry.transferSiteName && (
-                      <p className="text-[11px] text-gray-500 mt-0.5 pl-0">{entry.transferSiteName}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 pl-[0px]">{entry.transferSiteName}</p>
                     )}
                   </div>
                 );
@@ -1280,7 +1280,7 @@ const Summary = () => {
                 const amountColor = entry.amount < 0 ? 'text-red-600' : (entry.typeCode === 'RF' ? 'text-green-600' : 'text-black');
                 const displayAmount = Math.abs(entry.amount || 0).toLocaleString('en-IN');
                 return (
-                  <div key={idx} className="py-2 border-b border-gray-100 last:border-0">
+                  <div key={idx} className="py-[8px] border-b border-gray-100 last:border-0">
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-gray-800">#{entry.typeCode} - {entry.advancePortalId || idx + 1} {entry.date}</span>
                       <span className={`text-[13px] font-semibold ${amountColor}`}>
@@ -1288,7 +1288,7 @@ const Summary = () => {
                       </span>
                     </div>
                     {entry.typeCode === 'TF' && entry.transferSiteName && (
-                      <p className="text-[11px] text-gray-500 mt-0.5 pl-0">{entry.transferSiteName}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 pl-[0px]">{entry.transferSiteName}</p>
                     )}
                   </div>
                 );
@@ -1296,7 +1296,7 @@ const Summary = () => {
               </div>
 
               {/* Footer: totals and balance */}
-              <div className="border-t border-gray-200 px-4 py-2 bg-white flex-shrink-0">
+              <div className="border-t border-gray-200 px-[16px] py-[8px] bg-white flex-shrink-0">
                 {isStatus ? (
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[12px]">

@@ -47,12 +47,12 @@ const AddOptionModal = ({ isOpen, onClose, onAdd, existingOptions = [], fieldNam
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
       onClick={handleBackdropClick}
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       <div 
-        className="bg-white w-full max-w-[360px] rounded-[16px] p-6"
+        className="bg-white w-full max-w-[360px] rounded-[16px] p-[24px]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -73,13 +73,13 @@ const AddOptionModal = ({ isOpen, onClose, onAdd, existingOptions = [], fieldNam
             onChange={(e) => setNewOption(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
             placeholder={`Type ${fieldName}`}
-            className="w-full h-[32px] border border-[#E0E0E0] rounded-[8px] px-3 text-[12px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-full h-[32px] border border-[#E0E0E0] rounded-[8px] px-[12px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
             autoFocus
           />
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-[8px]">
           <button
             onClick={onClose}
             className="flex-1 h-[44px] border border-[#E0E0E0] rounded-[8px] text-[14px] font-semibold text-black hover:bg-gray-50 transition-colors"

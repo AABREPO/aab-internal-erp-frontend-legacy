@@ -201,7 +201,7 @@ const ItemCard = ({
       {/* Card */}
       <div
         ref={cardRef}
-        className="flex-1 bg-white border border-[#E0E0E0] rounded-[8px] px-3 py-2 cursor-pointer transition-transform duration-300 ease-out select-none"
+        className="flex-1 bg-white border border-[#E0E0E0] rounded-[8px] px-[12px] py-[8px] cursor-pointer transition-transform duration-300 ease-out select-none"
         style={{
           transform: `translateX(${swipeOffset}px)`,
           touchAction: 'pan-y',
@@ -211,9 +211,9 @@ const ItemCard = ({
         }}
         onClick={handleCardClick}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-[8px]">
           {/* Left: Item details */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-left">
             <p className="text-[12px] font-semibold text-black leading-snug truncate">
               {item.name && item.name.includes(',') ? item.name.split(',')[0].trim() : item.name}
             </p>
@@ -234,9 +234,9 @@ const ItemCard = ({
           </div>
           {/* Right: Category, Qty / Price (only when collapsed) */}
           {!expanded && (
-            <div className="flex flex-col items-end space-y-1 flex-shrink-0">
+            <div className="flex flex-col items-end flex-shrink-0 text-right">
               {category && (
-                <span className={`text-[10px] font-medium px-2 rounded-full whitespace-nowrap ${getCategoryColor(category)}`}>
+                <span className={`text-[10px] font-medium px-[6px] rounded-full whitespace-nowrap ${getCategoryColor(category)}`}>
                   {category}
                 </span>
               )}
@@ -255,7 +255,7 @@ const ItemCard = ({
                     onChange={handleAmountChange}
                     onBlur={handleAmountBlur}
                     onKeyDown={handleAmountKeyDown}
-                    className="text-[12px] font-semibold text-black leading-snug bg-transparent outline-none p-0 w-16 text-right border border-gray-400 rounded"
+                    className="text-[12px] font-semibold text-black leading-snug bg-transparent outline-none p-[0px] w-16 text-right border border-gray-400 rounded"
                     style={{ 
                       appearance: 'none',
                       WebkitAppearance: 'none',
@@ -279,7 +279,7 @@ const ItemCard = ({
 
       {/* Action Buttons - Behind the card on the right, revealed on swipe */}
       <div
-        className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+        className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
         style={{
           opacity:
             expanded ||
@@ -295,7 +295,7 @@ const ItemCard = ({
             e.stopPropagation();
             onEdit && onEdit();
           }}
-          className="action-button w-[40px] h-[66px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+          className="action-button w-[40px] h-[66px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
         >
           <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
         </button>
@@ -304,7 +304,7 @@ const ItemCard = ({
             e.stopPropagation();
             onDelete && onDelete();
           }}
-          className="action-button w-[40px] h-[66px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+          className="action-button w-[40px] h-[66px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
         >
           <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
         </button>

@@ -9,7 +9,7 @@ const Summary = () => {
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [rfqs, setRfqs] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
   const [projectOptions, setProjectOptions] = useState([]);
   const [summaryData, setSummaryData] = useState([]);
@@ -66,61 +66,62 @@ const Summary = () => {
     fetchProjects();
   }, []);
   // Load purchase orders from API
-  const loadPurchaseOrders = useCallback(async () => {
+  const loadRfqs = useCallback(async () => {
     // Don't load if vendors/projects aren't ready yet
     if (allVendors.length === 0 && allProjects.length === 0) {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/rfq/getAll');
       if (!response.ok) {
-        throw new Error('Failed to fetch purchase orders');
+        throw new Error('Failed to fetch RFQs');
       }
       const data = await response.json();
       // Transform API data to match expected format
-      const transformedPOs = data.map((po) => {
+      const transformed = data.map((rfq) => {
         // Fetch vendor name if we have vendor_id
         let vendorName = '';
-        if (po.vendor_id && allVendors.length > 0) {
-          const vendorMatch = allVendors.find(v => v.id === po.vendor_id);
+        if (rfq.vendor_id && allVendors.length > 0) {
+          const vendorMatch = allVendors.find(v => v.id === rfq.vendor_id);
           vendorName = vendorMatch?.vendorName || '';
         }
         // Fetch project/site name if we have client_id
         let projectName = '';
-        if (po.client_id && allProjects.length > 0) {
-          const projectMatch = allProjects.find(p => p.id === po.client_id);
+        if (rfq.client_id && allProjects.length > 0) {
+          const projectMatch = allProjects.find(p => p.id === rfq.client_id);
           projectName = projectMatch?.siteName || '';
         }
         return {
-          id: po.id || po._id,
-          date: po.date || '',
-          vendorName: vendorName || po.vendorName || '',
-          projectName: projectName || po.projectName || '',
-          vendor_id: po.vendor_id,
-          client_id: po.client_id,
+          id: rfq.id || rfq._id,
+          date: rfq.date || '',
+          vendorName: vendorName || rfq.vendorName || '',
+          projectName: projectName || rfq.projectName || '',
+          vendor_id: rfq.vendor_id,
+          client_id: rfq.client_id,
+          eno: rfq.eno || rfq.ENO || rfq.eNo || '',
         };
       });
-      setPurchaseOrders(transformedPOs);
+      setRfqs(transformed);
     } catch (error) {
-      console.error('Error loading purchase orders:', error);
+      console.error('Error loading RFQs:', error);
     }
   }, [allVendors, allProjects]);
   // Load purchase orders when vendors and projects are ready
   useEffect(() => {
     if (allVendors.length > 0 || allProjects.length > 0) {
-      loadPurchaseOrders();
+      loadRfqs();
     }
-  }, [allVendors, allProjects, loadPurchaseOrders]);
+  }, [allVendors, allProjects, loadRfqs]);
   // Listen for storage changes
   useEffect(() => {
     const handleStorageChange = () => {
-      loadPurchaseOrders();
+      loadRfqs();
     };
     window.addEventListener('poUpdated', handleStorageChange);
     return () => {
       window.removeEventListener('poUpdated', handleStorageChange);
     };
-  }, [loadPurchaseOrders]);
+  }, [loadRfqs]);
   // Helper function to normalize date format for comparison
   const normalizeDate = (dateStr) => {
     if (!dateStr) return '';
@@ -145,7 +146,7 @@ const Summary = () => {
       // Group by project for selected vendor and selected date
       const projectMap = new Map();
       const normalizedSelectedDate = normalizeDate(selectedDate);
-      purchaseOrders
+      rfqs
         .filter(po => {
           const poVendorName = po.vendorName || '';
           const poDate = normalizeDate(po.date);
@@ -165,7 +166,7 @@ const Summary = () => {
     } else if (viewMode === 'project' && selectedProject) {
       // Group by vendor for selected project
       const vendorMap = new Map();
-      purchaseOrders
+      rfqs
         .filter(po => po.projectName === selectedProject)
         .forEach(po => {
           if (po.vendorName) {
@@ -181,7 +182,7 @@ const Summary = () => {
     } else {
       setSummaryData([]);
     }
-  }, [viewMode, selectedVendor, selectedProject, selectedDate, purchaseOrders]);
+  }, [viewMode, selectedVendor, selectedProject, selectedDate, rfqs]);
   const handleAddNewVendor = (newVendor) => {
     if (!vendorOptions.includes(newVendor)) {
       setVendorOptions([...vendorOptions, newVendor]);
@@ -197,24 +198,26 @@ const Summary = () => {
     setShowDatePicker(false);
   };
   return (
-    <div className="w-full px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col min-h-[calc(100vh-96px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header Section - Sticky */}
-      <div className="sticky top-[100px] z-30 bg-white">
-        {/* Date Display - Clickable */}
-        <div className="mb-2 mt-2">
-          <button
-            type="button"
-            onClick={() => setShowDatePicker(true)}
-            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-          >
-            {selectedDate}
-          </button>
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        {/* Date Display and border */}
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between">
+          <div className="flex items-center pb-[8px] gap-[8px]">
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(true)}
+              className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
+            >
+              {selectedDate}
+            </button>
+          </div>
         </div>
         {/* Segmented Control (Vendor/Project) */}
-        <div className="mb-2 flex items-center bg-[#F5F5F5] rounded-[8px] p-1 w-[328px]">
+        <div className="mb-2 flex items-center bg-[#F5F5F5] rounded-[8px] w-full h-[32px]">
           <button
             onClick={() => setViewMode('vendor')}
-            className={`flex-1 h-[32px] rounded-[6px] text-[12px] font-medium transition-colors ${viewMode === 'vendor'
+            className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-medium transition-colors ${viewMode === 'vendor'
                 ? 'bg-white text-black shadow-sm'
                 : 'text-[#9E9E9E]'
               }`}
@@ -223,7 +226,7 @@ const Summary = () => {
           </button>
           <button
             onClick={() => setViewMode('project')}
-            className={`flex-1 h-[32px] rounded-[6px] text-[12px] font-medium transition-colors ${viewMode === 'project'
+            className={`flex-1 mr-0.5 h-[28px] rounded text-[12px] font-medium transition-colors ${viewMode === 'project'
                 ? 'bg-white text-black shadow-sm'
                 : 'text-[#9E9E9E]'
               }`}
@@ -233,15 +236,15 @@ const Summary = () => {
         </div>
         {/* Vendor/Project Selection */}
         {viewMode === 'vendor' ? (
-          <div className="">
+          <div className="pb-[8px] text-left">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Vendor Name<span className="text-[#eb2f8e]">*</span>
+              Vendor Name<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div className="relative">
                 <div
                   onClick={() => setShowVendorModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: selectedVendor ? '#000' : '#9E9E9E'
@@ -249,16 +252,13 @@ const Summary = () => {
                 >
                   {selectedVendor || 'Select ...'}
                 </div>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none"
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {!selectedVendor && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
               {selectedVendor && (
                 <button
@@ -267,7 +267,7 @@ const Summary = () => {
                     e.stopPropagation();
                     setSelectedVendor('');
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -277,15 +277,15 @@ const Summary = () => {
             </div>
           </div>
         ) : (
-          <div className="">
+          <div className="pb-[8px] text-left">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Project Name<span className="text-[#eb2f8e]">*</span>
+              Project Name<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div className="relative">
                 <div
                   onClick={() => setShowProjectModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: selectedProject ? '#000' : '#9E9E9E'
@@ -293,16 +293,13 @@ const Summary = () => {
                 >
                   {selectedProject || 'Select ...'}
                 </div>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none"
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {!selectedProject && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
               {selectedProject && (
                 <button
@@ -311,7 +308,7 @@ const Summary = () => {
                     e.stopPropagation();
                     setSelectedProject('');
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -324,9 +321,9 @@ const Summary = () => {
       </div>
       {/* Project/Vendor List Summary Card */}
       {summaryData.length > 0 && (
-        <div className="bg-white shadow-lg w-[328px]">
+        <div className="bg-white shadow-lg w-[360px] mt-[8px]">
           {/* Header */}
-          <div className="flex items-center justify-between px-4">
+          <div className="flex items-center justify-between ">
             <p className="text-[12px] font-semibold text-[#9E9E9E]">
               {viewMode === 'vendor' ? 'Project List' : 'Vendor List'}
             </p>
@@ -337,7 +334,7 @@ const Summary = () => {
             {summaryData.map((item, index) => (
               <div
                 key={index}
-                className={`flex items-center justify-between px-4 py-3 ${index < summaryData.length - 1 ? 'border-b border-[rgba(0,0,0,0.08)]' : ''
+                className={`flex items-center justify-between px-[16px] py-[12px] ${index < summaryData.length - 1 ? 'border-b border-[rgba(0,0,0,0.08)]' : ''
                   }`}
               >
                 <p className="text-[12px] font-medium text-black flex-1 text-left">
@@ -353,7 +350,7 @@ const Summary = () => {
       )}
       {/* Empty State */}
       {((viewMode === 'vendor' && selectedVendor) || (viewMode === 'project' && selectedProject)) && summaryData.length === 0 && (
-        <div className="bg-white rounded- border border-[rgba(0,0,0,0.16)] w-[328px] p-8 text-center">
+        <div className="bg-white rounded- border border-[rgba(0,0,0,0.16)] w-[360px] mt-[8px] p-[32px] text-center">
           <p className="text-[12px] font-medium text-[#9E9E9E]">
             No {viewMode === 'vendor' ? 'projects' : 'vendors'} found
           </p>

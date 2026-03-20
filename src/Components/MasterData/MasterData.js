@@ -13,6 +13,24 @@ import QRCode from '../Images/AAB_QR_CODE.jpeg';
 import DownloadIcon from '../Images/download_icon.png';
 import Select from 'react-select';
 const MasterData = ({ username, userRoles = [] }) => {
+  // Normalize userRoles - supports both ['Create'] and [{roles: 'Create'}] formats
+  const roleNames = useMemo(() => (
+    (userRoles || []).map(r => (typeof r === 'string' ? r : r?.roles)).filter(Boolean)
+  ), [userRoles]);
+
+  // Permission helpers based on userRoles
+  const hasCreatePermission = roleNames.includes('Create');
+  const hasEditPermission = roleNames.includes('Edit');
+  const hasDeletePermission = roleNames.includes('Delete');
+
+  const handleAddClick = (openFn) => {
+    if (hasCreatePermission) {
+      openFn();
+    } else {
+      alert("you don't have the permission to create new record");
+    }
+  };
+
   // State for Project Names (from ExpensesInputData)
   const [isSiteNamesOpen, setIsSiteNamesOpen] = useState(false);
   const [siteNameSearch, setSiteNameSearch] = useState("");
@@ -155,6 +173,8 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [isEmployeeDataOpen, setIsEmployeeDataOpen] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [employeeName, setEmployeeName] = useState('');
+  const [usernamesOptions, setUsernamesOptions] = useState([]);
+  const [empUserName, setEmpUserName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [roleOfEmployee, setRoleOfEmployee] = useState('');
   const [empAccountHolderName, setEmpAccountHolderName] = useState('');
@@ -173,6 +193,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [isEditEmployeeDataOpen, setIsEditEmployeeDataOpen] = useState(false);
   const [selectedEmployeeDataId, setSelectedEmployeeDataId] = useState(null);
   const [editEmployeeName, setEditEmployeeName] = useState('');
+  const [editEmpUserName, setEditEmpUserName] = useState('');
   const [editEmployeeMobileNumber, setEditEmployeeMobileNumber] = useState('');
   const [editRoleOfEmployee, setEditRoleOfEmployee] = useState('');
   const [editEmpAccountHolderName, setEditEmpAccountHolderName] = useState('');
@@ -592,6 +613,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     fetchCategories();
     fetchMachinTools();
     fetchEmployeeList();
+    fetchUsernames();
     fetchLaboursList();
     fetchAccountDetails();
     fetchBankAccountTypes();
@@ -667,6 +689,41 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const fetchUsernames = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuilderDash/api/user/usernames');
+      if (!response.ok) {
+        console.error('Failed to fetch usernames:', response.status, response.statusText);
+        return;
+      }
+      const data = await response.json();
+
+      const raw =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data?.username)
+            ? data.username
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+
+      const options = raw
+        .map((u) => {
+          if (typeof u === 'string') return u;
+          if (u && typeof u === 'object') {
+            return u.user_name || u.userName || u.username || u.name || u.employee_name || '';
+          }
+          return '';
+        })
+        .map((s) => String(s).trim())
+        .filter(Boolean);
+
+      setUsernamesOptions(Array.from(new Set(options)));
+    } catch (error) {
+      console.error('Error fetching usernames:', error);
     }
   };
   const fetchLaboursList = async () => {
@@ -1112,6 +1169,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       employee_id: employeeId,
       employee_mobile_number: mobileNumber,
       role_of_employee: roleOfEmployee,
+      user_name: empUserName || username || '',
       account_holder_name: empAccountHolderName,
       account_number: empAccountNumber,
       bank_name: empBankName,
@@ -1145,6 +1203,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setMessage('Employee Details saved successfully!');
         // Reset all form fields
         setEmployeeName('');
+        setEmpUserName('');
         setMobileNumber('');
         setRoleOfEmployee('');
         setEmpAccountHolderName('');
@@ -1492,6 +1551,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setEditEmployeeId(item.employee_id || '');
     setEditEmployeeMobileNumber(item.employee_mobile_number);
     setEditRoleOfEmployee(item.role_of_employee);
+    setEditEmpUserName(item.user_name || item.userName || item.username || '');
     setEditEmpAccountHolderName(item.account_holder_name || '');
     setEditEmpAccountNumber(item.account_number || '');
     setEditEmpBankName(item.bank_name || '');
@@ -3141,7 +3201,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
                     <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                      onClick={openProjectManagement}>
+                      onClick={() => handleAddClick(openProjectManagement)}>
                       + Add
                     </button>
                   </div>
@@ -3203,12 +3263,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                               </td>
                               <td className="p-2 text-left font-semibold">
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditProject(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-6 h-6" />
-                                  </button>
-                                  <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-6 h-6" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditProject(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-6 h-6" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteProject(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-6 h-6" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3233,7 +3297,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
                     <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                      onClick={openvendorNames}>
+                      onClick={() => handleAddClick(openvendorNames)}>
                       + Add
                     </button>
                   </div>
@@ -3280,12 +3344,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleVendorShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditVendorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteVendorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3309,7 +3377,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openContractorNames}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openContractorNames)}>
                       + Add
                     </button>
                   </div>
@@ -3354,12 +3422,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleContractorShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditContractorName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteContractorName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3384,7 +3456,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
                     <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-                      onClick={openCategory}>
+                      onClick={() => handleAddClick(openCategory)}>
                       + Add
                     </button>
                   </div>
@@ -3423,12 +3495,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.category}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditCategory(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteCategory(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3452,7 +3528,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openMachineTools}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openMachineTools)}>
                       + Add
                     </button>
                   </div>
@@ -3491,12 +3567,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.machineTool}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditMachineTool(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteMachineTool(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3520,7 +3600,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openEmployeeDetails}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openEmployeeDetails)}>
                       + Add
                     </button>
                   </div>
@@ -3567,12 +3647,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleEmployeeShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditEmployeeData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteEmployeeData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3596,7 +3680,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openLabourDetails}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openLabourDetails)}>
                       + Add
                     </button>
                   </div>
@@ -3635,12 +3719,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.labour_name}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditLabourData(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteLabourData(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3664,7 +3752,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openAccountDetails}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openAccountDetails)}>
                       + Add
                     </button>
                   </div>
@@ -3706,12 +3794,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   <button onClick={() => handleAccountShare(item)}>
                                     <img src={share} alt='Share' className='w-4 h-4' />
                                   </button>
-                                  <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditAccountDetails(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteAccountDetails(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3735,7 +3827,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openBankAccountType}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openBankAccountType)}>
                       + Add
                     </button>
                   </div>
@@ -3774,12 +3866,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.bank_account_type}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditBankAccountType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteBankAccountType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -3803,7 +3899,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
                       <img src={search} alt='search' className=' w-5 h-5' />
                     </button>
-                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={openSupportStaffName}>
+                    <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]" onClick={() => handleAddClick(openSupportStaffName)}>
                       + Add
                     </button>
                   </div>
@@ -3835,12 +3931,16 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   {item.support_staff_name || ''}
                                 </div>
                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                  <button onClick={() => handleEditSupportStaffName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                                    <img src={edit} alt="Edit" className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                                    <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
-                                  </button>
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditSupportStaffName(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -4342,7 +4442,27 @@ const MasterData = ({ username, userRoles = [] }) => {
                           />
                         </div>
                       </div>
-                      <div className='flex gap-4'>
+                      <div className='flex gap-4 flex-wrap'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">User Name</label>
+                          <select
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            value={empUserName}
+                            onChange={(e) => setEmpUserName(e.target.value)}
+                          >
+                            <option value="">{usernamesOptions.length > 0 ? 'Select user' : 'Loading...'}</option>
+                            {usernamesOptions.map((u) => (
+                              <option key={u} value={u}>
+                                {u}
+                              </option>
+                            ))}
+                            {empUserName && !usernamesOptions.includes(empUserName) && (
+                              <option key={empUserName} value={empUserName}>
+                                {empUserName}
+                              </option>
+                            )}
+                          </select>
+                        </div>
                         <div className="mb-4">
                           <label className="block text-lg font-medium mb-2">Designation</label>
                           <input
@@ -6558,6 +6678,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     employee_id: editEmployeeId,
                     employee_mobile_number: editEmployeeMobileNumber,
                     role_of_employee: editRoleOfEmployee,
+                    user_name: editEmpUserName || '',
                     account_holder_name: editEmpAccountHolderName,
                     account_number: editEmpAccountNumber,
                     bank_name: editEmpBankName,
@@ -6641,7 +6762,28 @@ const MasterData = ({ username, userRoles = [] }) => {
                           />
                         </div>
                       </div>
-                      <div className='flex gap-4'>
+                      <div className='flex gap-4 flex-wrap'>
+                        <div className="mb-4">
+                          <label className="block text-lg font-medium mb-2">User Name</label>
+                          <select
+                            className="w-96 border-2 border-[#BF9853] border-opacity-35 p-2 rounded-lg h-14 focus:outline-none"
+                            value={editEmpUserName}
+                            onChange={(e) => setEditEmpUserName(e.target.value)}
+                            disabled={!isEmployeeEditMode}
+                          >
+                            <option value="">{usernamesOptions.length > 0 ? 'Select user' : 'Loading...'}</option>
+                            {usernamesOptions.map((u) => (
+                              <option key={u} value={u}>
+                                {u}
+                              </option>
+                            ))}
+                            {editEmpUserName && !usernamesOptions.includes(editEmpUserName) && (
+                              <option key={editEmpUserName} value={editEmpUserName}>
+                                {editEmpUserName}
+                              </option>
+                            )}
+                          </select>
+                        </div>
                         <div className="mb-4">
                           <label className="block text-lg font-medium mb-2">Designation</label>
                           <input

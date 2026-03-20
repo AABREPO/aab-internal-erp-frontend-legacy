@@ -190,10 +190,10 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white w-[320px] rounded-[6px] p-6 relative">
+      <div className="bg-white w-[320px] rounded-[6px] p-[24px] relative">
         <p className="text-[16px] font-medium text-black text-center mb-6">Select the Date</p>
         
-        <div className="flex justify-center gap-8 mb-6">
+        <div className="flex justify-center gap-[32px] mb-6">
           {/* Day */}
           <div 
             className="flex flex-col items-center relative touch-none select-none"
@@ -206,7 +206,7 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
             {visibleDays.map((day, idx) => (
               <div key={day} className="relative w-full flex flex-col items-center">
                 {idx > 0 && (
-                  <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]"></div>
+                  <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]"></div>
                 )}
                 <button
                   data-day={day}
@@ -241,7 +241,7 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
             {visibleMonths.map((month, idx) => (
               <div key={month.index} className="relative w-full flex flex-col items-center">
                 {idx > 0 && (
-                  <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]"></div>
+                  <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]"></div>
                 )}
                 <button
                   data-month={month.index}
@@ -276,7 +276,7 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
             {visibleYears.map((year, idx) => (
               <div key={year} className="relative w-full flex flex-col items-center">
                 {idx > 0 && (
-                  <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]"></div>
+                  <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]"></div>
                 )}
                 <button
                   data-year={year}
@@ -300,7 +300,7 @@ const DatePickerModal = ({ isOpen, onClose, onConfirm, initialDate }) => {
           </div>
         </div>
         
-        <div className="flex justify-end gap-4">
+        <div className="flex justify-end gap-[16px]">
           <button
             onClick={onClose}
             className="text-[#656565] text-[16px] font-semibold"

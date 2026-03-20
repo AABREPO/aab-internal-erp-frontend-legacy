@@ -72,10 +72,10 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
         }
       `}</style>
       <div ref={fixedContainerRef} className="fixed top-[50px] transform w-full max-w-[357px] h-[40px] overflow-x-auto bg-white loan-portal-tabs-container" style={{ fontFamily: "'Manrope', sans-serif", zIndex: 30 }}>
-        <div className="relative h-full px-4 pr-6 overflow-x-auto scrollbar-hide loan-portal-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="relative h-full px-[16px] pr-[24px] overflow-x-auto scrollbar-hide loan-portal-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div 
             ref={tabsContainerRef}
-            className="flex items-center gap-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing loan-portal-tabs-scroll"
+            className="flex items-center gap-[16px] h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing loan-portal-tabs-scroll"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', paddingRight: '5px' }}
             onMouseDown={(e) => {
               setIsDragging(true);

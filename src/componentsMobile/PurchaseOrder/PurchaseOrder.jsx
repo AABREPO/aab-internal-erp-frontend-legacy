@@ -21,6 +21,7 @@ import SearchItemsModal from './SearchItemsModal';
 import Summary from './Summary';
 import editIcon from '../Images/edit.png';
 import SearchBlack from '../Images/search black.png';
+import CloseIcon from '../Images/Close F.svg'
 
 // Module-level cache that persists across component remounts
 const siteEngineersCache = { data: null };
@@ -45,6 +46,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showInchargeModal, setShowInchargeModal] = useState(false);
   const [showSearchItemsModal, setShowSearchItemsModal] = useState(false);
+  const [showRfqModal, setShowRfqModal] = useState(false);
+  const [rfqOptionLabels, setRfqOptionLabels] = useState([]);
+  const [selectedRfqIdentifier, setSelectedRfqIdentifier] = useState(''); // send as rfq_id in PO payload
+  const rfqLabelToRfqRef = useRef(new Map()); // label -> rfq row (at least {id, eno, vendor_id, ...})
+  const rfqLoadedForVendorRef = useRef(null); // vendorId we last loaded rfqs for
+  const [isRfqLoading, setIsRfqLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(''); // Store selected category to persist across modal opens
   const getTodayDate = () => {
     const today = new Date();
@@ -128,12 +135,249 @@ const PurchaseOrder = ({ user, onLogout }) => {
     expandedItemIdRef.current = expandedItemId;
   }, [expandedItemId]);
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = originalOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
     };
   }, []);
+
+  const fetchRfqsForSelectedVendor = async () => {
+    if (!selectedVendor?.id) return;
+    const vendorId = String(selectedVendor.id);
+    // Avoid refetching if already loaded for this vendor in this session
+    if (rfqLoadedForVendorRef.current === vendorId && rfqOptionLabels.length > 0) return;
+    setIsRfqLoading(true);
+    try {
+      const res = await fetch('https://backendaab.in/aabuildersDash/api/rfq/getAll');
+      if (!res.ok) {
+        setRfqOptionLabels([]);
+        rfqLabelToRfqRef.current = new Map();
+        return;
+      }
+      const data = await res.json();
+      const rfqs = Array.isArray(data) ? data : [];
+      const filtered = rfqs
+        .filter((r) => String(r?.vendor_id ?? r?.vendorId ?? '') === vendorId)
+        .sort((a, b) => Number(b?.eno || 0) - Number(a?.eno || 0));
+
+      const labelToRfq = new Map();
+      const labels = filtered.map((r) => {
+        const rawDate = r?.date || r?.createdAt || r?.created_at;
+        const year = rawDate ? new Date(rawDate).getFullYear() : new Date().getFullYear();
+        const eno = r?.eno ?? r?.rfq_eno ?? r?.rfqEno ?? null;
+        const label = eno ? `RFQ ${eno}` : `RFQ - ${r?.id ?? ''}`;
+        labelToRfq.set(label, r);
+        return label;
+      });
+      rfqLabelToRfqRef.current = labelToRfq;
+      rfqLoadedForVendorRef.current = vendorId;
+      setRfqOptionLabels(labels);
+    } catch (e) {
+      setRfqOptionLabels([]);
+      rfqLabelToRfqRef.current = new Map();
+    } finally {
+      setIsRfqLoading(false);
+    }
+  };
+
+  const applyRfqToPo = async (rfqRow) => {
+    if (!rfqRow) return;
+    const rfqId = rfqRow?.id ?? rfqRow?._id ?? null;
+    if (!rfqId) return;
+
+    isLoadingFromEventRef.current = true;
+    setIsPdfGenerated(false);
+    setPdfBlob(null);
+    setIsViewOnlyFromHistory(false);
+    setIsEditFromHistory(false);
+    setIsEditMode(true);
+    setHasOpenedAdd(true);
+
+    // Fetch full RFQ (ensures rfqTable exists)
+    let apiRfq = null;
+    try {
+      const res = await fetch(`https://backendaab.in/aabuildersDash/api/rfq/get/${rfqId}`);
+      if (res.ok) apiRfq = await res.json();
+    } catch (e) {
+      // best-effort
+    }
+    const source = apiRfq || rfqRow;
+    const rfqEno = source?.eno ?? source?.rfq_eno ?? source?.rfqEno ?? null;
+    // Backend expects rfq_id (String). Prefer RFQ number; fallback to RFQ row id.
+    setSelectedRfqIdentifier(String(rfqEno ?? rfqId ?? ''));
+
+    // Project (client) hydrate
+    const clientId = source?.client_id ?? source?.clientId ?? null;
+    if (clientId) {
+      const existing = siteOptions.find((opt) => String(opt?.id) === String(clientId));
+      if (existing) {
+        setSelectedSite({ id: existing.id, name: existing.value });
+        setPoData((prev) => ({ ...prev, projectName: existing.value }));
+      } else {
+        try {
+          const projRes = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`);
+          if (projRes.ok) {
+            const proj = await projRes.json();
+            const name = proj?.siteName || proj?.projectName || proj?.name || '';
+            if (name) {
+              setSelectedSite({ id: clientId, name });
+              setPoData((prev) => ({ ...prev, projectName: name }));
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    // Incharge hydrate (employee/support staff)
+    const inchargeId = source?.site_incharge_id ?? source?.siteInchargeId ?? null;
+    const inchargeType = source?.site_incharge_type ?? source?.siteInchargeType ?? null;
+    const inchargeMobile =
+      source?.site_incharge_mobile_number ?? source?.siteInchargeMobileNumber ?? source?.contact ?? '';
+
+    if (inchargeId) {
+      if (!inchargeType || inchargeType === 'employee') {
+        let emp = employeeList.find((e) => String(e?.id) === String(inchargeId)) || null;
+        if (!emp) {
+          try {
+            const empRes = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`);
+            if (empRes.ok) emp = await empRes.json();
+          } catch (e) {
+            // ignore
+          }
+        }
+        const name =
+          emp?.employeeName || emp?.name || emp?.fullName || emp?.employee_name || source?.site_incharge_name || '';
+        const mobile =
+          emp?.employee_mobile_number || emp?.mobileNumber || emp?.mobile_number || emp?.contact || inchargeMobile || '';
+        if (name) {
+          setSelectedIncharge({ id: inchargeId, name, mobileNumber: mobile, type: 'employee' });
+          setPoData((prev) => ({ ...prev, projectIncharge: name, contact: mobile }));
+        }
+      } else {
+        const staff =
+          supportStaffList.find((s) => String(s?.id) === String(inchargeId)) || null;
+        const name =
+          staff?.support_staff_name || staff?.supportStaffName || source?.site_incharge_name || '';
+        const mobile = staff?.mobile_number || staff?.mobileNumber || inchargeMobile || '';
+        if (name) {
+          setSelectedIncharge({ id: inchargeId, name, mobileNumber: mobile, type: 'support staff' });
+          setPoData((prev) => ({ ...prev, projectIncharge: name, contact: mobile }));
+        }
+      }
+    }
+
+    // Items from rfqTable
+    const rfqTable = source?.rfqTable || source?.items || [];
+    const rows = Array.isArray(rfqTable) ? rfqTable : [];
+    const mapped = rows.map((row, index) => {
+      const itemId = row?.item_id ?? row?.itemId ?? null;
+      const brandId = row?.brand_id ?? row?.brandId ?? null;
+      const modelId = row?.model_id ?? row?.modelId ?? null;
+      const typeId = row?.type_id ?? row?.typeId ?? null;
+      const categoryId = row?.category_id ?? row?.categoryId ?? null;
+      const isTileCategory = categoryId === 10 || String(categoryId) === '10';
+
+      const categoryName =
+        row?.categoryName ||
+        row?.category ||
+        (categoryId && categoryOptions?.length
+          ? (categoryOptions.find((c) => String(c?.id) === String(categoryId))?.label ||
+            categoryOptions.find((c) => String(c?.id) === String(categoryId))?.value ||
+            '')
+          : '');
+
+      // RFQ rows often contain only IDs; resolve display names from our prefetched lists.
+      let itemName = row?.itemName || row?.name || '';
+      if (!itemName && itemId) {
+        if (isTileCategory && tileData && tileData.length > 0) {
+          itemName =
+            findNameById(tileData, itemId, 'label') ||
+            findNameById(tileData, itemId, 'tileName') ||
+            findNameById(tileData, itemId, 'name') ||
+            '';
+        } else if (poItemName && poItemName.length > 0) {
+          itemName =
+            findNameById(poItemName, itemId, 'itemName') ||
+            findNameById(poItemName, itemId, 'poItemName') ||
+            findNameById(poItemName, itemId, 'name') ||
+            findNameById(poItemName, itemId, 'item_name') ||
+            '';
+        }
+      }
+
+      let brand = row?.brandName || row?.brand || '';
+      if (!brand && brandId && poBrand && poBrand.length > 0) {
+        brand =
+          findNameById(poBrand, brandId, 'brand') ||
+          findNameById(poBrand, brandId, 'brandName') ||
+          findNameById(poBrand, brandId, 'name') ||
+          '';
+      }
+
+      let model = row?.modelName || row?.model || '';
+      if (!model && modelId) {
+        if (isTileCategory && tileSizeData && tileSizeData.length > 0) {
+          model =
+            findNameById(tileSizeData, modelId, 'size') ||
+            findNameById(tileSizeData, modelId, 'tileSize') ||
+            findNameById(tileSizeData, modelId, 'label') ||
+            findNameById(tileSizeData, modelId, 'name') ||
+            '';
+        } else if (poModel && poModel.length > 0) {
+          model =
+            findNameById(poModel, modelId, 'model') ||
+            findNameById(poModel, modelId, 'modelName') ||
+            findNameById(poModel, modelId, 'name') ||
+            '';
+        }
+      }
+
+      let type = row?.typeName || row?.typeColor || row?.type || '';
+      if (!type && typeId && poType && poType.length > 0) {
+        type =
+          findNameById(poType, typeId, 'typeColor') ||
+          findNameById(poType, typeId, 'type') ||
+          findNameById(poType, typeId, 'typeName') ||
+          findNameById(poType, typeId, 'name') ||
+          '';
+      }
+
+      const quantity = Number(row?.quantity || 0) || 0;
+      const amount = Number(row?.amount || 0) || 0;
+      const price = Number(row?.price || 0) || (quantity ? amount / quantity : 0);
+      return {
+        id: `rfq-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+        name: itemName ? `${itemName}, ${categoryName || ''}` : '',
+        category: categoryName || '',
+        quantity,
+        price,
+        amount,
+        brand,
+        model,
+        type,
+        itemId: itemId,
+        brandId: brandId,
+        modelId: modelId,
+        typeId: typeId,
+        categoryId: categoryId || null,
+      };
+    });
+    setItems(mapped);
+
+    // Keep vendor as-is (selected vendor), but ensure vendorName is set
+    setPoData((prev) => ({ ...prev, vendorName: selectedVendor?.name || prev.vendorName }));
+
+    // Close picker and reset loading flag shortly after state settles
+    setTimeout(() => {
+      isLoadingFromEventRef.current = false;
+    }, 100);
+  };
   // Global mouse handlers for desktop support (like History.jsx)
   useEffect(() => {
     if (items.length === 0) return;
@@ -986,6 +1230,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setEditingItem(null);
     setExpandedItemId(null);
     setSwipeStates({});
+    setSelectedRfqIdentifier('');
     previousVendorId.current = null; // Reset previous vendor ID tracking
     hasLoadedNetStockItems.current = false; // Reset to allow loading NetStock items
   }, []);
@@ -1107,6 +1352,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           const employeeData = await employeeResponse.json();
           const employees = Array.isArray(employeeData) ? employeeData : [];
           siteEngineersCache.data = employees;
+          console.log("employees", employees);
           setEmployeeList(employees);
         }
 
@@ -1154,6 +1400,63 @@ const PurchaseOrder = ({ user, onLogout }) => {
       type: 'support staff'
     }))
   ];
+
+  // Auto-fill project incharge for new POs using logged-in username match
+  useEffect(() => {
+    const username = (user && user.username) ? String(user.username).trim().toLowerCase() : '';
+    if (!username) return;
+
+    // Avoid overwriting History/edit/view data
+    if (isEditMode || isEditFromHistory || isViewOnlyFromHistory) return;
+    if (poData.projectIncharge || poData.contact) return;
+
+    if (!Array.isArray(employeeList) || employeeList.length === 0) return;
+
+    // Backend returns `user_name` field for employees; match to `user.username`
+    const matchedEmployee = employeeList.find(emp => {
+      const empUserName = emp.user_name || emp.userName || emp.username || '';
+      return String(empUserName).trim().toLowerCase() === username;
+    });
+
+    if (!matchedEmployee) return;
+
+    const resolvedName =
+      matchedEmployee.employeeName ||
+      matchedEmployee.name ||
+      matchedEmployee.fullName ||
+      matchedEmployee.employee_name ||
+      '';
+
+    const resolvedMobile =
+      matchedEmployee.employee_mobile_number ||
+      matchedEmployee.mobileNumber ||
+      matchedEmployee.mobile_number ||
+      matchedEmployee.contact ||
+      '';
+
+    if (!resolvedName) return;
+
+    setSelectedIncharge({
+      id: matchedEmployee.id,
+      name: resolvedName,
+      mobileNumber: resolvedMobile,
+      type: 'employee'
+    });
+    setPoData(prev => ({
+      ...prev,
+      projectIncharge: prev.projectIncharge || resolvedName,
+      contact: prev.contact || resolvedMobile
+    }));
+  }, [
+    user,
+    isEditMode,
+    isEditFromHistory,
+    isViewOnlyFromHistory,
+    poData.projectIncharge,
+    poData.contact,
+    employeeList
+  ]);
+
   // Fetch PO item names from API - extracted as reusable function
   const fetchPoItemName = useCallback(async () => {
     try {
@@ -1943,6 +2246,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         site_incharge_id: siteInchargeIdForPayload,
         site_incharge_mobile_number: mobileForPayload,
         site_incharge_type: siteInchargeTypeForPayload,
+        rfq_id: selectedRfqIdentifier || null,
         eno: currentPoNo,
         created_by: username,
         purchaseTable: items.map(item => {
@@ -2523,6 +2827,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setEditingItem(null);
     setExpandedItemId(null);
     setSwipeStates({});
+    setSelectedRfqIdentifier('');
     setSelectedCategory('');
     previousVendorId.current = null;
     hasLoadedNetStockItems.current = false; // Reset to allow loading NetStock items again
@@ -2575,7 +2880,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setSidebarOpen(false);
   };
   const handleNavigate = (page) => {
-    if (page === 'purchase-order') {
+    if (page === 'request-for-quotation') {
+      setCurrentPage('request-for-quotation');
+      navigate('/rfq');
+    } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
     } else if (page === 'inventory') {
@@ -2593,7 +2901,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     }
   };
   return (
-    <div className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto pb-[80px]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="relative w-full h-[100vh] bg-white max-w-[360px] mx-auto overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -2606,8 +2914,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
       <Header user={user} onLogout={onLogout} onMenuClick={handleMenuClick} />
       {/* Tabs - Fixed */}
       <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
-      {/* Content Area - Add padding to account for fixed Header and Tabs */}
-      <div className="pt-[85px]">
+      {/* Content Area */}
+      <div className="mt-[96px] h-[calc(100vh-96px-80px)] overflow-hidden">
         {/* History Tab Content */}
         {activeTab === 'history' && <History />}
         {/* Input Data Tab Content */}
@@ -2616,85 +2924,102 @@ const PurchaseOrder = ({ user, onLogout }) => {
         {activeTab === 'summary' && <Summary />}
         {/* Create PO Tab Content */}
         {activeTab === 'create' && (
-          <div className="flex px-4 flex-col h-[calc(100vh-85px-80px)] overflow-hidden">
+          <div className="flex flex-col h-full bg-white overflow-hidden">
             {/* PO Number and Date Row - Only show date when not in empty state */}
-            {!isEmptyState && (
-              <div className="flex-shrink-0 pt-3 pb-1.5 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {poData.poNumber && (
-                      <p className="text-[12px] font-semibold text-black leading-normal">{poData.poNumber}</p>
-                    )}
-                    <button type="button" onClick={() => setShowDatePicker(true)}
-                      className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-                    >
-                      {poData.date}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {isPdfGenerated ? (
-                      <>
-                        <button type="button" onClick={downloadPDF} className="text-[13px] font-semibold text-black leading-normal" >
-                          Download
-                        </button>
 
-                      </>
-                    ) : !isViewOnlyFromHistory && areFieldsFilled ? (
-                      <button
-                        type="button"
-                        onClick={generatePO}
-                        disabled={isGenerating || isGeneratePrecheckRunning}
-                        className={`text-[13px] font-medium leading-normal ${(isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
-                      >
-                        {(isGenerating || isGeneratePrecheckRunning) ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
+            <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+              <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
+                <div className="flex items-center gap-[8px]">
+                  {poData.poNumber && (
+                    <p className="text-[12px] font-semibold text-black leading-normal">{poData.poNumber}</p>
+                  )}
+                  <button type="button" onClick={() => setShowDatePicker(true)}
+                    className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
+                  >
+                    {poData.date}
+                  </button>
+                </div>
+                <div className="flex items-center gap-[8px]">
+                  {!isViewOnlyFromHistory && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!selectedVendor?.id) {
+                          alert('Please select a vendor first.');
+                          return;
+                        }
+                        setShowRfqModal(true);
+                        await fetchRfqsForSelectedVendor();
+                      }}
+                      disabled={!selectedVendor?.id || isRfqLoading}
+                      className={`text-[12px] font-semibold leading-normal ${(!selectedVendor?.id || isRfqLoading) ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
+                    >
+                      RFQ
+                    </button>
+                  )}
+                  {isPdfGenerated ? (
+                    <>
+                      <button type="button" onClick={downloadPDF} className="text-[12px] font-semibold text-black leading-normal" >
+                        Download
                       </button>
-                    ) : null}
-                    {!isViewOnlyFromHistory && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Update UI state immediately for instant response
-                          setIsEditMode(true);
-                          setIsViewOnlyFromHistory(false); // Clear view-only mode when editing
-                          setHasOpenedAdd(false);
-                          setIsPdfGenerated(false);
-                          setPdfBlob(null);
-                          // Preserve isEditFromHistory flag - don't clear it if already editing from History
-                          // Only clear if we're not already editing from History (editing from Create PO page)
-                          if (!isEditFromHistory) {
-                            setIsEditFromHistory(false);
-                            // Update PO number automatically when clicking edit after generating PO
-                            // Do this asynchronously without blocking UI update
-                            if (selectedVendor?.id) {
-                              fetchNextPoNumberForVendor(selectedVendor.id)
-                                .then(nextPoNo => {
-                                  setPoData(prev => ({ ...prev, poNumber: `#${nextPoNo}` }));
-                                  previousVendorId.current = selectedVendor.id; // Update tracked vendor ID
-                                })
-                                .catch(error => {
-                                  console.error('Error fetching PO number:', error);
-                                });
-                            }
+
+                    </>
+                  ) : !isViewOnlyFromHistory && areFieldsFilled ? (
+                    <button
+                      type="button"
+                      onClick={generatePO}
+                      disabled={isGenerating || isGeneratePrecheckRunning}
+                      className={`text-[12px] font-semibold leading-normal ${(isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
+                    >
+                      {(isGenerating || isGeneratePrecheckRunning) ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
+                    </button>
+                  ) : null}
+
+                  {!isViewOnlyFromHistory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Update UI state immediately for instant response
+                        setIsEditMode(true);
+                        setIsViewOnlyFromHistory(false); // Clear view-only mode when editing
+                        setHasOpenedAdd(false);
+                        setIsPdfGenerated(false);
+                        setPdfBlob(null);
+                        // Preserve isEditFromHistory flag - don't clear it if already editing from History
+                        // Only clear if we're not already editing from History (editing from Create PO page)
+                        if (!isEditFromHistory) {
+                          setIsEditFromHistory(false);
+                          // Update PO number automatically when clicking edit after generating PO
+                          // Do this asynchronously without blocking UI update
+                          if (selectedVendor?.id) {
+                            fetchNextPoNumberForVendor(selectedVendor.id)
+                              .then(nextPoNo => {
+                                setPoData(prev => ({ ...prev, poNumber: `#${nextPoNo}` }));
+                                previousVendorId.current = selectedVendor.id; // Update tracked vendor ID
+                              })
+                              .catch(error => {
+                                console.error('Error fetching PO number:', error);
+                              });
                           }
-                        }}
-                        className="flex items-center font-semibold justify-center"
-                      >
-                        <img src={editIcon} alt="Edit" className="w-[15px] h-[15px]" />
-                      </button>
-                    )}
-                  </div>
+                        }
+                      }}
+                      className="flex items-center font-semibold justify-center"
+                    >
+                      <img src={editIcon} alt="Edit" className="w-[14px] h-[14px]" />
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
             {/* Input Fields - Show dropdowns BEFORE clicking + button (when !hasOpenedAdd) for edit/clone mode */}
             {/* For edit/clone mode: show dropdowns before clicking + */}
             {/* For regular flow: show dropdowns before clicking + (when selecting fields) */}
             {(!hasOpenedAdd && isEditMode) || ((!showAddItems && !hasOpenedAdd) && !isEditMode) || (items.length > 0 && hasOpenedAdd && (!poData.vendorName || !poData.projectName || !poData.projectIncharge)) ? (
-              <div className="flex-shrink-0 pt-4 space-y-[6px]">
+              <div className="flex-shrink-0 space-y-[6px]">
                 {/* Vendor Name Field */}
                 <div className=" relative">
                   <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                    Vendor Name<span className="text-[#eb2f8e]">*</span>
+                    Vendor Name<span className="text-[#E4572E]">*</span>
                   </p>
                   <div className="relative">
                     <div
@@ -2704,7 +3029,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                           setShowVendorModal(true);
                         }
                       }}
-                      className={`w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium flex items-center ${isEditFromHistory ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
+                      className={`w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium flex items-center ${isEditFromHistory ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
                         }`}
                       style={{
                         boxSizing: 'border-box',
@@ -2721,18 +3046,17 @@ const PurchaseOrder = ({ user, onLogout }) => {
                           e.stopPropagation();
                           setSelectedVendor(null);
                           setPoData({ ...poData, vendorName: '', poNumber: '' });
+                          setSelectedRfqIdentifier('');
                           previousVendorId.current = null; // Reset previous vendor ID tracking
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : !poData.vendorName && (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
                     )}
@@ -2741,11 +3065,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 {/* Project Name Field */}
                 <div className=" relative">
                   <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                    Project Name<span className="text-[#eb2f8e]">*</span>
+                    Project Name<span className="text-[#E4572E]">*</span>
                   </p>
                   <div className="relative">
                     <div onClick={() => setShowProjectModal(true)}
-                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
                         boxSizing: 'border-box',
                         color: poData.projectName ? '#000' : '#9E9E9E'
@@ -2761,14 +3085,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
                     )}
@@ -2777,11 +3099,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 {/* Project Incharge Field */}
                 <div className=" relative">
                   <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                    Project Incharge<span className="text-[#eb2f8e]">*</span>
+                    Project Incharge<span className="text-[#E4572E]">*</span>
                   </p>
                   <div className="relative">
                     <div onClick={() => setShowInchargeModal(true)}
-                      className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                       style={{
                         boxSizing: 'border-box',
                         color: poData.projectIncharge ? '#000' : '#9E9E9E'
@@ -2797,14 +3119,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
                     )}
@@ -2817,8 +3137,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
             {/* These two views are mutually exclusive - never show both at the same time */}
             {((hasOpenedAdd && isEditMode && (poData.vendorName || poData.projectName || poData.projectIncharge)) ||
               (hasOpenedAdd && !isEmptyState && (poData.vendorName || poData.projectName || poData.projectIncharge) && !isEditMode)) && (
-                <div className="flex-shrink-0 mx-2 mb-1 p-2 bg-white border border-[#aaaaaa] rounded-[8px]">
-                  <div className="flex flex-col gap-2 px-2">
+                <div className="flex-shrink-0 p-[8px] bg-white border border-[#aaaaaa] rounded-[8px]">
+                  <div className="flex flex-col gap-[8px] px-[8px]">
                     {poData.vendorName && (
                       <div className="flex items-start">
                         <p className="text-[12px] font-medium text-[#3f3f3f] leading-normal w-[111px]">Vendor Name</p>
@@ -2858,15 +3178,15 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 {/* Items Section - Show when items exist (from NetStock) or when all three fields are filled */}
                 {/* For edit/clone mode, always show items if they exist, regardless of hasOpenedAdd */}
                 {((items.length > 0 && (hasOpenedAdd || isEditMode)) || ((!isEmptyState || isEditMode) && poData.vendorName && poData.projectName && poData.projectIncharge)) && (
-                  <div className="flex flex-col flex-1 min-h-0 mb-4 mt-2">
+                  <div className="flex flex-col flex-1 min-h-0 mb-[8px] mt-[10px]">
                     {/* Items Header - Fixed */}
-                    <div className="flex-shrink-0 flex items-center gap-2 mb-2 border-b border-[#E0E0E0] pb-2">
+                    <div className="flex-shrink-0 flex items-center gap-[8px] mb-[8px] border-b border-[#E0E0E0] pb-[8px]">
                       <p className="text-[14px] font-medium text-black leading-normal">Items</p>
                       <input
                         type="text"
                         value={items.length}
                         readOnly
-                        className="w-[30px] h-[30px] border border-[rgba(0,0,0,0.16)] rounded-full px-2 text-[12px] font-medium text-black bg-gray-200 text-center"
+                        className="w-[20px] h-[20px] border border-[rgba(0,0,0,0.16)] rounded-full text-[10px] font-medium text-black bg-gray-200 text-center"
                       />
                       <div className="ml-auto cursor-pointer" onClick={() => setShowSearchItemsModal(true)}>
                         <img src={SearchBlack} alt='search' className=' w-[16px] h-[16px]' />
@@ -2874,7 +3194,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     </div>
                     {/* Items List - Scrollable */}
                     {items.length > 0 && (
-                      <div className="flex-1 overflow-y-auto scrollbar-hide">
+                      <div className="flex-1 overflow-y-auto no-scrollbar pb-[40px]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         <div className="space-y-2 ">
                           {items.map((item) => {
                             // Use item.id as-is (can be string or number) for consistent swipe state lookup
@@ -2991,7 +3311,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         {/* Floating WhatsApp Button - Show after PDF generation (only on create tab) */}
         {activeTab === 'create' && isPdfGenerated && (
           <button type="button" onClick={shareViaWhatsApp}
-            className="fixed bottom-[180px] right-[24px] lg:right-[calc(50%-164px)] w-[48px] h-[48px] rounded-full bg-[#25D366] flex items-center justify-center shadow-lg z-40 hover:bg-[#20BA5A] transition-colors"
+            className="fixed bottom-[180px] right-[20px] lg:right-[calc(50%-164px)] w-[48px] h-[48px] rounded-full bg-[#25D366] flex items-center justify-center shadow-lg z-40 hover:bg-[#20BA5A] transition-colors"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3066,12 +3386,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
             const selectedOption = vendorNameOptions.find(opt => opt.value === value);
             setSelectedVendor(selectedOption ? { id: selectedOption.id, name: value } : null);
             setPoData({ ...poData, vendorName: value });
+            setSelectedRfqIdentifier('');
             setShowVendorModal(false);
           }}
           selectedValue={poData.vendorName}
           options={vendorOptions}
           fieldName="Vendor"
-          onAddNew={handleAddNewVendor}
         />
         <SelectVendorModal
           isOpen={showProjectModal}
@@ -3132,6 +3452,19 @@ const PurchaseOrder = ({ user, onLogout }) => {
           selectedValue={poData.projectIncharge}
           options={inchargeOptions}
           fieldName="Project Incharge"
+        />
+        <SelectVendorModal
+          isOpen={showRfqModal}
+          onClose={() => setShowRfqModal(false)}
+          onSelect={async (value) => {
+            const rfqRow = rfqLabelToRfqRef.current.get(value);
+            setShowRfqModal(false);
+            if (!rfqRow) return;
+            await applyRfqToPo(rfqRow);
+          }}
+          selectedValue=""
+          options={rfqOptionLabels}
+          fieldName={isRfqLoading ? 'RFQ (Loading...)' : 'RFQ'}
         />
         <SearchItemsModal
           isOpen={showSearchItemsModal}

@@ -394,14 +394,14 @@ const LoanForm = () => {
 
   return (
     <div
-      className="px-4 flex flex-col flex-1 min-h-0 overflow-hidden"
+      className="px-[16px] flex flex-col flex-1 min-h-0 overflow-hidden"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Form section - no scroll */}
       <div className="flex-shrink-0">
       {/* Loan Number and Date */}
-      <div className="mb-2 items-center border-b border-gray-200 pb-1 mt-1.5 flex justify-between">
-        <div className="flex items-center gap-2 mt-0.5">
+      <div className="mb-2 items-center border-b border-gray-200 pb-[4px] mt-1.5 flex justify-between">
+        <div className="flex items-center gap-[8px] mt-0.5">
           <span className="text-[12px] font-semibold text-black leading-normal"># {entryNo}</span>
           <span className="text-[12px] font-semibold text-black leading-normal">{formatDate(dateValue)}</span>
         </div>
@@ -425,7 +425,7 @@ const LoanForm = () => {
           <div className="relative">
             <div
               onClick={() => setShowAssociateModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 boxSizing: 'border-box',
                 color: selectedOption ? '#000' : '#9E9E9E'
@@ -466,7 +466,7 @@ const LoanForm = () => {
           <div className="relative">
             <div
               onClick={() => setShowPurposeModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 boxSizing: 'border-box',
                 color: purpose ? '#000' : '#9E9E9E'
@@ -509,7 +509,7 @@ const LoanForm = () => {
                 value={formatWithCommas(amountGiven)}
                 onChange={handleAmountChange}
                 placeholder="Enter amount"
-                className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 text-[12px] font-medium bg-white focus:outline-none"
+                className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
                 style={{
                   boxSizing: 'border-box',
                   color: amountGiven ? '#000' : '#9E9E9E'
@@ -525,7 +525,7 @@ const LoanForm = () => {
             <div className="relative">
               <div
                 onClick={() => setShowPaymentModeModal(true)}
-                className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
                   color: paymentMode ? '#000' : '#9E9E9E'
@@ -563,7 +563,7 @@ const LoanForm = () => {
             Description
           </p>
           <textarea
-            className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-3 pt-1 items-center text-[12px] font-medium bg-white focus:outline-none"
+            className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] pt-[4px] items-center text-[12px] font-medium bg-white focus:outline-none"
             placeholder="Type Here"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -575,7 +575,7 @@ const LoanForm = () => {
         </div>
       </div>
       {/* Attach File - same pattern as AdvanceForm */}
-      <div className="flex flex-wrap items-center gap-x-2 mb-1 gap-y-1 w-full max-w-[328px]">
+      <div className="flex flex-wrap items-center gap-x-[8px] mb-1 gap-y-[4px] w-full max-w-[328px]">
         <input
           type="file"
           id="fileInput"
@@ -586,7 +586,7 @@ const LoanForm = () => {
         />
         <label
           htmlFor="fileInput"
-          className="cursor-pointer flex items-center gap-0.5 text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
+          className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
         >
           <img className='w-4 h-3' alt='#' src={Attach}></img>
           <span className="text-[12px] font-medium underline">Attach File</span>
@@ -614,7 +614,7 @@ const LoanForm = () => {
       {/* Select Type Modal */}
       {showTypeModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
           onClick={() => {
             setShowTypeModal(false);
             setTypeSearchQuery('');
@@ -626,7 +626,7 @@ const LoanForm = () => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex justify-between items-center px-6 pt-5">
+            <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select Type</p>
               <button
                 onClick={() => {
@@ -642,14 +642,14 @@ const LoanForm = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[16px] pb-[16px]">
               <div className="relative">
                 <input
                   type="text"
                   value={typeSearchQuery}
                   onChange={(e) => setTypeSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                   autoFocus
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -662,7 +662,7 @@ const LoanForm = () => {
             </div>
 
             {/* Options List */}
-            <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Loan', 'Refund', 'Transfer']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
@@ -677,11 +677,11 @@ const LoanForm = () => {
                           setShowTypeModal(false);
                           setTypeSearchQuery('');
                         }}
-                        className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                        className={`w-full h-[40px] px-[24px] flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                           }`}
                       >
                         {/* Left: Option Text */}
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
                           <p className="text-[14px] font-medium text-black text-left truncate">{type}</p>
                         </div>
 

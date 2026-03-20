@@ -41,32 +41,32 @@ const Summary = () => {
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto pb-20 px-4 flex items-center justify-center">
+      <div className="flex-1 overflow-y-auto pb-[80px] px-[16px] flex items-center justify-center">
         <div className="text-gray-500">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto pb-20 px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="max-w-[360px] mx-auto py-4">
+    <div className="flex-1 overflow-y-auto pb-[80px] px-[16px]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="max-w-[360px] mx-auto py-[16px]">
         <h2 className="text-lg font-semibold mb-4">Loan Summary</h2>
         
         {/* Summary Cards */}
         <div className="space-y-3 mb-6">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-[16px]">
             <p className="text-xs text-gray-500 mb-1">Total Loan Amount</p>
             <p className="text-xl font-semibold text-green-600">₹{summary.totalLoan.toLocaleString('en-IN')}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-[16px]">
             <p className="text-xs text-gray-500 mb-1">Total Refund Amount</p>
             <p className="text-xl font-semibold text-red-600">₹{summary.totalRefund.toLocaleString('en-IN')}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-[16px]">
             <p className="text-xs text-gray-500 mb-1">Total Transfer Amount</p>
             <p className="text-xl font-semibold text-blue-600">₹{summary.totalTransfer.toLocaleString('en-IN')}</p>
           </div>
-          <div className="bg-gradient-to-r from-[#BF9853] to-[#D4AF6A] rounded-lg p-4 text-white">
+          <div className="bg-gradient-to-r from-[#BF9853] to-[#D4AF6A] rounded-lg p-[16px] text-white">
             <p className="text-xs mb-1 opacity-90">Net Outstanding</p>
             <p className="text-2xl font-bold">₹{summary.netAmount.toLocaleString('en-IN')}</p>
           </div>
@@ -76,11 +76,11 @@ const Summary = () => {
         <div className="mt-6">
           <h3 className="text-md font-semibold mb-3">Recent Transactions</h3>
           {loanData.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">No transactions found</div>
+            <div className="text-center text-gray-500 py-[32px]">No transactions found</div>
           ) : (
             <div className="space-y-2">
               {loanData.slice(0, 10).map((entry, index) => (
-                <div key={entry.loanPortalId || entry.id || index} className="bg-white border border-gray-200 rounded-lg p-3">
+                <div key={entry.loanPortalId || entry.id || index} className="bg-white border border-gray-200 rounded-lg p-[12px]">
                   <div className="flex justify-between items-center">
                     <div className="flex-1">
                       <p className="text-sm font-semibold">{entry.type || 'Loan'}</p>

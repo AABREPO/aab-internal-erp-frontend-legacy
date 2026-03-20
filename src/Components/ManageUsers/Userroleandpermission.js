@@ -98,96 +98,100 @@ const Userroleandpermission = () => {
       level: "Level 2",
     },
     {
-      id: 19,
+      id: 18,
       name: "Tools Tracker",
       level: "Level 2",
     },
     {
-      id: 20,
+      id: 19,
       name: "Tile Calculator",
       level: "level 3",
     },
     {
-      id: 21,
+      id: 20,
       name: "Paint Calculator",
       level: "Level 2",
     },
     {
-      id: 22,
+      id: 21,
       name: "Bath Fixtures Matrix",
       level: "Level 1",
     },
     {
-      id: 23,
+      id: 22,
       name: "RCC Calculation",
       level: "Level 2",
     },
     {
-      id: 24,
+      id: 23,
       name: "Switch Matrix",
       level: "level 3",
     },
     {
-      id: 25,
+      id: 24,
       name: "Masonary Calculator",
       level: "Level 1",
     },
     {
-      id: 26,
+      id: 25,
       name: "Carpentry Calculator",
       level: "Level 2",
     },
     {
-      id: 27,
+      id: 26,
       name: "Onboarding",
       level: "Level 1",
     },
     {
-      id: 28,
+      id: 27,
       name: "Attendance",
       level: "Level 2",
     },
     {
-      id: 29,
+      id: 28,
       name: "Staff Advance",
       level: "level 3",
     },
     {
-      id: 30,
+      id: 29,
       name: "Manage User",
       level: "Level 1",
     },
     {
-      id: 31,
+      id: 30,
       name: "Loan Portal",
       level: "Level 1",
     },
     {
-      id: 32,
+      id: 31,
       name: "Bank Register",
       level: "Level 1",
     },
     {
-      id: 33,
+      id: 32,
       name: "Bank Reconciliation",
       level: "level 1",
     },
     {
-      id: 34,
+      id: 33,
       name: "Master Data",
       level: "Level 1",
     },
     {
-      id: 35,
+      id: 34,
       name: "Dashboard",
       level: "Level 1",
     },
     {
-      id: 36,
+      id: 35,
       name: "Directory",
       level: "Level 1",
+    },
+    {
+      id: 36,
+      name: "RFQ",
+      level: "Level 1",
     }
-
   ];
   const [availableModules, setAvailableModules] = useState(modules);
   const [selectedModuleToAdd, setSelectedModuleToAdd] = useState(""); // module selected in dropdown

@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Close from '../Images/close.png';
+import CloseIcon from '../Images/Close F.svg';
+import Search from '../Images/Search.png';
+import Star from '../Images/Star.svg';
 
-const SearchableDropdown = ({ 
-  value, 
-  onChange, 
-  options = [], 
+const SearchableDropdown = ({
+  value,
+  onChange,
+  options = [],
   placeholder = 'Select...',
   onAddNew,
   fieldName = 'Option',
   showAddNew = true,
   showAllOptions = false,
   maxHeight = '144px', // 4 items * 36px height = 144px
-  className = '' // Allow custom className for width/height
+  className = '', // Allow custom className for width/height
+  suggestedNewValue = '', // Pre-fill when opening "Add New"
+  addNewLabel = null // Override "Add New {fieldName}"
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,7 +39,7 @@ const SearchableDropdown = ({
 
   // Ensure options is always an array
   const safeOptions = Array.isArray(options) ? options : [];
-  
+
   // Filter options based on search query
   const filteredOptions = safeOptions.filter(option => {
     if (!option || typeof option !== 'string') {
@@ -43,16 +48,19 @@ const SearchableDropdown = ({
     }
     return option.toLowerCase().includes(searchQuery.toLowerCase());
   });
-  
+
   // Check if search query doesn't match any existing option (for creatable functionality)
   const searchQueryTrimmed = searchQuery.trim();
-  const canCreateNew = showAddNew && searchQueryTrimmed.length > 0 && !safeOptions.some(opt => 
-    opt && typeof opt === 'string' && opt.toLowerCase() === searchQueryTrimmed.toLowerCase()
-  );
-  
+  const canCreateNew =
+    showAddNew &&
+    searchQueryTrimmed.length > 0 &&
+    !safeOptions.some(
+      opt => opt && typeof opt === 'string' && opt.toLowerCase() === searchQueryTrimmed.toLowerCase()
+    );
+
   // Show all options or limit to 4 based on prop
   const visibleOptions = showAllOptions ? filteredOptions : filteredOptions.slice(0, 4);
-  
+
   // Debug: Log filtered options for Type
   useEffect(() => {
     if (fieldName === 'Type' && isOpen) {
@@ -64,21 +72,36 @@ const SearchableDropdown = ({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Check if click is outside the dropdown and not on any modal content
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-        setShowAddInput(false);
-        setNewOption('');
-        // Reset search query to current value when closing
-        setSearchQuery(value || '');
+        // Also check if click is not on the modal backdrop or modal content
+        const modalContent = document.querySelector('.searchable-dropdown-modal');
+        const modalContentDiv = document.querySelector('.searchable-dropdown-content');
+        if (
+          (modalContent && modalContent.contains(event.target)) ||
+          (modalContentDiv && modalContentDiv.contains(event.target))
+        ) {
+          return; // Don't close if clicking inside modal
+        }
+        // Only close if clicking on the backdrop (dark overlay)
+        const backdrop = event.target.closest('.searchable-dropdown-modal');
+        if (backdrop && event.target === backdrop) {
+          setIsOpen(false);
+          setShowAddInput(false);
+          setNewOption('');
+          // Reset search query to current value when closing
+          setSearchQuery(value || '');
+        }
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // Use click instead of mousedown to allow other events to process first
+      document.addEventListener('click', handleClickOutside, true);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside, true);
     };
   }, [isOpen, value]);
 
@@ -100,13 +123,13 @@ const SearchableDropdown = ({
           // Use visualViewport if available (better for mobile keyboard detection)
           const viewportHeight = window.visualViewport?.height || window.innerHeight;
           const windowHeight = window.innerHeight;
-          
+
           // Detect if keyboard is open (viewport height is significantly less than window height)
           const keyboardOpen = windowHeight - viewportHeight > 150;
-          
+
           const spaceBelow = viewportHeight - rect.bottom;
           const spaceAbove = rect.top;
-          
+
           // Use fixed positioning for better mobile keyboard support
           // Always position above input when keyboard is open or when there's not enough space below
           if (keyboardOpen || spaceBelow < 200) {
@@ -133,25 +156,25 @@ const SearchableDropdown = ({
           }
         }
       };
-      
+
       updatePosition();
       // Update on resize and scroll for mobile keyboard
       window.addEventListener('resize', updatePosition);
       window.addEventListener('scroll', updatePosition, true);
-      
+
       // Use visualViewport API for better mobile keyboard detection
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', updatePosition);
         window.visualViewport.addEventListener('scroll', updatePosition);
       }
-      
+
       // Also listen for focus events to detect keyboard
       const handleFocus = () => {
         setTimeout(updatePosition, 300); // Delay to allow keyboard to appear
       };
-      
+
       inputRef.current?.addEventListener('focus', handleFocus);
-      
+
       return () => {
         window.removeEventListener('resize', updatePosition);
         window.removeEventListener('scroll', updatePosition, true);
@@ -167,7 +190,7 @@ const SearchableDropdown = ({
       setDropdownStyle({});
     }
   }, [isOpen]);
-  
+
   // Update search query when value changes (for initial load) - only when dropdown is closed
   useEffect(() => {
     if (value && !isOpen) {
@@ -182,7 +205,7 @@ const SearchableDropdown = ({
     // Close dropdown after selection
     setIsOpen(false);
   };
-  
+
   const handleClear = (e) => {
     e.stopPropagation();
     onChange('');
@@ -193,7 +216,7 @@ const SearchableDropdown = ({
       inputRef.current?.focus();
     }, 0);
   };
-  
+
   const handleInputChange = (e) => {
     const newValue = e.target.value;
     setSearchQuery(newValue);
@@ -207,33 +230,18 @@ const SearchableDropdown = ({
       onChange('');
     }
   };
-  
+
   const handleInputFocus = () => {
     setIsOpen(true);
     // When focusing, clear search to show all options
     setSearchQuery('');
   };
-  
+
   const handleInputBlur = (e) => {
-    // Don't close if clicking on clear button or dropdown items
-    const relatedTarget = e.relatedTarget || document.activeElement;
-    if (relatedTarget && (
-      relatedTarget.closest('.dropdown-options') || 
-      relatedTarget.closest('.clear-button')
-    )) {
-      return;
-    }
-    
-    // Close dropdown on blur
-    setIsOpen(false);
-    // Reset search query to current value when closing
-    if (value) {
-      setSearchQuery(value);
-    } else {
-      setSearchQuery('');
-    }
+    // Don't close modal on blur - let user close it manually or by clicking outside
+    e.stopPropagation();
   };
-  
+
   // Display value: show search query when open, or value when closed
   const displayValue = isOpen ? searchQuery : (value || '');
 
@@ -296,8 +304,8 @@ const SearchableDropdown = ({
             setIsOpen(true);
             setSearchQuery(''); // Clear search to show all options including selected one
           }}
-          className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded pl-3 text-[12px] font-medium text-black bg-white focus:outline-none`}
-          style={{ 
+          className={`${className || 'w-full h-[32px]'} border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium text-black bg-white focus:outline-none`}
+          style={{
             boxSizing: 'border-box',
             paddingRight: value ? '40px' : '40px'
           }}
@@ -308,12 +316,10 @@ const SearchableDropdown = ({
           <button
             type="button"
             onClick={handleClear}
-            className="clear-button absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+            className="clear-button absolute top-1/2 transform -translate-y-1/2 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
             style={{ right: '12px' }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
           </button>
         )}
         {/* Dropdown Arrow - Hide when value is selected */}
@@ -322,21 +328,8 @@ const SearchableDropdown = ({
             className="absolute top-1/2 transform -translate-y-1/2 pointer-events-none"
             style={{ right: '12px' }}
           >
-            <svg 
-              width="12" 
-              height="12" 
-              viewBox="0 0 12 12" 
-              fill="none" 
-              xmlns="http://www.w3.org/2000/svg"
-              className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
-            >
-              <path 
-                d="M2.5 4.5L6 8L9.5 4.5" 
-                stroke="#666" 
-                strokeWidth="1.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-              />
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
         )}
@@ -344,56 +337,96 @@ const SearchableDropdown = ({
 
       {/* Dropdown Menu - Always show as popup modal */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-4 flex items-center justify-center p-4"
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px] searchable-dropdown-modal"
           onClick={(e) => {
+            // Only close if clicking directly on the backdrop, not on any child elements
             if (e.target === e.currentTarget) {
               setIsOpen(false);
               setSearchQuery(value || '');
             }
           }}
+          onMouseDown={(e) => {
+            // Prevent closing when mousedown happens on backdrop
+            if (e.target === e.currentTarget) {
+              e.stopPropagation();
+            }
+          }}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
-          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-6 pt-5">
+          <div
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg flex flex-col transform -translate-y-24 searchable-dropdown-content"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ height: '60vh', maxHeight: '60vh', minHeight: '60vh' }}
+          >
+            <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select {fieldName}</p>
-              <button onClick={() => {
-                setIsOpen(false);
-                setSearchQuery(value || '');
-              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  setSearchQuery(value || '');
+                }}
+                className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"
+              >
                 <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[6px] pb-[6px]">
               <div className="relative">
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setSearchQuery(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onKeyUp={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onFocus={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onBlur={(e) => {
+                    e.stopPropagation();
+                  }}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[30px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                   autoFocus
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+                  <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-[24px] px-[24px]">
               <div className="shadow-md rounded-lg overflow-hidden">
                 {/* Create New Option - Show when typing something that doesn't exist */}
                 {canCreateNew && (
                   <button
-                    onClick={() => {
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       handleCreateNewFromSearch();
                     }}
-                    className="w-full px-6 flex items-center gap-3 transition-colors hover:bg-[#F5F5F5]"
+                    className="w-full px-[24px] flex items-center gap-[12px] transition-colors hover:bg-[#FFF9EF]"
                     style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                   >
-                    <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                    <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-[#F5F5F5]">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
@@ -407,10 +440,18 @@ const SearchableDropdown = ({
                   <>
                     {!showAddInput ? (
                       <button
-                        onClick={() => {
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setNewOption(suggestedNewValue || '');
                           setShowAddInput(true);
                         }}
-                        className="w-full px-6 flex items-center gap-3 transition-colors hover:bg-[#F5F5F5]"
+                        className="w-full px-[10px] flex items-center gap-[4px] transition-colors bg-[#F6F6F6]"
                         style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                       >
                         <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
@@ -418,23 +459,62 @@ const SearchableDropdown = ({
                             <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
                         </div>
-                        <p className="text-[12px] font-medium text-black">Add New {fieldName}</p>
+                        <p className="text-[12px] font-medium text-black">{addNewLabel ?? `Add New ${fieldName}`}</p>
                       </button>
                     ) : (
-                      <div className="p-4 border-b border-[rgba(0,0,0,0.16)]">
+                      <div
+                        className="p-[16px] border-b border-[rgba(0,0,0,0.16)]"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
                         <input
                           type="text"
                           value={newOption}
-                          onChange={(e) => setNewOption(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddNew()}
-                          className="w-full h-[36px] border border-[rgba(0,0,0,0.16)] rounded-[6px] px-3 text-[12px] font-medium text-black bg-white mb-2"
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setNewOption(e.target.value);
+                          }}
+                          onKeyPress={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNew();
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onKeyUp={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="w-full h-[36px] border border-[rgba(0,0,0,0.16)] rounded-[6px] px-[8px] text-[12px] font-medium text-black bg-white mb-2"
                           placeholder={`Enter new ${fieldName.toLowerCase()}`}
                           autoFocus
-                          onClick={(e) => e.stopPropagation()}
                         />
-                        <div className="flex gap-2">
+                        <div className="flex gap-[8px]">
                           <button
-                            onClick={() => {
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               handleAddNew();
                             }}
                             className="flex-1 h-[32px] rounded-[6px] bg-black text-white text-[12px] font-medium"
@@ -442,7 +522,14 @@ const SearchableDropdown = ({
                             Add
                           </button>
                           <button
-                            onClick={() => {
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               setShowAddInput(false);
                               setNewOption('');
                             }}
@@ -460,7 +547,6 @@ const SearchableDropdown = ({
                 {filteredOptions.length > 0 ? (
                   <div className="space-y-0">
                     {filteredOptions.map((option, index) => {
-                      // Helper function to split option text at first hyphen (like From dropdown)
                       const splitOptionText = (text) => {
                         if (!text) return { firstLine: '', secondLine: '' };
                         const firstHyphenIndex = text.indexOf(' - ');
@@ -469,12 +555,12 @@ const SearchableDropdown = ({
                         }
                         return {
                           firstLine: text.substring(0, firstHyphenIndex),
-                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                          secondLine: text.substring(firstHyphenIndex + 3)
                         };
                       };
                       const { firstLine, secondLine } = splitOptionText(option);
                       const isSelected = value === option;
-                      
+
                       return (
                         <button
                           key={index}
@@ -488,18 +574,16 @@ const SearchableDropdown = ({
                             e.stopPropagation();
                             handleSelect(option);
                           }}
-                          className={`w-full px-6 flex items-center gap-3 transition-colors ${
-                            isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                          className={`w-full px-[10px] flex items-center gap-[8px] transition-colors ${
+                            isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#FFF9EF]'
                           }`}
-                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                          style={{ minHeight: '40px', maxHeight: '40px', height: '40px' }}
                         >
-                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                          <div className="flex items-center justify-center flex-shrink-0">
+                            <img src={Star} alt="Star" className="w-[20px] h-[19px]" />
                           </div>
                           <div className="flex flex-col flex-1 min-w-0 text-left">
-                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            <p className="text-[12px] font-semibold text-black truncate whitespace-nowrap text-left">{firstLine}</p>
                             {secondLine && (
                               <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
                             )}
@@ -509,7 +593,7 @@ const SearchableDropdown = ({
                     })}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-4">
+                  <div className="flex flex-col items-center justify-center py-[16px]">
                     <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
                       {searchQuery ? 'No options found' : 'No options available'}
                     </p>
@@ -523,30 +607,24 @@ const SearchableDropdown = ({
 
       {/* Confirmation Modal for Creating New Option */}
       {showConfirmModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-[10001] flex items-center justify-center"
           onClick={handleCancelCreate}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
-          <div 
-            className="bg-white w-full max-w-[360px] mx-4 rounded-[16px] p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white w-full max-w-[360px] mx-4 rounded-[16px] p-[24px] shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <p className="text-[16px] font-semibold text-black">Confirm Create?</p>
-              <button 
-                onClick={handleCancelCreate}
-                className="text-[#e4572e] text-[20px] font-semibold hover:opacity-80 transition-opacity"
-              >
+              <button onClick={handleCancelCreate} className="text-[#e4572e] text-[20px] font-semibold hover:opacity-80 transition-opacity">
                 ×
               </button>
             </div>
-            
+
             <p className="text-[14px] font-medium text-[#848484] mb-6">
               Do you want to create "{pendingNewValue}" as a new {fieldName.toLowerCase()}?
             </p>
-            
-            <div className="flex gap-4">
+
+            <div className="flex gap-[16px]">
               <button
                 onClick={handleCancelCreate}
                 className="flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white hover:bg-gray-50 transition-colors"

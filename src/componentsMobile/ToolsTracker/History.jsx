@@ -3,6 +3,9 @@ import EditIcon from '../Images/edit1.png';
 import DeleteIcon from '../Images/delete.png';
 import SelectOptionModal from '../PurchaseOrder/SelectOptionModal';
 import Filter from '../Images/Filter.png';
+import Close from '../Images/close.png';
+import Search from '../Images/Search.png';
+import CloseIcon from '../Images/Close F.svg'
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
@@ -41,6 +44,24 @@ const History = ({ user, onTabChange }) => {
   const [showFilterItemIdModal, setShowFilterItemIdModal] = useState(false);
   const [logEditEvents, setLogEditEvents] = useState([]); // array of { id, type, flattenedEntry, editedFields, oldValues, editedDate }
   const [logLoading, setLogLoading] = useState(false);
+  const [showFilterBottomSheet, setShowFilterBottomSheet] = useState(false);
+  const [filterItemName, setFilterItemName] = useState('');
+  const [filterFromLocation, setFilterFromLocation] = useState('');
+  const [filterToLocation, setFilterToLocation] = useState('');
+  const [filterMachineStatus, setFilterMachineStatus] = useState('');
+  const [filterProjectIncharge, setFilterProjectIncharge] = useState('');
+  const [filterMachineNumber, setFilterMachineNumber] = useState('');
+  const [showFilterItemNameDropdown, setShowFilterItemNameDropdown] = useState(false);
+  const [showFilterFromLocationDropdown, setShowFilterFromLocationDropdown] = useState(false);
+  const [showFilterToLocationDropdown, setShowFilterToLocationDropdown] = useState(false);
+  const [showFilterMachineStatusDropdown, setShowFilterMachineStatusDropdown] = useState(false);
+  const [showFilterProjectInchargeDropdown, setShowFilterProjectInchargeDropdown] = useState(false);
+  const [showFilterMachineNumberDropdown, setShowFilterMachineNumberDropdown] = useState(false);
+  const [filterItemNameSearchQuery, setFilterItemNameSearchQuery] = useState('');
+  const [filterFromLocationSearchQuery, setFilterFromLocationSearchQuery] = useState('');
+  const [filterToLocationSearchQuery, setFilterToLocationSearchQuery] = useState('');
+  const [filterProjectInchargeSearchQuery, setFilterProjectInchargeSearchQuery] = useState('');
+  const [filterMachineNumberSearchQuery, setFilterMachineNumberSearchQuery] = useState('');
   const expandedEntryIdRef = useRef(expandedEntryId);
   const cloneExpandedEntryIdRef = useRef(cloneExpandedEntryId);
   useEffect(() => {
@@ -270,9 +291,14 @@ const History = ({ user, onTabChange }) => {
           try {
             const d = oldDate ? new Date(oldDate) : null;
             if (d && !isNaN(d.getTime())) {
-              const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-              const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-              return `${dateStr} • ${timeStr}`;
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = d.getFullYear();
+              const h = d.getHours();
+              const m = d.getMinutes();
+              const h12 = h % 12 || 12;
+              const ampm = h < 12 ? 'AM' : 'PM';
+              return `${day}/${month}/${year} • ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
             }
             return oldDate || '-';
           } catch {
@@ -543,22 +569,60 @@ const History = ({ user, onTabChange }) => {
   }, [historyType, fullEntriesData, historyData, projectsMap, vendorsMap, employeesMap, itemNamesMap, itemIdsMap, machineNumbersMap]);
 
   const formatDateTime = (timestamp) => {
-    if (!timestamp) return { date: '', time: '' };
+    if (!timestamp) return { date: '', time: '', dateTime: '' };
     try {
-      const date = new Date(timestamp);
-      const formattedDate = date.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-      const formattedTime = date.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-      return { date: formattedDate, time: formattedTime };
+      const d = new Date(timestamp);
+      if (isNaN(d.getTime())) return { date: '', time: '', dateTime: '' };
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const formattedDate = `${day}/${month}/${year}`;
+      const h = d.getHours();
+      const m = d.getMinutes();
+      const h12 = h % 12 || 12;
+      const ampm = h < 12 ? 'AM' : 'PM';
+      const formattedTime = `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+      const dateTime = `${formattedDate} • ${formattedTime}`;
+      return { date: formattedDate, time: formattedTime, dateTime };
     } catch {
-      return { date: '', time: '' };
+      return { date: '', time: '', dateTime: '' };
+    }
+  };
+
+  const formatRelativeDateLabel = (input) => {
+    if (!input) return '';
+    try {
+      const asString = String(input).trim();
+      let d = new Date(asString);
+
+      // Handle common DD-MM-YYYY / DD/MM/YYYY formats (which `new Date()` often fails to parse)
+      if (isNaN(d.getTime())) {
+        const m = asString.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (m) {
+          const day = parseInt(m[1], 10);
+          const month = parseInt(m[2], 10) - 1;
+          const year = parseInt(m[3], 10);
+          d = new Date(year, month, day);
+        }
+      }
+
+      if (isNaN(d.getTime())) return asString;
+
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+      if (dateOnly.getTime() === today.getTime()) return 'Today';
+      if (dateOnly.getTime() === yesterday.getTime()) return 'Yesterday';
+
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return String(input);
     }
   };
   const resolveMachineNumberText = (entry) => {
@@ -709,7 +773,7 @@ const History = ({ user, onTabChange }) => {
       const entryId = entry.entryId || entry.id;
       if (entryId) {
         localStorage.setItem('editingToolsTrackerEntryId', String(entryId));
-          localStorage.removeItem('toolsTrackerCloneMode');
+        localStorage.removeItem('toolsTrackerCloneMode');
         if (onTabChange) {
           onTabChange('transfer');
         }
@@ -958,97 +1022,406 @@ const History = ({ user, onTabChange }) => {
       document.removeEventListener('mouseup', globalMouseUpHandler);
     };
   }, [historyData, historyType]);
-  
+
   // Get Item ID options for filter
   const filterItemIdOptions = Array.from(new Set(Object.values(itemIdsMap))).filter(Boolean).sort();
-  
+
+  // Get filter options from all entries
+  const getAllItemNames = () => {
+    const names = new Set();
+    historyData.forEach(entry => {
+      const name = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || '';
+      if (name) names.add(name);
+    });
+    return Array.from(names).sort();
+  };
+
+  const getAllFromLocations = () => {
+    const locations = new Set();
+    historyData.forEach(entry => {
+      const entryType = String(entry.toolsEntryType || '').toLowerCase();
+      let location = '';
+      if (entryType === 'service_return') {
+        location = vendorsMap[entry.serviceStoreId] || vendorsMap[String(entry.serviceStoreId)] || '';
+      } else {
+        location = projectsMap[entry.fromProjectId] || projectsMap[String(entry.fromProjectId)] || '';
+      }
+      if (location) locations.add(location);
+    });
+    return Array.from(locations).sort();
+  };
+
+  const getAllToLocations = () => {
+    const locations = new Set();
+    historyData.forEach(entry => {
+      const entryType = String(entry.toolsEntryType || '').toLowerCase();
+      let location = '';
+      if (entryType === 'entry') {
+        location = projectsMap[entry.toProjectId] || projectsMap[String(entry.toProjectId)] || '';
+        if (!location) location = vendorsMap[entry.serviceStoreId] || vendorsMap[String(entry.serviceStoreId)] || '';
+      } else if (entryType === 'relocate' || entryType === 'relocation') {
+        location = projectsMap[entry.homeLocationId] || projectsMap[String(entry.homeLocationId)] || '';
+        if (!location) location = projectsMap[entry.toProjectId] || projectsMap[String(entry.toProjectId)] || '';
+      } else if (entryType === 'service_return') {
+        location = projectsMap[entry.toProjectId] || projectsMap[String(entry.toProjectId)] || '';
+        if (!location) location = projectsMap[entry.fromProjectId] || projectsMap[String(entry.fromProjectId)] || '';
+      }
+      if (location) locations.add(location);
+    });
+    return Array.from(locations).sort();
+  };
+
+  const getAllMachineStatuses = () => ['Working', 'Not Working', 'Under Repair'];
+
+  const getAllProjectIncharges = () => {
+    const incharges = new Set();
+    historyData.forEach(entry => {
+      const incharge = employeesMap[entry.projectInchargeId] || employeesMap[String(entry.projectInchargeId)] || '';
+      if (incharge) incharges.add(incharge);
+    });
+    return Array.from(incharges).sort();
+  };
+
+  const getAllMachineNumbers = () => {
+    const numbers = new Set();
+    historyData.forEach(entry => {
+      const machineNum = resolveMachineNumberText(entry);
+      if (machineNum) numbers.add(machineNum);
+    });
+    return Array.from(numbers).sort();
+  };
+
+  // Filter functions
+  const normalizeSearchText = (text) => {
+    if (!text) return '';
+    return String(text).toLowerCase().trim();
+  };
+
+  const getFilteredItemNames = () => {
+    const options = getAllItemNames();
+    if (!filterItemNameSearchQuery.trim()) return options;
+    const query = normalizeSearchText(filterItemNameSearchQuery);
+    return options.filter(name => normalizeSearchText(name).includes(query));
+  };
+
+  const getFilteredFromLocations = () => {
+    const options = getAllFromLocations();
+    if (!filterFromLocationSearchQuery.trim()) return options;
+    const query = normalizeSearchText(filterFromLocationSearchQuery);
+    return options.filter(loc => normalizeSearchText(loc).includes(query));
+  };
+
+  const getFilteredToLocations = () => {
+    const options = getAllToLocations();
+    if (!filterToLocationSearchQuery.trim()) return options;
+    const query = normalizeSearchText(filterToLocationSearchQuery);
+    return options.filter(loc => normalizeSearchText(loc).includes(query));
+  };
+
+  const getFilteredProjectIncharges = () => {
+    const options = getAllProjectIncharges();
+    if (!filterProjectInchargeSearchQuery.trim()) return options;
+    const query = normalizeSearchText(filterProjectInchargeSearchQuery);
+    return options.filter(incharge => normalizeSearchText(incharge).includes(query));
+  };
+
+  const getFilteredMachineNumbers = () => {
+    const options = getAllMachineNumbers();
+    if (!filterMachineNumberSearchQuery.trim()) return options;
+    const query = normalizeSearchText(filterMachineNumberSearchQuery);
+    return options.filter(num => normalizeSearchText(num).includes(query));
+  };
+
   const filteredHistoryData = historyType === 'log'
-    ? (filterItemId
-        ? logEditEvents.filter(ev => {
-            const e = ev.flattenedEntry;
-            const entryItemId = e?.itemIdsId ? (itemIdsMap[e.itemIdsId] || itemIdsMap[String(e.itemIdsId)] || '') : '';
-            return entryItemId === filterItemId;
-          })
-        : logEditEvents)
+    ? logEditEvents.filter(ev => {
+      const e = ev.flattenedEntry;
+      // Filter by Item ID
+      if (filterItemId) {
+        const entryItemId = e?.itemIdsId ? (itemIdsMap[e.itemIdsId] || itemIdsMap[String(e.itemIdsId)] || '') : '';
+        if (entryItemId !== filterItemId) return false;
+      }
+      // Filter by Item Name
+      if (filterItemName) {
+        const entryItemName = itemNamesMap[e?.itemNameId] || itemNamesMap[String(e?.itemNameId)] || '';
+        if (entryItemName !== filterItemName) return false;
+      }
+      // Filter by From Location
+      if (filterFromLocation) {
+        const entryType = String(e?.toolsEntryType || '').toLowerCase();
+        let entryFromLocation = '';
+        if (entryType === 'service_return') {
+          entryFromLocation = vendorsMap[e?.serviceStoreId] || vendorsMap[String(e?.serviceStoreId)] || '';
+        } else {
+          entryFromLocation = projectsMap[e?.fromProjectId] || projectsMap[String(e?.fromProjectId)] || '';
+        }
+        if (entryFromLocation !== filterFromLocation) return false;
+      }
+      // Filter by To Location
+      if (filterToLocation) {
+        const entryType = String(e?.toolsEntryType || '').toLowerCase();
+        let entryToLocation = '';
+        if (entryType === 'entry') {
+          entryToLocation = projectsMap[e?.toProjectId] || projectsMap[String(e?.toProjectId)] || '';
+          if (!entryToLocation) entryToLocation = vendorsMap[e?.serviceStoreId] || vendorsMap[String(e?.serviceStoreId)] || '';
+        } else if (entryType === 'relocate' || entryType === 'relocation') {
+          entryToLocation = projectsMap[e?.homeLocationId] || projectsMap[String(e?.homeLocationId)] || '';
+          if (!entryToLocation) entryToLocation = projectsMap[e?.toProjectId] || projectsMap[String(e?.toProjectId)] || '';
+        } else if (entryType === 'service_return') {
+          entryToLocation = projectsMap[e?.toProjectId] || projectsMap[String(e?.toProjectId)] || '';
+          if (!entryToLocation) entryToLocation = projectsMap[e?.fromProjectId] || projectsMap[String(e?.fromProjectId)] || '';
+        }
+        if (entryToLocation !== filterToLocation) return false;
+      }
+      // Filter by Machine Status
+      if (filterMachineStatus) {
+        const entryMachineStatus = e?.machineStatus || 'Working';
+        if (entryMachineStatus !== filterMachineStatus) return false;
+      }
+      // Filter by Project Incharge
+      if (filterProjectIncharge) {
+        const entryIncharge = employeesMap[e?.projectInchargeId] || employeesMap[String(e?.projectInchargeId)] || '';
+        if (entryIncharge !== filterProjectIncharge) return false;
+      }
+      // Filter by Machine Number
+      if (filterMachineNumber) {
+        const entryMachineNumber = resolveMachineNumberText(e);
+        if (entryMachineNumber !== filterMachineNumber) return false;
+      }
+      return true;
+    })
     : historyData.filter(entry => {
-    const entryType = entry.toolsEntryType || 'Entry';
-    let typeMatch = false;
-    if (historyType === 'entry') {
-      typeMatch = entryType.toLowerCase() === 'entry';
-    } else if (historyType === 'service') {
-      typeMatch = entryType.toLowerCase() === 'service_return';
-    } else {
-      typeMatch = entryType.toLowerCase() === 'relocate';
-    }
+      const entryType = entry.toolsEntryType || 'Entry';
+      let typeMatch = false;
+      if (historyType === 'entry') {
+        typeMatch = entryType.toLowerCase() === 'entry';
+      } else if (historyType === 'service') {
+        typeMatch = entryType.toLowerCase() === 'service_return';
+      } else {
+        typeMatch = entryType.toLowerCase() === 'relocate';
+      }
+      if (!typeMatch) return false;
 
-    // Filter by Item ID if selected
-    if (filterItemId && typeMatch) {
-      const entryItemId = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
-      return entryItemId === filterItemId;
-    }
-
-    return typeMatch;
-  });
+      // Filter by Item ID
+      if (filterItemId) {
+        const entryItemId = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
+        if (entryItemId !== filterItemId) return false;
+      }
+      // Filter by Item Name
+      if (filterItemName) {
+        const entryItemName = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || '';
+        if (entryItemName !== filterItemName) return false;
+      }
+      // Filter by From Location
+      if (filterFromLocation) {
+        const entryTypeLower = String(entry.toolsEntryType || '').toLowerCase();
+        let entryFromLocation = '';
+        if (entryTypeLower === 'service_return') {
+          entryFromLocation = vendorsMap[entry.serviceStoreId] || vendorsMap[String(entry.serviceStoreId)] || '';
+        } else {
+          entryFromLocation = projectsMap[entry.fromProjectId] || projectsMap[String(entry.fromProjectId)] || '';
+        }
+        if (entryFromLocation !== filterFromLocation) return false;
+      }
+      // Filter by To Location
+      if (filterToLocation) {
+        const entryTypeLower = String(entry.toolsEntryType || '').toLowerCase();
+        let entryToLocation = '';
+        if (entryTypeLower === 'entry') {
+          entryToLocation = projectsMap[entry.toProjectId] || projectsMap[String(entry.toProjectId)] || '';
+          if (!entryToLocation) entryToLocation = vendorsMap[entry.serviceStoreId] || vendorsMap[String(entry.serviceStoreId)] || '';
+        } else if (entryTypeLower === 'relocate' || entryTypeLower === 'relocation') {
+          entryToLocation = projectsMap[entry.homeLocationId] || projectsMap[String(entry.homeLocationId)] || '';
+          if (!entryToLocation) entryToLocation = projectsMap[entry.toProjectId] || projectsMap[String(entry.toProjectId)] || '';
+        } else if (entryTypeLower === 'service_return') {
+          entryToLocation = projectsMap[entry.toProjectId] || projectsMap[String(entry.toProjectId)] || '';
+          if (!entryToLocation) entryToLocation = projectsMap[entry.fromProjectId] || projectsMap[String(entry.fromProjectId)] || '';
+        }
+        if (entryToLocation !== filterToLocation) return false;
+      }
+      // Filter by Machine Status
+      if (filterMachineStatus) {
+        const entryMachineStatus = entry.machineStatus || 'Working';
+        if (entryMachineStatus !== filterMachineStatus) return false;
+      }
+      // Filter by Project Incharge
+      if (filterProjectIncharge) {
+        const entryIncharge = employeesMap[entry.projectInchargeId] || employeesMap[String(entry.projectInchargeId)] || '';
+        if (entryIncharge !== filterProjectIncharge) return false;
+      }
+      // Filter by Machine Number
+      if (filterMachineNumber) {
+        const entryMachineNumber = resolveMachineNumberText(entry);
+        if (entryMachineNumber !== filterMachineNumber) return false;
+      }
+      return true;
+    });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden px-4 bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="flex items-center justify-between pt-1.5 pb-1.5 flex-shrink-0">
-        <p className="text-[12px] text-black font-semibold">Category</p>
-        <button
-          type="button"
-          onClick={() => setShowFilterItemIdModal(true)}
-          className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right"
-        >
-          {filterItemId ? filterItemId : 'Item ID'}
-        </button>
-      </div>
-      <div className="flex bg-[#F2F4F7] items-center h-9 rounded-md flex-shrink-0">
-        <button
-          onClick={() => setHistoryType('entry')}
-          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'entry'
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        <div className="flex items-center justify-between pb-[8px] border-b border-[#E0E0E0]">
+          <p className="text-[12px] text-black font-semibold">Category</p>
+          <div className="flex items-center gap-[4px] flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowFilterItemIdModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right"
+            >
+              {filterItemId ? filterItemId : 'Item ID'}
+            </button>
+            {filterItemId && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterItemId('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex w-full bg-[#F2F4F7] items-center h-[32px] rounded-md mt-[8px]">
+          <button
+            onClick={() => setHistoryType('entry')}
+            className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'entry'
               ? 'bg-white text-black shadow-sm'
               : 'text-[#9E9E9E]'
-            }`}
-          style={{ minWidth: 0 }}
-        >
-          Entry
-        </button>
-        <button
-          onClick={() => setHistoryType('service')}
-          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'service'
+              }`}
+            style={{ minWidth: 0 }}
+          >
+            Entry
+          </button>
+          <button
+            onClick={() => setHistoryType('service')}
+            className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'service'
               ? 'bg-white text-black shadow-sm'
               : 'text-[#9E9E9E]'
-            }`}
-          style={{ minWidth: 0 }}
-        >
-          Service
-        </button>
-        <button
-          onClick={() => setHistoryType('relocate')}
-          className={`flex-1 ml-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'relocate'
+              }`}
+            style={{ minWidth: 0 }}
+          >
+            Service
+          </button>
+          <button
+            onClick={() => setHistoryType('relocate')}
+            className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'relocate'
               ? 'bg-white text-black shadow-sm'
               : 'text-[#9E9E9E]'
-            }`}
-          style={{ minWidth: 0 }}
-        >
-          Relocate
-        </button>
-        <button
-          onClick={() => setHistoryType('log')}
-          className={`flex-1 mr-0.5 h-8 rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'log'
+              }`}
+            style={{ minWidth: 0 }}
+          >
+            Relocate
+          </button>
+          <button
+            onClick={() => setHistoryType('log')}
+            className={`flex-1 mr-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal transition-colors ${historyType === 'log'
               ? 'bg-white text-black shadow-sm'
               : 'text-[#9E9E9E]'
-            }`}
-          style={{ minWidth: 0 }}
-        >
-          Log
-        </button>
+              }`}
+            style={{ minWidth: 0 }}
+          >
+            Log
+          </button>
+        </div>
       </div>
       {/* Filter and Download Row */}
-      <div className="flex justify-between items-center gap-2 px-0 mt-3 mb-1 flex-shrink-0">
-        <div className="flex items-center gap-2 cursor-pointer flex-shrink-0">
-          <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
-          <span className="text-[12px] font-medium text-gray-500">Filter</span>
+      <div className="flex justify-between items-center gap-[4px] px-0 mt-[6px] flex-shrink-0">
+        <div className="flex items-center gap-[4px] min-w-0">
+          <button onClick={() => setShowFilterBottomSheet(true)} className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0">
+            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
+            {!(filterItemName || filterFromLocation || filterToLocation || filterMachineStatus || filterProjectIncharge || filterMachineNumber) && (
+              <span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
+            )}
+          </button>
+          {/* Active Filter Tags - Next to Filter button */}
+          <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {(filterItemName || filterFromLocation || filterToLocation || filterMachineStatus || filterProjectIncharge || filterMachineNumber) && (
+              <div className="flex items-center gap-[4px] flex-nowrap">
+                {filterItemName && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Item Name</span>
+                    <button
+                      onClick={() => setFilterItemName('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterFromLocation && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">From</span>
+                    <button
+                      onClick={() => setFilterFromLocation('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterToLocation && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">To</span>
+                    <button
+                      onClick={() => setFilterToLocation('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterMachineStatus && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Status</span>
+                    <button
+                      onClick={() => setFilterMachineStatus('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterProjectIncharge && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Incharge</span>
+                    <button
+                      onClick={() => setFilterProjectIncharge('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterMachineNumber && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Machine</span>
+                    <button
+                      onClick={() => setFilterMachineNumber('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pb-4">
@@ -1063,7 +1436,7 @@ const History = ({ user, onTabChange }) => {
             </p>
           </div>
         ) : (
-          <div className="mt-2">
+          <div className="mt-[6px]">
             {filteredHistoryData.map((rawEntry) => {
               const entry = historyType === 'log' ? rawEntry.flattenedEntry : rawEntry;
               const editedFields = historyType === 'log' ? (rawEntry.editedFields || new Set()) : new Set();
@@ -1071,7 +1444,7 @@ const History = ({ user, onTabChange }) => {
               const newVals = historyType === 'log' ? (rawEntry.newValues || {}) : {};
               const createdDateTime = historyType === 'log' ? rawEntry.editedDate : rawEntry.createdDateTime;
               const entryKey = historyType === 'log' ? rawEntry.id : entry.id;
-              const { date, time } = formatDateTime(createdDateTime);
+              const { date, time, dateTime } = formatDateTime(createdDateTime);
               const entryType = String(entry.toolsEntryType || '').toLowerCase();
               let fromLocation = getLocationName(entry.fromProjectId, false);
               let toLocation = '-';
@@ -1103,7 +1476,12 @@ const History = ({ user, onTabChange }) => {
               const canViewImages = Boolean(entry.itemTableId);
               let displayValue = itemIdName || (entry.quantity > 0 ? String(entry.quantity) : '');
               let machineNumberText = resolveMachineNumberText(entry);
-              let dateTimeDisplay = `${date} • ${time}`;
+              // Get entry date from original entry
+              const originalEntry = fullEntriesData.find(e => String(e.id) === String(entry.entryId));
+              const entryDate = originalEntry?.date || '';
+              const formattedDate = entryDate ? formatRelativeDateLabel(entryDate) : '';
+              const formattedCreatedDateTime = createdDateTime ? dateTime : '';
+              let dateTimeDisplay = dateTime || `${date} • ${time}`;
               if (historyType === 'log') {
                 // In Log tab, show NEW values (after edit) on the card
                 if (editedFields.has('fromLocation')) fromLocation = newVals.fromLocation ?? fromLocation;
@@ -1179,7 +1557,7 @@ const History = ({ user, onTabChange }) => {
                     </div>
                   )}
                   <div
-                    className="rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none bg-white"
+                    className="rounded-[8px] h-full px-3 py-[10px] cursor-pointer transition-all duration-300 ease-out select-none bg-white"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -1192,7 +1570,7 @@ const History = ({ user, onTabChange }) => {
                     onMouseDown={(e) => handleMouseDown(e, entryId)}
                     onClick={handleCardClick}
                   >
-                    <div className="flex items-start justify-between mb-0.5">
+                    <div className="flex items-start justify-between mb-[2px]">
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         <p
                           className={`text-[12px] font-semibold leading-snug truncate ${editedFields.has('itemName') ? 'text-[#2563eb] font-bold' : 'text-black'}`}
@@ -1201,7 +1579,7 @@ const History = ({ user, onTabChange }) => {
                           #{entry.eno}, {itemName}
                         </p>
                         {isLogCard && editedFields.size > 0 && (
-                          <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#2563eb] text-white">
+                          <span className="flex-shrink-0 px-1.5 rounded text-[10px] font-semibold text-[#2563eb]">
                             Edited
                           </span>
                         )}
@@ -1224,9 +1602,9 @@ const History = ({ user, onTabChange }) => {
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex items-start justify-between mb-0.5">
+                    <div className="flex items-start justify-between mb-[2px]">
                       <p
-                        className={`text-[11px] leading-snug truncate flex-1 min-w-0 ${editedFields.has('fromLocation') ? 'text-[#2563eb] font-semibold' : 'text-[#848484]'}`}
+                        className={`text-[11px] leading-snug font-semibold truncate flex-1 min-w-0 ${editedFields.has('fromLocation') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
                         title={editedFields.has('fromLocation') ? tooltip('fromLocation') : undefined}
                       >
                         From - {fromLocation}
@@ -1240,9 +1618,9 @@ const History = ({ user, onTabChange }) => {
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex items-start justify-between mb-0.5">
+                    <div className="flex items-start justify-between mb-[2px]">
                       <p
-                        className={`text-[11px] leading-snug truncate flex-1 min-w-0 ${editedFields.has('toLocation') ? 'text-[#2563eb] font-semibold' : 'text-[#BF9853]'}`}
+                        className={`text-[11px] leading-snug font-semibold truncate flex-1 min-w-0 ${editedFields.has('toLocation') ? 'text-[#2563eb] font-semibold' : 'text-[#BF9853]'}`}
                         title={editedFields.has('toLocation') ? tooltip('toLocation') : undefined}
                       >
                         To - {toLocation}
@@ -1250,16 +1628,16 @@ const History = ({ user, onTabChange }) => {
                       <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${entry.machineStatus === 'Working' ? 'bg-[#4CAF50]' :
-                              entry.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
-                                entry.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
-                                  'bg-[#9E9E9E]'
+                            entry.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                              entry.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
+                                'bg-[#9E9E9E]'
                             }`}
                         ></span>
                         <p
                           className={`text-[11px] font-medium leading-snug ${entry.machineStatus === 'Working' ? 'text-[#4CAF50]' :
-                              entry.machineStatus === 'Not Working' ? 'text-[#F44336]' :
-                                entry.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
-                                  'text-[#9E9E9E]'
+                            entry.machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                              entry.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
+                                'text-[#9E9E9E]'
                             }`}
                         >
                           {entry.machineStatus}
@@ -1267,11 +1645,9 @@ const History = ({ user, onTabChange }) => {
                       </div>
                     </div>
                     <div className="flex items-start justify-between">
-                      <p
-                        className={`text-[11px] leading-snug truncate flex-1 min-w-0 ${editedFields.has('date') ? 'text-[#2563eb] font-semibold' : 'text-[#848484]'}`}
-                        title={editedFields.has('date') ? tooltip('date') : undefined}
-                      >
-                        {dateTimeDisplay}
+                      <p className="flex items-center gap-[2px] text-[11px] leading-normal min-w-0 flex-1">
+                        <span className={`font-bold ${editedFields.has('date') ? 'text-[#2563eb]' : 'text-black'}`}>{formattedDate || date}</span>
+                        {formattedCreatedDateTime && <span className={`font-semibold ${editedFields.has('date') ? 'text-[#2563eb]' : 'text-[#9E9E9E]'}`}> • {formattedCreatedDateTime}</span>}
                       </p>
                       <p
                         className={`text-[12px] font-medium leading-snug flex-shrink-0 ml-2 ${editedFields.has('incharge') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
@@ -1369,16 +1745,16 @@ const History = ({ user, onTabChange }) => {
             <div className="flex items-center justify-center gap-2 mt-3">
               <span
                 className={`w-2 h-2 rounded-full ${imageViewerData.machineStatus === 'Working' ? 'bg-[#4CAF50]' :
-                    imageViewerData.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
-                      imageViewerData.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
-                        'bg-[#9E9E9E]'
+                  imageViewerData.machineStatus === 'Not Working' ? 'bg-[#F44336]' :
+                    imageViewerData.machineStatus === 'Under Repair' ? 'bg-[#FF9800]' :
+                      'bg-[#9E9E9E]'
                   }`}
               ></span>
               <p
                 className={`text-[12px] font-medium ${imageViewerData.machineStatus === 'Working' ? 'text-[#4CAF50]' :
-                    imageViewerData.machineStatus === 'Not Working' ? 'text-[#F44336]' :
-                      imageViewerData.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
-                        'text-[#9E9E9E]'
+                  imageViewerData.machineStatus === 'Not Working' ? 'text-[#F44336]' :
+                    imageViewerData.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
+                      'text-[#9E9E9E]'
                   }`}
               >
                 {imageViewerData.machineStatus}
@@ -1399,6 +1775,573 @@ const History = ({ user, onTabChange }) => {
         options={filterItemIdOptions}
         fieldName="Item ID"
       />
+      {/* Filter Bottom Sheet */}
+      {showFilterBottomSheet && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterBottomSheet(false)}>
+          <div className="bg-white w-full max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
+              <p className="text-[16px] font-bold text-black">Select Filters</p>
+              <button type="button" onClick={() => setShowFilterBottomSheet(false)} className="text-[#e06256] text-xl font-bold leading-none">
+                <img src={Close} alt="close" className="w-[11px] h-[11px]" />
+              </button>
+            </div>
+            {/* Content - scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-1">
+              {/* Item Name Filter */}
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  Item Name
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowFilterItemNameDropdown(!showFilterItemNameDropdown)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0"
+                    style={{
+                      color: filterItemName ? '#000' : '#9E9E9E',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className="truncate">{filterItemName || 'Select Item Name'}</span>
+                  </div>
+                  {filterItemName && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterItemName('');
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                  {!filterItemName && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {showFilterItemNameDropdown && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowFilterItemNameDropdown(false); setFilterItemNameSearchQuery(''); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center px-6 pt-[24px]">
+                        <p className="text-[16px] font-semibold text-black">Select Item Name</p>
+                        <button onClick={() => { setShowFilterItemNameDropdown(false); setFilterItemNameSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                          <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                        </button>
+                      </div>
+                      <div className="px-6 pt-[4px] pb-[6px]">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={filterItemNameSearchQuery}
+                            onChange={(e) => setFilterItemNameSearchQuery(e.target.value)}
+                            placeholder="Search"
+                            className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+                        <div className="shadow-md rounded-lg overflow-hidden">
+                          {getFilteredItemNames().length > 0 ? (
+                            <div className="space-y-0">
+                              {getFilteredItemNames().map((name, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setFilterItemName(name);
+                                    setShowFilterItemNameDropdown(false);
+                                    setFilterItemNameSearchQuery('');
+                                  }}
+                                  className={`w-full px-[16px] flex items-center gap-3 transition-colors ${filterItemName === name ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                                  style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                >
+                                  <p className="text-[12px] font-medium text-black text-left">{name}</p>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                                {filterItemNameSearchQuery ? 'No options found' : 'No options available'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* From Location Filter */}
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  From Location
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowFilterFromLocationDropdown(!showFilterFromLocationDropdown)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0"
+                    style={{
+                      color: filterFromLocation ? '#000' : '#9E9E9E',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className="truncate">{filterFromLocation || 'Select From Location'}</span>
+                  </div>
+                  {filterFromLocation && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterFromLocation('');
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                  {!filterFromLocation && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {showFilterFromLocationDropdown && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowFilterFromLocationDropdown(false); setFilterFromLocationSearchQuery(''); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center px-6 pt-[24px]">
+                        <p className="text-[16px] font-semibold text-black">Select From Location</p>
+                        <button onClick={() => { setShowFilterFromLocationDropdown(false); setFilterFromLocationSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                          <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                        </button>
+                      </div>
+                      <div className="px-6 pt-[4px] pb-[6px]">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={filterFromLocationSearchQuery}
+                            onChange={(e) => setFilterFromLocationSearchQuery(e.target.value)}
+                            placeholder="Search"
+                            className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+                        <div className="shadow-md rounded-lg overflow-hidden">
+                          {getFilteredFromLocations().length > 0 ? (
+                            <div className="space-y-0">
+                              {getFilteredFromLocations().map((location, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setFilterFromLocation(location);
+                                    setShowFilterFromLocationDropdown(false);
+                                    setFilterFromLocationSearchQuery('');
+                                  }}
+                                  className={`w-full px-[16px] flex items-center gap-3 transition-colors ${filterFromLocation === location ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                                  style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                >
+                                  <p className="text-[12px] font-medium text-black text-left">{location}</p>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                                {filterFromLocationSearchQuery ? 'No options found' : 'No options available'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* To Location Filter */}
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  To Location
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowFilterToLocationDropdown(!showFilterToLocationDropdown)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0"
+                    style={{
+                      color: filterToLocation ? '#000' : '#9E9E9E',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className="truncate">{filterToLocation || 'Select To Location'}</span>
+                  </div>
+                  {filterToLocation && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterToLocation('');
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                  {!filterToLocation && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {showFilterToLocationDropdown && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowFilterToLocationDropdown(false); setFilterToLocationSearchQuery(''); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center px-6 pt-[24px]">
+                        <p className="text-[16px] font-semibold text-black">Select To Location</p>
+                        <button onClick={() => { setShowFilterToLocationDropdown(false); setFilterToLocationSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                          <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                        </button>
+                      </div>
+                      <div className="px-6 pt-[4px] pb-[6px]">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={filterToLocationSearchQuery}
+                            onChange={(e) => setFilterToLocationSearchQuery(e.target.value)}
+                            placeholder="Search"
+                            className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+                        <div className="shadow-md rounded-lg overflow-hidden">
+                          {getFilteredToLocations().length > 0 ? (
+                            <div className="space-y-0">
+                              {getFilteredToLocations().map((location, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setFilterToLocation(location);
+                                    setShowFilterToLocationDropdown(false);
+                                    setFilterToLocationSearchQuery('');
+                                  }}
+                                  className={`w-full px-[16px] flex items-center gap-3 transition-colors ${filterToLocation === location ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                                  style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                >
+                                  <p className="text-[12px] font-medium text-black text-left">{location}</p>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                                {filterToLocationSearchQuery ? 'No options found' : 'No options available'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Machine Status and Project Incharge Filters */}
+              <div className="flex gap-[12px] mb-4">
+                {/* Machine Status Filter */}
+                <div className="flex-1">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                    Machine Status
+                  </p>
+                  <div className="relative">
+                    <div
+                      onClick={() => setShowFilterMachineStatusDropdown(!showFilterMachineStatusDropdown)}
+                      className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0"
+                      style={{
+                        color: filterMachineStatus ? '#000' : '#9E9E9E',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <span className="truncate">{filterMachineStatus || 'Select Status'}</span>
+                    </div>
+                    {filterMachineStatus && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterMachineStatus('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                    {!filterMachineStatus && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {showFilterMachineStatusDropdown && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowFilterMachineStatusDropdown(false); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center px-6 pt-[24px]">
+                          <p className="text-[16px] font-semibold text-black">Select Machine Status</p>
+                          <button onClick={() => setShowFilterMachineStatusDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                            <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                          </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+                          <div className="shadow-md rounded-lg overflow-hidden">
+                            {getAllMachineStatuses().length > 0 ? (
+                              <div className="space-y-0">
+                                {getAllMachineStatuses().map((status, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => {
+                                      setFilterMachineStatus(status);
+                                      setShowFilterMachineStatusDropdown(false);
+                                    }}
+                                    className={`w-full px-[16px] flex items-center gap-3 transition-colors ${filterMachineStatus === status ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                                    style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                  >
+                                    <p className="text-[12px] font-medium text-black text-left">{status}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-4">
+                                <p className="text-[14px] font-medium text-[#9E9E9E] text-center">No options available</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Project Incharge Filter */}
+                <div className="flex-1">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                    Project Incharge
+                  </p>
+                  <div className="relative">
+                    <div
+                      onClick={() => setShowFilterProjectInchargeDropdown(!showFilterProjectInchargeDropdown)}
+                      className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0"
+                      style={{
+                        color: filterProjectIncharge ? '#000' : '#9E9E9E',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <span className="truncate">{filterProjectIncharge || 'Select Incharge'}</span>
+                    </div>
+                    {filterProjectIncharge && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterProjectIncharge('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                    {!filterProjectIncharge && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {showFilterProjectInchargeDropdown && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowFilterProjectInchargeDropdown(false); setFilterProjectInchargeSearchQuery(''); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center px-6 pt-[24px]">
+                          <p className="text-[16px] font-semibold text-black">Select Project Incharge</p>
+                          <button onClick={() => { setShowFilterProjectInchargeDropdown(false); setFilterProjectInchargeSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                            <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                          </button>
+                        </div>
+                        <div className="px-6 pt-[4px] pb-[6px]">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={filterProjectInchargeSearchQuery}
+                              onChange={(e) => setFilterProjectInchargeSearchQuery(e.target.value)}
+                              placeholder="Search"
+                              className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                              autoFocus
+                            />
+                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                              <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+                          <div className="shadow-md rounded-lg overflow-hidden">
+                            {getFilteredProjectIncharges().length > 0 ? (
+                              <div className="space-y-0">
+                                {getFilteredProjectIncharges().map((incharge, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => {
+                                      setFilterProjectIncharge(incharge);
+                                      setShowFilterProjectInchargeDropdown(false);
+                                      setFilterProjectInchargeSearchQuery('');
+                                    }}
+                                    className={`w-full px-[16px] flex items-center gap-3 transition-colors ${filterProjectIncharge === incharge ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                                    style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                  >
+                                    <p className="text-[12px] font-medium text-black text-left">{incharge}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-4">
+                                <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                                  {filterProjectInchargeSearchQuery ? 'No options found' : 'No options available'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Machine Number Filter */}
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  Machine Number
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowFilterMachineNumberDropdown(!showFilterMachineNumberDropdown)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0"
+                    style={{
+                      color: filterMachineNumber ? '#000' : '#9E9E9E',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className="truncate">{filterMachineNumber || 'Select Machine Number'}</span>
+                  </div>
+                  {filterMachineNumber && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterMachineNumber('');
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                  {!filterMachineNumber && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {showFilterMachineNumberDropdown && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowFilterMachineNumberDropdown(false); setFilterMachineNumberSearchQuery(''); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center px-6 pt-[24px]">
+                        <p className="text-[16px] font-semibold text-black">Select Machine Number</p>
+                        <button onClick={() => { setShowFilterMachineNumberDropdown(false); setFilterMachineNumberSearchQuery(''); }} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                          <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                        </button>
+                      </div>
+                      <div className="px-6 pt-[4px] pb-[6px]">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={filterMachineNumberSearchQuery}
+                            onChange={(e) => setFilterMachineNumberSearchQuery(e.target.value)}
+                            placeholder="Search"
+                            className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+                        <div className="shadow-md rounded-lg overflow-hidden">
+                          {getFilteredMachineNumbers().length > 0 ? (
+                            <div className="space-y-0">
+                              {getFilteredMachineNumbers().map((number, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setFilterMachineNumber(number);
+                                    setShowFilterMachineNumberDropdown(false);
+                                    setFilterMachineNumberSearchQuery('');
+                                  }}
+                                  className={`w-full px-[16px] flex items-center gap-3 transition-colors ${filterMachineNumber === number ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                                  style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                                >
+                                  <p className="text-[12px] font-medium text-black text-left">{number}</p>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                                {filterMachineNumberSearchQuery ? 'No options found' : 'No options available'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Footer: Cancel + Add */}
+            <div className="flex-shrink-0 flex gap-[16px] px-6 pb-[20px] pt-[8px]">
+              <button type="button" onClick={() => setShowFilterBottomSheet(false)}
+                className="flex-1 h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
+              >
+                Cancel
+              </button>
+              <button type="button" onClick={() => setShowFilterBottomSheet(false)}
+                className="flex-1 h-[40px] border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white bg-black leading-normal"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

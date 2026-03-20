@@ -67,18 +67,18 @@ const LoginPage = ({
     return (
         <div className="relative flex items-center justify-center min-h-screen bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Black sidebars */}
-            <div className="hidden md:block fixed left-0 top-0 w-[calc((100%-800px)/2)] h-full bg-black"></div>
-            <div className="hidden md:block fixed right-0 top-0 w-[calc((100%-800px)/2)] h-full bg-black"></div>            
+            <div className="hidden md:block fixed left-0 top-[0px] w-[calc((100%-800px)/2)] h-full bg-black"></div>
+            <div className="hidden md:block fixed right-0 top-[0px] w-[calc((100%-800px)/2)] h-full bg-black"></div>            
             {/* Main content area */}
-            <div className="w-full max-w-[800px] mx-auto px-4">
-                <div className="bg-white rounded-[12px] p-8 shadow-lg border border-gray-200">
+            <div className="w-full max-w-[800px] mx-auto px-[16px]">
+                <div className="bg-white rounded-[12px] p-[32px] shadow-lg border border-gray-200">
                     {/* Title */}
                     <h2 className="text-2xl font-bold text-black text-center mb-6">
                         Login
                     </h2>
                 <form onSubmit={handleLogin} className="space-y-4">
                     {error && (
-                        <div className="p-4 mb-4 text-red-600 bg-red-50 rounded-[8px] border border-red-200 text-[14px] font-medium">
+                        <div className="p-[16px] mb-4 text-red-600 bg-red-50 rounded-[8px] border border-red-200 text-[14px] font-medium">
                             {error}
                         </div>
                     )}
@@ -91,7 +91,7 @@ const LoginPage = ({
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full h-[44px] px-4 border border-gray-300 rounded-[8px] text-[14px] font-medium text-black placeholder:text-gray-400 focus:outline-none focus:border-black bg-white"
+                            className="w-full h-[44px] px-[16px] border border-gray-300 rounded-[8px] text-[14px] font-medium text-black placeholder:text-gray-400 focus:outline-none focus:border-black bg-white"
                             required
                             placeholder='Enter Email Address'
                         />
@@ -105,7 +105,7 @@ const LoginPage = ({
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full h-[44px] px-4 pr-12 border border-gray-300 rounded-[8px] text-[14px] font-medium text-black placeholder:text-gray-400 focus:outline-none focus:border-black bg-white"
+                            className="w-full h-[44px] px-[16px] pr-[48px] border border-gray-300 rounded-[8px] text-[14px] font-medium text-black placeholder:text-gray-400 focus:outline-none focus:border-black bg-white"
                             required
                             placeholder='Enter Password'
                         />

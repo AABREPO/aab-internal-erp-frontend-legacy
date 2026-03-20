@@ -221,13 +221,13 @@ const DateRangePickerModal = ({ isOpen, onClose, onConfirm, initialStartDate, in
   }
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center"
       onClick={onClose}
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       <div 
-        className="bg-white w-[328px] rounded-[8px] p-4"
+        className="bg-white w-[328px] rounded-[8px] p-[16px]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -256,16 +256,16 @@ const DateRangePickerModal = ({ isOpen, onClose, onConfirm, initialStartDate, in
         </div>
 
         {/* Day Names */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
+        <div className="grid grid-cols-7 gap-[4px] mb-2">
           {dayNames.map((day, idx) => (
-            <div key={idx} className="text-center text-[11px] font-medium text-[#9E9E9E] py-1">
+            <div key={idx} className="text-center text-[11px] font-medium text-[#9E9E9E] py-[4px]">
               {day}
             </div>
           ))}
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-[4px]">
           {days.map((dateObj, idx) => {
             const { day, month, year, isCurrentMonth } = dateObj;
             const date = new Date(year, month, day);
@@ -324,7 +324,7 @@ const DateRangePickerModal = ({ isOpen, onClose, onConfirm, initialStartDate, in
 
         {/* Selected Range Display */}
         {(startDate || endDate) && (
-          <div className="mt-4 pt-4 border-t border-[#E0E0E0]">
+          <div className="mt-4 pt-[16px] border-t border-[#E0E0E0]">
             <div className="flex items-center justify-between text-[12px] text-[#777777] mb-2">
               <span>Start: {startDate ? formatDate(startDate) : 'Not selected'}</span>
               <span>End: {endDate ? formatDate(endDate) : 'Not selected'}</span>
@@ -333,14 +333,14 @@ const DateRangePickerModal = ({ isOpen, onClose, onConfirm, initialStartDate, in
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
+        <div className="flex items-center justify-between mt-4 pt-[16px] border-t border-[#E0E0E0]">
           <button
             onClick={onClose}
             className="text-[14px] font-medium text-[#9E9E9E] hover:text-black transition-colors"
           >
             Cancel
           </button>
-          <div className="flex gap-2">
+          <div className="flex gap-[8px]">
             {(startDate || endDate) && (
               <button
                 onClick={handleClear}

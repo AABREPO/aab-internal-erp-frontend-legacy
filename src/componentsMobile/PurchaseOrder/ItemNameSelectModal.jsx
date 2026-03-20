@@ -76,8 +76,8 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={handleBackdropClick}>
-      <div ref={scrollContainerRef} className="bg-white w-full max-w-[360px] rounded-[16px] p-6 max-h-[80vh] overflow-y-auto transform -translate-y-24" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]" onClick={handleBackdropClick}>
+      <div ref={scrollContainerRef} className="bg-white w-full max-w-[360px] rounded-[16px] p-[24px] max-h-[80vh] overflow-y-auto transform -translate-y-24" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
           <p className="text-[16px] font-medium text-black">Select Item Name</p>
           <button onClick={onClose} className="text-[#e4572e] text-[20px] font-semibold">
@@ -90,7 +90,7 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search"
-            className="w-full h-[32px] border border-[#E0E0E0] rounded-[8px] px-3 pr-10 text-[12px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-full h-[32px] border border-[#E0E0E0] rounded-[8px] px-[12px] pr-[40px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
           />
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -99,7 +99,7 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
             </svg>
           </div>
         </div>
-        <button onClick={handleAddNewClick} className="w-full h-[36px] px-3 flex items-center gap-2 hover:bg-[#f3f5f7] text-left border-b border-[rgba(0,0,0,0.08)] mb-2">
+        <button onClick={handleAddNewClick} className="w-full h-[36px] px-[12px] flex items-center gap-[8px] hover:bg-[#f3f5f7] text-left border-b border-[rgba(0,0,0,0.08)] mb-2">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
@@ -115,7 +115,7 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
                   key={index}
                   ref={isSelected ? selectedOptionRef : null}
                   onClick={() => handleSelect(option)}
-                  className={`w-full rounded-[6px] px-3 flex items-center gap-3 ${
+                  className={`w-full rounded-[6px] px-[12px] flex items-center gap-[12px] ${
                     isSelected
                       ? 'bg-[#FFF3E0]'
                       : 'bg-white'
@@ -155,12 +155,12 @@ const ItemNameSelectModal = ({ isOpen, onClose, onSelect, selectedValue, options
           </div>
         )}
         {filteredOptions.length === 0 && options.length > 0 && searchQuery && (
-          <p className="text-[12px] text-[#777777] text-center py-4">
+          <p className="text-[12px] text-[#777777] text-center py-[16px]">
             No item names found matching "{searchQuery}". Add a new one above.
           </p>
         )}
         {options.length === 0 && (
-          <p className="text-[12px] text-[#777777] text-center py-4">
+          <p className="text-[12px] text-[#777777] text-center py-[16px]">
             No item name options available. Add a new one above.
           </p>
         )}

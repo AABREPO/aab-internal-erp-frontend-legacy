@@ -370,16 +370,16 @@ const Report = () => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Week and Type Section */}
-      <div className="px-4">
+      <div className="px-[16px]">
         <div className="flex-shrink-0">
-          <div className="mb-2 items-center border-b border-gray-200 pb-1.5 mt-2 flex justify-between">
-            <div className="flex items-center gap-2 pt-0.5">
+          <div className="mb-2 items-center border-b border-gray-200 pb-[6px] mt-2 flex justify-between">
+            <div className="flex items-center gap-[8px] pt-[2px]">
               <span className="text-[12px] font-semibold text-black leading-normal">#Week</span>
             </div>
             <div>
               <button
                 onClick={() => setShowTypeModal(true)}
-                className="flex items-center gap-1 text-[12px] font-semibold text-black leading-normal cursor-pointer"
+                className="flex items-center gap-[4px] text-[12px] font-semibold text-black leading-normal cursor-pointer"
               >
                 <span>Type</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -392,8 +392,8 @@ const Report = () => {
       </div>
 
       {/* Date Range and Payment Mode Section */}
-      <div className="px-4 pt-2">
-        <div className="flex gap-2">
+      <div className="px-[16px] pt-[8px]">
+        <div className="flex gap-[8px]">
           {/* Date Range */}
           <div className="flex-1">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Date Range</p>
@@ -401,7 +401,7 @@ const Report = () => {
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{ boxSizing: 'border-box', color: (startDate || endDate) ? '#000' : '#9E9E9E' }}
               >
                 {startDate && endDate
@@ -425,7 +425,7 @@ const Report = () => {
             <div className="relative">
               <div
                 onClick={() => setShowPaymentModeModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{ boxSizing: 'border-box', color: paymentModeFilter ? '#000' : '#9E9E9E' }}
               >
                 {paymentModeFilter || 'Select'}
@@ -456,14 +456,14 @@ const Report = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="px-4 pt-2">
+      <div className="px-[16px] pt-[8px]">
         <div className="relative">
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-10 pr-4 border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-full h-[40px] pl-[40px] pr-[16px] border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -475,13 +475,13 @@ const Report = () => {
       </div>
 
       {/* Filter Section */}
-      <div className="flex-shrink-0 px-4 pt-2">
-        <div className="flex items-center justify-between gap-5">
-          <div className="flex items-center gap-2 min-w-0">
+      <div className="flex-shrink-0 px-[16px] pt-[8px]">
+        <div className="flex items-center justify-between gap-[20px]">
+          <div className="flex items-center gap-[8px] min-w-0">
             <button
               type="button"
               onClick={() => setShowFilterModal(true)}
-              className="flex items-center gap-2 px-0 flex-shrink-0"
+              className="flex items-center gap-[8px] px-[0px] flex-shrink-0"
             >
               <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
               {!hasActiveFilters && (
@@ -491,9 +491,9 @@ const Report = () => {
               )}
             </button>
             {/* Active Filter Tags */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {typeFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">{typeFilter}</span>
                   <button
                     onClick={() => setTypeFilter('')}
@@ -506,7 +506,7 @@ const Report = () => {
                 </div>
               )}
               {(startDate || endDate) && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Date</span>
                   <button
                     onClick={() => {
@@ -522,7 +522,7 @@ const Report = () => {
                 </div>
               )}
               {paymentModeFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Mode</span>
                   <button
                     onClick={() => setPaymentModeFilter('')}
@@ -535,7 +535,7 @@ const Report = () => {
                 </div>
               )}
               {associateFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Associate</span>
                   <button
                     onClick={() => setAssociateFilter('')}
@@ -548,7 +548,7 @@ const Report = () => {
                 </div>
               )}
               {purposeFilter && (
-                <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Purpose</span>
                   <button
                     onClick={() => setPurposeFilter('')}
@@ -583,7 +583,7 @@ const Report = () => {
 
       {/* Transaction List - Scrollable */}
       <div
-        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 mt-1"
+        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-[16px] mt-1"
         style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
       >
         {filtered.length === 0 ? (
@@ -607,15 +607,15 @@ const Report = () => {
                   className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
                   style={{ height: '95px' }}
                 >
-                  <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3">
-                    <div className="flex flex-col gap-0.5">
+                  <div className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px]">
+                    <div className="flex flex-col gap-[2px]">
                       {/* Row 1: ref and payment mode */}
                       <div className="flex items-center justify-between">
                         <span className="text-[12px] font-semibold text-black leading-snug">
                           {item.ref}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getPaymentModeBadgeClass(
+                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getPaymentModeBadgeClass(
                             paymentModeDisplay
                           )}`}
                         >
@@ -664,7 +664,7 @@ const Report = () => {
       {/* Type Modal */}
       {showTypeModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
           onClick={() => {
             setShowTypeModal(false);
             setTypeSearchQuery('');
@@ -675,7 +675,7 @@ const Report = () => {
             className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 pt-5">
+            <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select Type</p>
               <button
                 onClick={() => {
@@ -689,14 +689,14 @@ const Report = () => {
                 </svg>
               </button>
             </div>
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[16px] pb-[16px]">
               <div className="relative">
                 <input
                   type="text"
                   value={typeSearchQuery}
                   onChange={(e) => setTypeSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                   autoFocus
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -707,7 +707,7 @@ const Report = () => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Loan', 'Refund', 'Transfer']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
@@ -721,10 +721,10 @@ const Report = () => {
                           setShowTypeModal(false);
                           setTypeSearchQuery('');
                         }}
-                        className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                        className={`w-full h-[40px] px-[24px] flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                           }`}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
                           <p className="text-[14px] font-medium text-black text-left truncate">{type}</p>
                         </div>
                         <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
@@ -779,7 +779,7 @@ const Report = () => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white rounded-t-2xl w-full max-w-[360px] p-4 relative"
+            className="bg-white rounded-t-2xl w-full max-w-[360px] p-[16px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-2">
@@ -794,14 +794,14 @@ const Report = () => {
                 </svg>
               </button>
             </div>
-            <div className="grid grid-cols-[2fr_1fr] gap-4 mb-3">
+            <div className="grid grid-cols-[2fr_1fr] gap-[16px] mb-3">
               {/* Associate Filter */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Associate</p>
                 <div className="relative">
                   <div
                     onClick={() => setShowAssociateModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: associateFilter ? '#000' : '#9E9E9E' }}
                   >
                     {associateFilter || 'Select'}
@@ -834,7 +834,7 @@ const Report = () => {
                 <div className="relative">
                   <div
                     onClick={() => setShowPurposeModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: purposeFilter ? '#000' : '#9E9E9E' }}
                   >
                     {purposeFilter || 'Select'}
@@ -862,7 +862,7 @@ const Report = () => {
                 </div>
               </div>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-[16px]">
               <button
                 type="button"
                 onClick={() => {
@@ -870,14 +870,14 @@ const Report = () => {
                   setPurposeFilter('');
                   setShowFilterModal(false);
                 }}
-                className="px-6 w-full py-2 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
+                className="px-[24px] w-full py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => setShowFilterModal(false)}
-                className="px-6 py-2 w-full text-[14px] font-semibold text-white bg-black rounded-lg"
+                className="px-[24px] py-[8px] w-full text-[14px] font-semibold text-white bg-black rounded-lg"
               >
                 Save
               </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from './SelectVendorModal';
-import SearchableDropdown from './SearchableDropdown';
+import CloseIcon from '../Images/Close F.svg';
 
 const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType }) => {
   const [formData, setFormData] = useState({
@@ -13,6 +13,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
   });
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showItemNameModal, setShowItemNameModal] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
   const [quantityError, setQuantityError] = useState('');
 
   // State for PO item names from API
@@ -262,16 +266,26 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     if (!isTilesCategory) {
       if (poItemName && poItemName.length > 0) {
         const filteredItemNames = filterByCategory(poItemName, ['itemName', 'poItemName', 'name', 'item_name'], 'category');
-        // Merge with saved names from localStorage
-        const savedItemNames = localStorage.getItem('itemNameOptions');
-        const savedNames = savedItemNames ? JSON.parse(savedItemNames) : [];
-        const allItemNames = [...new Set([...filteredItemNames, ...savedNames])];
-        setItemNameOptions(allItemNames);
+        // IMPORTANT: when a category is selected, do NOT merge global localStorage options.
+        // localStorage is not category-scoped and can leak options from other categories (user-specific pollution).
+        if (currentCategory) {
+          setItemNameOptions([...new Set(filteredItemNames)]);
+        } else {
+          const savedItemNames = localStorage.getItem('itemNameOptions');
+          const savedNames = savedItemNames ? JSON.parse(savedItemNames) : [];
+          const allItemNames = [...new Set([...filteredItemNames, ...savedNames])];
+          setItemNameOptions(allItemNames);
+        }
       } else {
-        // If no API data, load from localStorage
-        const savedItemNames = localStorage.getItem('itemNameOptions');
-        if (savedItemNames) {
-          setItemNameOptions(JSON.parse(savedItemNames));
+        // If no API data, only fall back to localStorage when NO category is selected.
+        // With a category selected we prefer showing empty instead of incorrect cross-category options.
+        if (!currentCategory) {
+          const savedItemNames = localStorage.getItem('itemNameOptions');
+          if (savedItemNames) {
+            setItemNameOptions(JSON.parse(savedItemNames));
+          }
+        } else {
+          setItemNameOptions([]);
         }
       }
     }
@@ -279,28 +293,44 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     if (!isTilesCategory) {
       if (poModel && poModel.length > 0) {
         const filteredModels = filterByCategory(poModel, ['model', 'poModel', 'modelName', 'name'], 'category');
-        const savedModels = localStorage.getItem('modelOptions');
-        const savedModelNames = savedModels ? JSON.parse(savedModels) : [];
-        const allModels = [...new Set([...filteredModels, ...savedModelNames])];
-        setModelOptions(allModels);
+        if (currentCategory) {
+          setModelOptions([...new Set(filteredModels)]);
+        } else {
+          const savedModels = localStorage.getItem('modelOptions');
+          const savedModelNames = savedModels ? JSON.parse(savedModels) : [];
+          const allModels = [...new Set([...filteredModels, ...savedModelNames])];
+          setModelOptions(allModels);
+        }
       } else {
-        const savedModels = localStorage.getItem('modelOptions');
-        if (savedModels) {
-          setModelOptions(JSON.parse(savedModels));
+        if (!currentCategory) {
+          const savedModels = localStorage.getItem('modelOptions');
+          if (savedModels) {
+            setModelOptions(JSON.parse(savedModels));
+          }
+        } else {
+          setModelOptions([]);
         }
       }
     }
     // Filter brands
     if (poBrand && poBrand.length > 0) {
       const filteredBrands = filterByCategory(poBrand, ['brand', 'poBrand', 'brandName', 'name'], 'category');
-      const savedBrands = localStorage.getItem('brandOptions');
-      const savedBrandNames = savedBrands ? JSON.parse(savedBrands) : [];
-      const allBrands = [...new Set([...filteredBrands, ...savedBrandNames])];
-      setBrandOptions(allBrands);
+      if (currentCategory) {
+        setBrandOptions([...new Set(filteredBrands)]);
+      } else {
+        const savedBrands = localStorage.getItem('brandOptions');
+        const savedBrandNames = savedBrands ? JSON.parse(savedBrands) : [];
+        const allBrands = [...new Set([...filteredBrands, ...savedBrandNames])];
+        setBrandOptions(allBrands);
+      }
     } else {
-      const savedBrands = localStorage.getItem('brandOptions');
-      if (savedBrands) {
-        setBrandOptions(JSON.parse(savedBrands));
+      if (!currentCategory) {
+        const savedBrands = localStorage.getItem('brandOptions');
+        if (savedBrands) {
+          setBrandOptions(JSON.parse(savedBrands));
+        }
+      } else {
+        setBrandOptions([]);
       }
     }
     // Filter types
@@ -309,14 +339,22 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       const filteredTypes1 = filterByCategory(poType, ['typeColor'], 'category');
       const filteredTypes2 = filterByCategory(poType, ['type', 'poType', 'typeName', 'name'], 'category');
       const filteredTypesCombined = [...new Set([...filteredTypes1, ...filteredTypes2])];
-      const savedTypes = localStorage.getItem('typeOptions');
-      const savedTypeNames = savedTypes ? JSON.parse(savedTypes) : [];
-      const allTypes = [...new Set([...filteredTypesCombined, ...savedTypeNames])];
-      setTypeOptions(allTypes);
+      if (currentCategory) {
+        setTypeOptions([...new Set(filteredTypesCombined)]);
+      } else {
+        const savedTypes = localStorage.getItem('typeOptions');
+        const savedTypeNames = savedTypes ? JSON.parse(savedTypes) : [];
+        const allTypes = [...new Set([...filteredTypesCombined, ...savedTypeNames])];
+        setTypeOptions(allTypes);
+      }
     } else {
-      const savedTypes = localStorage.getItem('typeOptions');
-      if (savedTypes) {
-        setTypeOptions(JSON.parse(savedTypes));
+      if (!currentCategory) {
+        const savedTypes = localStorage.getItem('typeOptions');
+        if (savedTypes) {
+          setTypeOptions(JSON.parse(savedTypes));
+        }
+      } else {
+        setTypeOptions([]);
       }
     }
   }, [formData.category, selectedCategory, poItemName, poModel, poBrand, poType]);
@@ -703,13 +741,17 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     if (isEditingMode && itemNameChanged && !resolvedItemId && formData.itemName) {
       console.warn('Could not resolve itemId for changed item:', formData.itemName, 'Initial itemName:', initialData.itemName);
     }
-    // Only use initialData IDs if the corresponding field hasn't changed
-    const modelChanged = isEditingMode && initialData.model && formData.model &&
-      initialData.model.toLowerCase().trim() !== formData.model.toLowerCase().trim();
-    const brandChanged = isEditingMode && initialData.brand && formData.brand &&
-      initialData.brand.toLowerCase().trim() !== formData.brand.toLowerCase().trim();
-    const typeChanged = isEditingMode && initialData.type && formData.type &&
-      initialData.type.toLowerCase().trim() !== formData.type.toLowerCase().trim();
+    // Only use initialData IDs if the corresponding field hasn't changed.
+    // IMPORTANT: If user clears the text field, we must NOT keep the old ID (otherwise backend/PDF still shows old value).
+    const modelChanged = isEditingMode && (
+      (initialData.model || '').toString().toLowerCase().trim() !== (formData.model || '').toString().toLowerCase().trim()
+    );
+    const brandChanged = isEditingMode && (
+      (initialData.brand || '').toString().toLowerCase().trim() !== (formData.brand || '').toString().toLowerCase().trim()
+    );
+    const typeChanged = isEditingMode && (
+      (initialData.type || '').toString().toLowerCase().trim() !== (formData.type || '').toString().toLowerCase().trim()
+    );
     // Always try to resolve from current formData first
     let resolvedModelId = null;
     if (formData.model) {
@@ -720,21 +762,24 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         resolvedModelId = findIdByLabel(poModel, formData.model, ['model', 'poModel', 'modelName', 'name']);
       }
     }
-    if (!resolvedModelId && !modelChanged && initialData.modelId) {
+    // Only fall back to old ID when user still has a value in the field.
+    if (!resolvedModelId && !modelChanged && initialData.modelId && formData.model) {
       resolvedModelId = initialData.modelId;
     }
     let resolvedBrandId = null;
     if (formData.brand) {
       resolvedBrandId = findIdByLabel(poBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name']);
     }
-    if (!resolvedBrandId && !brandChanged && initialData.brandId) {
+    // Only fall back to old ID when user still has a value in the field.
+    if (!resolvedBrandId && !brandChanged && initialData.brandId && formData.brand) {
       resolvedBrandId = initialData.brandId;
     }
     let resolvedTypeId = null;
     if (formData.type) {
       resolvedTypeId = findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
     }
-    if (!resolvedTypeId && !typeChanged && initialData.typeId) {
+    // Only fall back to old ID when user still has a value in the field.
+    if (!resolvedTypeId && !typeChanged && initialData.typeId && formData.type) {
       resolvedTypeId = initialData.typeId;
     }
     // If any ID is missing, refresh the arrays and try again
@@ -901,103 +946,198 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
+        className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center"
+        style={{ fontFamily: "'Manrope', sans-serif", overflow: 'hidden', overscrollBehavior: 'contain' }}
         onClick={handleBackdropClick}
       >
-        <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white w-full h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
           {/* Header with Title and Category */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <div className="flex items-center justify-between px-[24px] pt-[20px] pb-[16px]">
             {/* Title on the left */}
-            <p className="text-[16px] font-medium text-black leading-normal">
+            <p className="text-[16px] font-bold text-black leading-normal">
               Add Items
             </p>
             {/* Category label on the right */}
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[16px] font-medium text-black decoration-solid"
+              className="text-[16px] font-semibold text-black decoration-solid"
               style={{ textUnderlinePosition: 'from-font' }}
             >
               {(formData.category || selectedCategory) || 'Category'}
             </button>
           </div>
           {/* Form fields - All fields are enabled and can be used independently of category selection */}
-          <div className="px-6">
+          <div className="px-[24px]">
             {/* Item Name - Can be selected without category */}
             <div className="space-y-[6px]">
-              <div className=" relative">
+              <div className="relative">
                 <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                  Item Name<span className="text-[#eb2f8e]">*</span>
+                  Item Name<span className="text-[#E4572E]">*</span>
                 </p>
-                <SearchableDropdown
-                  value={formData.itemName}
-                  onChange={(value) => handleFieldSelect('itemName', value)}
-                  onAddNew={(value) => handleFieldAddNew('itemName', value)}
-                  options={itemNameOptions}
-                  placeholder="Select ..."
-                  fieldName="Item Name"
-                  showAllOptions={true}
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowItemNameModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                    style={{
+                      paddingRight: formData.itemName ? '32px' : '12px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className={formData.itemName ? 'text-black' : 'text-[#9E9E9E]'}>
+                      {formData.itemName || 'Select ...'}
+                    </span>
+                    {!formData.itemName && (
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+                  {formData.itemName && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFieldSelect('itemName', '');
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                      style={{ right: '8px' }}
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
               </div>
               {/* Model - Can be selected without category */}
               <div className="relative">
                 <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                  Model<span className="text-[#eb2f8e]">*</span>
+                  Model<span className="text-[#E4572E]">*</span>
                 </p>
-                <SearchableDropdown
-                  value={formData.model}
-                  onChange={(value) => handleFieldSelect('model', value)}
-                  onAddNew={(value) => handleFieldAddNew('model', value)}
-                  options={modelOptions}
-                  placeholder="Select ..."
-                  fieldName="Model"
-                  showAllOptions={true}
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowModelModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                    style={{
+                      paddingRight: formData.model ? '32px' : '12px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className={formData.model ? 'text-black' : 'text-[#9E9E9E]'}>
+                      {formData.model || 'Select ...'}
+                    </span>
+                    {!formData.model && (
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+                  {formData.model && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFieldSelect('model', '');
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                      style={{ right: '8px' }}
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
               </div>
               {/* Brand - Can be selected without category */}
               <div className="w-full relative">
                 <p className="text-[13px] font-medium text-black mb-1 leading-normal">
-                  Type<span className="text-[#eb2f8e]">*</span>
+                  Type<span className="text-[#E4572E]">*</span>
                 </p>
-                <SearchableDropdown
-                  value={formData.type}
-                  onChange={(value) => handleFieldSelect('type', value)}
-                  onAddNew={(value) => handleFieldAddNew('type', value)}
-                  options={typeOptions}
-                  placeholder="Select ..."
-                  className="w-full h-[32px]"
-                  fieldName="Type"
-                  showAllOptions={true}
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowTypeModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                    style={{
+                      paddingRight: formData.type ? '32px' : '12px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span className={formData.type ? 'text-black' : 'text-[#9E9E9E]'}>
+                      {formData.type || 'Select ...'}
+                    </span>
+                    {!formData.type && (
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+                  {formData.type && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFieldSelect('type', '');
+                      }}
+                      className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                      style={{ right: '8px' }}
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
               </div>
               {/* Type and Quantity row */}
-              <div className="flex gap-3">
+              <div className="flex gap-[12px]">
                 {/* Type - Can be selected without category */}
                 <div className="w-full relative">
                   <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                    Brand<span className="text-[#eb2f8e]">*</span>
+                    Brand<span className="text-[#E4572E]">*</span>
                   </p>
-                  <SearchableDropdown
-                    value={formData.brand}
-                    onChange={(value) => handleFieldSelect('brand', value)}
-                    onAddNew={(value) => handleFieldAddNew('brand', value)}
-                    options={brandOptions}
-                    placeholder="Select ..."
-                    fieldName="Brand"
-                    showAllOptions={true}
-                  />
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowBrandModal(true)}
+                      className="w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                      style={{
+                        paddingRight: formData.brand ? '32px' : '12px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <span className={formData.brand ? 'text-black' : 'text-[#9E9E9E]'}>
+                        {formData.brand || 'Select ...'}
+                      </span>
+                      {!formData.brand && (
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </button>
+                    {formData.brand && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFieldSelect('brand', '');
+                        }}
+                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                        style={{ right: '8px' }}
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {/* Quantity */}
                 <div className="w-[100px] relative">
                   <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                    Quantity<span className="text-[#eb2f8e]">*</span>
+                    Quantity<span className="text-[#E4572E]">*</span>
                   </p>
                   <div className="relative">
                     <input
                       type="text"
                       value={formData.quantity}
                       onChange={handleQuantityChange}
-                      className={`w-[100px] h-[32px] border rounded px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
+                      className={`w-[100px] h-[32px] border rounded px-[12px] text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
                         }`}
                       placeholder="Enter"
                     />
@@ -1011,16 +1151,16 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
               </div>
             </div>
             {/* Buttons */}
-            <div className="mt-5 mb-3 flex gap-4">
+            <div className="mt-5 mb-3 flex gap-[16px]">
               <button
                 onClick={onClose}
-                className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
+                className="w-full h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAdd}
-                className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
+                className="w-full h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
               >
                 Add
               </button>
@@ -1039,6 +1179,54 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         options={categoryOptionsStrings}
         fieldName="Category"
         onAddNew={handleAddNewCategory}
+      />
+      <SelectVendorModal
+        isOpen={showItemNameModal}
+        onClose={() => setShowItemNameModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('itemName', value);
+          setShowItemNameModal(false);
+        }}
+        selectedValue={formData.itemName}
+        options={itemNameOptions}
+        fieldName="Item Name"
+        onAddNew={(value) => handleFieldAddNew('itemName', value)}
+      />
+      <SelectVendorModal
+        isOpen={showModelModal}
+        onClose={() => setShowModelModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('model', value);
+          setShowModelModal(false);
+        }}
+        selectedValue={formData.model}
+        options={modelOptions}
+        fieldName="Model"
+        onAddNew={(value) => handleFieldAddNew('model', value)}
+      />
+      <SelectVendorModal
+        isOpen={showTypeModal}
+        onClose={() => setShowTypeModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('type', value);
+          setShowTypeModal(false);
+        }}
+        selectedValue={formData.type}
+        options={typeOptions}
+        fieldName="Type"
+        onAddNew={(value) => handleFieldAddNew('type', value)}
+      />
+      <SelectVendorModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('brand', value);
+          setShowBrandModal(false);
+        }}
+        selectedValue={formData.brand}
+        options={brandOptions}
+        fieldName="Brand"
+        onAddNew={(value) => handleFieldAddNew('brand', value)}
       />
     </>
   );

@@ -321,7 +321,6 @@ const RccCalculator = () => {
             }))
         );
     };
-
     const handleCommonInputChanges = (e) => {
         const { name, value } = e.target;
         const updatedValues = {
@@ -509,23 +508,53 @@ const RccCalculator = () => {
         const numericValue = parseFloat(lengthString.replace("'").trim());
         return isNaN(numericValue) ? 0 : numericValue;
     };
+    // Unit weight of steel bars (kg per foot) - from standard table
+    const STEEL_WEIGHT_KG_PER_FEET = {
+        "6MM": 0.067,
+        "8MM": 0.120,
+        "10MM": 0.188,
+        "12MM": 0.270,
+        "16MM": 0.480,
+        "20MM": 0.751,
+        "25MM": 1.174,
+        "32MM": 1.925,
+    };
+    const getSteelWeightGramsPerFoot = (type) => (STEEL_WEIGHT_KG_PER_FEET[type] || 0);
     const calculateWeightInGrams = (lengthInFeet, type) => {
-        switch (type) {
-            case "8MM":
-                return lengthInFeet * 150;
-            case "10MM":
-                return lengthInFeet * 200;
-            case "12MM":
-                return lengthInFeet * 250;
-            case "16MM":
-                return lengthInFeet * 500;
-            case "25MM":
-                return lengthInFeet * 750;
-            case "32MM":
-                return lengthInFeet * 1000;
-            default:
-                return 0;
-        }
+        const kgPerFoot = STEEL_WEIGHT_KG_PER_FEET[type] || 0;
+        const gramsPerFoot = getSteelWeightGramsPerFoot(type);
+        const weightInGrams = lengthInFeet * gramsPerFoot;
+        const weightKg = weightInGrams / 1000;
+        console.log("[Weight Calc] lengthInFeet:", lengthInFeet, "| type:", type, "| kg/ft:", kgPerFoot, "| g/ft:", gramsPerFoot, "| weightGrams:", weightInGrams.toFixed(2), "| weightKg:", weightKg.toFixed(2));
+        return weightInGrams;
+    };
+
+    const calculateSteelRowWeightKg = (tile) => {
+        const lengthFt = convertToInches(tile?.length || "");
+        const qty8 = parseFloat(calculateSum2() || 0) || 0;
+        const qty10 = parseFloat(calculateSum3() || 0) || 0;
+        const qty12 = parseFloat(calculateSum() || 0) || 0;
+        const qty16 = parseFloat(calculateSum1() || 0) || 0;
+        const qty20 = parseFloat(calculateSum4() || 0) || 0;
+        const qty25 = parseFloat(calculateSum5() || 0) || 0;
+        const qty32 = parseFloat(calculateSum6() || 0) || 0;
+
+        const kg8 = lengthFt * qty8 * (STEEL_WEIGHT_KG_PER_FEET["8MM"] || 0);
+        const kg10 = lengthFt * qty10 * (STEEL_WEIGHT_KG_PER_FEET["10MM"] || 0);
+        const kg12 = lengthFt * qty12 * (STEEL_WEIGHT_KG_PER_FEET["12MM"] || 0);
+        const kg16 = lengthFt * qty16 * (STEEL_WEIGHT_KG_PER_FEET["16MM"] || 0);
+        const kg20 = lengthFt * qty20 * (STEEL_WEIGHT_KG_PER_FEET["20MM"] || 0);
+        const kg25 = lengthFt * qty25 * (STEEL_WEIGHT_KG_PER_FEET["25MM"] || 0);
+        const kg32 = lengthFt * qty32 * (STEEL_WEIGHT_KG_PER_FEET["32MM"] || 0);
+        const kg = kg8 + kg10 + kg12 + kg16 + kg20 + kg25 + kg32;
+
+        console.log(
+            "[Steel Row Weight] L(ft):", lengthFt,
+            "| qty 8/10/12/16/20/25/32:", qty8, qty10, qty12, qty16, qty20, qty25, qty32,
+            "| kg 8/10/12/16/20/25/32:", kg8.toFixed(3), kg10.toFixed(3), kg12.toFixed(3), kg16.toFixed(3), kg20.toFixed(3), kg25.toFixed(3), kg32.toFixed(3),
+            "| totalKg:", kg.toFixed(3)
+        );
+        return kg;
     };
     const convertToInches = (value) => {
         if (!value || value.trim() === "0" || !/['"]/.test(value)) {
@@ -1249,7 +1278,6 @@ const RccCalculator = () => {
             const floor = updatedFloors[floorIndex];
             const tile = floor?.tiles?.[tileIndex];
             if (!tile || !tile.size) return prevFloors;
-
             // Only custom behavior for Footing / Column
             if (floor.areaName === "FOOTING - SLOPED" || floor.areaName === "FOOTING" || floor.areaName === "FOOTING - BOX"|| floor.areaName === "FOOTING MAT" || floor.areaName === "FOOTING SIDE" || floor.areaName === "COLUMN") {
                 const parts = tile.size.split(/x/i).map((val) => val.trim());
@@ -1258,7 +1286,6 @@ const RccCalculator = () => {
                 tile.breadth = breadth || "";
                 return updatedFloors;
             }
-
             // Fallback to existing popup for other area types
             openLengthPopupScreen(floorIndex, tileIndex);
             return updatedFloors;
@@ -1279,7 +1306,6 @@ const RccCalculator = () => {
             [`${floorIndex}-${tileIndex}`]: updatedData,
         }));
     };
-
     const closeDeductionPopup = (floorIndex, tileIndex) => {
         setDeductionPopupState((prevState) => ({
             ...prevState,
@@ -1609,7 +1635,6 @@ const RccCalculator = () => {
                     }),
                 };
             });
-            console.log("Updated Floorss:", updatedFloors);
             return updatedFloors;
         });
     };
@@ -1929,10 +1954,20 @@ const RccCalculator = () => {
         }
     };
     const togglePopup = (type) => {
-        console.log("Toggle Popup:", type);
         setPopupType((prevType) => (prevType === type ? null : type));
     };
     const [popupType, setPopupType] = useState("");
+    const [steelPopupLB, setSteelPopupLB] = useState({ lengthLabel: "", breadthLabel: "" });
+    const [steelFrameInputs, setSteelFrameInputs] = useState({
+        topOuter: '24"',
+        bottomOuter: '24"',
+        leftOuter: '36"',
+        rightOuter: '36"',
+        topGap: '9"',
+        bottomGap: '9"',
+        leftGap: '9"',
+        rightGap: '9"',
+    });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isModalOpens, setIsModalOpens] = useState(false);
     const [isModalOpensConcrete, setIsModalOpensConcrete] = useState(false);
@@ -2089,7 +2124,8 @@ const RccCalculator = () => {
                     if (lbh.length || lbh.breadth || lbh.height) {
                         if (lbh.length) tile.length = lbh.length;
                         if (lbh.breadth) tile.breadth = lbh.breadth;
-                        if (lbh.height) { tile.height = lbh.height; tile.heightFromSize = true; }
+                        tile.height = lbh.height || "";
+                        tile.heightFromSize = !!lbh.height;
                     }
                 }
                 const L = convertToInches(tile.length);
@@ -2116,17 +2152,10 @@ const RccCalculator = () => {
                 } else {
                     tile.amount = "0.00";
                 }
-                const typeToWeightFactor = {
-                    "8MM": 150,
-                    "10MM": 200,
-                    "12MM": 250,
-                    "16MM": 500,
-                    "25MM": 750,
-                    "32MM": 1000,
-                };
-                const weightFactor = typeToWeightFactor[tile.type] || 0;
+                const weightFactor = getSteelWeightGramsPerFoot(tile.type);
                 const weightInGrams = L * weightFactor;
                 tile.weight = formatWeightInKg(weightInGrams);
+                console.log("[Tile Weight] length(ft):", L, "| type:", tile.type, "| g/ft:", weightFactor, "| weightGrams:", weightInGrams.toFixed(2), "| result:", tile.weight);
                 return { ...tile, areaName: selectedAreaName };
             });
             return updatedFloors;
@@ -2139,14 +2168,6 @@ const RccCalculator = () => {
             const selectedAreaName = updatedFloors[floorIndex].areaName;
             const selectedFloorName = updatedFloors[floorIndex].floorName;
             const matchingBeam = beamData.find((beam) => beam.beamName === selectedAreaName);
-            const typeToWeightFactor = {
-                "8MM": 150,
-                "10MM": 200,
-                "12MM": 250,
-                "16MM": 500,
-                "25MM": 750,
-                "32MM": 1000,
-            };
             if (field === "mix") {
                 tile.mix = value;
                 updatedFloors[floorIndex].tiles.forEach((t) => {
@@ -2235,11 +2256,21 @@ const RccCalculator = () => {
                 tile.totalArea = "";
                 tile.amount = "";
 
-                if (selectedAreaName === "FOOTING - BOX" || selectedAreaName === "FOOTING" || selectedAreaName === "FOOTING - SLOPED" || selectedAreaName === "FOOTING MAT" || selectedAreaName === "FOOTING SIDE" || selectedAreaName === "COLUMN") {
+                // When Type changes (especially after inserting a new row), ensure L/B/H are filled from Size
+                // using the beam a/b/c mapping for the selected Area.
+                const lbhFromSize = matchingBeam ? mapSizePartsToLbh(parts, matchingBeam) : null;
+                if (lbhFromSize) {
+                    tile.length = lbhFromSize.length || "";
+                    tile.breadth = lbhFromSize.breadth || "";
+                    tile.height = lbhFromSize.height || "";
+                    tile.heightFromSize = !!lbhFromSize.height;
+                } else if (
+                    selectedAreaName === "FOOTING - BOX" || selectedAreaName === "FOOTING" || selectedAreaName === "FOOTING - SLOPED" ||
+                    selectedAreaName === "FOOTING MAT" || selectedAreaName === "FOOTING SIDE" || selectedAreaName === "COLUMN"
+                ) {
                     const [length = "", breadth = "", height = ""] = parts;
                     tile.length = existingRow?.length || length || "";
                     tile.breadth = existingRow?.breadth || breadth || "";
-                    // Only copy height from existing row if it came from size (auto). Manually entered height should not propagate.
                     if (existingRow?.heightFromSize && existingRow?.height) {
                         tile.height = existingRow.height;
                         tile.heightFromSize = true;
@@ -2332,35 +2363,48 @@ const RccCalculator = () => {
                     : ["", "", ""];
 
                 // Use beamData to map size parts to L, B, H
-                const lbh = matchingBeam ? mapSizePartsToLbh(parts, matchingBeam) : null;
+                const mappedLbh = matchingBeam ? mapSizePartsToLbh(parts, matchingBeam) : null;
+                // Ensure size always drives L/B/H on size-change. Prefer beam mapping.
+                // Only fill missing values from raw parts when the beam actually uses that dimension (a, b, c).
+                const resolvedLbh = mappedLbh ? { ...mappedLbh } : null;
+                if (resolvedLbh && matchingBeam) {
+                    const a = (matchingBeam.a || "").trim();
+                    const b = (matchingBeam.b || "").trim();
+                    const c = (matchingBeam.c || "").trim();
+                    if (parts.length >= 3) {
+                        if (!resolvedLbh.length && a) resolvedLbh.length = parts[0] || "";
+                        if (!resolvedLbh.breadth && b) resolvedLbh.breadth = parts[1] || "";
+                        if (!resolvedLbh.height && c) resolvedLbh.height = parts[2] || "";
+                    } else {
+                        // 2-part size: only fill L and B from parts[0], parts[1]; never fill H from parts[1]
+                        if (!resolvedLbh.length && a) resolvedLbh.length = parts[0] || "";
+                        if (!resolvedLbh.breadth && b) resolvedLbh.breadth = parts[1] || (parts.length >= 1 ? parts[0] : "");
+                        // Height only when we have a 3rd part
+                    }
+                }
 
                 updatedFloors[floorIndex].tiles.forEach((t) => {
                     if (t.type === currentType &&
                         updatedFloors[floorIndex].areaName === selectedAreaName &&
                         updatedFloors[floorIndex].floorName === selectedFloorName) {
                         t.size = value;
-                        if (lbh) {
-                            t.length = lbh.length || t.length || "";
-                            t.breadth = lbh.breadth || t.breadth || "";
-                            if (t.heightFromSize !== false && (!t.height || (prevHt && t.height === prevHt))) {
-                                t.height = lbh.height || t.height || "";
-                                t.heightFromSize = !!lbh.height;
-                            }
+                        if (resolvedLbh) {
+                            // When user changes Size, always refresh dimensions for that Type
+                            t.length = resolvedLbh.length || "";
+                            t.breadth = resolvedLbh.breadth || "";
+                            t.height = resolvedLbh.height || "";
+                            t.heightFromSize = !!resolvedLbh.height;
                         } else {
                             // Fallback when no beamData: 3-part = L,B,H, 2-part = B,H
                             if (parts.length >= 3) {
                                 t.length = parts[0] || "";
                                 t.breadth = parts[1] || "";
-                                if (t.heightFromSize !== false) {
-                                    t.height = parts[2] || "";
-                                    t.heightFromSize = !!parts[2];
-                                }
+                                t.height = parts[2] || "";
+                                t.heightFromSize = !!parts[2];
                             } else {
                                 t.breadth = parts[0] || "";
-                                if (t.heightFromSize !== false) {
-                                    t.height = parts[1] || "";
-                                    t.heightFromSize = !!parts[1];
-                                }
+                                t.height = parts[1] || "";
+                                t.heightFromSize = !!parts[1];
                             }
                         }
                     }
@@ -2437,7 +2481,6 @@ const RccCalculator = () => {
                         }
                     }
                 });
-
                 // remember latest size pattern for this type
                 setTypeSizes((prev) => ({
                     ...prev,
@@ -2470,9 +2513,10 @@ const RccCalculator = () => {
             const totalArea = parseFloat(tile.area) - deduction;
             tile.totalArea = Math.max(totalArea, 0).toFixed(2);
             tile.amount = tile.rate ? (parseFloat(tile.rate) * tile.totalArea).toFixed(2) : "0.00";
-            const weightFactor = typeToWeightFactor[tile.type] || 0;
+            const weightFactor = getSteelWeightGramsPerFoot(tile.type);
             const weightInGrams = L * weightFactor;
             tile.weight = formatWeightInKg(weightInGrams);
+            console.log("[Tile Weight] length(ft):", L, "| type:", tile.type, "| g/ft:", weightFactor, "| weightGrams:", weightInGrams.toFixed(2), "| result:", tile.weight);
             updatedFloors[floorIndex].totalAmount = updatedFloors[floorIndex].tiles
                 .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
                 .toFixed(2);
@@ -2857,6 +2901,7 @@ const RccCalculator = () => {
             );
             const beamNames = beamDataWithImage.map((item) => item.beamName);
             setBeamData(beamDataWithImage);
+            console.log(beamDataWithImage);
             setBeamNames(beamNames);
         } catch (error) {
             console.error("Error fetching paint data:", error);
@@ -2879,7 +2924,6 @@ const RccCalculator = () => {
                 label: calculation.fileName,
             }));
             setRccFullData(data);
-            console.log(data);
             setFileOptions(formattedOptions);
         } catch (error) {
             console.error('Error fetching calculations:', error);
@@ -3094,8 +3138,6 @@ const RccCalculator = () => {
     };
     const handleSubmit = async () => {
         const payload = await preparePayload();
-        console.log('=== SENDING DATA (payload) ===', JSON.stringify(payload, null, 2));
-        console.log('=== First tile sample (breadthData/heightData) ===', payload?.rccFormWorkFloorDetails?.[0]?.rccFormWorks?.[0]);
         try {
             const response = await fetch('https://backendaab.in/aabuilderDash/api/rcc_formWork/save/form_work', {
                 method: 'POST',
@@ -3105,8 +3147,6 @@ const RccCalculator = () => {
                 body: JSON.stringify(payload),
             });
             const result = await response.json();
-            console.log('=== RESPONSE DATA ===', result);
-            console.log('=== RESPONSE STATUS ===', response.status);
             if (response.ok) {
                 alert("Rcc calculation saved successfully!");
             } else {
@@ -3416,8 +3456,8 @@ const RccCalculator = () => {
             columnStyles: {
                 0: { halign: "center", cellWidth: 12 },
                 1: { halign: "left", cellWidth: 50 },
-                2: { halign: "left", cellWidth: 29 },
-                3: { halign: "center", cellWidth: 20 },
+                2: { halign: "left", cellWidth: 25 },
+                3: { halign: "left", cellWidth: 24 },
                 4: { halign: "center", cellWidth: 19 },
                 5: { halign: "center", cellWidth: 19 },
                 6: { halign: "center", cellWidth: 19 },
@@ -3648,23 +3688,54 @@ const RccCalculator = () => {
         const selectedDate = formatDateForName(date);
         const clientId = rccClientSNo || 0;
         const revisionCount = await getRevisionNumber(RccClientName.label);
-        const revisionNumber = `R${revisionCount}`;
-        const header = (pdf) => {
-            pdf.setFontSize(16);
-            pdf.setFont("helvetica", "bold");
-            pdf.text("RCC CONCRETE BILL", 14, 15);
-            pdf.setFontSize(10);
-            pdf.text(`CLIENT: ${(RccClientName.label || "").toUpperCase()}`, 14, 33);
-            pdf.text("CONCRETE", doc.internal.pageSize.width - 32, 41);
-            pdf.text(`FMS BC ${clientId} - ${selectedDate} - ${revisionNumber}`, doc.internal.pageSize.width - 80, 27);
+        const revisionNumber = `R${revisionCount}`;        
+        const header = (doc) => {
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("RCC CONCRETE SHEET", 14, 15);
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            const clientLabel = "CLIENT: ";
+            doc.text(clientLabel, 14, 33);
+            const labelWidth = doc.getTextWidth(clientLabel);
+            doc.setFontSize(8);
+            doc.text("CONCRETE", doc.internal.pageSize.width - 32, 41);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            const siteNameText = (RccClientName.label || "").toUpperCase();
+            doc.text(siteNameText, 14 + labelWidth, 33);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("BILL COPY", doc.internal.pageSize.width - 34, 15);
+            doc.setFontSize(10);
+            const tmsDate = `FMS BC ${clientId} - ${selectedDate} - ${revisionNumber}`;
+            doc.setFont("helvetica", "normal");
+            const textWidth = doc.getTextWidth(tmsDate);
+            const rightMargin = 14;
+            const pageWidth = doc.internal.pageSize.width;
+            const startX = pageWidth - rightMargin - textWidth;
+            doc.text(tmsDate, startX, 27);
+            doc.setDrawColor('#BF9853');
+            doc.setLineWidth(1);
+            doc.line(14, 20, doc.internal.pageSize.width - 14, 20);
         };
-        const footer = (pdf) => {
-            const pw = pdf.internal.pageSize.width;
-            const ph = pdf.internal.pageSize.height;
-            pdf.setFontSize(9);
-            pdf.text("AA BUILDERS", 14, ph - 12);
-            const pn = pdf.internal.getCurrentPageInfo().pageNumber;
-            pdf.text(`${pn} | Page`, pw - 30, ph - 12);
+        const footer = () => {
+            const pageWidth = doc.internal.pageSize.width;
+            const footerY = doc.internal.pageSize.height - 17;
+            doc.setDrawColor(150);
+            doc.setLineWidth(0.5);
+            doc.line(14, footerY, pageWidth - 14, footerY);
+            doc.setFontSize(10.5);
+            doc.setFont("helvetica", "bold");
+            doc.text("AA BUILDERS", 14, doc.internal.pageSize.height - 12.5);
+            doc.setFontSize(9);
+            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+            const currentPageText = `${currentPage} |`;
+            const pageText = " P a g e";
+            doc.setTextColor(0, 0, 0);
+            doc.text(currentPageText, pageWidth - 19 - doc.getTextWidth(pageText), doc.internal.pageSize.height - 12.5);
+            doc.setTextColor(200, 200, 200);
+            doc.text(pageText, pageWidth - 25, doc.internal.pageSize.height - 12.5);
         };
         const filteredConcrete = useAllData
             ? filteredFloors
@@ -3754,37 +3825,64 @@ const RccCalculator = () => {
             body: tableBody.length ? tableBody : [["No data"]],
             theme: "grid",
             startY: y,
-            headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontSize: 9, halign: "center" },
-            bodyStyles: { fontSize: 8, textColor: [0, 0, 0], halign: "left" },
+            headStyles: {
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
+                fontSize: 10,
+                halign: "center",
+                lineWidth: 0,
+            },
+            bodyStyles: {
+                fontSize: 9,
+                textColor: [0, 0, 0],
+                halign: "left",
+                font: "helvetica",
+            },
             columnStyles: {
-                0: { halign: "center", cellWidth: 10 },
-                1: { halign: "left", cellWidth: 38 },
-                2: { halign: "left", cellWidth: 22 },
-                3: { halign: "left", cellWidth: 20 },
-                4: { halign: "center", cellWidth: 24 },
+                0: { halign: "center", cellWidth: 11 },
+                1: { halign: "left", cellWidth: 39.5 },
+                2: { halign: "left", cellWidth: 20 },
+                3: { halign: "left", cellWidth: 21 },
+                4: { halign: "left", cellWidth: 23 },
                 5: { halign: "center", cellWidth: 14 },
                 6: { halign: "center", cellWidth: 14 },
                 7: { halign: "center", cellWidth: 14 },
                 8: { halign: "center", cellWidth: 10 },
-                9: { halign: "right", cellWidth: 18 },
-                10: { halign: "right", cellWidth: 18 },
-                11: { halign: "right", cellWidth: 18 },
-                12: { halign: "right", cellWidth: 22 },
-                13: { halign: "center", cellWidth: 18 },
-                14: { halign: "right", cellWidth: 20 },
+                9: { halign: "right", cellWidth: 17 },
+                10: { halign: "right", cellWidth: 17 },
+                11: { halign: "right", cellWidth: 17 },
+                12: { halign: "right", cellWidth: 16 },
+                13: { halign: "center", cellWidth: 16 },
+                14: { halign: "right", cellWidth: 19.5 },
             },
-            margin: { left: 14, right: 14 },
-            pageBreak: "auto",
+            margin: { left: 14, right: 14, top: 44 },
+            pageBreak: 'auto',
             didDrawPage: (data) => {
                 if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
-                    data.settings.startY = 20;
-                    const tableStartY = 20;
+                    data.settings.startY = -30;
+                    const tableStartY = 44;
                     doc.setDrawColor(0, 0, 0);
                     doc.setLineWidth(0.6);
                     doc.line(14, tableStartY, doc.internal.pageSize.width - 14, tableStartY);
                 }
                 header(doc);
                 footer(doc);
+            },
+            didDrawCell: (data) => {
+                if (data.section === "head") {
+                    const { doc, cell } = data;
+                    const startX = cell.x;
+                    const startY = cell.y + cell.height;
+                    const endX = cell.x + cell.width;
+                    doc.setDrawColor(0, 0, 0);
+                    doc.setLineWidth(0.6);
+                    doc.line(startX, startY, endX, startY);
+                }
+                if (data.section === 'body' && data.column.index === 0 && data.cell.text[0] === "No Data") {
+                    doc.setFontSize(9);
+                    doc.setTextColor(0);
+                    doc.text("No Data", data.cell.x + 10, data.cell.y + 5);
+                }
             },
         });
         doc.save(`Concrete BC ${clientId} - ${selectedDate} - ${revisionNumber}.pdf`);
@@ -4582,17 +4680,17 @@ const RccCalculator = () => {
                                                                 </tr>
                                                                 {floor.tiles.map((tile, tileIndex) => (
                                                                     <tr key={tileIndex}>
-                                                                        <td>{floor.areaName}</td>
-                                                                        <td>{tile.type}</td>
-                                                                        <td>{tile.size}</td>
-                                                                        <td>{tile.length}</td>
-                                                                        <td>{tile.breadth}</td>
-                                                                        <td>{tile.height}</td>
-                                                                        <td>{tile.area}</td>
-                                                                        <td>{tile.deductionArea}</td>
-                                                                        <td>{tile.totalArea}</td>
-                                                                        <td>{tile.rate}</td>
-                                                                        <td>{tile.amount}</td>
+                                                                        <td className="text-left">{floor.areaName}</td>
+                                                                        <td className="text-left">{tile.type}</td>
+                                                                        <td className="text-left">{tile.size}</td>
+                                                                        <td className="text-left">{tile.length}</td>
+                                                                        <td className="text-left">{tile.breadth}</td>
+                                                                        <td className="text-left">{tile.height}</td>
+                                                                        <td className="text-left">{tile.area}</td>
+                                                                        <td className="text-left">{tile.deductionArea}</td>
+                                                                        <td className="text-left">{tile.totalArea}</td>
+                                                                        <td className="text-right">{tile.rate}</td>
+                                                                        <td className="text-right">{tile.amount}</td>
                                                                     </tr>
                                                                 ))}
                                                             </React.Fragment>
@@ -4679,7 +4777,7 @@ const RccCalculator = () => {
                                                             <th className="px-4 py-2 font-bold text-base">L</th>
                                                             <th className="px-4 py-2 font-bold text-base">B</th>
                                                             <th className="px-4 py-2 font-bold text-base">H</th>
-                                                            <th className="px-4 py-2 font-bold text-base">Quantity</th>
+                                                            <th className="px-4 py-2 font-bold text-base">Qty</th>
                                                             <th className="px-4 py-2 font-bold text-base">Area (sqft)</th>
                                                             <th className="px-4 py-2 font-bold text-base">Deduction Area (sqft)</th>
                                                             <th className="px-4 py-2 font-bold text-base">Total Area</th>
@@ -4719,17 +4817,17 @@ const RccCalculator = () => {
                                                                                         {floor.areaName}
                                                                                     </td>
                                                                                 ) : null}
-                                                                                <td>{tile.type}</td>
-                                                                                <td>{tile.size}</td>
-                                                                                <td>{tile.length}</td>
-                                                                                <td>{tile.breadth}</td>
-                                                                                <td>{tile.height}</td>
-                                                                                <td>{tile.quantity}</td>
-                                                                                <td>{tile.area}</td>
-                                                                                <td>{tile.deductionArea}</td>
-                                                                                <td>{tile.totalArea}</td>
-                                                                                <td>{tile.rate}</td>
-                                                                                <td>{tile.amount}</td>
+                                                                                <td className="text-left">{tile.type}</td>
+                                                                                <td className="text-left">{tile.size}</td>
+                                                                                <td className="text-left">{tile.length}</td>
+                                                                                <td className="text-left">{tile.breadth}</td>
+                                                                                <td className="text-left">{tile.height}</td>
+                                                                                <td className="text-left">{tile.quantity}</td>
+                                                                                <td className="text-left">{tile.area}</td>
+                                                                                <td className="text-left">{tile.deductionArea}</td>
+                                                                                <td className="text-left">{tile.totalArea}</td>
+                                                                                <td className="text-right">{tile.rate}</td>
+                                                                                <td className="text-right">{tile.amount}</td>
                                                                             </tr>
                                                                         ))}
                                                                     </React.Fragment>
@@ -4737,7 +4835,7 @@ const RccCalculator = () => {
                                                             })}
                                                         <tr className="bg-gray-100 font-bold">
                                                             <td colSpan="11" className="text-right pr-4">Total Amount:</td>
-                                                            <td>
+                                                            <td className="text-right">
                                                                 {filteredFloors.reduce((sum, floor) => {
                                                                     const matchingTiles = floor.tiles.filter(
                                                                         tile => selectedAreass[`${floor.floorName}-${floor.areaName}`]
@@ -5002,13 +5100,27 @@ const RccCalculator = () => {
                                                                 className="bg-[#BF9853] w-16 text-sm h-7 text-white rounded"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    handleEditClick(floor.areaName, floorIndex);
+                                                                    const matchingBeam = beamData.find(b => b.beamName === floor.areaName);
+                                                                    if (matchingBeam) {
+                                                                        if (matchingBeam.steelConfiguration === 'Beam Type') {
+                                                                            togglePopup('Roof Beam');
+                                                                        } else if (matchingBeam.steelConfiguration === 'Steel Type') {
+                                                                            // Use current tile's L and B for the diagram labels
+                                                                            const rawL = tile.length || "";
+                                                                            const rawB = tile.breadth || "";
+                                                                            setSteelPopupLB({
+                                                                                lengthLabel: rawL,
+                                                                                breadthLabel: rawB,
+                                                                            });
+                                                                            togglePopup('Plinth Beam');
+                                                                        }
+                                                                    }
                                                                 }}
                                                             >
                                                                 Edit
                                                             </button>
                                                             {popupType === 'Roof Beam' && (
-                                                                <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center pl-[600px]">
+                                                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
                                                                     <div
                                                                         className="bg-white p-6 rounded relative"
                                                                         style={{ width: "580px", height: '833px' }}>
@@ -5508,7 +5620,7 @@ const RccCalculator = () => {
                                                                                     <div className="absolute top-[390px]  left-[-460px] flex items-center">
                                                                                         <img className="w-[15px] mr-[-4px] text-[#8D8989] ml-[-8px] mt-[-32px]" src={leftarrow} alt="#"></img>
                                                                                         <div>
-                                                                                            <div className="h-[2px] bg-[#8D8989] w-[375px] flex items-center"></div>
+                                                                                            <div className="h-[2px] bg-[#8D8989] w-[375px] mb flex items-center"></div>
                                                                                             <input
                                                                                                 type="text"
                                                                                                 value={tile.breadth || ""}
@@ -5568,12 +5680,77 @@ const RccCalculator = () => {
                                                                             </select>
                                                                         </div>
                                                                         <p className="text-base text-left mb-6 mt-[-20px] font-bold">First Floor - SL01</p>
-                                                                        <div className="relative bg-gray-200 border rounded-lg p-4 mb-6 ml-7" style={{ width: '352px', height: '290px' }}>
-                                                                            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-sm">24"</div>
-                                                                            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-sm">24"</div>
-                                                                            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 text-sm">36"</div>
-                                                                            <div className="absolute right-0 top-1/2 transform -translate-y-1/2 text-sm">36"</div>
-                                                                            <p className="text-center text-sm text-gray-500">Rebar Diagram (Replace with Image)</p>
+                                                                        {/* Diagram box */}
+                                                                        <div className="relative mb-6 ml-7" style={{ width: '352px', height: '290px' }}>
+                                                                            {/* outer beige frame */}
+                                                                            <div className="absolute inset-0 bg-[#F6EBD4] rounded-md border border-[#D4C29A]" />
+                                                                            {/* inner white core */}
+                                                                            <div className="absolute inset-10 bg-white rounded-sm border border-[#D4C29A]" />
+
+                                                                            {/* OUTER DIMENSION INPUTS (4) */}
+                                                                            <input
+                                                                                className="absolute top-[-20px] left-[170px] -translate-x-1/2 text-xs font-medium text-[#5B4A30] bg-transparent text-center w-14 focus:outline-none"
+                                                                                value={steelFrameInputs.topOuter}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, topOuter: e.target.value }))}
+                                                                            />
+                                                                            <input
+                                                                                className="absolute bottom-[-20px] left-[170px] -translate-x-1/2 text-xs font-medium text-[#5B4A30] bg-transparent text-center w-14 focus:outline-none"
+                                                                                value={steelFrameInputs.bottomOuter}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, bottomOuter: e.target.value }))}
+                                                                            />
+                                                                            <input
+                                                                                className="absolute top-[145px] -translate-y-1/2 left-[-40px] text-xs font-medium text-[#5B4A30] bg-transparent text-center w-14 focus:outline-none"
+                                                                                value={steelFrameInputs.leftOuter}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, leftOuter: e.target.value }))}
+                                                                            />
+                                                                            <input
+                                                                                className="absolute top-[145px] -translate-y-1/2 right-[-40px] text-xs font-medium text-[#5B4A30] bg-transparent text-center w-14 focus:outline-none"
+                                                                                value={steelFrameInputs.rightOuter}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, rightOuter: e.target.value }))}
+                                                                            />
+
+                                                                            {/* GAP DIMENSION INPUTS (4 between outer and inner) */}
+                                                                            <input
+                                                                                className="absolute top-3 left-[170px] -translate-x-1/2 text-xs font-medium text-[#5B4A30] bg-transparent text-center w-10 focus:outline-none"
+                                                                                value={steelFrameInputs.topGap}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, topGap: e.target.value }))}
+                                                                            />
+                                                                            <input
+                                                                                className="absolute bottom-3 left-[170px] -translate-x-1/2 text-xs font-medium text-[#5B4A30] bg-transparent text-center w-10 focus:outline-none"
+                                                                                value={steelFrameInputs.bottomGap}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, bottomGap: e.target.value }))}
+                                                                            />
+                                                                            <input
+                                                                                className="absolute top-[145px] -translate-y-1/2 left-1 text-xs font-medium text-[#5B4A30] bg-transparent text-center w-10 focus:outline-none"
+                                                                                value={steelFrameInputs.leftGap}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, leftGap: e.target.value }))}
+                                                                            />
+                                                                            <input
+                                                                                className="absolute top-[145px] -translate-y-1/2 right-1 text-xs font-medium text-[#5B4A30] bg-transparent text-center w-10 focus:outline-none"
+                                                                                value={steelFrameInputs.rightGap}
+                                                                                onChange={(e) => setSteelFrameInputs(prev => ({ ...prev, rightGap: e.target.value }))}
+                                                                            />
+
+                                                                            {/* INNER ARROWS WITH L / B */}
+                                                                            {/* Horizontal arrow (bottom) */}
+                                                                            <div className="absolute bottom-16 left-16 right-16 flex items-center">
+                                                                                <div className="w-3 h-3 border-l-2 border-b-2 border-[#E4572E] rotate-45" />
+                                                                                <div className="flex-1 border-t-2 border-dashed border-[#E4572E]" />
+                                                                                <div className="w-3 h-3 border-r-2 border-b-2 border-[#E4572E] -rotate-45" />
+                                                                            </div>
+                                                                            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 text-sm font-semibold text-[#E4572E]">
+                                                                                {steelPopupLB.lengthLabel || '10"'}
+                                                                            </div>
+
+                                                                            {/* Vertical arrow (right) */}
+                                                                            <div className="absolute top-16 bottom-16 right-16 flex flex-col items-center">
+                                                                                <div className="w-3 h-3 border-l-2 border-t-2 border-[#E4572E] -rotate-45" />
+                                                                                <div className="flex-1 border-l-2 border-dashed border-[#E4572E]" />
+                                                                                <div className="w-3 h-3 border-l-2 border-b-2 border-[#E4572E] rotate-45" />
+                                                                            </div>
+                                                                            <div className="absolute top-1/2 -translate-y-1/2 right-10 text-sm font-semibold text-[#E4572E]">
+                                                                                {steelPopupLB.breadthLabel || '10"'}
+                                                                            </div>
                                                                         </div>
                                                                         <div className=" grid-cols-3 gap-4 mb-6">
                                                                             <div className="mb-[14px]" style={{ marginLeft: '280px' }}>
@@ -5880,7 +6057,10 @@ const RccCalculator = () => {
                                                         <td className="text-center">
                                                             <CreatableSelect
                                                                 className="w-[140px] h-[27px] font-medium -mt-2"
+                                                                menuPortalTarget={document.body}
                                                                 styles={{
+                                                                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                                                    menu: (base) => ({ ...base, zIndex: 9999 }),
                                                                     control: (base) => ({
                                                                         ...base,
                                                                         backgroundColor: "transparent",
@@ -6020,7 +6200,7 @@ const RccCalculator = () => {
                                                             <input
                                                                 readOnly
                                                                 className="w-[65px] bg-transparent focus:outline-none pl-3"
-                                                                value={weight || "0kg"}
+                                                                value={`${(calculateSteelRowWeightKg(tile) || 0).toFixed(2)}kg`}
                                                                 placeholder="Weight (e.g., 2.50kg)"
                                                             />
                                                         </td>
@@ -6189,7 +6369,6 @@ const RccCalculator = () => {
                                             <button
                                                 onClick={() => {
                                                     setIsPopupOpen4(false);
-                                                    console.log("Cut List generated!");
                                                 }}
                                                 className="bg-[#BF9853] text-white px-4 py-2 rounded w-60 font-semibold cursor-pointer"
                                             >
@@ -6341,7 +6520,6 @@ const RccCalculator = () => {
                                                 <button
                                                     onClick={() => {
                                                         setIsPopupOpen2(false);
-                                                        console.log("Cut List generated!");
                                                     }}
                                                     className="bg-[#BF9853] text-white px-4 py-2 rounded w-60 font-semibold"
                                                 >
@@ -6485,7 +6663,6 @@ const RccCalculator = () => {
                                             <button
                                                 onClick={() => {
                                                     setIsPopupOpen1(false);
-                                                    console.log("Cut List generated!");
                                                 }}
                                                 className="bg-[#BF9853] text-white px-4 py-2 rounded w-60 font-semibold cursor-pointer"
                                             >
@@ -7143,20 +7320,20 @@ const RccCalculator = () => {
                                                             .filter(() => selectedAreass[`${floor.floorName}-${floor.areaName}`])
                                                             .map((tile, ti) => (
                                                                 <tr key={`${floor.floorName}-${floor.areaName}-${ti}`}>
-                                                                    <td className="px-2 py-1">{floor.floorName}</td>
-                                                                    <td className="px-2 py-1">{floor.areaName}</td>
-                                                                    <td className="px-2 py-1">{tile.type}</td>
-                                                                    <td className="px-2 py-1">{tile.mix}</td>
-                                                                    <td className="px-2 py-1">{tile.size}</td>
-                                                                    <td className="px-2 py-1">{tile.length}</td>
-                                                                    <td className="px-2 py-1">{tile.breadth}</td>
-                                                                    <td className="px-2 py-1">{tile.height}</td>
-                                                                    <td className="px-2 py-1">{tile.quantity}</td>
-                                                                    <td className="px-2 py-1">{tile.cement}</td>
-                                                                    <td className="px-2 py-1">{tile.sand}</td>
-                                                                    <td className="px-2 py-1">{tile.jally}</td>
-                                                                    <td className="px-2 py-1">{tile.totalValume}</td>
-                                                                    <td className="px-2 py-1">{tile.concreteTotalAmount ? parseFloat(tile.concreteTotalAmount).toFixed(2) : "0.00"}</td>
+                                                                    <td className="px-2 py-1 text-left">{floor.floorName}</td>
+                                                                    <td className="px-2 py-1 text-left">{floor.areaName}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.type}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.mix}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.size}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.length}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.breadth}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.height}</td>
+                                                                    <td className="px-2 py-1 text-left">{tile.quantity}</td>
+                                                                    <td className="px-2 py-1 text-right">{tile.cement}</td>
+                                                                    <td className="px-2 py-1 text-right">{tile.sand}</td>
+                                                                    <td className="px-2 py-1 text-right">{tile.jally}</td>
+                                                                    <td className="px-2 py-1 text-right">{tile.totalValume}</td>
+                                                                    <td className="px-2 py-1 text-right">{tile.concreteTotalAmount ? parseFloat(tile.concreteTotalAmount).toFixed(2) : "0.00"}</td>
                                                                 </tr>
                                                             ))
                                                     )}

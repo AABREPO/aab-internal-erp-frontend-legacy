@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
-import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
+import CloseIcon from '../Images/Close F.svg';
 
 const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType }) => {
   const [formData, setFormData] = useState({
@@ -13,6 +13,10 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
   });
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showItemNameModal, setShowItemNameModal] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
   const [quantityError, setQuantityError] = useState('');
 
   // State for PO item names from API
@@ -647,98 +651,209 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleBackdropClick}>
-        <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-6 pt-5 mb-3">
-            <p className="text-[16px] font-medium text-black leading-normal">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleBackdropClick}>
+        <div className="bg-white w-full h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-[24px] pt-[20px] pb-[16px]">
+            <p className="text-[16px] font-bold text-black leading-normal">
               Add Items
             </p>
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="text-[16px] font-medium text-black decoration-solid"
+              className="text-[16px] font-semibold text-black decoration-solid"
               style={{ textUnderlinePosition: 'from-font' }}
             >
               {(formData.category || selectedCategory) || 'Category'}
             </button>
           </div>
-          <div className="px-6 mb-2">
-            <div className="space-y-[6px]">
+          <div className="px-[24px]">
+            <div>
               {(() => {
                 const isCategorySelected = !!(formData.category || selectedCategory);
                 return (
-                  <>
+                  <div className="space-y-[6px]">
                     <div className=" relative">
                       <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                        Item Name<span className="text-[#eb2f8e]">*</span>
+                        Item Name<span className="text-[#E4572E]">*</span>
                       </p>
-                      <SearchableDropdown
-                        value={formData.itemName}
-                        onChange={(value) => handleFieldSelect('itemName', value)}
-                        onAddNew={(value) => handleFieldAddNew('itemName', value)}
-                        options={itemNameOptions}
-                        placeholder="12A Switch"
-                        fieldName="Item Name"
-                        showAllOptions={true}
-                        disabled={!isCategorySelected}
-                      />
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isCategorySelected) setShowItemNameModal(true);
+                          }}
+                          disabled={!isCategorySelected}
+                          className={`w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none ${
+                            !isCategorySelected ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          style={{
+                            paddingRight: formData.itemName ? '32px' : '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <span className={formData.itemName ? 'text-black' : 'text-[#9E9E9E]'}>
+                            {formData.itemName || 'Select ...'}
+                          </span>
+                          {!formData.itemName && (
+                            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </button>
+                        {formData.itemName && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData((prev) => ({ ...prev, itemName: '' }));
+                            }}
+                            className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                            style={{ right: '8px' }}
+                          >
+                            <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className=" relative">
-                      <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                        Model<span className="text-[#eb2f8e]">*</span>
+                      <p className="text-[13px] font-medium text-black mb-1 leading-normal">
+                        Model<span className="text-[#E4572E]">*</span>
                       </p>
-                      <SearchableDropdown
-                        value={formData.model}
-                        onChange={(value) => handleFieldSelect('model', value)}
-                        onAddNew={(value) => handleFieldAddNew('model', value)}
-                        options={modelOptions}
-                        placeholder="Natural Cream"
-                        fieldName="Model"
-                        showAllOptions={true}
-                        disabled={!isCategorySelected}
-                      />
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isCategorySelected) setShowModelModal(true);
+                          }}
+                          disabled={!isCategorySelected}
+                          className={`w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none ${
+                            !isCategorySelected ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          style={{
+                            paddingRight: formData.model ? '32px' : '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <span className={formData.model ? 'text-black' : 'text-[#9E9E9E]'}>
+                            {formData.model || 'Select ...'}
+                          </span>
+                          {!formData.model && (
+                            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </button>
+                        {formData.model && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData((prev) => ({ ...prev, model: '' }));
+                            }}
+                            className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                            style={{ right: '8px' }}
+                          >
+                            <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="w-full relative">
-                      <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                        Type<span className="text-[#eb2f8e]">*</span>
+                      <p className="text-[13px] font-medium text-black mb-1 leading-normal">
+                        Type<span className="text-[#E4572E]">*</span>
                       </p>
-                      <SearchableDropdown
-                        value={formData.type}
-                        onChange={(value) => handleFieldSelect('type', value)}
-                        onAddNew={(value) => handleFieldAddNew('type', value)}
-                        options={typeOptions}
-                        placeholder="Flip Type"
-                        className="w-full h-[32px]"
-                        fieldName="Type"
-                        showAllOptions={true}
-                        disabled={!isCategorySelected}
-                      />
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isCategorySelected) setShowTypeModal(true);
+                          }}
+                          disabled={!isCategorySelected}
+                          className={`w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none ${
+                            !isCategorySelected ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          style={{
+                            paddingRight: formData.type ? '32px' : '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <span className={formData.type ? 'text-black' : 'text-[#9E9E9E]'}>
+                            {formData.type || 'Select ...'}
+                          </span>
+                          {!formData.type && (
+                            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </button>
+                        {formData.type && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormData((prev) => ({ ...prev, type: '' }));
+                            }}
+                            className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                            style={{ right: '8px' }}
+                          >
+                            <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-[12px]">
                       <div className="w-full relative">
                         <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                          Brand<span className="text-[#eb2f8e]">*</span>
+                          Brand<span className="text-[#E4572E]">*</span>
                         </p>
-                        <SearchableDropdown
-                          value={formData.brand}
-                          onChange={(value) => handleFieldSelect('brand', value)}
-                          onAddNew={(value) => handleFieldAddNew('brand', value)}
-                          options={brandOptions}
-                          placeholder="Kundan"
-                          fieldName="Brand"
-                          showAllOptions={true}
-                          disabled={!isCategorySelected}
-                        />
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isCategorySelected) setShowBrandModal(true);
+                            }}
+                            disabled={!isCategorySelected}
+                            className={`w-full h-[32px] px-[12px] border border-[rgba(0,0,0,0.16)] rounded text-[12px] font-medium text-black bg-white flex items-center justify-between focus:outline-none ${
+                              !isCategorySelected ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                            style={{
+                              paddingRight: formData.brand ? '32px' : '12px',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            <span className={formData.brand ? 'text-black' : 'text-[#9E9E9E]'}>
+                              {formData.brand || 'Select ...'}
+                            </span>
+                            {!formData.brand && (
+                              <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </button>
+                          {formData.brand && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFormData((prev) => ({ ...prev, brand: '' }));
+                              }}
+                              className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
+                              style={{ right: '8px' }}
+                            >
+                              <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="w-[100px] relative">
                         <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                          Quantity<span className="text-[#eb2f8e]">*</span>
+                          Quantity<span className="text-[#E4572E]">*</span>
                         </p>
                         <div className="relative">
                           <input
                             type="text"
                             value={formData.quantity}
                             onChange={handleQuantityChange}
-                            className={`w-[100px] h-[32px] border rounded px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
+                            className={`w-[100px] h-[32px] border rounded px-[12px] text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
                               }`}
                             style={{ fontFamily: "'Manrope', sans-serif" }}
                             placeholder="Enter"
@@ -751,18 +866,18 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                         </div>
                       </div>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
             </div>
-            <div className="mt-5 mb-3 flex gap-4">
+            <div className="mt-5 mb-3 flex gap-[16px]">
               <button
                 onClick={onClose}
-                className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
+                className="w-full h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
               >
                 Cancel
               </button>
-              <button onClick={handleAdd} className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal">
+              <button onClick={handleAdd} className="w-full h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal">
                 Add
               </button>
             </div>
@@ -780,6 +895,50 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
         options={categoryOptionsStrings}
         fieldName="Category"
         onAddNew={handleAddNewCategory}
+      />
+      <SelectVendorModal
+        isOpen={showItemNameModal}
+        onClose={() => setShowItemNameModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('itemName', value);
+        }}
+        selectedValue={formData.itemName}
+        options={itemNameOptions.filter((opt) => opt && opt.toString().trim() !== '')}
+        fieldName="Item Name"
+        onAddNew={(value) => handleFieldAddNew('itemName', value)}
+      />
+      <SelectVendorModal
+        isOpen={showModelModal}
+        onClose={() => setShowModelModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('model', value);
+        }}
+        selectedValue={formData.model}
+        options={modelOptions}
+        fieldName="Model"
+        onAddNew={(value) => handleFieldAddNew('model', value)}
+      />
+      <SelectVendorModal
+        isOpen={showTypeModal}
+        onClose={() => setShowTypeModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('type', value);
+        }}
+        selectedValue={formData.type}
+        options={typeOptions}
+        fieldName="Type"
+        onAddNew={(value) => handleFieldAddNew('type', value)}
+      />
+      <SelectVendorModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('brand', value);
+        }}
+        selectedValue={formData.brand}
+        options={brandOptions}
+        fieldName="Brand"
+        onAddNew={(value) => handleFieldAddNew('brand', value)}
       />
     </>
   );

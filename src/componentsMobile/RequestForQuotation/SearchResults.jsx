@@ -121,7 +121,7 @@ const SearchResultItem = ({ item, searchQuery, onAdd, onClose }) => {
   const matchType = item.matchType || null;
 
   return (
-    <div className="w-full px-4 py-3 border-b border-[rgba(0,0,0,0.08)] last:border-b-0">
+    <div className="w-full px-[16px] py-[12px] border-b border-[rgba(0,0,0,0.08)] last:border-b-0">
       {/* Item Name and Category Tag Row */}
       <div className="flex items-center justify-between mb-2.5">
         {/* Item Name at the left - always bold, but search term is also bolded if it matches */}
@@ -130,13 +130,13 @@ const SearchResultItem = ({ item, searchQuery, onAdd, onClose }) => {
         </p>
 
         {/* Category Tag - Green pill shape, aligned to the right */}
-        <span className="text-[10px] font-medium text-white bg-[#26bf94] px-2.5 py-1 rounded-full whitespace-nowrap">
+        <span className="text-[10px] font-medium text-white bg-[#26bf94] px-[10px] py-[4px] rounded-full whitespace-nowrap">
           {item.category || 'Electricals'}
         </span>
       </div>
 
       {/* Item Attributes List Below */}
-      <div className="flex flex-wrap items-center gap-1 mb-2.5 text-[11px] font-medium text-[#777777] leading-normal">
+      <div className="flex flex-wrap items-center gap-[4px] mb-2.5 text-[11px] font-medium text-[#777777] leading-normal">
         {/* Brand with comma */}
         {item.brand && (
           <span>{highlightText(item.brand, searchQuery, matchType, 'brand')},</span>
@@ -161,7 +161,7 @@ const SearchResultItem = ({ item, searchQuery, onAdd, onClose }) => {
       </div>
 
       {/* Controls Row: Quantity Selector and Add Button - Aligned to the right */}
-      <div className="flex items-center justify-end gap-2 mb-2.5">
+      <div className="flex items-center justify-end gap-[8px] mb-2.5">
         {/* Quantity Selector */}
         <div className="flex items-center border border-[rgba(0,0,0,0.16)] rounded-[6px]">
           <button
@@ -184,7 +184,7 @@ const SearchResultItem = ({ item, searchQuery, onAdd, onClose }) => {
         {/* Add Button */}
         <button
           onClick={handleAdd}
-          className="h-[28px] px-3 bg-black text-white text-[12px] font-medium rounded-[6px] hover:bg-[#333] transition-colors whitespace-nowrap"
+          className="h-[28px] px-[12px] bg-black text-white text-[12px] font-medium rounded-[6px] hover:bg-[#333] transition-colors whitespace-nowrap"
         >
           Add
         </button>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import DatePickerModal from './DatePickerModal';
+import CloseIcon from '../Images/Close F.svg'
 
 const Summary = () => {
   const [viewMode, setViewMode] = useState('vendor'); // 'vendor' or 'project'
@@ -197,11 +198,12 @@ const Summary = () => {
     setShowDatePicker(false);
   };
   return (
-    <div className="w-full px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col min-h-[calc(100vh-96px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header Section - Sticky */}
-      <div className="sticky top-[100px] z-30 bg-white">
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
         {/* Date Display - Clickable */}
-        <div className="mb-2 mt-2">
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between">
+          <div className="flex items-center pb-[8px] gap-[8px]">
           <button
             type="button"
             onClick={() => setShowDatePicker(true)}
@@ -209,12 +211,13 @@ const Summary = () => {
           >
             {selectedDate}
           </button>
+          </div>
         </div>
         {/* Segmented Control (Vendor/Project) */}
-        <div className="mb-2 flex items-center bg-[#F5F5F5] rounded-[8px] p-1 w-[328px]">
+        <div className="mb-2 flex items-center bg-[#F5F5F5] rounded-[8px] w-full h-[32px]">
           <button
             onClick={() => setViewMode('vendor')}
-            className={`flex-1 h-[32px] rounded-[6px] text-[12px] font-medium transition-colors ${viewMode === 'vendor'
+            className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-medium transition-colors ${viewMode === 'vendor'
                 ? 'bg-white text-black shadow-sm'
                 : 'text-[#9E9E9E]'
               }`}
@@ -223,7 +226,7 @@ const Summary = () => {
           </button>
           <button
             onClick={() => setViewMode('project')}
-            className={`flex-1 h-[32px] rounded-[6px] text-[12px] font-medium transition-colors ${viewMode === 'project'
+            className={`flex-1 mr-0.5 h-[28px] rounded text-[12px] font-medium transition-colors ${viewMode === 'project'
                 ? 'bg-white text-black shadow-sm'
                 : 'text-[#9E9E9E]'
               }`}
@@ -233,15 +236,15 @@ const Summary = () => {
         </div>
         {/* Vendor/Project Selection */}
         {viewMode === 'vendor' ? (
-          <div className="">
+          <div className="pb-[8px]">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Vendor Name<span className="text-[#eb2f8e]">*</span>
+              Vendor Name<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div className="relative">
                 <div
                   onClick={() => setShowVendorModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: selectedVendor ? '#000' : '#9E9E9E'
@@ -249,16 +252,13 @@ const Summary = () => {
                 >
                   {selectedVendor || 'Select ...'}
                 </div>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none"
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {!selectedVendor && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
               {selectedVendor && (
                 <button
@@ -267,25 +267,23 @@ const Summary = () => {
                     e.stopPropagation();
                     setSelectedVendor('');
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               )}
             </div>
           </div>
         ) : (
-          <div className="">
+          <div className="pb-[8px]">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Project Name<span className="text-[#eb2f8e]">*</span>
+              Project Name<span className="text-[#E4572E]">*</span>
             </p>
             <div className="relative">
               <div className="relative">
                 <div
                   onClick={() => setShowProjectModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: selectedProject ? '#000' : '#9E9E9E'
@@ -293,16 +291,13 @@ const Summary = () => {
                 >
                   {selectedProject || 'Select ...'}
                 </div>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none"
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {!selectedProject && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
               </div>
               {selectedProject && (
                 <button
@@ -311,11 +306,9 @@ const Summary = () => {
                     e.stopPropagation();
                     setSelectedProject('');
                   }}
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               )}
             </div>
@@ -324,9 +317,9 @@ const Summary = () => {
       </div>
       {/* Project/Vendor List Summary Card */}
       {summaryData.length > 0 && (
-        <div className="bg-white shadow-lg w-[328px]">
+        <div className="bg-white shadow-lg rounded-[8px] shadow-top-lg w-[360px] mt-[8px]">
           {/* Header */}
-          <div className="flex items-center justify-between px-4">
+          <div className="flex items-center px-[16px] py-[10px] justify-between bg-white rounded-t-[8px] border-b border-[rgba(0,0,0,0.10)]">
             <p className="text-[12px] font-semibold text-[#9E9E9E]">
               {viewMode === 'vendor' ? 'Project List' : 'Vendor List'}
             </p>
@@ -337,7 +330,7 @@ const Summary = () => {
             {summaryData.map((item, index) => (
               <div
                 key={index}
-                className={`flex items-center justify-between px-4 py-3 ${index < summaryData.length - 1 ? 'border-b border-[rgba(0,0,0,0.08)]' : ''
+                className={`flex items-center justify-between px-[16px] py-[12px] ${index < summaryData.length - 1 ? 'border-b border-[rgba(0,0,0,0.08)]' : ''
                   }`}
               >
                 <p className="text-[12px] font-medium text-black flex-1 text-left">
@@ -353,7 +346,7 @@ const Summary = () => {
       )}
       {/* Empty State */}
       {((viewMode === 'vendor' && selectedVendor) || (viewMode === 'project' && selectedProject)) && summaryData.length === 0 && (
-        <div className="bg-white rounded- border border-[rgba(0,0,0,0.16)] w-[328px] p-8 text-center">
+        <div className="bg-white rounded- border border-[rgba(0,0,0,0.16)] w-[360px] p-[32px] text-center">
           <p className="text-[12px] font-medium text-[#9E9E9E]">
             No {viewMode === 'vendor' ? 'projects' : 'vendors'} found
           </p>
@@ -370,7 +363,6 @@ const Summary = () => {
         selectedValue={selectedVendor}
         options={vendorOptions}
         fieldName="Vendor"
-        onAddNew={handleAddNewVendor}
       />
       {/* Project Select Modal */}
       <SelectVendorModal
@@ -383,7 +375,6 @@ const Summary = () => {
         selectedValue={selectedProject}
         options={projectOptions}
         fieldName="Project"
-        onAddNew={handleAddNewProject}
       />
       {/* Date Picker Modal */}
       <DatePickerModal

@@ -5,6 +5,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
   const [selectedGroupName, setSelectedGroupName] = useState(propSelectedGroupName);
   const [groupNameList, setGroupNameList] = useState([]);
   const [groupNameOptions, setGroupNameOptions] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const selectedCategoryRef = useRef(null);
   const selectedGroupNameRef = useRef(null);
   const categoryScrollContainerRef = useRef(null);
@@ -22,6 +23,13 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
   useEffect(() => {
     setSelectedGroupName(propSelectedGroupName);
   }, [propSelectedGroupName]);
+
+  // Reset search when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+    }
+  }, [isOpen]);
 
   // Scroll to selected option when modal opens
   useEffect(() => {
@@ -139,8 +147,21 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
     };
   };
 
+  // Filter categories based on search query
+  const filteredCategories = predefinedCategories.filter(category => {
+    if (!searchQuery.trim()) return true;
+    return category.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  // Filter group names based on search query
+  const filteredGroupNames = groupNameOptions.filter(option => {
+    if (!searchQuery.trim()) return true;
+    return option.value.toLowerCase().includes(searchQuery.toLowerCase()) || 
+           option.label.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
   // Sort categories: favorites first, then alphabetically
-  const sortedCategories = [...predefinedCategories].sort((a, b) => {
+  const sortedCategories = [...filteredCategories].sort((a, b) => {
     const aIsFavorite = categoryFavorites.includes(a);
     const bIsFavorite = categoryFavorites.includes(b);
     if (aIsFavorite && !bIsFavorite) return -1;
@@ -149,7 +170,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
   });
 
   // Sort group names: favorites first, then alphabetically
-  const sortedGroupNames = [...groupNameOptions].sort((a, b) => {
+  const sortedGroupNames = [...filteredGroupNames].sort((a, b) => {
     const aIsFavorite = groupNameFavorites.includes(a.value);
     const bIsFavorite = groupNameFavorites.includes(b.value);
     if (aIsFavorite && !bIsFavorite) return -1;
@@ -158,8 +179,28 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
   });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] p-6 pb-8 relative transform -translate-y-24" style={{ minHeight: '400px', maxHeight: '80vh' }}>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center" 
+      onClick={(e) => {
+        // Only close if clicking directly on backdrop
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      onMouseDown={(e) => {
+        // Prevent closing when mousedown happens on backdrop
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
+      style={{ fontFamily: "'Manrope', sans-serif" }}
+    >
+      <div 
+        className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] p-[24px] pb-[32px] relative transform -translate-y-24" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{ minHeight: '400px', maxHeight: '80vh' }}
+      >
         <div className="flex justify-between items-center mb-4">
           <p className="text-[16px] font-medium text-black">Select Category</p>
           <button onClick={onClose} className="text-[#e4572e] text-[14px] font-semibold underline">
@@ -167,9 +208,50 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
           </button>
         </div>
 
+        {/* Search Bar */}
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                e.stopPropagation();
+                setSearchQuery(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+              }}
+              onKeyUp={(e) => {
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+              }}
+              onFocus={(e) => {
+                e.stopPropagation();
+              }}
+              onBlur={(e) => {
+                e.stopPropagation();
+              }}
+              placeholder="Search"
+              className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+              autoFocus
+            />
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
         {/* Segmented Control (Category/Group Name) - Only show if showGroupName is true */}
         {showGroupName && (
-          <div className="mb-4 flex items-center bg-[#F5F5F5] rounded-[8px] p-1 w-full">
+          <div className="mb-4 flex items-center bg-[#F5F5F5] rounded-[8px] p-[4px] w-full">
             <button
               onClick={() => setViewMode('category')}
               className={`flex-1 h-[32px] rounded-[6px] text-[12px] font-medium transition-colors ${
@@ -195,7 +277,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
 
         {/* Category View */}
         {(!showGroupName || viewMode === 'category') && (
-          <div ref={categoryScrollContainerRef} className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+          <div ref={categoryScrollContainerRef} className="grid grid-cols-2 gap-[12px] max-h-[50vh] overflow-y-auto">
             {sortedCategories.map((category) => {
               const isSelected = selectedCategory === category;
               const isFavorite = categoryFavorites.includes(category);
@@ -204,7 +286,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
                 key={category}
                 ref={isSelected ? selectedCategoryRef : null}
                 onClick={() => handleCategorySelect(category)}
-                className={`rounded-[6px] px-3 flex items-center gap-2 ${
+                className={`rounded-[6px] px-[12px] flex items-center gap-[8px] ${
                   isSelected
                     ? 'bg-white border-[0.8px] border-[#26bf94]'
                     : 'bg-[#f3f5f7]'
@@ -248,7 +330,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
         {viewMode === 'groupName' && (
           <div ref={groupNameScrollContainerRef} className=" max-h-[50vh] overflow-y-auto">
             {sortedGroupNames.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-[12px]">
                 {sortedGroupNames.map((option, index) => {
                   const isSelected = selectedGroupName === option.value;
                   const isFavorite = groupNameFavorites.includes(option.value);
@@ -257,7 +339,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
                     key={index}
                     ref={isSelected ? selectedGroupNameRef : null}
                     onClick={() => handleGroupNameSelect(option.value)}
-                    className={`w-full rounded-[6px] px-3 flex items-center gap-2 ${
+                    className={`w-full rounded-[6px] px-[12px] flex items-center gap-[8px] ${
                       isSelected
                         ? 'bg-white border-[0.8px] border-[#26bf94]'
                         : 'bg-[#f3f5f7]'
@@ -296,7 +378,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
                 })}
               </div>
             ) : (
-              <p className="text-[12px] text-[#777777] text-center py-4">
+              <p className="text-[12px] text-[#777777] text-center py-[16px]">
                 No group names available
               </p>
             )}

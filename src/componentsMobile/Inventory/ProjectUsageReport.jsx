@@ -633,7 +633,7 @@ const ProjectUsageReport = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
-      <div className="px-4">
+      <div className="pb-[8px] border-b border-[#E0E0E0]">
         <div className="sticky z-30 bg-white flex items-center justify-between mt-2">
           <button
             type="button"
@@ -652,12 +652,12 @@ const ProjectUsageReport = () => {
         </div>
       </div>
       {/* Report/History Tabs */}
-      <div className="flex-shrink-0 px-4 pt-1">
-        <div className="flex bg-gray-100 items-center h-9 shadow-sm flex-1 rounded-md">
+      <div className="flex-shrink-0 pt-[8px]">
+        <div className="flex bg-gray-100 items-center h-[32px] shadow-sm flex-1 rounded-md">
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeTab === 'history'
+            className={`flex-1 ml-[2px] h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${activeTab === 'history'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -667,7 +667,7 @@ const ProjectUsageReport = () => {
           <button
             type="button"
             onClick={() => setActiveTab('report')}
-            className={`flex-1 py-1 px-4 mr-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeTab === 'report'
+            className={`flex-1 mr-[2px] h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${activeTab === 'report'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -677,7 +677,7 @@ const ProjectUsageReport = () => {
         </div>
       </div>
       {/* Filters Section */}
-      <div className="flex-shrink-0 px-4 pt-2 mb-2">
+      <div className="flex-shrink-0 pt-[8px] mb-2">
         {/* Project Name Filter */}
         <div className="mb-2">
           <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
@@ -686,7 +686,7 @@ const ProjectUsageReport = () => {
           <div className="relative">
             <div
               onClick={() => setShowProjectModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 boxSizing: 'border-box',
                 color: selectedProject ? '#000' : '#9E9E9E'
@@ -729,12 +729,12 @@ const ProjectUsageReport = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-10 pr-3 text-[12px] font-medium bg-white"
+            className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-[40px] pr-[12px] text-[12px] font-medium bg-white"
           />
         </div>
       </div>
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide no-scrollbar scrollbar-none">
+      <div className="flex-1 overflow-y-auto pb-[16px] scrollbar-hide no-scrollbar scrollbar-none">
         {activeTab === 'report' ? (
           // Report Tab Content
           !selectedProject ? (
@@ -779,7 +779,7 @@ const ProjectUsageReport = () => {
                       ref={(el) => {
                         if (el) cardRefs.current[itemId] = el;
                       }}
-                      className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                      className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out"
                       style={{
                         transform: `translateX(${swipeOffset}px)`,
                         touchAction: 'pan-y',
@@ -815,7 +815,7 @@ const ProjectUsageReport = () => {
                           </p>
                           {/* Category Tag */}
                           {item.category && (
-                            <span className={`px-2 py-1  rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
+                            <span className={`px-[8px] py-[4px]  rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
                               {item.category.toUpperCase()}
                             </span>
                           )}
@@ -860,7 +860,7 @@ const ProjectUsageReport = () => {
 
                     {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                     <div
-                      className="absolute top-[2.5px] flex gap-2 flex-shrink-0 z-0"
+                      className="absolute top-[2.5px] flex gap-[8px] flex-shrink-0 z-0"
                       style={{
                         right: '2px',
                         opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
@@ -876,7 +876,7 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleEdit(item);
                         }}
-                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                         title="Edit"
                       >
                         <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -886,7 +886,7 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleDelete(item);
                         }}
-                        className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                        className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
                         title="Delete"
                       >
                         <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
@@ -932,7 +932,7 @@ const ProjectUsageReport = () => {
                       ref={(el) => {
                         if (el) cardRefs.current[itemId] = el;
                       }}
-                      className="flex-1 bg-white rounded-[6px] h-full px-4 py-2 transition-all duration-300 ease-out"
+                      className="flex-1 bg-white rounded-[6px] h-full px-[16px] py-[8px] transition-all duration-300 ease-out"
                       style={{
                         transform: `translateX(${swipeOffset}px)`,
                         touchAction: 'pan-y',
@@ -966,7 +966,7 @@ const ProjectUsageReport = () => {
                             {item.itemName}
                           </p>
                           {item.category && (
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
+                            <span className={`px-[8px] py-[4px] rounded-full text-[10px] font-medium ${getCategoryColor(item.category)}`}>
                               {item.category.toUpperCase()}
                             </span>
                           )}
@@ -1018,7 +1018,7 @@ const ProjectUsageReport = () => {
 
                     {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                     <div
-                      className="absolute top-[2.5px] flex gap-2 flex-shrink-0 z-0"
+                      className="absolute top-[2.5px] flex gap-[8px] flex-shrink-0 z-0"
                       style={{
                         right: '2px',
                         opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
@@ -1034,7 +1034,7 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleEdit(item);
                         }}
-                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                        className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                         title="Edit"
                       >
                         <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -1044,7 +1044,7 @@ const ProjectUsageReport = () => {
                           e.stopPropagation();
                           handleDelete(item);
                         }}
-                        className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                        className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
                         title="Delete"
                       >
                         <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />

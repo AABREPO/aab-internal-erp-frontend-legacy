@@ -5048,7 +5048,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             comments: categoryComments || "",
                                             machineTools: "",
                                             source: "Cash Register",
-                                            billCopyUrl: currentProjectAdvanceRow.bill_copy_url,
+                                            billCopyUrl: currentProjectAdvanceRow.bill_copy_url || '',
                                             branchId: activeBranchId ?? null,
                                             enteredBy: username
                                         };

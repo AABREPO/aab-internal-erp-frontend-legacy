@@ -5,6 +5,20 @@ import Close from '../Images/close.png'
 import Edit from '../Images/edit1.png';
 
 const IncomingTracker = ({ user, onTabChange }) => {
+  // Prevent whole-page scroll; keep only inner containers scrollable
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
+
   const [activeStatus, setActiveStatus] = useState('live'); // 'live', 'closed', or 'history'
   const [incomingRecords, setIncomingRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
@@ -27,7 +41,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
   const [filterPONo, setFilterPONo] = useState('');
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-  const [showPODropdown, setShowPODropdown] = useState(false);
   const [swipeStates, setSwipeStates] = useState({});
   const [expandedClosedCardId, setExpandedClosedCardId] = useState(null);
   
@@ -846,17 +859,17 @@ const IncomingTracker = ({ user, onTabChange }) => {
     setFilteredRecords(filtered);
   }, [incomingRecords, activeStatus, searchQuery, allPurchaseOrders, filterVendorName, filterStockingLocation, filterPONo]);
   return (
-    <div className=" bg-white">
+    <div className="bg-white flex flex-col h-full overflow-hidden">
       {/* Back Button - Show when detail view is open */}
       {showDetailView && selectedRecord && (
-        <div className="flex px-4 pb-1">
+        <div className="flex pb-[4px]">
           <button
             type="button"
             onClick={() => {
               setShowDetailView(false);
               setSelectedRecord(null);
             }}
-            className="flex items-center gap-2 text-[14px] font-medium text-black"
+            className="flex items-center gap-[8px] text-[14px] font-medium text-black"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M15 18L9 12L15 6" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -867,30 +880,24 @@ const IncomingTracker = ({ user, onTabChange }) => {
       )}
       {/* Date and Category Buttons - Hide when detail view is open */}
       {!showDetailView && (
-        <div className="px-4 pt-2">
-          <div className="flex items-center justify-between  mb-1">
+        <div className="pt-[8px]">
+          <div className="flex items-center justify-between pb-[8px] border-b border-[#E0E0E0]">
             {/* Date Button */}
-            <button
-              type="button"
-              className="text-[12px] font-semibold text-black"
-            >
+            <button type="button" className="text-[12px] font-semibold text-black">
               Date
             </button>
             {/* Category Button */}
-            <button
-              type="button"
-              className=" text-[12px] font-semibold text-black"
-            >
+            <button type="button" className=" text-[12px] font-semibold text-black">
               Category
             </button>
           </div>
         </div>
       )}
       {/* Live/Closed/History Toggle - Always visible */}
-      <div className="px-4 pb-2">
-        <div className="flex items-center gap-2">
+      <div className="pb-[8px] pt-[8px]">
+        <div className="flex items-center gap-[8px]">
           {/* Live/Closed/History Tabs */}
-          <div className="flex bg-gray-100 items-center rounded-md h-9 shadow-sm flex-1">
+          <div className="flex bg-gray-100 items-center rounded-md h-[32px] shadow-sm flex-1">
             <button
               type="button"
               onClick={() => {
@@ -903,7 +910,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 setFilterStockingLocation('');
                 setFilterPONo('');
               }}
-              className={`flex-1 py-1 px-4 ml-1 h-8 rounded text-[14px] font-medium duration-1000 ease-out transition-colors ${activeStatus === 'live'
+              className={`flex-1 ml-[2px] h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${activeStatus === 'live'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -922,7 +929,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 setFilterStockingLocation('');
                 setFilterPONo('');
               }}
-              className={`flex-1 py-1 px-4 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeStatus === 'closed'
+              className={`flex-1 h-[28px] rounded text-[12px] font-semibold leading-normal transition-colors duration-1000 ease-out ${activeStatus === 'closed'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -941,7 +948,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 setFilterStockingLocation('');
                 setFilterPONo('');
               }}
-              className={`flex-1 py-1 px-4 mr-1 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeStatus === 'history'
+              className={`flex-1 mr-[2px] h-[28px] rounded text-[12px] font-semibold leading-normal transition-colors duration-1000 ease-out ${activeStatus === 'history'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -953,14 +960,14 @@ const IncomingTracker = ({ user, onTabChange }) => {
       </div>
       {/* Search Bar */}
       {!showDetailView && (
-        <div className=" px-4 pb-2">
+        <div className="">
           <div className="relative">
             <input
               type="text"
               placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[40px] pl-10 pr-4 border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
+              className="w-full h-[40px] pl-[40px] pr-[16px] border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
             />
             <svg
               className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -976,67 +983,77 @@ const IncomingTracker = ({ user, onTabChange }) => {
 
       {/* Filter Button */}
       {!showDetailView && (
-        <div className=" px-4 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex justify-between items-center gap-[4px] px-0 mt-[8px] mb-[8px] flex-shrink-0">
+          <div className="flex items-center gap-[4px] min-w-0">
             <button
               type="button"
               onClick={() => setShowFilterModal(true)}
-              className="flex items-center gap-2 text-[14px] font-medium text-gray-700"
+              className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0"
             >
               <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
               {!(filterVendorName || filterStockingLocation || filterPONo) && (
-                <span className="text-[12px] font-medium text-black">Filter</span>
+                <span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
               )}
             </button>
-            {filterVendorName && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
-                <span className="text-[12px] font-medium text-black">Vendor</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilterVendorName('');
-                  }}
-                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            {filterStockingLocation && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
-                <span className="text-[12px] font-medium text-black">Stocking Location</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilterStockingLocation('');
-                  }}
-                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            {filterPONo && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
-                <span className="text-[12px] font-medium text-black">PO. No</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilterPONo('');
-                  }}
-                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+
+            {(filterVendorName || filterStockingLocation || filterPONo) && (
+              <div
+                className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                <div className="flex items-center gap-[4px] flex-nowrap">
+                  {filterVendorName && (
+                    <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Vendor</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterVendorName('');
+                        }}
+                        className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterStockingLocation && (
+                    <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Stocking Location</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterStockingLocation('');
+                        }}
+                        className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterPONo && (
+                    <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">PO. No</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFilterPONo('');
+                        }}
+                        className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1044,12 +1061,12 @@ const IncomingTracker = ({ user, onTabChange }) => {
       )}
 
       {/* Records List */}
-      <div className="flex-1 px-4 overflow-hidden  flex flex-col">
+      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide pb-[16px]">
         {showDetailView && selectedRecord ? (
           /* Detail View - Inline below search bar */
           <div className="bg-white flex flex-col flex-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Purchase Order Info Card */}
-            <div className="flex-shrink-0 p-4 bg-white border border-gray-200 rounded-lg mb-2">
+            <div className="flex-shrink-0 p-[8px] bg-white border border-gray-200 rounded-lg mb-2">
               <div className="space-y-2">
                 <div className="flex items-start">
                   <p className="text-[12px] font-medium text-[#3f3f3f] w-[120px]">Vendor Name</p>
@@ -1070,13 +1087,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
             </div>
 
             {/* Items Summary */}
-            <div className="flex-shrink-0 mb-4 flex items-center gap-2 border-b border-[#E0E0E0] pb-2">
+            <div className="flex-shrink-0 mb-4 flex items-center gap-[8px] border-b border-[#E0E0E0] pb-[8px]">
               <p className="text-[14px] font-medium text-black">Items</p>
               <input
                 type="text"
                 value={selectedRecord.numberOfItems || selectedRecord.totalMergedItems || 0}
                 readOnly
-                className="w-[30px] h-[30px] border border-[rgba(0,0,0,0.16)] rounded-full px-2 text-[12px] font-medium text-black bg-gray-200 text-center"
+                className="w-[30px] h-[30px] border border-[rgba(0,0,0,0.16)] rounded-full px-[8px] text-[12px] font-medium text-black bg-gray-200 text-center"
               />
               <div className="ml-auto">
                 <span className="text-[14px] font-medium text-black">Total Amount: </span>
@@ -1096,7 +1113,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
             </div>
 
             {/* Items List */}
-            <div className=" overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide pb-14" style={{ maxHeight: '400px' }}>
+            <div className=" overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide pb-[56px]" style={{ maxHeight: '400px' }}>
               {(() => {
                 // First, try to use allInventoryItems/inventoryItems for received items
                 const receivedItems = selectedRecord.allInventoryItems || selectedRecord.inventoryItems || selectedRecord.inventory_items || [];
@@ -1284,11 +1301,11 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   const isQuantityZero = quantity === 0;
 
                   return (
-                    <div key={index} className={`bg-white border rounded-[8px] p-3 ${isQuantityZero ? 'border-[#FF6B6B] border-2' : 'border-[#E0E0E0]'}`}>
+                    <div key={index} className={`bg-white border rounded-[8px] p-[12px] ${isQuantityZero ? 'border-[#FF6B6B] border-2' : 'border-[#E0E0E0]'}`}>
                       <div className=" ">
                         <div className="flex items-center justify-between">
                           <p className="text-[14px] font-semibold text-black">{itemName}</p>
-                          <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${getCategoryColor(category)}`}>
+                          <span className={`text-[10px] font-medium px-[10px] py-[4px] rounded-full ${getCategoryColor(category)}`}>
                             {(category || 'Electricals').toUpperCase()}
                           </span>
                         </div>
@@ -1322,11 +1339,11 @@ const IncomingTracker = ({ user, onTabChange }) => {
             </div>
           </div>
         ) : loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-[32px]">
             <p className="text-gray-500">Loading...</p>
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-[32px]">
             <p className="text-gray-500">
               {activeStatus === 'live'
                 ? 'No live incoming records with pending quantities'
@@ -1367,13 +1384,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 return (
                   <div
                     key={record.id || record._id || `${record.purchaseNo}_${record.vendorName}_${Math.random()}`}
-                    className="flex items-center justify-between py-3 px-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50"
+                    className="flex items-center justify-between py-[12px] px-[16px] border-b border-gray-200 cursor-pointer hover:bg-gray-50"
                     onClick={() => {
                       setSelectedRecord(record);
                       setShowDetailView(true);
                     }}
                   >
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-[4px]">
                       <span className="text-[12px] font-semibold text-[#BF9853]">
                         #{record.purchaseNo || record.entryNumber}
                       </span>
@@ -1406,10 +1423,10 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 }
                 return (
                   <div key={recordId}>
-                    <div className={`relative overflow-hidden rounded-[8px] ${isClosedCard ? 'shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8]' : ''}`}>
+                    <div className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]">
                       {isClosedCard && (
                         <div
-                          className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                          className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                           style={{
                             opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                             transform: swipeOffset < 0
@@ -1421,7 +1438,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                         >
                           <button
                             type="button"
-                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditClosedRecord(record)
@@ -1433,7 +1450,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                         </div>
                       )}
                       <div
-                        className={`bg-white border rounded-lg p-4 relative ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'border-[#007233]' : 'border-gray-200'}`}
+                        className={`bg-white rounded-lg px-[12px] py-[12px] relative flex flex-col transition-all duration-300 ease-out ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'border-[#007233]' : 'border-gray-200'}`}
                         style={{
                           ...(isSelected ? { borderWidth: '1px', borderColor: '#007233' } : {}),
                           ...(isClosedCard ? {
@@ -1459,35 +1476,35 @@ const IncomingTracker = ({ user, onTabChange }) => {
                       >
                         {/* Green Checkmark Icon - Top Left */}
                         {isSelected && (
-                          <div className="absolute top-0 left-[-1px]">
+                          <div className="absolute top-[0px] left-[-1px]">
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <circle cx="10" cy="10" r="10" fill="#007233" />
                               <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           </div>
                         )}
-                        <div className="flex justify-between items-start">
+                        <div className="flex items-start justify-between gap-[8px] mb-[2px]">
                           {/* Left Side */}
-                          <div className="flex-1 pr-2">
+                          <div className="flex-1 min-w-0">
                             <div
-                              className="flex items-center gap-1 mb-1 cursor-pointer hover:opacity-80"
+                              className="flex items-center gap-[8px] mb-[2px] cursor-pointer hover:opacity-80"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedRecord(record);
                                 setShowDetailView(true);
                               }}
                             >
-                              <span className="text-[12px] font-semibold text-black">
+                              <span className="text-[12px] font-semibold text-black leading-snug">
                                 #{record.purchaseNo || record.entryNumber}
                               </span>
-                              <span className="text-[12px] font-semibold text-black">
+                              <span className="text-[12px] font-semibold text-black leading-snug">
                                 , {record.vendorName}
                               </span>
                             </div>
-                            <p className="text-[12px] text-gray-600 mb-1">
+                            <p className="text-[12px] text-gray-600 leading-snug mb-0.5 break-words">
                               {record.stockingLocation}
                             </p>
-                            <p className="text-[12px] text-gray-500">
+                            <p className="text-[11px] font-medium text-[#777777] leading-snug break-words">
                               {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
                                 day: '2-digit',
                                 month: '2-digit',
@@ -1499,12 +1516,12 @@ const IncomingTracker = ({ user, onTabChange }) => {
                             </p>
                           </div>
                           {/* Right Side */}
-                          <div className="flex flex-col items-end">
-                            <p className="text-[12px] text-gray-600 mb-1">
+                          <div className="flex-shrink-0 flex flex-col items-end gap-[4px]">
+                            <p className="text-[11px] font-medium text-gray-600 leading-snug">
                               No. of Items - {displayItems}
                             </p>
-                            <p className='mb-[20px]'></p>
-                            <p className="text-[12px] font-semibold text-[#BF9853] mb-1">
+                            <p className="hidden"></p>
+                            <p className="text-[12px] font-semibold text-[#BF9853] leading-snug">
                               Quantity - {displayQuantity}
                             </p>
                           </div>
@@ -1520,7 +1537,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
       </div>
       {/* Close PO Button - Above bottom footer */}
       {!showDetailView && activeStatus === 'live' && selectedLiveCardId && (
-        <div className="flex-shrink-0 flex justify-end px-4 py-3">
+        <div className="flex-shrink-0 flex justify-end py-[12px]">
           <button
             type="button"
             onClick={async () => {
@@ -1692,7 +1709,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 }
               }
             }}
-            className="w-[100px] bg-black text-white py-3 rounded-full text-[14px] font-medium"
+            className="w-[100px] bg-black text-white py-[12px] rounded-full text-[14px] font-medium"
           >
             Close PO
           </button>
@@ -1701,23 +1718,22 @@ const IncomingTracker = ({ user, onTabChange }) => {
       {/* Filter Modal */}
       {showFilterModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowFilterModal(false);
               setShowVendorDropdown(false);
               setShowLocationDropdown(false);
-              setShowPODropdown(false);
             }
           }}
         >
           <div
-            className="bg-white w-full max-w-[360px] rounded-t-3xl shadow-lg"
+            className="bg-white w-full rounded-t-3xl shadow-lg"
             style={{ maxHeight: '60vh' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 pt-4 mb-3">
+            <div className="flex items-center justify-between px-[24px] pt-[16px] pb-3 border-b border-[rgba(0,0,0,0.08)] flex-shrink-0">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
               <button
                 type="button"
@@ -1725,7 +1741,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   setShowFilterModal(false);
                   setShowVendorDropdown(false);
                   setShowLocationDropdown(false);
-                  setShowPODropdown(false);
                 }}
                 className="text-red-500 hover:text-red-700"
               >
@@ -1733,7 +1748,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
               </button>
             </div>
             {/* Modal Content */}
-            <div className="px-6 overflow-visible">
+            <div className="flex-1 overflow-y-auto px-[24px] py-3">
               {/* Vendor Name */}
               <div className="space-y-[6px]">
                 <div className="relative">
@@ -1744,7 +1759,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                       setFilterVendorName(value);
                       setShowVendorDropdown(false);
                       setShowLocationDropdown(false);
-                      setShowPODropdown(false);
                     }}
                     options={vendorData.map((v) => v.vendorName || v.name || '').filter(Boolean)}
                     placeholder="Select"
@@ -1754,8 +1768,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   />
                 </div>
                 {/* Stocking Location */}
-                <div className="relative flex items-center gap-2">
-                  <div>
+                <div className="relative flex items-center gap-[12px]">
+                  <div className="flex-1 min-w-0">
                     <label className="text-[13px] font-medium text-black mb-0.5">Stocking Location</label>
                     <SearchableDropdown
                       value={filterStockingLocation}
@@ -1763,7 +1777,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
                         setFilterStockingLocation(value);
                         setShowVendorDropdown(false);
                         setShowLocationDropdown(false);
-                        setShowPODropdown(false);
                       }}
                       options={siteData.map((s) => s.siteName || s.name || '').filter(Boolean)}
                       placeholder="Select"
@@ -1773,82 +1786,28 @@ const IncomingTracker = ({ user, onTabChange }) => {
                     />
                   </div>
                   {/* PO. No */}
-                  <div className="relative">
+                  <div className="relative flex-1 min-w-0">
                     <label className="block text-[13px] font-medium text-black mb-0.5">PO. No</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Enter"
-                        value={filterPONo}
-                        onChange={(e) => {
-                          setFilterPONo(e.target.value);
-                          setShowPODropdown(true);
-                          setShowVendorDropdown(false);
-                          setShowLocationDropdown(false);
-                        }}
-                        onFocus={() => {
-                          setShowPODropdown(true);
-                          setShowVendorDropdown(false);
-                          setShowLocationDropdown(false);
-                        }}
-                        className="w-full max-w-[120px] h-[32px] rounded px-3 border border-gray-300 text-[14px] bg-white focus:outline-none focus:border-gray-400"
-                        style={{
-                          paddingRight: filterPONo ? '60px' : '40px'
-                        }}
-                      />
-                      {filterPONo && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterPONo('');
-                            setShowPODropdown(false);
-                          }}
-                          className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                          style={{ right: '24px' }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPODropdown(!showPODropdown);
-                          setShowVendorDropdown(false);
-                          setShowLocationDropdown(false);
-                        }}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      {showPODropdown && (
-                        <div className="absolute z-[100] w-full max-w-[120px] mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                          {Array.from(new Set(incomingRecords.map(r => r.purchaseNo || r.entryNumber).filter(Boolean))).map((poNo) => (
-                            <div
-                              key={poNo}
-                              className="px-3 py-2 text-[14px] text-gray-700 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setFilterPONo(String(poNo).replace('#', ''));
-                                setShowPODropdown(false);
-                              }}
-                            >
-                              {String(poNo).replace('#', '')}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <SearchableDropdown
+                      value={filterPONo}
+                      onChange={(value) => {
+                        setFilterPONo(String(value).replace('#', ''));
+                        setShowVendorDropdown(false);
+                        setShowLocationDropdown(false);
+                      }}
+                      options={Array.from(new Set(incomingRecords.map(r => r.purchaseNo || r.entryNumber).filter(Boolean))).map((poNo) => String(poNo).replace('#', ''))}
+                      placeholder="Enter"
+                      fieldName="PO. No"
+                      showAddNew={false}
+                      showAllOptions={true}
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center gap-3 px-6 py-4">
+            <div className="flex items-center gap-[12px] px-[24px] py-[16px] border-t border-[rgba(0,0,0,0.08)] flex-shrink-0 bg-white">
               <button
                 type="button"
                 onClick={() => {
@@ -1858,9 +1817,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   setShowFilterModal(false);
                   setShowVendorDropdown(false);
                   setShowLocationDropdown(false);
-                  setShowPODropdown(false);
                 }}
-                className="px-6 w-[175px] h-[40px] py-2 border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
+                className="flex-1 px-[24px] h-[40px] py-[8px] border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -1870,9 +1828,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   setShowFilterModal(false);
                   setShowVendorDropdown(false);
                   setShowLocationDropdown(false);
-                  setShowPODropdown(false);
                 }}
-                className="px-6 py-2 w-[175px] h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
+                className="flex-1 px-[24px] py-[8px] h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
               >
                 Save
               </button>

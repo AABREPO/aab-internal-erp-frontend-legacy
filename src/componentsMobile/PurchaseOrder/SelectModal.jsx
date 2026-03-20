@@ -114,7 +114,7 @@ const SelectModal = ({ isOpen, onClose, onSelect, onAddNew, selectedValue, field
     >
       <div 
         ref={scrollContainerRef}
-        className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] p-6 max-h-[400px] overflow-y-auto transform -translate-y-24"
+        className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] p-[24px] max-h-[400px] overflow-y-auto transform -translate-y-24"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -131,7 +131,7 @@ const SelectModal = ({ isOpen, onClose, onSelect, onAddNew, selectedValue, field
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`Search ${fieldName.toLowerCase()}...`}
-            className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] px-3 pr-10 text-[12px] font-medium text-black bg-white"
+            className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] px-[12px] pr-[40px] text-[12px] font-medium text-black bg-white"
             autoFocus
           />
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -146,7 +146,7 @@ const SelectModal = ({ isOpen, onClose, onSelect, onAddNew, selectedValue, field
         {!showAddInput ? (
           <button
             onClick={() => setShowAddInput(true)}
-            className="w-full h-[36px] rounded-[6px] px-3 mb-3 bg-[#f3f5f7] flex items-center justify-center gap-2"
+            className="w-full h-[36px] rounded-[6px] px-[12px] mb-3 bg-[#f3f5f7] flex items-center justify-center gap-[8px]"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
@@ -160,11 +160,11 @@ const SelectModal = ({ isOpen, onClose, onSelect, onAddNew, selectedValue, field
               value={newOption}
               onChange={(e) => setNewOption(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleAddNew()}
-              className="w-full h-[36px] border border-[rgba(0,0,0,0.16)] rounded-[6px] px-3 text-[12px] font-medium text-black bg-white mb-2"
+              className="w-full h-[36px] border border-[rgba(0,0,0,0.16)] rounded-[6px] px-[12px] text-[12px] font-medium text-black bg-white mb-2"
               placeholder={`Enter new ${fieldName.toLowerCase()}`}
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="flex gap-[8px]">
               <button
                 onClick={handleAddNew}
                 className="flex-1 h-[36px] rounded-[6px] bg-black text-white text-[12px] font-medium"
@@ -195,7 +195,7 @@ const SelectModal = ({ isOpen, onClose, onSelect, onAddNew, selectedValue, field
                 key={index}
                 ref={isSelected ? selectedOptionRef : null}
                 onClick={() => handleSelect(option)}
-                className={`w-full rounded-[6px] px-3 flex items-center gap-3 ${
+                className={`w-full rounded-[6px] px-[12px] flex items-center gap-[12px] ${
                   isSelected
                     ? 'bg-white border-[0.8px] border-[#26bf94]'
                     : 'bg-[#f3f5f7]'
@@ -237,13 +237,13 @@ const SelectModal = ({ isOpen, onClose, onSelect, onAddNew, selectedValue, field
 
         {/* No results message */}
         {filteredOptions.length === 0 && options.length > 0 && searchQuery && (
-          <p className="text-[12px] text-[#777777] text-center py-4">
+          <p className="text-[12px] text-[#777777] text-center py-[16px]">
             No {fieldName.toLowerCase()} found matching "{searchQuery}". Add a new one above.
           </p>
         )}
 
         {options.length === 0 && !showAddInput && (
-          <p className="text-[12px] text-[#777777] text-center py-4">
+          <p className="text-[12px] text-[#777777] text-center py-[16px]">
             No {fieldName.toLowerCase()} options available. Add a new one above.
           </p>
         )}

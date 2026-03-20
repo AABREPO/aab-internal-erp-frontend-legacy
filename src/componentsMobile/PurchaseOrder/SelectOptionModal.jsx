@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Close from '../Images/close.png';
+import Search from '../Images/Search.png';
 
 const SelectOptionModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], onAddNew, fieldName = 'Option' }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,113 +103,109 @@ const SelectOptionModal = ({ isOpen, onClose, onSelect, selectedValue, options =
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2"
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
       onClick={handleBackdropClick}
+      style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       <div
         ref={scrollContainerRef}
-        className="bg-white w-full max-w-[360px] rounded-[16px] p-4 max-h-[70vh] overflow-y-auto transform -translate-y-24"
+        className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-[16px] font-medium text-black">Select {fieldName}</p>
-          <button onClick={onClose} className="text-[#e4572e] text-[20px] font-semibold">
-            ×
+        <div className="flex justify-between items-center px-[24px] pt-[24px]">
+          <p className="text-[16px] font-semibold text-black">Select {fieldName}</p>
+          <button onClick={onClose} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+            <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
           </button>
         </div>
 
         {/* Search Input */}
-        <div className="mb-2 relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search"
-            className="w-full h-[32px] border border-[#E0E0E0] rounded-[8px] px-3 pr-10 text-[12px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
-          />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M15 15L11 11" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+        <div className="px-[24px] pt-[4px] pb-[6px]">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search"
+              className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+              autoFocus
+            />
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+            </div>
           </div>
         </div>
 
-        {/* New Option Button */}
-        <div className="flex-1 overflow-y-auto px-1 w-[308px] max-h-[390px] mb-2 shadow-md rounded-lg">
-          <button
-            onClick={handleAddNewClick}
-            className="w-full h-[36px] px-3 flex items-center gap-2 hover:bg-[#f3f5f7] text-left mb-1"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <p className="text-[12px] font-medium text-black">New {fieldName}</p>
-          </button>
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+          <div className="shadow-md rounded-lg overflow-hidden">
+            {/* New Option Button */}
+            {onAddNew && (
+              <button
+                onClick={handleAddNewClick}
+                className="w-full px-[24px] flex items-center gap-[12px] transition-colors hover:bg-[#F5F5F5]"
+                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+              >
+                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 3V11M3 7H11" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p className="text-[12px] font-medium text-black">New {fieldName}</p>
+              </button>
+            )}
 
-          {/* Existing Options - Filtered by search */}
-          {sortedOptions.length > 0 && (
-            <div className="">
-              {sortedOptions.map((option, index) => {
-                const isSelected = selectedValue === option;
-                const isFavorite = favorites.includes(option);
-                return (
-                  <button
-                    key={index}
-                    ref={isSelected ? selectedOptionRef : null}
-                    onClick={() => handleSelect(option)}
-                    className={`w-full rounded-[6px] px-3 flex items-center gap-3 ${isSelected
-                      ? 'bg-[#FFF3E0]'
-                      : 'bg-white'
-                      }`}
-                    style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
-                  >
+            {/* Existing Options - Filtered by search */}
+            {sortedOptions.length > 0 ? (
+              <div className="space-y-0">
+                {sortedOptions.map((option, index) => {
+                  const isSelected = selectedValue === option;
+                  const isFavorite = favorites.includes(option);
+                  const { firstLine, secondLine } = splitOptionText(option);
+                  return (
                     <button
-                      onClick={(e) => handleToggleFavorite(e, option)}
-                      className="w-6 h-6 flex items-center justify-center flex-shrink-0"
+                      key={index}
+                      ref={isSelected ? selectedOptionRef : null}
+                      onClick={() => handleSelect(option)}
+                      className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${
+                        isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                      }`}
+                      style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                     >
-                      {isFavorite ? (
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      ) : (
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
+                      <button
+                        onClick={(e) => handleToggleFavorite(e, option)}
+                        className="w-6 h-6 flex items-center justify-center flex-shrink-0"
+                      >
+                        {isFavorite ? (
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" fill="#e4572e" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                      <div className="flex flex-col flex-1 min-w-0 text-left">
+                        <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                        {secondLine && (
+                          <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                        )}
+                      </div>
                     </button>
-                    <div className="flex flex-col flex-1 min-w-0 text-left">
-                      {(() => {
-                        const { firstLine, secondLine } = splitOptionText(option);
-                        return (
-                          <>
-                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
-                            {secondLine && (
-                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-[16px]">
+                <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                  {searchQuery.trim() ? 'No options found' : 'No options available'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-        {/* No results message */}
-        {filteredOptions.length === 0 && options.length > 0 && searchQuery && (
-          <p className="text-[12px] text-[#777777] text-center py-4">
-            No {fieldName.toLowerCase()}s found matching "{searchQuery}". Add a new one above.
-          </p>
-        )}
-
-        {options.length === 0 && (
-          <p className="text-[12px] text-[#777777] text-center py-4">
-            No {fieldName.toLowerCase()} options available. Add a new one above.
-          </p>
-        )}
-
       </div>
     </div>
   );

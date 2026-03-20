@@ -5,7 +5,7 @@ const BottomNav = ({ activeTab = 'home' }) => {
   const homeIconColor = isHomeActive ? '#bf9853' : '#979ea3'; // Golden/orange when active
   
   return (
-    <div className="fixed bottom-[9px] left-1/2 transform -translate-x-1/2 w-[362px] h-[60px] bg-white rounded-[10px] shadow-[3px_3px_16px_7px_rgba(0,0,0,0.12)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="fixed bottom-[9px] left-1/2 transform -translate-x-1/2 w-[360px] h-[60px] bg-white rounded-[10px] shadow-[3px_3px_16px_7px_rgba(0,0,0,0.12)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
       <div className="flex items-center justify-center gap-[27px] h-full px-[25.5px]">
         {/* Home */}
         <div className="flex flex-col items-center justify-center relative">

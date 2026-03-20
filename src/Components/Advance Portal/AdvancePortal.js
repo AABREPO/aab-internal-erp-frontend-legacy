@@ -1511,6 +1511,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           comments: description,
           machineTools: '',
           billCopyUrl: fileUrl || '',
+          source: "Advance Portal",
           branchId: activeBranchId,
           enteredBy: username,
         };

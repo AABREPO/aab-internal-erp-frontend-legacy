@@ -159,7 +159,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      <div className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] p-6 pb-8 relative transform -translate-y-24" style={{ minHeight: '400px', maxHeight: '80vh' }}>
+      <div className="bg-white w-full max-w-[360px] rounded-tl-[16px] rounded-tr-[16px] p-[24px] pb-[32px] relative transform -translate-y-24" style={{ minHeight: '400px', maxHeight: '80vh' }}>
         <div className="flex justify-between items-center mb-4">
           <p className="text-[16px] font-medium text-black">Select Category</p>
           <button onClick={onClose} className="text-[#e4572e] text-[14px] font-semibold underline">
@@ -169,7 +169,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
 
         {/* Segmented Control (Category/Group Name) - Only show if showGroupName is true */}
         {showGroupName && (
-          <div className="mb-4 flex items-center bg-[#F5F5F5] rounded-[8px] p-1 w-full">
+          <div className="mb-4 flex items-center bg-[#F5F5F5] rounded-[8px] p-[4px] w-full">
             <button
               onClick={() => setViewMode('category')}
               className={`flex-1 h-[32px] rounded-[6px] text-[12px] font-medium transition-colors ${
@@ -195,7 +195,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
 
         {/* Category View */}
         {(!showGroupName || viewMode === 'category') && (
-          <div ref={categoryScrollContainerRef} className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+          <div ref={categoryScrollContainerRef} className="grid grid-cols-2 gap-[12px] max-h-[50vh] overflow-y-auto">
             {sortedCategories.map((category) => {
               const isSelected = selectedCategory === category;
               const isFavorite = categoryFavorites.includes(category);
@@ -204,7 +204,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
                 key={category}
                 ref={isSelected ? selectedCategoryRef : null}
                 onClick={() => handleCategorySelect(category)}
-                className={`rounded-[6px] px-3 flex items-center gap-2 ${
+                className={`rounded-[6px] px-[12px] flex items-center gap-[8px] ${
                   isSelected
                     ? 'bg-white border-[0.8px] border-[#26bf94]'
                     : 'bg-[#f3f5f7]'
@@ -248,7 +248,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
         {viewMode === 'groupName' && (
           <div ref={groupNameScrollContainerRef} className=" max-h-[50vh] overflow-y-auto">
             {sortedGroupNames.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-[12px]">
                 {sortedGroupNames.map((option, index) => {
                   const isSelected = selectedGroupName === option.value;
                   const isFavorite = groupNameFavorites.includes(option.value);
@@ -257,7 +257,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
                     key={index}
                     ref={isSelected ? selectedGroupNameRef : null}
                     onClick={() => handleGroupNameSelect(option.value)}
-                    className={`w-full rounded-[6px] px-3 flex items-center gap-2 ${
+                    className={`w-full rounded-[6px] px-[12px] flex items-center gap-[8px] ${
                       isSelected
                         ? 'bg-white border-[0.8px] border-[#26bf94]'
                         : 'bg-[#f3f5f7]'
@@ -296,7 +296,7 @@ const CategorySelectModal = ({ isOpen, onClose, onSelect, selectedCategory, cate
                 })}
               </div>
             ) : (
-              <p className="text-[12px] text-[#777777] text-center py-4">
+              <p className="text-[12px] text-[#777777] text-center py-[16px]">
                 No group names available
               </p>
             )}

@@ -17,8 +17,8 @@ const Header = ({ title = "Project Advance", showBack = true, showNotification =
   };
   return (
     <>
-      <div className="fixed top-0 left-1/2 transform -translate-x-1/2 w-full max-w-[400px] h-[50px] bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>
-        <div className="relative flex items-center justify-between px-4 h-full">
+      <div className="fixed top-[0px] left-1/2 transform -translate-x-1/2 w-full max-w-[400px] h-[50px] bg-white z-40" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="relative flex items-center justify-between px-[16px] h-full">
           {/* Hamburger menu button */}
           {showBack && (
             <div 
@@ -37,7 +37,7 @@ const Header = ({ title = "Project Advance", showBack = true, showNotification =
           </p>
 
           {/* Right side icons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-[8px]">
             {showNotification && (
               <div className="w-[18.945px] h-[19.97px] cursor-pointer flex items-center">
                 <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">

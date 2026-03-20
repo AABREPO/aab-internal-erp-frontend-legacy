@@ -9,7 +9,7 @@ const ProfileModal = ({ user, isOpen, onClose, onLogout }) => {
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-[12px] p-6 w-full max-w-[320px] mx-4 shadow-lg"
+        className="bg-white rounded-[12px] p-[24px] w-full max-w-[320px] mx-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
         style={{ fontFamily: "'Manrope', sans-serif" }}
       >

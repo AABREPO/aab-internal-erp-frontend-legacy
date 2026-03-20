@@ -35,6 +35,8 @@ import QuotationHeading from './Components/Quotation/QuotationHeading';
 import DirectoryHeading from './Components/Directory/DirectoryHeading';
 import ToolsTrackerHeading from './Components/ToolsTracker/ToolsTrackerHeading';
 import TestToolsTrackerHeading from './Components/TestToolsTracker/TestToolsTrackerHeading';
+import MobileRFQLogin from './componentsMobile/RequestForQuotation/LoginPage';
+import MobileRFQ from './componentsMobile/RequestForQuotation/RequestForQuotation';
 
 function MainContentWithSidebarMargin({ children }) {
   const { isSidebarVisible } = useSidebar();
@@ -60,8 +62,13 @@ function AppContent({ user, handleLogout }) {
     };
   }, []);
 
-  const isMobileRoute = location.pathname.startsWith('/purchaseorder') || location.pathname.startsWith('/inventory') || location.pathname.startsWith('/toolsTracker') 
-  || location.pathname.startsWith('/portal') || location.pathname.startsWith('/loan');
+  const isMobileRoute =
+    location.pathname.startsWith('/purchaseorder') ||
+    location.pathname.startsWith('/inventory') ||
+    location.pathname.startsWith('/toolsTracker') ||
+    location.pathname.startsWith('/portal') ||
+    location.pathname.startsWith('/loan') ||
+    location.pathname.startsWith('/rfq');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
 
   return (
@@ -94,6 +101,32 @@ function AppContent({ user, handleLogout }) {
         <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route
+          path="/rfq-login"
+          element={
+            <MobileRFQLogin
+              onLogin={(userData) => {
+                // Reuse main login handling, but redirect to RFQ mobile route
+                const normalizedUser = {
+                  ...userData,
+                  branchId: userData?.branchId ?? userData?.branch_id ?? userData?.brachId ?? ''
+                };
+                localStorage.setItem('user', JSON.stringify(normalizedUser));
+                window.location.href = '/rfq';
+              }}
+              redirectPath="/rfq"
+            />
+          }
+        />
+        <Route
+          path="/rfq"
+          element={
+            <MobileRFQ
+              user={user}
+              onLogout={handleLogout}
+            />
+          }
+        />
         <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/testpurchaseorder' element={<TestPurchaseOrder />} />
         <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []} />} />

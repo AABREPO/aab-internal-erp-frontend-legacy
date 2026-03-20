@@ -558,10 +558,10 @@ const NetStock = () => {
     doc.save(`NetStock_${selectedDate.replace(/\//g, '-')}.pdf`);
   };
   return (
-    <div className="flex flex-col px-4 h-[calc(100vh-90px-80px)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
       {/* Date Row */}
       <div className="">
-        <div className=" pt-2 border-b border-gray-200">
+        <div className=" pt-[8px] border-b border-gray-200">
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -570,7 +570,7 @@ const NetStock = () => {
             >
               {selectedDate}
             </button>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-[12px]">
               {selectedCards.length > 0 && (
                 <button
                   type="button"
@@ -612,7 +612,7 @@ const NetStock = () => {
         </div>
       </div>
       {/* Filters Section */}
-      <div className="pt-2 mb-2">
+      <div className="pt-[8px] mb-2">
         {/* Category Filter */}
         <div className="space-y-[6px]">
           <div className="">
@@ -633,7 +633,7 @@ const NetStock = () => {
             <div className="relative">
               <div
                 onClick={() => setShowCategoryModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
                   color: selectedCategory ? '#000' : '#9E9E9E'
@@ -671,7 +671,7 @@ const NetStock = () => {
             <div className="relative">
               <div
                 onClick={() => setShowStockingLocationModal(true)}
-                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
                   color: selectedStockingLocation ? '#000' : '#9E9E9E'
@@ -703,7 +703,7 @@ const NetStock = () => {
           </div>
         </div>
         {/* Search Bar */}
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-[8px] mt-2">
           <div className="relative flex-1">
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -716,18 +716,18 @@ const NetStock = () => {
               placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[40px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none"
+              className="w-full h-[40px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] border border-[rgba(0,0,0,0.16)] rounded-full px-2 py-1 font-semibold text-black">{selectedCards.length}</span>
+          <div className="flex items-center gap-[8px]">
+            <div className="flex items-center gap-[8px]">
+              <span className="text-[12px] border border-[rgba(0,0,0,0.16)] rounded-full px-[8px] py-[4px] font-semibold text-black">{selectedCards.length}</span>
             </div>
             <div className="flex flex-col">
               <select
                 value={selectionFilter || 'All'}
                 onChange={(e) => setSelectionFilter(e.target.value)}
-                className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-1 text-[12px] font-medium bg-white"
+                className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[4px] text-[12px] font-medium bg-white"
                 style={{ minWidth: '100px' }}
               >
                 <option value="All">All</option>
@@ -795,7 +795,7 @@ const NetStock = () => {
                 setSelectAllFiltered(false);
               }
             }}
-            className={`w-14 h-5 rounded-full p-1 flex items-center transition-colors ${filteredData.length === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${selectAllFiltered ? 'bg-[#BEE6CC]' : 'bg-[#cfd4d8]'}`}
+            className={`w-14 h-5 rounded-full p-[4px] flex items-center transition-colors ${filteredData.length === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${selectAllFiltered ? 'bg-[#BEE6CC]' : 'bg-[#cfd4d8]'}`}
             title={filteredData.length === 0 ? 'No items to select' : (selectAllFiltered ? 'Unselect filtered items' : 'Select all filtered items')}
           >
             <div className={`bg-white w-5 h-4 rounded-full shadow transform transition-transform duration-200 ease-in-out ${selectAllFiltered ? 'translate-x-7' : 'translate-x-0'}`}></div>
@@ -803,7 +803,7 @@ const NetStock = () => {
         </div>
       </div>
       {/* Product List */}
-      <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide no-scrollbar scrollbar-none">
+      <div className="flex-1 overflow-y-auto pb-[16px] scrollbar-hide no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <p className="text-[14px] text-gray-500">Loading...</p>
@@ -823,7 +823,7 @@ const NetStock = () => {
                 >
                   {/* Checkmark icon for selected cards */}
                   {isSelected && (
-                    <div className="absolute -top-1 -left-0.5 w-6 h-6 bg-[#007233] rounded-full flex items-center justify-center z-10">
+                    <div className="absolute -top-[4px] -left-0.5 w-6 h-6 bg-[#007233] rounded-full flex items-center justify-center z-10">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M11.6667 3.5L5.25 10.5L2.33334 7.58333" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
@@ -843,13 +843,13 @@ const NetStock = () => {
                         }
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] cursor-pointer transition-all duration-300 ease-out"
                   >
                     <div className="flex items-start justify-between">
                       {/* Left side: Item details */}
                       <div className="flex-1">
                         {/* Item ID and Favorite */}
-                        <div className="flex items-center gap-1 mb-1">
+                        <div className="flex items-center gap-[4px] mb-1">
                           {item.isFavorite && (
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M6 1L7.545 4.13L11 4.635L8.5 7.07L9.09 10.5L6 8.885L2.91 10.5L3.5 7.07L1 4.635L4.455 4.13L6 1Z" fill="#EF4444" />
@@ -862,11 +862,11 @@ const NetStock = () => {
                             {item.itemName}
                           </p>
                           {item.status === 'Place Order' ? (
-                            <button className="bg-[#007233] text-white text-[11px] font-medium px-3 rounded-[4px]">
+                            <button className="bg-[#007233] text-white text-[11px] font-medium px-[12px] rounded-[4px]">
                               Place Order
                             </button>
                           ) : (
-                            <div className="bg-[#f7f1c9] text-[#BF9853] text-[11px] font-medium px-3 rounded-[15px] ">
+                            <div className="bg-[#f7f1c9] text-[#BF9853] text-[11px] font-medium px-[12px] rounded-[15px] ">
                               Available
                             </div>
                           )}
@@ -882,7 +882,7 @@ const NetStock = () => {
                           <p className="text-[12px] font-medium text-[#616161]">
                             {item.brand && item.type ? `${item.brand}, ${item.type}` : item.brand || item.type || ''}
                           </p>
-                          <p className="text-[11px] font-medium text-[#E4572E] pl-3">
+                          <p className="text-[11px] font-medium text-[#E4572E] pl-[12px]">
                             Net Stock : {String(item.netStock).padStart(2, '0')}
                           </p>
                         </div>

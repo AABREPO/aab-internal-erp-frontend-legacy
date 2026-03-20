@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import EditIcon from '../Images/edit1.png';
 import SelectOptionModal from '../PurchaseOrder/SelectOptionModal';
-
+import Close from '../Images/close.png';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import Search from '../Images/Search.png';
+import CloseIcon from '../Images/Close F.svg';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
@@ -10,6 +14,7 @@ const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_
 const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/vendor_Names';
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
 const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
+const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/employee_details';
 
 const NetStock = ({ user }) => {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
@@ -29,12 +34,15 @@ const NetStock = ({ user }) => {
   const [toolsItemNameFullData, setToolsItemNameFullData] = useState([]);
   const [projectsMap, setProjectsMap] = useState({});
   const [vendorsMap, setVendorsMap] = useState({});
+  const [employeesMap, setEmployeesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [itemIdOptions, setItemIdOptions] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
   const [machineNumbersList, setMachineNumbersList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [itemNameSearchQuery, setItemNameSearchQuery] = useState('');
+  const [itemIdSearchQuery, setItemIdSearchQuery] = useState('');
 
   // Edit stock bottom sheet state
   const [showEditStockModal, setShowEditStockModal] = useState(false);
@@ -237,6 +245,22 @@ const NetStock = ({ user }) => {
           const raw = await machineNumbersRes.json();
           setMachineNumbersList(extractArrayFromResponse(raw));
         }
+
+        // Fetch employees for Project Incharge
+        const employeesRes = await fetch(`${EMPLOYEE_DETAILS_BASE_URL}/site_engineers`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (employeesRes.ok) {
+          const data = await employeesRes.json();
+          const map = {};
+          (Array.isArray(data) ? data : []).forEach(e => {
+            map[e.id] = e.employee_name || e.employeeName || '';
+            map[String(e.id)] = e.employee_name || e.employeeName || '';
+          });
+          setEmployeesMap(map);
+        }
       } catch (error) {
         console.error('Error fetching lookup data:', error);
       }
@@ -285,9 +309,11 @@ const NetStock = ({ user }) => {
         if (trackerRes.ok) {
           const raw = await trackerRes.json();
           const data = extractArrayFromResponse(raw);
+          // Include all movement-related entry types so we can find the true last entry for current location
+          const movementTypes = ['entry', 'relocation', 'relocate', 'service_return', 'service return'];
           const entries = (Array.isArray(data) ? data : []).filter((entry) => {
-            const entryType = entry.tools_entry_type || entry.toolsEntryType || 'Entry';
-            return entryType.toLowerCase() === 'entry' || entryType.toLowerCase() === 'relocation';
+            const entryType = (entry.tools_entry_type || entry.toolsEntryType || 'Entry').toLowerCase().trim();
+            return movementTypes.some(t => entryType === t);
           });
           setToolsTrackerManagementData(entries);
         }
@@ -324,11 +350,12 @@ const NetStock = ({ user }) => {
       for (const entryItem of entryItems) {
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
-        const entryMachineNumber = entryItem.machine_number || entryItem.machineNumber || '';
+        const entryMachineNumberId = entryItem.machine_number_id || entryItem.machineNumberId;
+        const entryMachineNumberResolved = entryMachineNumberId ? resolveMachineNumberText(entryMachineNumberId) : (entryItem.machine_number || entryItem.machineNumber || '').trim();
 
         const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
         const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
-        const machineMatch = !machineNumber || (entryMachineNumber && String(entryMachineNumber).trim() === machineNumber.trim());
+        const machineMatch = !machineNumber || (String(entryMachineNumberResolved).trim() === String(machineNumber).trim());
 
         if (itemIdsMatch && brandMatch && machineMatch) {
           // Check if this specific item has home_location_id
@@ -355,24 +382,19 @@ const NetStock = ({ user }) => {
 
           // If we have a home_location_id (from entryItem or stock_management), add it to matching entries
           if (itemHomeLocationId) {
-            const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
+            const entryId = Number(entry.id ?? entry._id ?? 0) || 0;
             matchingEntries.push({
               homeLocationId: itemHomeLocationId,
-              date: entryDate
+              entryId
             });
           }
         }
       }
     }
 
-    // If we found entries with home_location_id, return the most recent one (by date)
+    // If we found entries with home_location_id, return the most recent one (by id, not date)
     if (matchingEntries.length > 0) {
-      // Sort by date descending (most recent first)
-      matchingEntries.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA; // Descending order
-      });
+      matchingEntries.sort((a, b) => b.entryId - a.entryId); // Descending by id (higher id = more recent)
       return matchingEntries[0].homeLocationId;
     }
 
@@ -405,60 +427,48 @@ const NetStock = ({ user }) => {
     return correctHomeLocationId || stockHomeLocationId;
   };
 
-  // Helper to get current location (To location) from tools_tracker_management - similar to History.jsx logic
-  const getCurrentToLocation = (itemIdsId, brandId, machineNumber, homeLocationId) => {
+  // Helper to get current location (To location) from tools_tracker_management.
+  // Uses the LAST entry for this itemIdsId (by id, not date) to get to_project_id (where the item moved to = current location).
+  // Only considers data that has this itemIdsId - does not use date or created_date_time.
+  const getCurrentToLocation = (itemIdsId, itemNameId, brandId, machineNumber, homeLocationId) => {
     if (!itemIdsId) return homeLocationId;
 
     let latestEntry = null;
-    let latestDate = null;
+    let latestEntryId = 0;
 
-    // Find the most recent entry in tools_tracker_management for this item
+    // Find the most recent entry in tools_tracker_management for this item (only by itemIdsId + brand + machine, use id for ordering)
     for (const entry of toolsTrackerManagementData) {
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
-      
+
       for (const entryItem of entryItems) {
         const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
         const entryBrandId = entryItem.brand_id || entryItem.brandId;
-        const entryMachineNumber = (entryItem.machine_number || entryItem.machineNumber || '').trim();
-        
+        const entryMachineNumberId = entryItem.machine_number_id || entryItem.machineNumberId;
+        const entryMachineNumberResolved = entryMachineNumberId ? resolveMachineNumberText(entryMachineNumberId) : (entryItem.machine_number || entryItem.machineNumber || '').trim();
+
         const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
         const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
-        const machineMatch = !machineNumber || (entryMachineNumber && entryMachineNumber === String(machineNumber).trim());
-        
+        const machineMatch = !machineNumber || (String(entryMachineNumberResolved).trim() === String(machineNumber).trim());
+
         if (itemIdsMatch && brandMatch && machineMatch) {
-          const entryDate = entry.created_date_time || entry.createdDateTime || entry.timestamp || '';
-          if (!latestDate || entryDate > latestDate) {
-            latestDate = entryDate;
+          const entryId = Number(entry.id ?? entry._id ?? 0) || 0;
+          if (entryId > latestEntryId) {
+            latestEntryId = entryId;
             latestEntry = { entry, entryItem };
           }
         }
       }
     }
-
+    // For the last entry: to_project_id is where the item was sent = current location
     if (latestEntry) {
-      const entryType = String(latestEntry.entry.tools_entry_type || latestEntry.entry.toolsEntryType || '').toLowerCase();
-      
-      if (entryType === 'entry') {
-        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
-        if (toProjectId) return toProjectId;
-        const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
-        if (serviceStoreId) return serviceStoreId;
-      } else if (entryType === 'relocate' || entryType === 'relocation') {
-        const itemHomeLocationId = latestEntry.entryItem.home_location_id || latestEntry.entryItem.homeLocationId;
-        if (itemHomeLocationId) return itemHomeLocationId;
-        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
-        if (toProjectId) return toProjectId;
-      } else if (entryType === 'service_return') {
-        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
-        if (toProjectId) return toProjectId;
-        const fromProjectId = latestEntry.entry.from_project_id || latestEntry.entry.fromProjectId;
-        if (fromProjectId) return fromProjectId;
-      } else {
-        const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
-        if (serviceStoreId) return serviceStoreId;
-        const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
-        if (toProjectId) return toProjectId;
-      }
+      const toProjectId = latestEntry.entry.to_project_id || latestEntry.entry.toProjectId;
+      if (toProjectId) return toProjectId;
+      const serviceStoreId = latestEntry.entry.service_store_id || latestEntry.entry.serviceStoreId;
+      if (serviceStoreId) return serviceStoreId;
+      const fromProjectId = latestEntry.entry.from_project_id || latestEntry.entry.fromProjectId;
+      if (fromProjectId) return fromProjectId;
+      const itemHomeLocationId = latestEntry.entryItem.home_location_id || latestEntry.entryItem.homeLocationId;
+      if (itemHomeLocationId) return itemHomeLocationId;
     }
 
     // Fallback to home location
@@ -496,8 +506,8 @@ const NetStock = ({ user }) => {
           // Get most recent home location from tools_tracker_management, fallback to stock_management
           const actualHomeLocationId = getHomeLocationId(itemIdsId, brandId, machineNumber, homeLocationId);
           const homeLocation = getLocationName(actualHomeLocationId);
-          // Get current location (To location) from tools_tracker_management
-          const currentLocationId = getCurrentToLocation(itemIdsId, brandId, machineNumber, actualHomeLocationId);
+          // Get current location from last entry's to_project_id
+          const currentLocationId = getCurrentToLocation(itemIdsId, itemNameId, brandId, machineNumber, actualHomeLocationId);
           const currentLocation = getLocationName(currentLocationId);
 
           // Use itemKey as mergeKey so each item shows as its own row (no merging of different tools)
@@ -512,6 +522,7 @@ const NetStock = ({ user }) => {
             location: homeLocation,
             currentLocation: currentLocation,
             brand,
+            model: (stock.model || '').trim() || '',
             machineNumber,
             status,
             quantity: 0,
@@ -548,6 +559,7 @@ const NetStock = ({ user }) => {
             location: homeLocation,
             currentLocation: '-',
             brand,
+            model: (stock.model || '').trim() || '-',
             machineNumber: '-',
             status: '-',
             quantity,
@@ -567,7 +579,6 @@ const NetStock = ({ user }) => {
         }
       }
     });
-
     // Convert Map to array
     const items = Array.from(itemsMap.values()).map(item => {
       // For items with itemIds, if merged (count > 1), show the count as quantity
@@ -581,7 +592,6 @@ const NetStock = ({ user }) => {
       }
       return item;
     });
-
     // Apply filters
     let filtered = items;
     if (selectedItemName) {
@@ -598,14 +608,12 @@ const NetStock = ({ user }) => {
     if (selectedBrand) {
       filtered = filtered.filter(item => item.brand === selectedBrand);
     }
-
     return filtered;
   }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, selectedBrand, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getCurrentToLocation, getLocationName, resolveMachineNumberText, resolveItemIdDisplay, resolveBrandDisplay, resolveItemNameDisplay]);
 
   // Apply universal search filter to tableData
   const filteredTableData = useMemo(() => {
     if (!searchQuery.trim()) return tableData;
-    
     const query = searchQuery.toLowerCase().trim();
     return tableData.filter(item => {
       const searchableText = [
@@ -614,11 +622,11 @@ const NetStock = ({ user }) => {
         item.location || '',
         item.currentLocation || '',
         item.brand || '',
+        item.model || '',
         item.machineNumber || '',
         item.status || '',
         item.quantity?.toString() || ''
       ].join(' ').toLowerCase();
-      
       return searchableText.includes(query);
     });
   }, [tableData, searchQuery]);
@@ -627,20 +635,16 @@ const NetStock = ({ user }) => {
   const aggregatedSummary = useMemo(() => {
     const aggregated = {};
     const processedItemIds = new Set();
-
     // Process stock management data directly
     stockManagementData.forEach((stock) => {
       const itemNameId = stock.item_name_id ?? stock.itemNameId;
       const itemIdsId = stock.item_ids_id ?? stock.itemIdsId;
       const brandId = stock.brand_name_id ?? stock.brandNameId ?? stock.brand_id ?? stock.brandId;
       const quantity = parseInt(stock.quantity || 0, 10);
-
       if (!itemNameId) return;
-
       const itemName = resolveItemNameDisplay(itemNameId);
       const brand = resolveBrandDisplay(brandId);
       const key = `${itemName}_${brand}`;
-
       if (!aggregated[key]) {
         aggregated[key] = {
           itemName,
@@ -650,7 +654,6 @@ const NetStock = ({ user }) => {
           total: 0
         };
       }
-
       if (itemIdsId) {
         // Track unique itemIds
         const itemId = resolveItemIdDisplay(itemIdsId);
@@ -662,7 +665,6 @@ const NetStock = ({ user }) => {
         aggregated[key].quantitySum += quantity;
       }
     });
-
     // Also check tools_tracker_management for items that might have been transferred
     toolsTrackerManagementData.forEach((entry) => {
       const entryItems = entry.tools_tracker_item_name_table ?? entry.toolsTrackerItemNameTable ?? [];
@@ -670,13 +672,10 @@ const NetStock = ({ user }) => {
         const itemNameId = entryItem.item_name_id ?? entryItem.itemNameId;
         const itemIdsId = entryItem.item_ids_id ?? entryItem.itemIdsId;
         const brandId = entryItem.brand_id ?? entryItem.brandId;
-
         if (!itemNameId) return;
-
         const itemName = resolveItemNameDisplay(itemNameId);
         const brand = resolveBrandDisplay(brandId);
         const key = `${itemName}_${brand}`;
-
         if (!aggregated[key]) {
           aggregated[key] = {
             itemName,
@@ -686,7 +685,6 @@ const NetStock = ({ user }) => {
             total: 0
           };
         }
-
         if (itemIdsId) {
           // Track unique itemIds
           const itemId = resolveItemIdDisplay(itemIdsId);
@@ -698,7 +696,6 @@ const NetStock = ({ user }) => {
         // This is just to capture itemIds that might be in transfers but not in stock
       });
     });
-
     // Convert Sets to counts and calculate totals
     const result = Object.values(aggregated).map(item => ({
       itemName: item.itemName,
@@ -707,7 +704,6 @@ const NetStock = ({ user }) => {
       quantitySum: item.quantitySum,
       total: item.itemIdSet.size + item.quantitySum
     }));
-
     // Filter if needed
     let filtered = result;
     if (selectedItemName) {
@@ -716,7 +712,6 @@ const NetStock = ({ user }) => {
     if (selectedBrand) {
       filtered = filtered.filter(item => item.brand === selectedBrand);
     }
-
     return filtered.sort((a, b) => {
       if (a.itemName !== b.itemName) {
         return a.itemName.localeCompare(b.itemName);
@@ -724,11 +719,9 @@ const NetStock = ({ user }) => {
       return a.brand.localeCompare(b.brand);
     });
   }, [stockManagementData, toolsTrackerManagementData, resolveItemNameDisplay, resolveBrandDisplay, resolveItemIdDisplay, selectedItemName, selectedBrand]);
-
   // Apply universal search filter to aggregatedSummary
   const filteredAggregatedSummary = useMemo(() => {
     if (!searchQuery.trim()) return aggregatedSummary;
-    
     const query = searchQuery.toLowerCase().trim();
     return aggregatedSummary.filter(item => {
       const searchableText = [
@@ -738,30 +731,41 @@ const NetStock = ({ user }) => {
         item.quantitySum?.toString() || '',
         item.total?.toString() || ''
       ].join(' ').toLowerCase();
-      
+
       return searchableText.includes(query);
     });
   }, [aggregatedSummary, searchQuery]);
 
-  // Close dropdowns when clicking outside
+  // Filter item name options based on search
+  const getFilteredItemNameOptions = () => {
+    const query = (itemNameSearchQuery || '').trim().toLowerCase();
+    if (!query) return itemNameOptions;
+    return itemNameOptions.filter(option =>
+      String(option).toLowerCase().includes(query)
+    );
+  };
+
+  // Filter item ID options based on search
+  const getFilteredItemIdOptions = () => {
+    const query = (itemIdSearchQuery || '').trim().toLowerCase();
+    if (!query) return itemIdOptions;
+    return itemIdOptions.filter(option =>
+      String(option).toLowerCase().includes(query)
+    );
+  };
+
+  // Reset search queries when dropdowns close
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.dropdown-container')) {
-        setShowItemNameDropdown(false);
-        setShowItemIdDropdown(false);
-      }
-    };
-
-    if (showItemNameDropdown || showItemIdDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
+    if (!showItemNameDropdown) {
+      setItemNameSearchQuery('');
     }
+  }, [showItemNameDropdown]);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [showItemNameDropdown, showItemIdDropdown]);
+  useEffect(() => {
+    if (!showItemIdDropdown) {
+      setItemIdSearchQuery('');
+    }
+  }, [showItemIdDropdown]);
 
   // Swipe handlers for edit functionality
   const minSwipeDistance = 50;
@@ -909,6 +913,148 @@ const NetStock = ({ user }) => {
     };
   }, [tableData]);
 
+  // Helper to get Project Incharge from tools_tracker_management
+  // Only considers data that has this itemIdsId; uses id (not date) to pick the latest entry
+  const getProjectIncharge = (itemIdsId, brandId, machineNumber) => {
+    if (!itemIdsId) return '-';
+
+    let latestEntry = null;
+    let latestEntryId = 0;
+
+    // Find the most recent entry in tools_tracker_management for this item (by id, not date)
+    for (const entry of toolsTrackerManagementData) {
+      const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+
+      for (const entryItem of entryItems) {
+        const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+        const entryBrandId = entryItem.brand_id || entryItem.brandId;
+        const entryMachineNumberId = entryItem.machine_number_id || entryItem.machineNumberId;
+        const entryMachineNumberResolved = entryMachineNumberId ? resolveMachineNumberText(entryMachineNumberId) : (entryItem.machine_number || entryItem.machineNumber || '').trim();
+
+        const itemIdsMatch = entryItemIdsId && String(entryItemIdsId) === String(itemIdsId);
+        const brandMatch = !brandId || (entryBrandId && String(entryBrandId) === String(brandId));
+        const machineMatch = !machineNumber || (String(entryMachineNumberResolved).trim() === String(machineNumber).trim());
+
+        if (itemIdsMatch && brandMatch && machineMatch) {
+          const entryId = Number(entry.id ?? entry._id ?? 0) || 0;
+          if (entryId > latestEntryId) {
+            latestEntryId = entryId;
+            latestEntry = entry;
+          }
+        }
+      }
+    }
+
+    if (latestEntry) {
+      const projectInchargeId = latestEntry.project_incharge_id || latestEntry.projectInchargeId;
+      if (projectInchargeId) {
+        return employeesMap[projectInchargeId] || employeesMap[String(projectInchargeId)] || '-';
+      }
+    }
+
+    return '-';
+  };
+
+  // Generate PDF function
+  const handleDownloadPDF = () => {
+    if (!filteredTableData || filteredTableData.length === 0) {
+      alert('No data to download');
+      return;
+    }
+    const doc = new jsPDF({
+      orientation: "landscape",
+    });
+    // Title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Net Stock Report', 10, 18);
+
+    // Prepare table data
+    const tableData = filteredTableData.map((item, index) => {
+      // Get Model and Project Incharge from stock management
+      let model = '-';
+      let projectIncharge = '-';
+
+      if (item.hasItemId && item.itemId !== '-') {
+        // Find the stock item by matching itemId display string, brand, and machineNumber
+        const stockItem = stockManagementData.find(stock => {
+          const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+          if (!stockItemIdsId) return false;
+
+          const stockItemIdDisplay = resolveItemIdDisplay(stockItemIdsId);
+          const stockBrandId = stock.brand_name_id || stock.brandNameId;
+          const stockBrandDisplay = resolveBrandDisplay(stockBrandId);
+          const stockMachineNumberId = stock.machine_number_id || stock.machineNumberId;
+          const stockMachineNumberRaw = stock.machine_number || stock.machineNumber || '';
+          const stockMachineNumber = stockMachineNumberId ? resolveMachineNumberText(stockMachineNumberId) : stockMachineNumberRaw;
+
+          const itemIdMatch = stockItemIdDisplay === item.itemId;
+          const brandMatch = !item.brand || stockBrandDisplay === item.brand;
+          const machineMatch = !item.machineNumber || item.machineNumber === '-' || stockMachineNumber === item.machineNumber;
+
+          return itemIdMatch && brandMatch && machineMatch;
+        });
+
+        if (stockItem) {
+          model = stockItem.model || '-';
+
+          // Get Project Incharge using the stock item's IDs
+          const itemIdsId = stockItem.item_ids_id || stockItem.itemIdsId;
+          const brandId = stockItem.brand_name_id || stockItem.brandNameId;
+          const machineNumber = stockItem.machine_number || stockItem.machineNumber || '';
+          projectIncharge = getProjectIncharge(itemIdsId, brandId, machineNumber);
+        }
+      }
+
+      return [
+        index + 1, // S.No
+        item.itemName || '-', // Item Name
+        item.itemId || '-', // Item ID
+        item.brand || '-', // Brand
+        model, // Model
+        item.machineNumber && item.machineNumber !== '-' ? item.machineNumber : '-', // Machine Number
+        item.location && item.location !== '-' ? item.location : '-', // Home
+        item.currentLocation && item.currentLocation !== '-' ? item.currentLocation : '-', // Current
+        projectIncharge // Project Incharge
+      ];
+    });
+
+    // Generate table - transparent bg, lighter borders, no extra column (like PendingItems)
+    const columnWidths = [12, 36, 20, 20, 26, 30, 50, 50, 35];
+    const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
+    autoTable(doc, {
+      head: [['S.No', 'Item Name', 'Item ID', 'Brand', 'Model', 'Machine Number', 'Home', 'Current', 'Project Incharge']],
+      body: tableData,
+      startY: 24,
+      tableWidth,
+      styles: { fontSize: 7, cellPadding: 1.5, fillColor: false, lineColor: [180, 180, 180], lineWidth: 0.1 },
+      headStyles: { fillColor: false, textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 7, lineColor: [180, 180, 180], lineWidth: 0.1 },
+      alternateRowStyles: { fillColor: false },
+      tableLineColor: [180, 180, 180],
+      tableLineWidth: 0.1,
+      columnStyles: Object.fromEntries(columnWidths.map((w, i) => [i, { cellWidth: w }])),
+      margin: { left: 10, right: 10 },
+      didDrawPage: function (data) {
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.text(`Page ${data.pageNumber} of ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+      }
+    });
+
+    // Generate filename
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/\//g, '-');
+    const filename = `Net_Stock_${dateStr}.pdf`;
+
+    // Save PDF
+    doc.save(filename);
+  };
+
   // Handle save edit stock
   const handleSaveEditStock = async () => {
     if (!selectedItemForEdit || !newCount) {
@@ -986,44 +1132,62 @@ const NetStock = ({ user }) => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white px-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      {/* Category and Brand Section */}
-      <div className="flex justify-end mt-1.5">
-        <button
-          type="button"
-          onClick={() => setShowBrandModal(true)}
-          className="text-[12px] text-black font-semibold leading-normal mb-2 cursor-pointer hover:underline p-0 border-0 bg-transparent text-right"
-        >
-          {selectedBrand ? selectedBrand : 'Brand'}
-        </button>
-      </div>
-
-      {/* Table/List Segmented Control */}
-      <div className="flex-shrink-0">
-        <div className="flex bg-[#F2F4F7] items-center h-9 shadow-sm rounded-md">
-          <button
-            onClick={() => setViewMode('table')}
-            className={`flex-1 px-4 ml-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'table'
-              ? 'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            Table
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`flex-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'list'
-              ? 'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            List
-          </button>
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white " style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        {/* Category and Brand Section */}
+        <div className="flex items-center justify-between pb-[8px] border-b border-[#E0E0E0]">
+          <div className="flex items-center gap-[4px] min-w-0">
+            <button
+              type="button"
+              onClick={() => setShowBrandModal(true)}
+              className="text-[12px] text-black font-semibold leading-normal cursor-pointer hover:underline p-[0px] border-0 bg-transparent text-right"
+            >
+              {selectedBrand ? selectedBrand : 'Brand'}
+            </button>
+            {selectedBrand && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedBrand(null);
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <span className="text-[12px] font-semibold cursor-pointer whitespace-nowrap" onClick={handleDownloadPDF}>Download</span>
+        </div>
+        {/* Table/List Segmented Control */}
+        <div className="flex-shrink-0 pt-[8px]">
+          <div className="flex bg-[#F2F4F7] items-center h-[32px] shadow-sm rounded-md">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex-1 px-[16px] ml-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'table'
+                ? 'bg-white text-black'
+                : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex-1 px-[16px] mr-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'list'
+                ? 'bg-white text-black'
+                : 'bg-gray-100 text-gray-600'
+                }`}
+            >
+              List
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Item Name and Item ID Dropdowns */}
-      <div className="flex gap-3 mt-2">
+      <div className="flex gap-[12px] pt-[10px]">
         {/* Item Name Dropdown */}
         <div className="flex-1 relative dropdown-container">
           <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Item Name</p>
@@ -1033,42 +1197,121 @@ const NetStock = ({ user }) => {
                 setShowItemNameDropdown(!showItemNameDropdown);
                 setShowItemIdDropdown(false);
               }}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer truncate whitespace-nowrap overflow-hidden"
               style={{
                 color: selectedItemName ? '#000' : '#9E9E9E',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                paddingRight: selectedItemName ? '40px' : '40px'
               }}
             >
               {selectedItemName || 'Select'}
             </div>
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
+            {selectedItemName && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedItemName(null);
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+              </button>
+            )}
+            {!selectedItemName && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
             {showItemNameDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] max-h-[200px] overflow-y-auto">
-                <div
-                  onClick={() => {
-                    setSelectedItemName(null);
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
                     setShowItemNameDropdown(false);
-                  }}
-                  className="px-3 py-2 text-[12px] font-medium cursor-pointer hover:bg-gray-100"
-                >
-                  All
-                </div>
-                {itemNameOptions.map((name) => (
-                  <div
-                    key={name}
-                    onClick={() => {
-                      setSelectedItemName(name);
-                      setShowItemNameDropdown(false);
-                    }}
-                    className="px-3 py-2 text-[12px] font-medium cursor-pointer hover:bg-gray-100"
-                  >
-                    {name}
+                  }
+                }}
+                style={{ fontFamily: "'Manrope', sans-serif" }}
+              >
+                <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                    <p className="text-[16px] font-semibold text-black">Select Item Name</p>
+                    <button onClick={() => setShowItemNameDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                      <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                    </button>
                   </div>
-                ))}
+                  <div className="px-[24px] pt-[4px] pb-[6px]">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={itemNameSearchQuery}
+                        onChange={(e) => setItemNameSearchQuery(e.target.value)}
+                        placeholder="Search"
+                        className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                        autoFocus
+                      />
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+                    <div className="shadow-md rounded-lg overflow-hidden">
+                      {getFilteredItemNameOptions().length > 0 ? (
+                        <div className="space-y-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedItemName(null);
+                              setShowItemNameDropdown(false);
+                            }}
+                            className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${!selectedItemName ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                              }`}
+                            style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                          >
+                            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">All</p>
+                          </button>
+                          {getFilteredItemNameOptions().map((name) => {
+                            const isSelected = selectedItemName === name;
+                            return (
+                              <button
+                                key={name}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedItemName(name);
+                                  setShowItemNameDropdown(false);
+                                }}
+                                className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                  }`}
+                                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                              >
+                                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </div>
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">{name}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-[16px]">
+                          <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                            {itemNameSearchQuery.trim() ? 'No options found' : 'No options available'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1083,42 +1326,121 @@ const NetStock = ({ user }) => {
                 setShowItemIdDropdown(!showItemIdDropdown);
                 setShowItemNameDropdown(false);
               }}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{
                 color: selectedItemId ? '#000' : '#9E9E9E',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                paddingRight: selectedItemId ? '40px' : '40px'
               }}
             >
               {selectedItemId || 'Select'}
             </div>
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
+            {selectedItemId && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedItemId(null);
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+              </button>
+            )}
+            {!selectedItemId && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
             {showItemIdDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-[rgba(0,0,0,0.16)] rounded-[8px] max-h-[200px] overflow-y-auto">
-                <div
-                  onClick={() => {
-                    setSelectedItemId(null);
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
                     setShowItemIdDropdown(false);
-                  }}
-                  className="px-3 py-2 text-[12px] font-medium cursor-pointer hover:bg-gray-100"
-                >
-                  All
-                </div>
-                {itemIdOptions.map((id) => (
-                  <div
-                    key={id}
-                    onClick={() => {
-                      setSelectedItemId(id);
-                      setShowItemIdDropdown(false);
-                    }}
-                    className="px-3 py-2 text-[12px] font-medium cursor-pointer hover:bg-gray-100"
-                  >
-                    {id}
+                  }
+                }}
+                style={{ fontFamily: "'Manrope', sans-serif" }}
+              >
+                <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="flex justify-between items-center px-[24px] pt-[24px]">
+                    <p className="text-[16px] font-semibold text-black">Select Item ID</p>
+                    <button onClick={() => setShowItemIdDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
+                      <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+                    </button>
                   </div>
-                ))}
+                  <div className="px-[24px] pt-[4px] pb-[6px]">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={itemIdSearchQuery}
+                        onChange={(e) => setItemIdSearchQuery(e.target.value)}
+                        placeholder="Search"
+                        className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                        autoFocus
+                      />
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
+                    <div className="shadow-md rounded-lg overflow-hidden">
+                      {getFilteredItemIdOptions().length > 0 ? (
+                        <div className="space-y-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedItemId(null);
+                              setShowItemIdDropdown(false);
+                            }}
+                            className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${!selectedItemId ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                              }`}
+                            style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                          >
+                            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">All</p>
+                          </button>
+                          {getFilteredItemIdOptions().map((id) => {
+                            const isSelected = selectedItemId === id;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedItemId(id);
+                                  setShowItemIdDropdown(false);
+                                }}
+                                className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                                  }`}
+                                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                              >
+                                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </div>
+                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">{id}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-[16px]">
+                          <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                            {itemIdSearchQuery.trim() ? 'No options found' : 'No options available'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1126,7 +1448,7 @@ const NetStock = ({ user }) => {
       </div>
 
       {/* Universal Search and Download */}
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-[8px] pt-[6px] pb-[6px]">
         <div className="flex-1 relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1139,21 +1461,21 @@ const NetStock = ({ user }) => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[36px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
+            className="w-full h-[36px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
           />
         </div>
-        <span className="text-[12px] text-gray-400 font-semibold cursor-pointer whitespace-nowrap">Download</span>
+        
       </div>
 
       {/* Main Content Area */}
-      <div key={viewMode} className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pb-4">
+      <div key={viewMode} className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pb-[8px]">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <p className="text-[14px] text-gray-500">Loading...</p>
           </div>
         ) : viewMode === 'table' ? (
           /* Table View - Individual Items */
-          <div className="mt-1.5">
+          <div className="pt-[6px">
             {filteredTableData.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
@@ -1175,10 +1497,10 @@ const NetStock = ({ user }) => {
                         : 0;
 
                     return (
-                      <div key={itemId} className="relative shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
+                      <div key={itemId} className="relative shadow-xl border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
                         {/* Card */}
                         <div
-                          className="bg-white rounded-[8px] h-full px-3 py-3 cursor-pointer transition-all duration-300 ease-out select-none"
+                          className="bg-white rounded-[8px] h-full px-[12px] py-[10px] cursor-pointer transition-all duration-300 ease-out select-none"
                           style={{
                             transform: `translateX(${swipeOffset}px)`,
                             touchAction: 'pan-y',
@@ -1193,7 +1515,7 @@ const NetStock = ({ user }) => {
                         >
                           <div className="flex flex-col">
                             {/* Top line: Location, Item Name and Status badge */}
-                            <div className="flex justify-between items-start mb-0.5">
+                            <div className="flex justify-between items-start">
                               <p className="text-[12px] font-semibold leading-tight">
                                 {item.location !== '-' ? (
                                   <>
@@ -1204,37 +1526,39 @@ const NetStock = ({ user }) => {
                                 )}
                               </p>
                               {item.status !== '-' && (
-                                <span className={`px-2 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0 ml-3 ${item.status === 'Working' ? 'bg-green-100 text-green-800' :
-                                    item.status === 'Dead' ? 'bg-orange-100 text-orange-800' :
-                                      'bg-gray-100 text-gray-800'
+                                <span className={`pl-[6px] pr-[10px] py-[2px] rounded-full text-[10px] font-medium whitespace-nowrap flex-shrink-0 ml-3 ${item.status === 'Working' ? 'bg-[#E6FFEE] text-[#007233]' :
+                                  item.status === 'Not Working' ? 'bg-[#FFF2DB] text-[#BF9853]' : item.status === 'Machine Dead' ? 'bg-[#FFEAE4] text-[#E4572E]' :
+                                    'bg-[#E6E6E6] text-[#212121]'
                                   }`}>
-                                  {item.status}
+                                  • {item.status}
                                 </span>
                               )}
                             </div>
                             <div className="flex justify-between items-start mb-0.5">
                               <div className="flex flex-col">
                                 <p className="text-[11px] leading-tight">
-                                  <span className="text-[#848484] font-medium">Home: </span>
-                                  <span className="text-[#848484] font-medium">{item.location !== '-' ? item.location : '-'}</span>
+                                  <span className="text-black font-semibold">Home: </span>
+                                  <span className="text-black font-semibold">{item.location !== '-' ? item.location : '-'}</span>
                                 </p>
                                 <p className="text-[11px] leading-tight text-[#BF9853] mt-0.5">
-                                  <span className=" font-medium">Current: </span>
-                                  <span className=" font-medium">{item.currentLocation && item.currentLocation !== '-' ? item.currentLocation : '-'}</span>
+                                  <span className=" font-semibold">Current: </span>
+                                  <span className=" font-semibold">{item.currentLocation && item.currentLocation !== '-' ? item.currentLocation : '-'}</span>
                                 </p>
                               </div>
                             </div>
                             {/* Middle line: Machine number - empty opposite */}
                             <div className="flex justify-between items-start mb-0.5">
-                              <p className="text-[12px] text-gray-700 leading-tight">
+                              <p className="text-[12px] text-black leading-tight">
                                 {item.machineNumber !== '-' ? resolveMachineNumberText(item.machineNumber) : ''}
                               </p>
                               <div className="flex-shrink-0 ml-3"></div>
                             </div>
-                            {/* Bottom line: Brand and Item ID/Quantity */}
-                            <div className="flex justify-between items-start">
-                              <p className="text-[12px] text-gray-700 leading-tight">{item.brand}</p>
-                              <p className="text-[12px] font-medium text-black flex-shrink-0 ml-3">
+                            {/* Bottom line: Brand, Model and Item ID/Quantity */}
+                            <div className="flex justify-between items-start gap-2">
+                              <p className="text-[12px] text-[#9E9E9E] font-semibold leading-tight min-w-0 flex-1">
+                                {[item.brand || '', item.model && item.model !== '' ? item.model : null].filter(Boolean).join(', ') || ''}
+                              </p>
+                              <p className="text-[12px] font-medium text-black flex-shrink-0">
                                 {item.hasItemId
                                   ? (item.isMerged ? item.quantity : item.itemId)
                                   : item.quantity}
@@ -1244,7 +1568,7 @@ const NetStock = ({ user }) => {
                         </div>
                         {/* Edit Button - Behind the card on the right, revealed on swipe */}
                         <div
-                          className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                          className="absolute right-0 top-0 bottom-0 flex gap-[8px] flex-shrink-0 z-0"
                           style={{
                             opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                             transform: swipeOffset < 0
@@ -1266,7 +1590,7 @@ const NetStock = ({ user }) => {
                                 setExpandedItemId(null);
                               }
                             }}
-                            className="action-button w-[48px] h-[80px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                            className="action-button w-[48px] h-full min-h-[48px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                             title="Edit"
                           >
                             <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
@@ -1281,33 +1605,33 @@ const NetStock = ({ user }) => {
           </div>
         ) : (
           /* List View - Aggregated Summary Table Only */
-          <div className="mt-1.5">
+          <div className="">
             {filteredAggregatedSummary.length === 0 ? (
               <p className="text-[14px] text-gray-500 text-center mt-8">No data available</p>
             ) : (
               <>
-                <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-                  {/* Table Header */}
-                  <div className="bg-gray-50 border-b border-gray-200">
-                    <div className="grid grid-cols-12 gap-2 px-3 py-2">
-                      <div className="col-span-1 text-[12px] font-medium text-gray-700">#</div>
-                      <div className="col-span-5 text-[12px] font-medium text-gray-700">Item Name</div>
-                      <div className="col-span-3 text-[12px] font-medium text-gray-700">Brand</div>
-                      <div className="col-span-3 text-[12px] font-medium text-gray-700 text-right">Total Stock</div>
+                <div className="bg-white rounded-lg overflow-hidden border border-gray-200 flex flex-col max-h-[50vh]">
+                  {/* Table Header - fixed, does not scroll */}
+                  <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
+                    <div className="grid grid-cols-12 gap-[8px] px-[12px] py-[8px]">
+                      <div className="col-span-1 text-[12px] font-medium font-semibold"></div>
+                      <div className="col-span-5 text-[12px] font-medium text-black font-semibold">Item Name</div>
+                      <div className="col-span-3 text-[12px] font-medium text-black font-semibold">Brand</div>
+                      <div className="col-span-3 text-[12px] font-medium text-black text-right font-semibold">Total Stock</div>
                     </div>
                   </div>
-                  {/* Table Body */}
-                  <div>
+                  {/* Table Body - scrollable */}
+                  <div className="overflow-y-auto flex-1 min-h-0">
                     {filteredAggregatedSummary.map((item, index) => (
                       <div
                         key={`${item.itemName}_${item.brand}_${index}`}
                         className="border-b border-gray-100 last:border-b-0"
                       >
-                        <div className="grid grid-cols-12 gap-2 px-3 py-3">
-                          <div className="col-span-1 text-[12px] text-gray-700">{index + 1}</div>
-                          <div className="col-span-5 text-[12px] text-black">{item.itemName}</div>
-                          <div className="col-span-3 text-[12px] text-gray-700">{item.brand}</div>
-                          <div className="col-span-3 text-[12px] font-medium text-black text-right">
+                        <div className="grid grid-cols-12 gap-[8px] px-[12px] py-[12px]">
+                          <div className="col-span-1 text-[12px] text-black font-medium">{index + 1}</div>
+                          <div className="col-span-5 text-[12px] text-black font-medium">{item.itemName}</div>
+                          <div className="col-span-3 text-[12px] text-black font-medium">{item.brand}</div>
+                          <div className="col-span-3 text-[12px] font-medium text-black text-center">
                             {String(item.total).padStart(2, '0')}
                           </div>
                         </div>
@@ -1336,7 +1660,7 @@ const NetStock = ({ user }) => {
           {/* Bottom Sheet */}
           <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+            <div className="flex items-center justify-between px-[16px] pt-[16px] pb-[12px] border-b border-gray-200">
               <h2 className="text-[16px] font-semibold text-black">Edit Stock</h2>
               <button
                 type="button"
@@ -1353,7 +1677,7 @@ const NetStock = ({ user }) => {
               </button>
             </div>
             {/* Content */}
-            <div className="px-4 py-4 space-y-4">
+            <div className="px-[16px] py-[16px] space-y-4">
               {/* Item Name - Read Only */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-1">
@@ -1363,7 +1687,7 @@ const NetStock = ({ user }) => {
                   type="text"
                   value={selectedItemForEdit.itemName || ''}
                   readOnly
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[12px] text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
                   style={{ fontFamily: "'Manrope', sans-serif" }}
                 />
               </div>
@@ -1376,7 +1700,7 @@ const NetStock = ({ user }) => {
                   type="text"
                   value={selectedItemForEdit.brand || '-'}
                   readOnly
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[12px] text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
                   style={{ fontFamily: "'Manrope', sans-serif" }}
                 />
               </div>
@@ -1389,14 +1713,14 @@ const NetStock = ({ user }) => {
                   type="number"
                   value={newCount}
                   onChange={(e) => setNewCount(e.target.value)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[12px] text-[12px] font-medium bg-white text-black"
                   style={{ fontFamily: "'Manrope', sans-serif" }}
                   placeholder="Enter"
                 />
               </div>
             </div>
             {/* Action Buttons */}
-            <div className="px-4 pb-4 pt-2 flex gap-3">
+            <div className="px-[16px] pb-[16px] pt-[8px] flex gap-[12px]">
               <button
                 type="button"
                 onClick={() => {

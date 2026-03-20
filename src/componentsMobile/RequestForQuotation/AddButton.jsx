@@ -11,9 +11,9 @@ const AddButton = ({ onClick, disabled = false, showNew = false }) => {
       }`} 
       onClick={disabled ? undefined : onClick}
     >
-      <div className={`${showNew ? 'px-4' : 'w-[80px]'} h-[80px] rounded-full flex items-center justify-center `}>
+      <div className={`${showNew ? 'px-[16px]' : 'w-[80px]'} h-[80px] rounded-full flex items-center justify-center `}>
         {showNew ? (
-          <span className="text-white text-[16px] font-medium flex items-center gap-2">
+          <span className="text-white text-[16px] font-medium flex items-center gap-[8px]">
             <img src={New} alt="New" className="w-[80px] h-[35px]" />
           </span>
         ) : (

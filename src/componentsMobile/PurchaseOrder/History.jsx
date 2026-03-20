@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DeleteConfirmModal from './DeleteConfirmModal';
-import SearchableDropdown from './SearchableDropdown';
 import DateRangePickerModal from './DateRangePickerModal';
 import SelectVendorModal from './SelectVendorModal';
 import Edit from '../Images/edit1.png'
@@ -28,6 +27,9 @@ const History = () => {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showVendorFilterModal, setShowVendorFilterModal] = useState(false);
+  const [showProjectFilterModal, setShowProjectFilterModal] = useState(false);
+  const [showInchargeFilterModal, setShowInchargeFilterModal] = useState(false);
   // Initialize filters from localStorage if available
   const [filters, setFilters] = useState(() => {
     try {
@@ -213,11 +215,48 @@ const History = () => {
         ? 'https://backendaab.in/aabuildersDash/api/purchase_orders/getAll'
         : 'https://backendaab.in/aabuildersDash/api/purchase_orders/get/latest';
 
-      const response = await fetch(apiUrl);
+      const [response, inventoryResponse] = await Promise.all([
+        fetch(apiUrl),
+        fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll').catch(() => null)
+      ]);
       if (!response.ok) {
         throw new Error('Failed to fetch purchase orders');
       }
       const data = await response.json();
+      const inventoryData = inventoryResponse && inventoryResponse.ok ? await inventoryResponse.json() : [];
+
+      // Build lookup map: purchase_no -> (composite item key -> total incoming qty)
+      const incomingQtyByPurchaseNo = {};
+      (Array.isArray(inventoryData) ? inventoryData : []).forEach((record) => {
+        const isDeleted = record?.delete_status === true || record?.deleteStatus === true;
+        if (isDeleted) return;
+        const inventoryType = (record?.inventory_type || record?.inventoryType || '').toString().toLowerCase();
+        if (inventoryType && inventoryType !== 'incoming') return;
+
+        const purchaseNo = String(record?.purchase_no || record?.purchaseNo || record?.purchase_number || '')
+          .replace('#', '')
+          .trim();
+        if (!purchaseNo || purchaseNo === 'NO_PO') return;
+
+        if (!incomingQtyByPurchaseNo[purchaseNo]) {
+          incomingQtyByPurchaseNo[purchaseNo] = {};
+        }
+        const bucket = incomingQtyByPurchaseNo[purchaseNo];
+        const inventoryItems = record?.inventoryItems || record?.inventory_items || [];
+        if (!Array.isArray(inventoryItems)) return;
+
+        inventoryItems.forEach((invItem) => {
+          const itemId = invItem?.item_id ?? invItem?.itemId ?? null;
+          const categoryId = invItem?.category_id ?? invItem?.categoryId ?? null;
+          const modelId = invItem?.model_id ?? invItem?.modelId ?? null;
+          const brandId = invItem?.brand_id ?? invItem?.brandId ?? null;
+          const typeId = invItem?.type_id ?? invItem?.typeId ?? null;
+          if (itemId === null || itemId === undefined) return;
+          const key = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+          bucket[key] = (bucket[key] || 0) + Math.abs(Number(invItem?.quantity || 0));
+        });
+      });
+
       const transformedPOs = data
         .filter((po) => {
           return !(po.delete_status === true || po.deleteStatus === true);
@@ -294,6 +333,44 @@ const History = () => {
             paymentStatus = po.paymentStatus;
           }
 
+          // Determine stock status for this PO using incoming inventory records.
+          // Full match => green (like Paid), partial match => red (like Unpaid), none => hidden.
+          const poNoForStock = String(po.eno || po.ENO || po.poNumber || po.po_number || '')
+            .replace('#', '')
+            .trim();
+          const poIncomingQtyMap = incomingQtyByPurchaseNo[poNoForStock] || {};
+          const poRows = po.purchaseTable || [];
+          let totalOrderedQty = 0;
+          let totalAddedQty = 0;
+          let hasAnyRowWithStock = false;
+
+          poRows.forEach((row) => {
+            const rowItemId = row?.item_id ?? row?.itemId ?? null;
+            const rowCategoryId = row?.category_id ?? row?.categoryId ?? null;
+            const rowModelId = row?.model_id ?? row?.modelId ?? null;
+            const rowBrandId = row?.brand_id ?? row?.brandId ?? null;
+            const rowTypeId = row?.type_id ?? row?.typeId ?? null;
+            if (rowItemId === null || rowItemId === undefined) return;
+
+            const orderedQty = Math.max(0, Number(row?.quantity || 0));
+            const rowKey = `${rowItemId || 'null'}-${rowCategoryId || 'null'}-${rowModelId || 'null'}-${rowBrandId || 'null'}-${rowTypeId || 'null'}`;
+            const addedQty = Math.max(0, Number(poIncomingQtyMap[rowKey] || 0));
+            const cappedAddedQty = Math.min(orderedQty, addedQty);
+
+            totalOrderedQty += orderedQty;
+            totalAddedQty += cappedAddedQty;
+            if (cappedAddedQty > 0) {
+              hasAnyRowWithStock = true;
+            }
+          });
+
+          let stockStatus = '';
+          let stockStatusType = '';
+          if (hasAnyRowWithStock) {
+            stockStatus = 'To Stock';
+            stockStatusType = totalOrderedQty > 0 && totalAddedQty >= totalOrderedQty ? 'full' : 'partial';
+          }
+
           return {
             id: po.id || po._id,
             poNumber: po.eno ? `PO - ${year} - ${po.eno}` : po.poNumber || '',
@@ -307,6 +384,8 @@ const History = () => {
             created_by: po.created_by || '',
             items: items,
             paymentStatus: paymentStatus,
+            stockStatus: stockStatus,
+            stockStatusType: stockStatusType,
             createdAt: po.createdAt || po.created_at || po.created_date_time || po.date || new Date().toISOString(),
             created_date_time: po.created_date_time || po.createdAt || po.created_at || null,
             // Preserve raw IDs so edit screen can send them back when unchanged
@@ -1027,8 +1106,7 @@ const History = () => {
       siteIncharge: '',
       startDate: '',
       endDate: '',
-      poNumber: '',
-      branch: ''
+      poNumber: ''
     });
     // Clear localStorage
     try {
@@ -1633,6 +1711,48 @@ const History = () => {
       return '';
     }
   };
+
+  // ToolsTracker-style formatting: show a relative date label + a "DD/MM/YYYY • HH:MM AM/PM" timestamp
+  const formatRelativeDateLabel = (input) => {
+    if (!input) return '';
+    try {
+      const d = new Date(input);
+      if (isNaN(d.getTime())) return '';
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (dateOnly.getTime() === today.getTime()) return 'Today';
+      if (dateOnly.getTime() === yesterday.getTime()) return 'Yesterday';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const formatDateTimeParts = (timestamp) => {
+    if (!timestamp) return { date: '', time: '', dateTime: '' };
+    try {
+      const d = new Date(timestamp);
+      if (isNaN(d.getTime())) return { date: '', time: '', dateTime: '' };
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const formattedDate = `${day}/${month}/${year}`;
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const formattedTime = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+      return { date: formattedDate, time: formattedTime, dateTime: `${formattedDate} • ${formattedTime}` };
+    } catch {
+      return { date: '', time: '', dateTime: '' };
+    }
+  };
   const formatDate = (dateString) => {
     if (!dateString) return '';
     if (dateString.includes('/')) return dateString;
@@ -1654,7 +1774,7 @@ const History = () => {
     });
     setShowDatePicker(false);
   };
-  const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber || filters.branch;
+  const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber;
   // Use all available options from APIs for filter dropdowns
   const uniqueVendors = [...new Set(allVendors.map(v => v.vendorName).filter(Boolean))].sort();
   // Extract unique branches from projects
@@ -1673,17 +1793,43 @@ const History = () => {
     )
   ].filter(Boolean))].sort();
   return (
-    <div className="relative w-full h-screen bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      {/* Header Section - Fixed */}
-      <div className="flex-shrink-0 bg-white px-4 pt-4 z-30">
+    <div className="flex flex-col min-h-[calc(100vh-96px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      {/* Header Section - Sticky */}
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        {/* Branch Button Row (always top-right) */}
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
+          <div />
+          <div className="flex items-center gap-[4px]">
+            <button
+              type="button"
+              onClick={() => setShowBranchModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {filters.branch || 'Branch'}
+            </button>
+            {filters.branch && (
+              <button
+                type="button"
+                aria-label="Clear branch"
+                title="Clear"
+                onClick={() => setFilters(prev => ({ ...prev, branch: '', clientName: '' }))}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
         {/* Search Bar */}
-        <div className="relative mb-2">
+        <div className="relative">
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-[328px] h-[40px] pl-10 pr-4 border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-[360px] h-[40px] pl-[30px] pr-[16px] border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -1693,39 +1839,25 @@ const History = () => {
           </div>
         </div>
         {/* Filter and Clear Buttons with Filter Tags */}
-        <div className="flex items-center justify-between gap-5">
-          <div className="flex items-center gap-2  min-w-0">
-            <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-0 flex-shrink-0" >
-              <img src={Filter} alt='filter' className=' w-[11px] h-[11px]' />
+        <div className="flex justify-between items-center gap-[4px] px-0 mt-[6px] flex-shrink-0">
+          <div className="flex items-center gap-[4px] min-w-0">
+            <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0" >
+            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
               {!hasActiveFilters && (
-                <span className="text-[14px] font-medium flex-shrink-0 text-[#9E9E9E]">
+                <span className="text-[12px] font-medium text-black flex-shrink-0">
                   Filter
                 </span>
               )}
             </button>
             {/* Active Filter Tags - Next to Filter button */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {/* Show "Filter" text only when no filters are active */}
               {/* Show filter tags when filters are active */}
-              {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.branch) && (
-                <div className="flex items-center gap-2 flex-nowrap">
-                  {filters.branch && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
-                      <span className="text-[11px] font-medium text-black">Branch</span>
-                      <button
-                        onClick={() => {
-                          setFilters({ ...filters, branch: '', clientName: '' }); // Clear clientName when branch is cleared
-                        }}
-                        className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
-                      >
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
+              {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate) && (
+                <div className="flex items-center gap-[4px] flex-nowrap">
+                 
                   {filters.vendorName && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Vendor</span>
                       <button onClick={() => setFilters({ ...filters, vendorName: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
@@ -1737,7 +1869,7 @@ const History = () => {
                     </div>
                   )}
                   {filters.clientName && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Project</span>
                       <button onClick={() => setFilters({ ...filters, clientName: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
@@ -1749,7 +1881,7 @@ const History = () => {
                     </div>
                   )}
                   {filters.siteIncharge && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Incharge</span>
                       <button onClick={() => setFilters({ ...filters, siteIncharge: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
@@ -1761,7 +1893,7 @@ const History = () => {
                     </div>
                   )}
                   {(filters.startDate || filters.endDate) && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black whitespace-nowrap">
                         Date
                       </span>
@@ -1786,14 +1918,14 @@ const History = () => {
         </div>
       </div>
       {/* Purchase Orders List - Scrollable */}
-      <div className="overflow-y-auto no-scrollbar mx-auto scrollbar-none scrollbar-hide px-4 mt-1 " style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide mt-[6px] pb-8" style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
         onClick={() => {
           setExpandedPoId(null);
           setCloneExpandedPoId(null);
         }}
       >
         {filteredPOs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center ">
+          <div className="flex flex-col items-center justify-center py-8">
             <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8 12H24M8 20H24M8 28H24" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" />
@@ -1804,7 +1936,7 @@ const History = () => {
             </p>
           </div>
         ) : (
-          <div className="">
+          <div className="mt-[6px]">
             {filteredPOs.map((po, index) => {
               const isFirstCard = index === 0;
               // First card starts expanded, but can be closed by swiping right
@@ -1858,7 +1990,7 @@ const History = () => {
                 >
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
-                    className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute left-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
                       opacity: (isCloneExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20)) && !isExpanded ? 1 : 0,
                       transition: 'opacity 0.2s ease-out',
@@ -1870,7 +2002,7 @@ const History = () => {
                         e.stopPropagation();
                         handleClone(po);
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center gap-[6px] transition-colors shadow-sm"
                       title="Clone"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1888,7 +2020,7 @@ const History = () => {
                         delete cardRefs.current[po.id];
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out flex flex-col"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -1906,10 +2038,10 @@ const History = () => {
                       }
                     }}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-[8px] mb-[2px]">
                       {/* Left: PO Details */}
                       <div className=" min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
+                        <div className="flex items-center gap-[8px] mb-[2px]">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1930,52 +2062,75 @@ const History = () => {
                         <p className="text-[11px] font-medium text-[#777777] leading-snug break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                           {po.projectName || 'N/A'}
                         </p>
-                        {!isExpanded && (
-                          <span className="text-[11px] font-medium text-[#777777] leading-snug mb-0">
-                            {formatDateTime(po.created_date_time || po.createdAt)}
-                          </span>
-                        )}
                       </div>
                       {/* Right: Payment Status Badge and Amount - Always visible */}
-                      <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                      <div className="flex-shrink-0 flex flex-col items-end gap-[4px]">
                         {po.paymentStatus && (
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${po.paymentStatus === 'Paid'
-                              ? 'bg-[#E8F5E9] text-[#2E7D32]'
+                            className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${po.paymentStatus === 'Paid'
+                              ? 'bg-[#E8F5E9] text-[#4CAF50]'
                               : po.paymentStatus === 'Unpaid'
-                                ? 'bg-[#FFEBEE] text-[#C62828]'
+                                ? 'bg-[#FFEBEE] text-[#F44336]'
                                 : po.paymentStatus === 'Partially paid'
-                                  ? 'bg-[#E8F5E9] text-[#388E3C]'
+                                  ? 'bg-[#E8F5E9] text-[#4CAF50]'
                                   : 'bg-gray-100 text-gray-600'
                               }`}
                           >
                             <span
                               className={`w-1.5 h-1.5 rounded-full ${po.paymentStatus === 'Paid'
-                                ? 'bg-[#2E7D32]'
+                                ? 'bg-[#4CAF50]'
                                 : po.paymentStatus === 'Unpaid'
-                                  ? 'bg-[#C62828]'
+                                  ? 'bg-[#F44336]'
                                   : po.paymentStatus === 'Partially paid'
-                                    ? 'bg-[#388E3C]'
+                                    ? 'bg-[#4CAF50]'
                                     : 'bg-gray-600'
                                 }`}
                             ></span>
                             {po.paymentStatus}
                           </span>
                         )}
+                      </div>
+                    </div>
+                    {/* Bottom row: Date/Time on the left, Amount on the right - similar to ToolsTracker layout */}
+                    <div className="flex items-center justify-between ">
+                      {!isExpanded && (
+                        <span className="text-[11px] leading-normal min-w-0 flex-1 flex items-center flex-wrap gap-x-[4px]">
+                          <span className="font-bold text-black">
+                            {formatRelativeDateLabel(po.created_date_time || po.createdAt)}
+                          </span>
+                          {(() => {
+                            const { dateTime } = formatDateTimeParts(po.created_date_time || po.createdAt);
+                            return dateTime ? (
+                              <span className="font-semibold text-[#9E9E9E]"> • {dateTime}</span>
+                            ) : null;
+                          })()}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-[6px] flex-shrink-0">
+                        {po.stockStatus && (
+                          <span
+                            className={`px-[8px] py-[1px] rounded-full text-[10px] font-medium inline-flex items-center gap-[4px] ${po.stockStatusType === 'full'
+                              ? 'bg-[#E8F5E9] text-[#4CAF50]'
+                              : 'bg-[#FFEBEE] text-[#F44336]'
+                              }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${po.stockStatusType === 'full' ? 'bg-[#4CAF50]' : 'bg-[#F44336]'}`}></span>
+                            {po.stockStatus}
+                          </span>
+                        )}
                         {totalAmount > 0 && (
-                          <>
-                            <p className="text-[12px] font-semibold text-black block leading-snug mt-5">
-                              ₹{totalAmount.toLocaleString('en-IN')}
-                            </p>
-                            <p className="text-[10px] font-medium text-[#9E9E9E]"> Incl Tax</p>
-                          </>
+                          <div className="flex flex-col items-end">
+                          <p className="text-[12px] font-semibold text-black leading-snug">
+                            ₹{totalAmount.toLocaleString('en-IN')}
+                          </p>
+                          </div>
                         )}
                       </div>
                     </div>
                   </div>
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
-                    className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                       transform: swipeOffset < 0
@@ -1992,7 +2147,7 @@ const History = () => {
                         handleEdit(po);
                         setExpandedPoId(null); // Close after edit
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                       title="Edit"
                     >
                       <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -2003,7 +2158,7 @@ const History = () => {
                         handleDelete(po.id);
                         setExpandedPoId(null); // Close after delete
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
                       title="Delete"
                     >
                       <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
@@ -2017,70 +2172,69 @@ const History = () => {
       </div>
       {/* Filter Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => { setShowFilterModal(false); setShowVendorFilterModal(false); setShowProjectFilterModal(false); setShowInchargeFilterModal(false); }}>
+          <div className="bg-white w-full h-[340px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
             {/* Title */}
-            <div className="px-6 pt-5 pb-4 flex items-center justify-between">
+            <div className="px-[24px] pt-[20px] pb-[16px] flex items-center justify-between">
               <p className="text-[14px] font-semibold text-black">Select Filters</p>
-              {/* Branch Filter Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowBranchModal(true);
-                }}
-                className="text-[14px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                {filters.branch || 'Branch'}
-              </button>
             </div>
-            <div className="px-6">
+            <div className="px-[24px]">
               <div className="space-y-[6px]">
                 {/* Vendor Name Filter */}
                 <div>
                   <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Vendor Name
                   </label>
-                  <SearchableDropdown
-                    value={filters.vendorName}
-                    onChange={(value) => setFilters({ ...filters, vendorName: value })}
-                    options={uniqueVendors}
-                    placeholder="Select"
-                    fieldName="Vendor Filter"
-                    showAddNew={false}
-                    showAllOptions={true}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVendorFilterModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[#E0E0E0] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
+                  >
+                    <span className={`${filters.vendorName ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
+                      {filters.vendorName || 'Select'}
+                    </span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0 ml-2">
+                      <path d="M4 6L8 10L12 6" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
                 </div>
                 {/* Client Name Filter */}
                 <div>
                   <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Project Name
                   </label>
-                  <SearchableDropdown
-                    value={filters.clientName}
-                    onChange={(value) => setFilters({ ...filters, clientName: value })}
-                    options={uniqueClients}
-                    placeholder="Select"
-                    fieldName="Client Filter"
-                    showAddNew={false}
-                    showAllOptions={true}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowProjectFilterModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[#E0E0E0] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
+                  >
+                    <span className={`${filters.clientName ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
+                      {filters.clientName || 'Select'}
+                    </span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0 ml-2">
+                      <path d="M4 6L8 10L12 6" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
                 </div>
                 {/* Site Incharge Filter */}
                 <div>
                   <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Site Incharge
                   </label>
-                  <SearchableDropdown
-                    value={filters.siteIncharge}
-                    onChange={(value) => setFilters({ ...filters, siteIncharge: value })}
-                    options={uniqueSiteIncharges}
-                    placeholder="Select"
-                    fieldName="Site Incharge Filter"
-                    showAddNew={false}
-                    showAllOptions={true}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowInchargeFilterModal(true)}
+                    className="w-full h-[32px] px-[12px] border border-[#E0E0E0] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
+                  >
+                    <span className={`${filters.siteIncharge ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
+                      {filters.siteIncharge || 'Select'}
+                    </span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0 ml-2">
+                      <path d="M4 6L8 10L12 6" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-[8px]">
                   {/* Date Filter */}
                   <div className="flex-1">
                     <label className="text-[12px] font-semibold text-black mb-0.5 block">Date</label>
@@ -2088,7 +2242,7 @@ const History = () => {
                       <button
                         type="button"
                         onClick={() => setShowDatePicker(true)}
-                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                        className="w-full h-[32px] px-[16px] border border-[#E0E0E0] rounded text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                       >
                         <span className={`${(filters.startDate || filters.endDate) ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
                           {filters.startDate && filters.endDate
@@ -2114,27 +2268,12 @@ const History = () => {
                         value={filters.poNumber}
                         onChange={(e) => setFilters({ ...filters, poNumber: e.target.value })}
                         placeholder="Enter"
-                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+                        className="w-full h-[32px] px-[16px] border border-[#E0E0E0] rounded text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
                       />
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-            {/* Action Buttons - Fixed at bottom */}
-            <div className="absolute mt-5 left-0 right-0 px-6 flex gap-4">
-              <button
-                onClick={() => setShowFilterModal(false)}
-                className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowFilterModal(false)}
-                className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>
@@ -2167,6 +2306,46 @@ const History = () => {
         fieldName="Branch"
         onAddNew={null}
         showStarIcon={false}
+      />
+      {/* Filter Popups */}
+      <SelectVendorModal
+        isOpen={showVendorFilterModal}
+        onClose={() => setShowVendorFilterModal(false)}
+        onSelect={(value) => {
+          setFilters({ ...filters, vendorName: value });
+          setShowVendorFilterModal(false);
+        }}
+        selectedValue={filters.vendorName}
+        options={uniqueVendors}
+        fieldName="Vendor Name"
+        onAddNew={null}
+        showStarIcon={true}
+      />
+      <SelectVendorModal
+        isOpen={showProjectFilterModal}
+        onClose={() => setShowProjectFilterModal(false)}
+        onSelect={(value) => {
+          setFilters({ ...filters, clientName: value });
+          setShowProjectFilterModal(false);
+        }}
+        selectedValue={filters.clientName}
+        options={uniqueClients}
+        fieldName="Project Name"
+        onAddNew={null}
+        showStarIcon={true}
+      />
+      <SelectVendorModal
+        isOpen={showInchargeFilterModal}
+        onClose={() => setShowInchargeFilterModal(false)}
+        onSelect={(value) => {
+          setFilters({ ...filters, siteIncharge: value });
+          setShowInchargeFilterModal(false);
+        }}
+        selectedValue={filters.siteIncharge}
+        options={uniqueSiteIncharges}
+        fieldName="Site Incharge"
+        onAddNew={null}
+        showStarIcon={true}
       />
     </div>
   );

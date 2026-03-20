@@ -42,6 +42,41 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   const [submittedDiscounts, setSubmittedDiscounts] = useState(new Set());
   const [accountDetails, setAccountDetails] = useState([]);
 
+  const resolveActiveBranchId = (fallbackBranchId) => {
+    try {
+      const selectedBranchId = localStorage.getItem("selectedBranchId");
+      const resolved = Number(selectedBranchId || fallbackBranchId);
+      return Number.isFinite(resolved) ? resolved : null;
+    } catch {
+      const resolved = Number(fallbackBranchId);
+      return Number.isFinite(resolved) ? resolved : null;
+    }
+  };
+
+  // ISO 8601 week number calculation (same logic as WeeklyPayment.js)
+  const getISOWeekNumber = (date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
+    const thursday = new Date(d);
+    thursday.setDate(d.getDate() + 4 - dayOfWeek);
+    thursday.setHours(0, 0, 0, 0);
+
+    const weekYear = thursday.getFullYear();
+    const jan1 = new Date(weekYear, 0, 1);
+    jan1.setHours(0, 0, 0, 0);
+
+    const jan1DayOfWeek = jan1.getDay() || 7;
+    const firstThursday = new Date(jan1);
+    firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
+    firstThursday.setHours(0, 0, 0, 0);
+
+    const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
+    const weekNo = Math.floor(daysDiff / 7) + 1;
+    return weekNo;
+  };
+
   // Drag and scroll functionality
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
@@ -1105,12 +1140,21 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     cashRegisterPayload,
                                                     { headers: { "Content-Type": "application/json" } }
                                                   );
+                                                  const activeBranchId = resolveActiveBranchId(
+                                                    payment.branch_id ??
+                                                    payment.branchId ??
+                                                    selectedRow?.branch_id ??
+                                                    selectedRow?.branchId ??
+                                                    null
+                                                  );
                                                   const paymentsReceivedPayload = {
                                                     date: payment.date,
                                                     amount: Number(payment.amount),
                                                     type: "Claim",
-                                                    weekly_number: "",
+                                                    weekly_number: getISOWeekNumber(new Date()),
                                                     status: false,
+                                                    branch_id: activeBranchId,
+                                                    enteredBy: username,
                                                   };
                                                   await axios.post(
                                                     "https://backendaab.in/aabuildersDash/api/payments-received/save",

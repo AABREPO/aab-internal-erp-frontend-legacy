@@ -8,13 +8,13 @@ import Delete from '../Images/delete.png'
 import Filter from '../Images/Filter.png'
 import Search from '../Images/Search.png'
 const History = () => {
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [rfqs, setRfqs] = useState([]);
   // Cache for fast "get by id" lookups during clone (prevents repeated network calls)
   const quickFetchCacheRef = useRef(new Map());
   // Initialize searchQuery from localStorage if available
   const [searchQuery, setSearchQuery] = useState(() => {
     try {
-      const saved = localStorage.getItem('purchaseOrderHistorySearchQuery');
+      const saved = localStorage.getItem('rfqHistorySearchQuery');
       return saved || '';
     } catch (error) {
       return '';
@@ -31,7 +31,7 @@ const History = () => {
   // Initialize filters from localStorage if available
   const [filters, setFilters] = useState(() => {
     try {
-      const saved = localStorage.getItem('purchaseOrderHistoryFilters');
+      const saved = localStorage.getItem('rfqHistoryFilters');
       if (saved) {
         return JSON.parse(saved);
       }
@@ -44,8 +44,7 @@ const History = () => {
       siteIncharge: '',
       startDate: '',
       endDate: '',
-      poNumber: '',
-      branch: ''
+      rfqNumber: ''
     };
   });
 
@@ -89,7 +88,7 @@ const History = () => {
   useEffect(() => {
     if (isInitialMount.current) return;
     try {
-      localStorage.setItem('purchaseOrderHistoryFilters', JSON.stringify(filters));
+      localStorage.setItem('rfqHistoryFilters', JSON.stringify(filters));
     } catch (error) {
       console.error('Error saving filters to localStorage:', error);
     }
@@ -99,7 +98,7 @@ const History = () => {
   useEffect(() => {
     if (isInitialMount.current) return;
     try {
-      localStorage.setItem('purchaseOrderHistorySearchQuery', searchQuery);
+      localStorage.setItem('rfqHistorySearchQuery', searchQuery);
     } catch (error) {
       console.error('Error saving searchQuery to localStorage:', error);
     }
@@ -192,7 +191,7 @@ const History = () => {
     // If filters are active and we have cached data, load from cache first for instant display
     if (!skipCache && hasActiveFilters) {
       try {
-        const cachedData = localStorage.getItem('purchaseOrdersHistoryCache');
+        const cachedData = localStorage.getItem('rfqsHistoryCache');
         if (cachedData) {
           const cachedPOs = JSON.parse(cachedData);
           if (cachedPOs.length > 0) {
@@ -201,7 +200,7 @@ const History = () => {
               const idB = parseInt(b.id) || 0;
               return idB - idA;
             });
-            setPurchaseOrders(sorted);
+            setRfqs(sorted);
           }
         }
       } catch (error) {
@@ -210,8 +209,8 @@ const History = () => {
     }
     try {
       const apiUrl = hasActiveFilters
-        ? 'https://backendaab.in/aabuildersDash/api/purchase_orders/getAll'
-        : 'https://backendaab.in/aabuildersDash/api/purchase_orders/get/latest';
+        ? 'https://backendaab.in/aabuildersDash/api/rfq/getAll'
+        : 'https://backendaab.in/aabuildersDash/api/rfq/get/latest';
 
       const response = await fetch(apiUrl);
       if (!response.ok) {
@@ -251,8 +250,8 @@ const History = () => {
             }
           }
 
-          // Transform purchaseTable to items format
-          const items = (po.purchaseTable || []).map(item => ({
+          // Transform rfqTable to items format
+          const items = (po.rfqTable || []).map(item => ({
             name: item.itemName || `${item.item_id || ''}`,
             brand: item.brandName || '',
             model: item.modelName || '',
@@ -323,11 +322,11 @@ const History = () => {
         const idB = parseInt(b.id) || 0;
         return idB - idA; // Descending order (highest ID first)
       });
-      setPurchaseOrders(sorted);
+      setRfqs(sorted);
 
       // Cache the transformed data for fast loading next time
       try {
-        localStorage.setItem('purchaseOrdersHistoryCache', JSON.stringify(sorted));
+        localStorage.setItem('rfqsHistoryCache', JSON.stringify(sorted));
       } catch (error) {
         console.error('Error caching purchase orders:', error);
       }
@@ -336,7 +335,7 @@ const History = () => {
       // Fallback to localStorage cache if API fails
       if (!hasActiveFilters) {
         try {
-          const cachedData = localStorage.getItem('purchaseOrdersHistoryCache');
+          const cachedData = localStorage.getItem('rfqsHistoryCache');
           if (cachedData) {
             const cachedPOs = JSON.parse(cachedData);
             const sorted = cachedPOs.sort((a, b) => {
@@ -344,7 +343,7 @@ const History = () => {
               const idB = parseInt(b.id) || 0;
               return idB - idA;
             });
-            setPurchaseOrders(sorted);
+            setRfqs(sorted);
           }
         } catch (localError) {
           console.error('Error loading from cache:', localError);
@@ -363,7 +362,7 @@ const History = () => {
     };
     window.addEventListener('poUpdated', handlePOUpdate);
     // Check if filters are active
-    const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber || filters.branch;
+    const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber;
     // Poll for changes periodically (only when no filters are active to avoid heavy load)
     const interval = hasActiveFilters ? null : setInterval(() => {
       loadPurchaseOrders();
@@ -375,20 +374,20 @@ const History = () => {
       }
     };
   }, [allVendors, allProjects, allEmployees, allSupportStaff, searchQuery, filters, loadPurchaseOrders]);
-  const handleEdit = async (po) => {
-    // Fetch the specific PO quickly (ensures purchaseTable/items are present immediately)
-    let payload = po;
+  const handleEdit = async (rfq) => {
+    // Fetch the specific RFQ quickly (ensures rfqTable/items are present immediately)
+    let payload = rfq;
     try {
-      const apiPo = await fetchPurchaseOrderById(po?.id);
+      const apiPo = await fetchPurchaseOrderById(rfq?.id);
       if (apiPo) {
         payload = {
-          ...po,
-          vendor_id: apiPo.vendor_id ?? po.vendor_id,
-          client_id: apiPo.client_id ?? po.client_id,
-          site_incharge_id: apiPo.site_incharge_id ?? po.site_incharge_id,
-          site_incharge_type: apiPo.site_incharge_type ?? po.site_incharge_type,
-          site_incharge_mobile_number: apiPo.site_incharge_mobile_number ?? po.site_incharge_mobile_number,
-          items: (apiPo.purchaseTable || []).map((row) => ({
+          ...rfq,
+          vendor_id: apiPo.vendor_id ?? rfq.vendor_id,
+          client_id: apiPo.client_id ?? rfq.client_id,
+          site_incharge_id: apiPo.site_incharge_id ?? rfq.site_incharge_id,
+          site_incharge_type: apiPo.site_incharge_type ?? rfq.site_incharge_type,
+          site_incharge_mobile_number: apiPo.site_incharge_mobile_number ?? rfq.site_incharge_mobile_number,
+          items: (apiPo.rfqTable || []).map((row) => ({
             name: row.itemName || `${row.item_id || ''}`,
             itemName: row.itemName || '',
             item_id: row.item_id,
@@ -536,27 +535,27 @@ const History = () => {
     } catch (e) {
       // best-effort
     }
-    // Store PO data in localStorage to load in create tab
-    localStorage.setItem('editingPO', JSON.stringify(payload));
+    // Store RFQ data in localStorage to load in create tab
+    localStorage.setItem('editingRFQ', JSON.stringify(payload));
     // Switch to create tab immediately
     localStorage.setItem('activeTab', 'create');
-    window.dispatchEvent(new CustomEvent('editPO', { detail: payload }));
+    window.dispatchEvent(new CustomEvent('editRFQ', { detail: payload }));
   };
 
-  const handleView = async (po) => {
-    // View-only mode (Download button) with fast PO-by-id fetch
-    let payload = po;
+  const handleView = async (rfq) => {
+    // View-only mode (Download button) with fast RFQ-by-id fetch
+    let payload = rfq;
     try {
-      const apiPo = await fetchPurchaseOrderById(po?.id);
+      const apiPo = await fetchPurchaseOrderById(rfq?.id);
       if (apiPo) {
         payload = {
-          ...po,
-          vendor_id: apiPo.vendor_id ?? po.vendor_id,
-          client_id: apiPo.client_id ?? po.client_id,
-          site_incharge_id: apiPo.site_incharge_id ?? po.site_incharge_id,
-          site_incharge_type: apiPo.site_incharge_type ?? po.site_incharge_type,
-          site_incharge_mobile_number: apiPo.site_incharge_mobile_number ?? po.site_incharge_mobile_number,
-          items: (apiPo.purchaseTable || []).map((row) => ({
+          ...rfq,
+          vendor_id: apiPo.vendor_id ?? rfq.vendor_id,
+          client_id: apiPo.client_id ?? rfq.client_id,
+          site_incharge_id: apiPo.site_incharge_id ?? rfq.site_incharge_id,
+          site_incharge_type: apiPo.site_incharge_type ?? rfq.site_incharge_type,
+          site_incharge_mobile_number: apiPo.site_incharge_mobile_number ?? rfq.site_incharge_mobile_number,
+          items: (apiPo.rfqTable || []).map((row) => ({
             name: row.itemName || `${row.item_id || ''}`,
             itemName: row.itemName || '',
             item_id: row.item_id,
@@ -706,7 +705,7 @@ const History = () => {
     }
     // Switch to create tab so details are visible
     localStorage.setItem('activeTab', 'create');
-    window.dispatchEvent(new CustomEvent('viewPO', { detail: payload }));
+    window.dispatchEvent(new CustomEvent('viewRFQ', { detail: payload }));
   };
 
   const quickFetchJson = useCallback(async (url) => {
@@ -731,16 +730,16 @@ const History = () => {
   const fetchPurchaseOrderById = useCallback(
     async (poId) => {
       if (!poId) return null;
-      return await quickFetchJson(`https://backendaab.in/aabuildersDash/api/purchase_orders/get/${poId}`);
+      return await quickFetchJson(`https://backendaab.in/aabuildersDash/api/rfq/get/${poId}`);
     },
     [quickFetchJson]
   );
 
-  const handleClone = async (po) => {
-    // Fetch the specific PO quickly (ensures purchaseTable/items are present immediately)
-    let sourcePO = { ...po };
+  const handleClone = async (rfq) => {
+    // Fetch the specific RFQ quickly (ensures rfqTable/items are present immediately)
+    let sourcePO = { ...rfq };
     try {
-      const apiPo = await fetchPurchaseOrderById(po?.id);
+      const apiPo = await fetchPurchaseOrderById(rfq?.id);
       if (apiPo) {
         sourcePO = {
           ...sourcePO,
@@ -750,8 +749,8 @@ const History = () => {
           site_incharge_type: apiPo.site_incharge_type ?? sourcePO.site_incharge_type,
           site_incharge_mobile_number:
             apiPo.site_incharge_mobile_number ?? sourcePO.site_incharge_mobile_number,
-          // Rebuild items from purchaseTable so Create tab always receives item rows
-          items: (apiPo.purchaseTable || []).map((row) => ({
+          // Rebuild items from rfqTable so Create tab always receives item rows
+          items: (apiPo.rfqTable || []).map((row) => ({
             name: row.itemName || `${row.item_id || ''}`,
             itemName: row.itemName || '',
             item_id: row.item_id,
@@ -814,7 +813,7 @@ const History = () => {
 
         // Prefetch next PO number for this vendor in background (non-blocking)
         // Don't await - let it fetch in background while page opens
-        fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll')
+        fetch('https://backendaab.in/aabuildersDash/api/rfq/getAll')
           .then(response => {
             if (response.ok) {
               return response.json();
@@ -965,12 +964,12 @@ const History = () => {
       console.error('Clone quick-prefetch failed:', e);
     }
 
-    // Store cloned PO data in localStorage to load in create tab
-    localStorage.setItem('editingPO', JSON.stringify(clonedPO));
+    // Store cloned RFQ data in localStorage to load in create tab
+    localStorage.setItem('editingRFQ', JSON.stringify(clonedPO));
     // Switch to create tab immediately
     localStorage.setItem('activeTab', 'create');
     // Dispatch custom event for create tab to listen
-    window.dispatchEvent(new CustomEvent('editPO', { detail: clonedPO }));
+    window.dispatchEvent(new CustomEvent('editRFQ', { detail: clonedPO }));
     setCloneExpandedPoId(null);
   };
   const handleDelete = (poId) => {
@@ -981,10 +980,10 @@ const History = () => {
     if (poToDelete) {
       try {
         // Find the PO to get its order ID
-        const order = purchaseOrders.find(po => po.id === poToDelete);
+        const order = rfqs.find(r => r.id === poToDelete);
         if (order) {
           // Call API to mark PO as deleted - matching working example format
-          const apiUrl = `https://backendaab.in/aabuildersDash/api/purchase_orders/markDeleted/${order.id}?deleteStatus=true`;
+          const apiUrl = `https://backendaab.in/aabuildersDash/api/rfq/markDeleted/${order.id}?deleteStatus=true`;
           const response = await fetch(apiUrl, {
             method: 'PUT',
           });
@@ -1028,17 +1027,16 @@ const History = () => {
       startDate: '',
       endDate: '',
       poNumber: '',
-      branch: ''
     });
     // Clear localStorage
     try {
-      localStorage.removeItem('purchaseOrderHistoryFilters');
-      localStorage.removeItem('purchaseOrderHistorySearchQuery');
+      localStorage.removeItem('rfqHistoryFilters');
+      localStorage.removeItem('rfqHistorySearchQuery');
     } catch (error) {
       console.error('Error clearing filters from localStorage:', error);
     }
   };
-  const filteredPOs = purchaseOrders.filter(po => {
+  const filteredPOs = rfqs.filter(po => {
     // Search query filter
     if (searchQuery && searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -1654,7 +1652,7 @@ const History = () => {
     });
     setShowDatePicker(false);
   };
-  const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber || filters.branch;
+  const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber;
   // Use all available options from APIs for filter dropdowns
   const uniqueVendors = [...new Set(allVendors.map(v => v.vendorName).filter(Boolean))].sort();
   // Extract unique branches from projects
@@ -1673,17 +1671,43 @@ const History = () => {
     )
   ].filter(Boolean))].sort();
   return (
-    <div className="relative w-full h-screen bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col min-h-[calc(100vh-96px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header Section - Fixed */}
-      <div className="flex-shrink-0 bg-white px-4 pt-4 z-30">
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        {/* Branch Button Row - with bottom border (same as PurchaseOrder) */}
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
+          <div />
+          <div className="flex items-center gap-[4px]">
+            <button
+              type="button"
+              onClick={() => setShowBranchModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {filters.branch || 'Branch'}
+            </button>
+            {filters.branch && (
+              <button
+                type="button"
+                aria-label="Clear branch"
+                title="Clear"
+                onClick={() => setFilters(prev => ({ ...prev, branch: '', clientName: '' }))}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
         {/* Search Bar */}
-        <div className="relative mb-2">
+        <div className="relative">
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-[328px] h-[40px] pl-10 pr-4 border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-full h-[40px] pl-[30px] pr-[16px] border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -1693,39 +1717,25 @@ const History = () => {
           </div>
         </div>
         {/* Filter and Clear Buttons with Filter Tags */}
-        <div className="flex items-center justify-between gap-5">
-          <div className="flex items-center gap-2  min-w-0">
-            <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-0 flex-shrink-0" >
-              <img src={Filter} alt='filter' className=' w-[11px] h-[11px]' />
+        <div className="flex justify-between items-center gap-[4px] px-0 mt-[6px] flex-shrink-0">
+          <div className="flex items-center gap-[4px]  min-w-0">
+            <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0" >
+              <img src={Filter} alt='filter' className=' w-[13px] h-[11px]' />
               {!hasActiveFilters && (
-                <span className="text-[14px] font-medium flex-shrink-0 text-[#9E9E9E]">
+                <span className="text-[12px] font-medium flex-shrink-0 text-black">
                   Filter
                 </span>
               )}
             </button>
             {/* Active Filter Tags - Next to Filter button */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none  min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {/* Show "Filter" text only when no filters are active */}
               {/* Show filter tags when filters are active */}
-              {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.branch) && (
-                <div className="flex items-center gap-2 flex-nowrap">
-                  {filters.branch && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
-                      <span className="text-[11px] font-medium text-black">Branch</span>
-                      <button
-                        onClick={() => {
-                          setFilters({ ...filters, branch: '', clientName: '' }); // Clear clientName when branch is cleared
-                        }}
-                        className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
-                      >
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
+              {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate) && (
+                <div className="flex items-center gap-[4px] flex-nowrap">
+
                   {filters.vendorName && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Vendor</span>
                       <button onClick={() => setFilters({ ...filters, vendorName: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
@@ -1737,7 +1747,7 @@ const History = () => {
                     </div>
                   )}
                   {filters.clientName && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Project</span>
                       <button onClick={() => setFilters({ ...filters, clientName: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
@@ -1749,7 +1759,7 @@ const History = () => {
                     </div>
                   )}
                   {filters.siteIncharge && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Incharge</span>
                       <button onClick={() => setFilters({ ...filters, siteIncharge: '' })}
                         className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
@@ -1761,7 +1771,7 @@ const History = () => {
                     </div>
                   )}
                   {(filters.startDate || filters.endDate) && (
-                    <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+                    <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black whitespace-nowrap">
                         Date
                       </span>
@@ -1786,7 +1796,7 @@ const History = () => {
         </div>
       </div>
       {/* Purchase Orders List - Scrollable */}
-      <div className="overflow-y-auto no-scrollbar mx-auto scrollbar-none scrollbar-hide px-4 mt-1 " style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide mt-[6px]" style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
         onClick={() => {
           setExpandedPoId(null);
           setCloneExpandedPoId(null);
@@ -1858,7 +1868,7 @@ const History = () => {
                 >
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
-                    className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute left-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
                       opacity: (isCloneExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20)) && !isExpanded ? 1 : 0,
                       transition: 'opacity 0.2s ease-out',
@@ -1870,7 +1880,7 @@ const History = () => {
                         e.stopPropagation();
                         handleClone(po);
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] transition-colors shadow-sm"
                       title="Clone"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1888,7 +1898,7 @@ const History = () => {
                         delete cardRefs.current[po.id];
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out flex flex-col"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
@@ -1906,10 +1916,10 @@ const History = () => {
                       }
                     }}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-[8px]  mb-[2px]">
                       {/* Left: PO Details */}
-                      <div className=" min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
+                      <div className=" min-w-0 text-left">
+                        <div className="flex items-center gap-[8px] mb-[2px]">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1937,25 +1947,25 @@ const History = () => {
                         )}
                       </div>
                       {/* Right: Payment Status Badge and Amount - Always visible */}
-                      <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                      <div className="flex-shrink-0 flex flex-col items-end gap-[4px]">
                         {po.paymentStatus && (
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${po.paymentStatus === 'Paid'
-                              ? 'bg-[#E8F5E9] text-[#2E7D32]'
+                            className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${po.paymentStatus === 'Paid'
+                              ? 'bg-[#E8F5E9] text-[#4CAF50]'
                               : po.paymentStatus === 'Unpaid'
-                                ? 'bg-[#FFEBEE] text-[#C62828]'
+                                ? 'bg-[#FFEBEE] text-[#F44336]'
                                 : po.paymentStatus === 'Partially paid'
-                                  ? 'bg-[#E8F5E9] text-[#388E3C]'
+                                  ? 'bg-[#E8F5E9] text-[#4CAF50]'
                                   : 'bg-gray-100 text-gray-600'
                               }`}
                           >
                             <span
                               className={`w-1.5 h-1.5 rounded-full ${po.paymentStatus === 'Paid'
-                                ? 'bg-[#2E7D32]'
+                                ? 'bg-[#4CAF50]'
                                 : po.paymentStatus === 'Unpaid'
-                                  ? 'bg-[#C62828]'
+                                  ? 'bg-[#F44336]'
                                   : po.paymentStatus === 'Partially paid'
-                                    ? 'bg-[#388E3C]'
+                                    ? 'bg-[#4CAF50]'
                                     : 'bg-gray-600'
                                 }`}
                             ></span>
@@ -1975,7 +1985,7 @@ const History = () => {
                   </div>
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
-                    className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
+                    className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                       transform: swipeOffset < 0
@@ -1992,7 +2002,7 @@ const History = () => {
                         handleEdit(po);
                         setExpandedPoId(null); // Close after edit
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                       title="Edit"
                     >
                       <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -2003,7 +2013,7 @@ const History = () => {
                         handleDelete(po.id);
                         setExpandedPoId(null); // Close after delete
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
                       title="Delete"
                     >
                       <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
@@ -2017,27 +2027,17 @@ const History = () => {
       </div>
       {/* Filter Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterModal(false)}>
+          <div className="bg-white w-full h-[340px] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }} onClick={(e) => e.stopPropagation()}>
             {/* Title */}
-            <div className="px-6 pt-5 pb-4 flex items-center justify-between">
+            <div className="px-[24px] pt-[20px] pb-[16px] flex items-center">
               <p className="text-[14px] font-semibold text-black">Select Filters</p>
-              {/* Branch Filter Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowBranchModal(true);
-                }}
-                className="text-[14px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                {filters.branch || 'Branch'}
-              </button>
             </div>
-            <div className="px-6">
+            <div className="px-[24px]">
               <div className="space-y-[6px]">
                 {/* Vendor Name Filter */}
                 <div>
-                  <label className="text-[12px] font-semibold text-black mb-0.5 block">
+                  <label className="text-[12px] font-semibold text-black mb-0.5 block text-left">
                     Vendor Name
                   </label>
                   <SearchableDropdown
@@ -2052,7 +2052,7 @@ const History = () => {
                 </div>
                 {/* Client Name Filter */}
                 <div>
-                  <label className="text-[12px] font-semibold text-black mb-0.5 block">
+                  <label className="text-[12px] font-semibold text-black mb-0.5 block text-left">
                     Project Name
                   </label>
                   <SearchableDropdown
@@ -2067,7 +2067,7 @@ const History = () => {
                 </div>
                 {/* Site Incharge Filter */}
                 <div>
-                  <label className="text-[12px] font-semibold text-black mb-0.5 block">
+                  <label className="text-[12px] font-semibold text-black mb-0.5 block text-left">
                     Site Incharge
                   </label>
                   <SearchableDropdown
@@ -2080,15 +2080,15 @@ const History = () => {
                     showAllOptions={true}
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-[8px]">
                   {/* Date Filter */}
                   <div className="flex-1">
-                    <label className="text-[12px] font-semibold text-black mb-0.5 block">Date</label>
+                    <label className="text-[12px] font-semibold text-black mb-0.5 block text-left">Date</label>
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setShowDatePicker(true)}
-                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
+                        className="w-full h-[32px] border border-[#E0E0E0] px-[10px] rounded text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                       >
                         <span className={`${(filters.startDate || filters.endDate) ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
                           {filters.startDate && filters.endDate
@@ -2107,35 +2107,21 @@ const History = () => {
                   </div>
                   {/* PO.No Filter */}
                   <div className="flex-1">
-                    <label className="text-[12px] font-semibold text-black mb-0.5 block">PO.No</label>
+                    <label className="text-[12px] font-semibold text-black mb-0.5 block text-left">PO.No</label>
                     <div className="relative">
                       <input
                         type="text"
                         value={filters.poNumber}
                         onChange={(e) => setFilters({ ...filters, poNumber: e.target.value })}
                         placeholder="Enter"
-                        className="w-full h-[32px] px-4 border border-[#E0E0E0] rounded text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+                        className="w-full h-[32px] border pl-[10px] border-[#E0E0E0] rounded text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
                       />
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            {/* Action Buttons - Fixed at bottom */}
-            <div className="absolute mt-5 left-0 right-0 px-6 flex gap-4">
-              <button
-                onClick={() => setShowFilterModal(false)}
-                className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowFilterModal(false)}
-                className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
-              >
-                Save
-              </button>
-            </div>
+            {/* Bottom sheet has no explicit action buttons, mirrors PurchaseOrder History */}
           </div>
         </div>
       )}

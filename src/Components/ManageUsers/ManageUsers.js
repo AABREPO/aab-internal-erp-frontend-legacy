@@ -145,7 +145,6 @@ const ManageUsers = ({ isOpen, onClose }) => {
       console.error('Error:', error);
     }
   };
-
   useEffect(() => {
     fetchRoleNames();
   }, []);

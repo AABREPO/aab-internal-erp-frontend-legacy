@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Filter from '../Images/Filter.png';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Close from '../Images/close.png';
+import Download from '../Images/Download.svg';
+import Search from '../Images/Search.png';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
@@ -10,10 +14,11 @@ const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/vendor_Na
 const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/employee_details';
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
+const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
 
 const PendingItems = ({ user }) => {
   const [pendingData, setPendingData] = useState([]);
-  const [selectedDays, setSelectedDays] = useState('30');
+  const [selectedDays, setSelectedDays] = useState('all');
   const [selectedHomeLocation, setSelectedHomeLocation] = useState(null);
   const [showHomeLocationDropdown, setShowHomeLocationDropdown] = useState(false);
   const [homeLocationSearchQuery, setHomeLocationSearchQuery] = useState('');
@@ -28,6 +33,7 @@ const PendingItems = ({ user }) => {
   const [employeesMap, setEmployeesMap] = useState({});
   const [itemNamesMap, setItemNamesMap] = useState({});
   const [itemIdsMap, setItemIdsMap] = useState({});
+  const [brandsMap, setBrandsMap] = useState({});
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [filterItemName, setFilterItemName] = useState(null);
   const [filterLocation, setFilterLocation] = useState(null);
@@ -113,6 +119,21 @@ const PendingItems = ({ user }) => {
           });
           setItemIdsMap(map);
         }
+        const brandsRes = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (brandsRes.ok) {
+          const data = await brandsRes.json();
+          const map = {};
+          (Array.isArray(data) ? data : []).forEach(b => {
+            const brandName = b.tools_brand || b.toolsBrand || '';
+            map[b.id] = brandName;
+            map[String(b.id)] = brandName;
+          });
+          setBrandsMap(map);
+        }
       } catch (error) {
         console.error('Error fetching lookup data:', error);
       }
@@ -167,18 +188,22 @@ const PendingItems = ({ user }) => {
   }, [projectsMap, vendorsMap]);
 
   // Build home location options - include both old (entry level/stock) and new (entryItem level) home locations
+  // Build locationOptions for Current Location filter - From/To (current) locations from transfers
   useEffect(() => {
     const locations = new Set();
-    // First, add home locations from tools_tracker_management entries (old home locations)
+    const currentLocations = new Set();
     toolsTrackerManagementData.forEach(entry => {
-      const entryHomeLocationId = entry.home_location_id || entry.homeLocationId;
-      if (entryHomeLocationId) {
-        const locationName = getLocationName(entryHomeLocationId);
-        if (locationName && locationName !== '-') {
-          locations.add(JSON.stringify({ id: String(entryHomeLocationId), name: locationName }));
-        }
+      const entryType = String(entry.tools_entry_type || entry.toolsEntryType || '').toLowerCase();
+      const fromId = entry.from_project_id || entry.fromProjectId;
+      const toId = entry.to_project_id || entry.toProjectId;
+      if (fromId) {
+        const name = getLocationName(fromId);
+        if (name && name !== '-') currentLocations.add(JSON.stringify({ id: String(fromId), name }));
       }
-      // Also add home locations from entry items (new home locations)
+      if (toId) {
+        const name = getLocationName(toId);
+        if (name && name !== '-') currentLocations.add(JSON.stringify({ id: String(toId), name }));
+      }
       const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
       entryItems.forEach(entryItem => {
         const itemHomeLocationId = entryItem.home_location_id || entryItem.homeLocationId;
@@ -186,11 +211,20 @@ const PendingItems = ({ user }) => {
           const locationName = getLocationName(itemHomeLocationId);
           if (locationName && locationName !== '-') {
             locations.add(JSON.stringify({ id: String(itemHomeLocationId), name: locationName }));
+            if (entryType === 'relocate' || entryType === 'relocation') {
+              currentLocations.add(JSON.stringify({ id: String(itemHomeLocationId), name: locationName }));
+            }
           }
         }
       });
+      const entryHomeLocationId = entry.home_location_id || entry.homeLocationId;
+      if (entryHomeLocationId) {
+        const locationName = getLocationName(entryHomeLocationId);
+        if (locationName && locationName !== '-') {
+          locations.add(JSON.stringify({ id: String(entryHomeLocationId), name: locationName }));
+        }
+      }
     });
-    // Then, add home locations from stock management (for items not in tools_tracker_management)
     stockManagementData.forEach(stock => {
       const homeLocationId = stock.home_location_id || stock.homeLocationId;
       if (homeLocationId) {
@@ -200,30 +234,30 @@ const PendingItems = ({ user }) => {
         }
       }
     });
-    const options = Array.from(locations).map(loc => {
+    const homeOptions = Array.from(locations).map(loc => {
       const parsed = JSON.parse(loc);
-      return {
-        id: parsed.id,
-        value: parsed.name,
-        label: parsed.name
-      };
+      return { id: parsed.id, value: parsed.name, label: parsed.name };
     });
-    // Sort alphabetically
-    options.sort((a, b) => a.value.localeCompare(b.value));
-    setHomeLocationOptions(options);
-    setLocationOptions(options);
+    homeOptions.sort((a, b) => a.value.localeCompare(b.value));
+    setHomeLocationOptions(homeOptions);
+    const currentOptions = Array.from(currentLocations).map(loc => {
+      const parsed = JSON.parse(loc);
+      return { id: parsed.id, value: parsed.name, label: parsed.name };
+    });
+    currentOptions.sort((a, b) => a.value.localeCompare(b.value));
+    setLocationOptions(currentOptions);
   }, [toolsTrackerManagementData, stockManagementData, getLocationName]);
-  
+
   // Populate filter options
   useEffect(() => {
     // Item Name options
     const itemNames = Array.from(new Set(Object.values(itemNamesMap))).filter(Boolean).sort();
     setItemNameOptions(itemNames.map(name => ({ value: name, label: name })));
-    
+
     // Item ID options
     const itemIds = Array.from(new Set(Object.values(itemIdsMap))).filter(Boolean).sort();
     setItemIdOptions(itemIds.map(id => ({ value: id, label: id })));
-    
+
     // Entry No options
     const entryNos = new Set();
     toolsTrackerManagementData.forEach(entry => {
@@ -231,7 +265,7 @@ const PendingItems = ({ user }) => {
       if (eno) entryNos.add(eno);
     });
     setEntryNoOptions(Array.from(entryNos).sort().map(eno => ({ value: eno, label: eno })));
-    
+
     // Project Incharge options
     const incharges = Array.from(new Set(Object.values(employeesMap))).filter(Boolean).sort();
     setProjectInchargeOptions(incharges.map(name => ({ value: name, label: name })));
@@ -518,36 +552,48 @@ const PendingItems = ({ user }) => {
               }
             }
             if (mostRecentEntry) {
-              console.log("Most Recent Entry: ", mostRecentEntry);
               const fromLocationId = mostRecentEntry.from_project_id || mostRecentEntry.fromProjectId;
               const entryType = String(mostRecentEntry.tools_entry_type || mostRecentEntry.toolsEntryType || '').toLowerCase();
               const relocateHomeLocationId = mostRecentEntryItem?.home_location_id || mostRecentEntryItem?.homeLocationId;
               const toLocationId = (entryType === 'relocate' || entryType === 'relocation')
                 ? relocateHomeLocationId
                 : (mostRecentEntry.to_project_id || mostRecentEntry.toProjectId);
-              console.log("To Location ID: ", toLocationId);
-              console.log("From Location ID: ", fromLocationId);
+              const entryDate = mostRecentEntry.date || '';
               const createdDateTime = mostRecentEntry.created_date_time || mostRecentEntry.createdDateTime || mostRecentEntry.timestamp || '';
               const projectInchargeId = mostRecentEntry.project_incharge_id || mostRecentEntry.projectInchargeId;
               const eno = mostRecentEntry.eno || '';
               const fromLocation = getLocationName(fromLocationId);
               const toLocation = getLocationName(toLocationId);
-              console.log("To Location: ", toLocation);
               const inchargeName = employeesMap[projectInchargeId] || employeesMap[String(projectInchargeId)] || '-';
               const homeLocationName = getLocationName(homeLocationId);
-              const dateObj = new Date(createdDateTime);
-              const formattedDate = dateObj.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-              });
+              const formattedDate = entryDate ? (() => {
+                try {
+                  const d = new Date(entryDate);
+                  return isNaN(d.getTime()) ? entryDate : d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                } catch { return entryDate; }
+              })() : '-';
+              const formattedCreatedDateTime = createdDateTime ? (() => {
+                try {
+                  const d = new Date(createdDateTime);
+                  if (isNaN(d.getTime())) return String(createdDateTime);
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const year = d.getFullYear();
+                  const h = d.getHours();
+                  const m = d.getMinutes();
+                  const h12 = h % 12 || 12;
+                  const ampm = h < 12 ? 'AM' : 'PM';
+                  return `${day}/${month}/${year} • ${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+                } catch { return String(createdDateTime); }
+              })() : '';
               pendingItems.push({
                 id: `${itemIdsId}_${brandId || ''}_${machineNumber}`,
                 entryNo: eno,
                 itemName: itemName,
                 from: fromLocation,
                 to: toLocation,
-                date: formattedDate,
+                date: entryDate,
+                createdDateTimeFormatted: formattedCreatedDateTime,
                 itemId: itemId,
                 daysPending: `${totalDaysAway} ${totalDaysAway === 1 ? 'Day' : 'Days'}`,
                 daysAway: totalDaysAway,
@@ -573,9 +619,6 @@ const PendingItems = ({ user }) => {
               return false; // Exclude items without home location ID
             }
             const matches = String(itemHomeLocationId) === String(selectedHomeLocation.id);
-            if (!matches) {
-              console.log(`Item ${item.itemId || item.itemIdsId} excluded: homeLocationId ${itemHomeLocationId} !== selected ${selectedHomeLocation.id}`);
-            }
             return matches;
           });
         }
@@ -589,23 +632,21 @@ const PendingItems = ({ user }) => {
         // Apply additional filters
         if (filterItemName) {
           const filterValue = String(filterItemName).toLowerCase().trim();
-          filteredItems = filteredItems.filter(item => 
+          filteredItems = filteredItems.filter(item =>
             item.itemName && String(item.itemName).toLowerCase().includes(filterValue)
           );
         }
 
         if (filterLocation) {
-          const filterValue = String(filterLocation).toLowerCase().trim();
-          filteredItems = filteredItems.filter(item => {
-            const fromMatch = item.from && String(item.from).toLowerCase().includes(filterValue);
-            const toMatch = item.to && String(item.to).toLowerCase().includes(filterValue);
-            return fromMatch || toMatch;
-          });
+          const filterValue = String(filterLocation).trim();
+          filteredItems = filteredItems.filter(item =>
+            item.to && String(item.to).trim() === filterValue
+          );
         }
 
         if (filterItemId) {
           const filterValue = String(filterItemId).toLowerCase().trim();
-          filteredItems = filteredItems.filter(item => 
+          filteredItems = filteredItems.filter(item =>
             item.itemId && String(item.itemId).toLowerCase().includes(filterValue)
           );
         }
@@ -613,7 +654,7 @@ const PendingItems = ({ user }) => {
         if (filterDate) {
           const filterDateStr = formatDateForDisplay(filterDate);
           if (filterDateStr) {
-            filteredItems = filteredItems.filter(item => 
+            filteredItems = filteredItems.filter(item =>
               item.date === filterDateStr
             );
           }
@@ -621,14 +662,14 @@ const PendingItems = ({ user }) => {
 
         if (filterEntryNo) {
           const filterValue = String(filterEntryNo).trim();
-          filteredItems = filteredItems.filter(item => 
+          filteredItems = filteredItems.filter(item =>
             String(item.entryNo).trim() === filterValue
           );
         }
 
         if (filterProjectIncharge) {
           const filterValue = String(filterProjectIncharge).toLowerCase().trim();
-          filteredItems = filteredItems.filter(item => 
+          filteredItems = filteredItems.filter(item =>
             item.personName && String(item.personName).toLowerCase().includes(filterValue)
           );
         }
@@ -728,12 +769,7 @@ const PendingItems = ({ user }) => {
 
     if (homeLocationHistory.length === 0) {
     } else {
-      console.log(`Total Home Location Changes: ${homeLocationHistory.length}`);
-      console.log('----------------------------------------');
       homeLocationHistory.forEach((historyItem, index) => {
-        if (historyItem.source) {
-          console.log(`   Source: ${historyItem.source}`);
-        }
       });
     }
     setSelectedItemHistory(item);
@@ -763,7 +799,7 @@ const PendingItems = ({ user }) => {
       option.label.toLowerCase().includes(query)
     );
   };
-  
+
   // Filter dropdown helpers
   const getFilterPickerOptions = () => {
     if (!filterOpenPicker) return [];
@@ -778,17 +814,17 @@ const PendingItems = ({ user }) => {
     if (!q) return opts;
     return opts.filter(o => String(o.value || o.label || o).toLowerCase().includes(q));
   };
-  
+
   const openFilterPicker = (field) => {
     setFilterOpenPicker(field);
     setFilterPickerSearch('');
   };
-  
+
   const closeFilterPicker = () => {
     setFilterOpenPicker(null);
     setFilterPickerSearch('');
   };
-  
+
   const handleFilterPickerSelect = (field, value) => {
     if (field === 'itemName') setFilterItemName(value);
     else if (field === 'location') setFilterLocation(value);
@@ -797,7 +833,7 @@ const PendingItems = ({ user }) => {
     else if (field === 'projectIncharge') setFilterProjectIncharge(value);
     closeFilterPicker();
   };
-  
+
   const handleClearFilter = (field, e) => {
     e.stopPropagation();
     if (field === 'itemName') setFilterItemName(null);
@@ -806,7 +842,7 @@ const PendingItems = ({ user }) => {
     else if (field === 'entryNo') setFilterEntryNo(null);
     else if (field === 'projectIncharge') setFilterProjectIncharge(null);
   };
-  
+
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return '';
     if (dateStr.includes('-') && dateStr.length === 10) {
@@ -815,25 +851,115 @@ const PendingItems = ({ user }) => {
     }
     return dateStr;
   };
-  
+
   const handleDatePickerOpen = () => {
     setShowDatePicker(true);
   };
-  
+
   const handleDatePickerConfirm = (formattedDate) => {
     setFilterDate(formattedDate);
     setShowDatePicker(false);
   };
-  
+
+  // Generate PDF function
+  const handleDownloadPDF = () => {
+    if (!pendingData || pendingData.length === 0) {
+      alert('No data to download');
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+    });
+
+    // Title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pending Items Report', 10, 18);
+
+    // Prepare table data
+    const tableData = pendingData.map((item, index) => {
+      // Get Brand name
+      const brandName = item.brandId ? (brandsMap[item.brandId] || brandsMap[String(item.brandId)] || '-') : '-';
+
+      // Get Model and Machine Number from stock management
+      let model = '-';
+      let machineNumber = item.machineNumber || '-';
+
+      const stockItem = stockManagementData.find(stock => {
+        const stockItemIdsId = stock.item_ids_id || stock.itemIdsId;
+        const stockBrandId = stock.brand_name_id || stock.brandNameId;
+        const stockMachineNumber = stock.machine_number || stock.machineNumber || '';
+        const itemIdsMatch = stockItemIdsId && String(stockItemIdsId) === String(item.itemIdsId);
+        const brandMatch = !item.brandId || (stockBrandId && String(stockBrandId) === String(item.brandId));
+        const machineMatch = !item.machineNumber || (stockMachineNumber && String(stockMachineNumber).trim() === String(item.machineNumber).trim());
+        return itemIdsMatch && brandMatch && machineMatch;
+      });
+      if (stockItem) {
+        model = stockItem.model || '-';
+        if (!machineNumber || machineNumber === '-') {
+          machineNumber = stockItem.machine_number || stockItem.machineNumber || '-';
+        }
+      }
+      return [
+        index + 1, // S.No
+        item.date || '-', // Date
+        item.itemName || '-', // Item Name
+        item.itemId || '-', // Item ID
+        brandName, // Brand
+        model, // Model
+        machineNumber, // Machine Number
+        item.from || '-', // From
+        item.to || '-', // To
+        item.personName || '-' // Project Incharge
+      ];
+    });
+
+    // Generate table - transparent bg, lighter borders, no extra column
+    const columnWidths = [12, 20, 36, 20, 20, 24, 25, 46, 46, 30];
+    const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
+    autoTable(doc, {
+      head: [['S.No', 'Date', 'Item Name', 'Item ID', 'Brand', 'Model', 'Machine Number', 'From', 'To', 'Project Incharge']],
+      body: tableData,
+      startY: 24,
+      tableWidth,
+      styles: { fontSize: 7, cellPadding: 1.5, fillColor: false, lineColor: [180, 180, 180], lineWidth: 0.1 },
+      headStyles: { fillColor: false, textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 7, lineColor: [180, 180, 180], lineWidth: 0.1 },
+      alternateRowStyles: { fillColor: false },
+      tableLineColor: [180, 180, 180],
+      tableLineWidth: 0.1,
+      columnStyles: Object.fromEntries(columnWidths.map((w, i) => [i, { cellWidth: w }])),
+      margin: { left: 10, right: 10 },
+      didDrawPage: function (data) {
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.text(`Page ${data.pageNumber} of ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+      }
+    });
+
+    // Generate filename
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/\//g, '-');
+    const filename = `Pending_Items_${dateStr}.pdf`;
+
+    // Save PDF
+    doc.save(filename);
+  };
+
   const renderFilterDropdown = (field, value, placeholder) => {
     const fieldLabels = {
       itemName: 'Item Name',
-      location: 'Location',
+      location: 'Current Location',
       itemId: 'Item ID',
       entryNo: 'Entry. No',
       projectIncharge: 'Project Incharge'
     };
-    
+
     return (
       <div className="relative w-full">
         {showFilterSheet && filterOpenPicker === field ? (
@@ -843,13 +969,13 @@ const PendingItems = ({ user }) => {
             onChange={(e) => setFilterPickerSearch(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             placeholder={placeholder}
-            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white focus:outline-none"
+            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white focus:outline-none"
             style={{ color: '#000', boxSizing: 'border-box', paddingRight: '40px' }}
             autoFocus
           />
         ) : (
           <div onClick={() => openFilterPicker(field)}
-            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+            className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
             style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box', paddingRight: value ? '60px' : '40px' }}
           >
             {value || placeholder}
@@ -874,33 +1000,30 @@ const PendingItems = ({ user }) => {
         )}
         {/* Dropdown options - Popup Modal */}
         {showFilterSheet && filterOpenPicker === field && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] -top-4 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) { closeFilterPicker(); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
-            <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center px-6 pt-5">
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] -top-[16px] flex items-center justify-center p-[16px]" onClick={(e) => { if (e.target === e.currentTarget) { closeFilterPicker(); } }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+            <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center px-[24px] pt-[24px]">
                 <p className="text-[16px] font-semibold text-black">Select {fieldLabels[field] || field}</p>
                 <button onClick={() => closeFilterPicker()} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
                   <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
                 </button>
               </div>
-              <div className="px-6 pt-4 pb-4">
+              <div className="px-[24px] pt-[4px] pb-[6px]">
                 <div className="relative">
                   <input
                     type="text"
                     value={filterPickerSearch}
                     onChange={(e) => setFilterPickerSearch(e.target.value)}
                     placeholder="Search"
-                    className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                    className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                     autoFocus
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                      <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
+                    <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
                   </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6">
+              <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
                 <div className="shadow-md rounded-lg overflow-hidden">
                   {getFilterPickerOptions().length > 0 ? (
                     <div className="space-y-0">
@@ -923,9 +1046,8 @@ const PendingItems = ({ user }) => {
                         const { firstLine, secondLine } = splitOptionText(optLabel);
                         return (
                           <button key={idx} type="button" onClick={(e) => { e.stopPropagation(); handleFilterPickerSelect(field, optValue); }}
-                            className={`w-full px-6 flex items-center gap-3 transition-colors ${
-                              isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                            }`}
+                            className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                              }`}
                             style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                           >
                             <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
@@ -944,7 +1066,7 @@ const PendingItems = ({ user }) => {
                       })}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-4">
+                    <div className="flex flex-col items-center justify-center py-[16px]">
                       <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
                         {filterPickerSearch.trim() ? 'No options found' : 'No options available'}
                       </p>
@@ -960,99 +1082,181 @@ const PendingItems = ({ user }) => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
-      {/* Home Location Filter */}
-      <div className="px-4 pt-2 pb-2">
-        <label className="block text-[13px] font-medium text-black mb-0.5">
-          Home Location<span className="text-[#eb2f8e]">*</span>
-        </label>
-        <div
-          onClick={() => setShowHomeLocationDropdown(true)}
-          className="w-full h-[32px] px-3 border border-[rgba(0,0,0,0.16)] rounded flex items-center justify-between cursor-pointer bg-white"
-        >
-          <span className={`text-[12px] ${selectedHomeLocation ? 'text-black font-medium' : 'text-[#9E9E9E]'}`}>
-            {selectedHomeLocation ? selectedHomeLocation.value : 'Select Home Location'}
-          </span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 4.5L6 7.5L9 4.5" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+        {/* Header row: Home Location label (left) + Download (right) - like Item ID in History */}
+        <div className="flex items-center justify-between pb-[8px] border-b border-[#E0E0E0] ">
+          <div className="flex-shrink-0 flex items-center gap-[4px]">
+            <button
+              type="button"
+              onClick={() => setShowHomeLocationDropdown(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-left"
+            >
+              {selectedHomeLocation ? selectedHomeLocation.value : 'Home Location'}
+            </button>
+            {selectedHomeLocation && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedHomeLocation(null);
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleDownloadPDF}
+            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right flex items-center gap-1"
+          >
+            Download
+          </button>
         </div>
-      </div>
-      <div className="flex justify-between px-4 mb-2">
-        <div className="flex bg-[#F2F4F7] items-center h-6 shadow-sm rounded-full">
-          <button onClick={() => setSelectedDays('all')}
-            className={`flex px-4 ml-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === 'all'
+        <div className="flex w-full bg-[#F2F4F7] items-center h-[32px] rounded-md mt-[8px]">
+          <button
+            onClick={() => setSelectedDays('all')}
+            className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${selectedDays === 'all'
               ? 'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
+              : 'bg-transparent text-[#848484]'
               }`}
           >
             All Days
           </button>
-          <button onClick={() => setSelectedDays('30')}
-            className={`flex px-4 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '30'
+          <button
+            onClick={() => setSelectedDays('30')}
+            className={`flex-1 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${selectedDays === '30'
               ? 'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
+              : 'bg-transparent text-[#848484]'
               }`}
           >
             30 Days
           </button>
-          <button onClick={() => setSelectedDays('60')}
-            className={`flex px-4 mr-0.5 h-5 rounded-full text-[11px] items-center font-medium transition-colors duration-1000 ease-out ${selectedDays === '60'
+          <button
+            onClick={() => setSelectedDays('60')}
+            className={`flex-1 mr-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${selectedDays === '60'
               ? 'bg-white text-black'
-              : 'bg-gray-100 text-gray-600'
+              : 'bg-transparent text-[#848484]'
               }`}
           >
             60 Days
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium text-black leading-normal">Download</span>
-          <img src={Filter} alt="Filter" className="w-[12px] h-[12px] cursor-pointer" onClick={() => setShowFilterSheet(true)} />
+        {/* Home Location - clickable text, opens popup; shows selected location or placeholder */}
+        <div className="flex justify-between items-center gap-[4px] mb-0 flex-shrink-0 pt-[6px]">
+          <div className="flex items-center gap-[4px] min-w-0 flex-1">
+            <button onClick={() => setShowFilterSheet(true)} className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0">
+              <img src={Filter} alt="Filter" className="w-[13px] h-[12px]" />
+              {!(filterItemName || filterLocation || filterItemId || filterDate || filterEntryNo || filterProjectIncharge) && (
+                <span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
+              )}
+            </button>
+            {/* Active Filter Chips - between Filter and toggle buttons */}
+            <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {(filterItemName || filterLocation || filterItemId || filterDate || filterEntryNo || filterProjectIncharge) && (
+                <div className="flex items-center gap-[4px] flex-nowrap">
+                  {filterItemName && (
+                    <div className="flex items-center gap-1 border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Item Name</span>
+                      <button onClick={() => setFilterItemName(null)} className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterLocation && (
+                    <div className="flex items-center gap-1 border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Current Location</span>
+                      <button onClick={() => setFilterLocation(null)} className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterItemId && (
+                    <div className="flex items-center gap-1 border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Item ID</span>
+                      <button onClick={() => setFilterItemId(null)} className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterDate && (
+                    <div className="flex items-center gap-1 border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Date</span>
+                      <button onClick={() => setFilterDate(null)} className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterEntryNo && (
+                    <div className="flex items-center gap-1 border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Entry No</span>
+                      <button onClick={() => setFilterEntryNo(null)} className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
+                  )}
+                  {filterProjectIncharge && (
+                    <div className="flex items-center gap-1 border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                      <span className="text-[11px] font-medium text-black">Incharge</span>
+                      <button onClick={() => setFilterProjectIncharge(null)} className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pt-[6px] pb-[16px]">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-[32px]">
             <p className="text-[12px] text-gray-500">Loading...</p>
           </div>
         ) : pendingData.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-[32px]">
             <p className="text-[12px] text-gray-500">No pending items found.</p>
           </div>
         ) : (
           <div className="shadow-lg">
             {pendingData.map((item) => (
-              <div key={item.id} className="bg-white rounded-[8px] px-4 py-2 shadow-sm border border-[#E0E0E0]">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                      #{item.entryNo}, {item.itemName}
+              <div key={item.id} className="bg-white rounded-[8px] px-[12px] py-[10px] shadow-lg border border-[#E0E0E0]">
+                <div className="flex justify-between items-start mb-0.5">
+                  <p className="text-[12px] font-semibold text-black leading-normal">
+                    #{item.entryNo}, {item.itemName}
+                  </p>
+                  {item.itemId && (
+                    <p className="text-[12px] font-semibold text-black leading-normal flex-shrink-0">
+                      {item.itemId}
                     </p>
-                    <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                      From - {item.from}
-                    </p>
-                    <p className="text-[12px] font-semibold text-[#BF9853] leading-normal mb-0.5">
-                      To - {item.to}
-                    </p>
-                    <p className="text-[11px] text-[#848484] leading-normal">
-                      {item.date}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end ml-4">
-                    {item.itemId && (
-                      <p className="text-[12px] font-semibold text-black leading-normal mb-1">
-                        {item.itemId}
-                      </p>
-                    )}
-                    {item.daysPending && (
-                      <button onClick={() => handleDaysClick(item)} className="text-[12px] font-semibold text-[#e06256] leading-normal mb-1 cursor-pointer hover:underline">
-                        {item.daysPending}
-                      </button>
-                    )}
-                    <p className="text-[12px] font-semibold text-[#848484] leading-normal">
-                      {item.personName}
-                    </p>
-                  </div>
+                  )}
+                </div>
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  From -  {item.from}
+                </p>
+                <div className="flex justify-between items-center gap-2 mb-0.5">
+                  <p className="text-[12px] font-semibold text-[#BF9853] leading-normal min-w-0">
+                    To - {item.to}
+                  </p>
+                  {item.daysPending && (
+                    <button onClick={() => handleDaysClick(item)} className={`text-[12px] font-semibold leading-normal flex-shrink-0 cursor-pointer hover:underline ${(item.daysAway ?? 0) < 30 ? 'text-black' : 'text-[#E4572E]'}`}>
+                      {item.daysPending}
+                    </button>
+                  )}
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <p className="flex items-center gap-[2px] text-[11px] leading-normal min-w-0">
+                    <span className="font-bold text-black">{item.date}</span>
+                    {item.createdDateTimeFormatted && <span className=" font-semibold text-[#9E9E9E]"> • {item.createdDateTimeFormatted}</span>}
+                  </p>
+                  <p className="text-[12px] font-semibold text-black leading-normal flex-shrink-0">
+                    {item.personName}
+                  </p>
                 </div>
               </div>
             ))}
@@ -1062,7 +1266,7 @@ const PendingItems = ({ user }) => {
       {/* Home Location Dropdown */}
       {showHomeLocationDropdown && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowHomeLocationDropdown(false);
@@ -1072,10 +1276,10 @@ const PendingItems = ({ user }) => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 pt-5">
+            <div className="flex justify-between items-center px-[24px] pt-[24px]">
               <p className="text-[16px] font-semibold text-black">Select Home Location</p>
               <button
                 onClick={() => {
@@ -1084,48 +1288,75 @@ const PendingItems = ({ user }) => {
                 }}
                 className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"
               >
-                ×
+                <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
               </button>
             </div>
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[4px] pb-[6px]">
               <div className="relative">
                 <input
                   type="text"
                   value={homeLocationSearchQuery}
                   onChange={(e) => setHomeLocationSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                   autoFocus
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+                  <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-6">
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
               <div className="shadow-md rounded-lg overflow-hidden">
                 {getFilteredHomeLocationOptions().length === 0 ? (
-                  <div className="p-4 text-center text-[12px] text-gray-500">
-                    No locations found
+                  <div className="flex flex-col items-center justify-center py-[16px]">
+                    <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
+                      {homeLocationSearchQuery ? 'No options found' : 'No options available'}
+                    </p>
                   </div>
                 ) : (
-                  getFilteredHomeLocationOptions().map((option) => (
-                    <div
-                      key={option.id}
-                      onClick={() => {
-                        setSelectedHomeLocation(option);
-                        setShowHomeLocationDropdown(false);
-                        setHomeLocationSearchQuery('');
-                      }}
-                      className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors ${selectedHomeLocation && selectedHomeLocation.id === option.id ? 'bg-blue-50' : ''
-                        }`}
-                    >
-                      <p className="text-[13px] font-medium text-black">{option.value}</p>
-                    </div>
-                  ))
+                  <div className="space-y-0">
+                    {getFilteredHomeLocationOptions().map((option) => {
+                      const isSelected = selectedHomeLocation && selectedHomeLocation.id === option.id;
+                      // Helper function to split option text at first hyphen
+                      const splitOptionText = (text) => {
+                        if (!text) return { firstLine: '', secondLine: '' };
+                        const firstHyphenIndex = text.indexOf(' - ');
+                        if (firstHyphenIndex === -1) {
+                          return { firstLine: text, secondLine: '' };
+                        }
+                        return {
+                          firstLine: text.substring(0, firstHyphenIndex),
+                          secondLine: text.substring(firstHyphenIndex + 3) // +3 to skip ' - '
+                        };
+                      };
+                      const { firstLine, secondLine } = splitOptionText(option.value);
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedHomeLocation(option);
+                            setShowHomeLocationDropdown(false);
+                            setHomeLocationSearchQuery('');
+                          }}
+                          className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
+                          style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                        >
+                          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          <div className="flex flex-col flex-1 min-w-0 text-left">
+                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left">{firstLine}</p>
+                            {secondLine && (
+                              <p className="text-[11px] font-medium text-[#777777] truncate whitespace-nowrap text-left">{secondLine}</p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -1136,7 +1367,7 @@ const PendingItems = ({ user }) => {
       {showHistorySheet && selectedItemHistory && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center" onClick={() => setShowHistorySheet(false)} style={{ fontFamily: "'Manrope', sans-serif" }}>
           <div className="bg-white w-full max-w-[360px] rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-gray-200">
+            <div className="flex justify-between items-center px-[24px] pt-[20px] pb-[16px] border-b border-gray-200">
               <p className="text-[16px] font-semibold text-black">
                 {selectedItemHistory.homeLocationName || '-'}
               </p>
@@ -1144,14 +1375,14 @@ const PendingItems = ({ user }) => {
                 ×
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-[24px] py-[16px]">
               {selectedItemHistory.history && selectedItemHistory.history.length > 0 ? (
                 <div className="">
                   {/* Filter out home entries and show only transfer locations */}
                   {selectedItemHistory.history
                     .filter(entry => !entry.isHome)
                     .map((entry, index) => (
-                      <div key={index} className="pb-3 border-b border-gray-100 last:border-b-0">
+                      <div key={index} className="pb-[12px] border-b border-gray-100 last:border-b-0">
                         <div className="flex items-start justify-between mb-1">
                           <p className="text-[14px] font-semibold text-black">
                             {entry.eno ? `#${entry.eno} ` : ''}{entry.locationName}
@@ -1169,7 +1400,7 @@ const PendingItems = ({ user }) => {
                     ))}
 
                   {/* Summary */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 pt-[16px] border-t border-gray-200">
                     <div className="flex items-center justify-between">
                       <p className="text-[13px] font-semibold text-black">Total Days</p>
                       <p className="text-[14px] font-bold text-[#e06256]">
@@ -1179,7 +1410,7 @@ const PendingItems = ({ user }) => {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center py-8">
+                <div className="flex items-center justify-center py-[32px]">
                   <p className="text-[12px] text-gray-500">No transfer history available.</p>
                 </div>
               )}
@@ -1189,10 +1420,10 @@ const PendingItems = ({ user }) => {
       )}
       {/* Filter Bottom Sheet Modal */}
       {showFilterSheet && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterSheet(false)}>
-          <div className="bg-white w-full max-w-[360px] max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-50 overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterSheet(false)}>
+          <div className="bg-white w-full max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
+            <div className="flex-shrink-0 flex items-center justify-between px-[24px] pt-[20px] pb-[4px]">
               <p className="text-[16px] font-bold text-black">Select Filters</p>
               <button type="button" onClick={() => setShowFilterSheet(false)} className="text-[#e06256] text-xl font-bold leading-none">
                 ×
@@ -1206,20 +1437,20 @@ const PendingItems = ({ user }) => {
               />
             )}
             {/* Form - scrollable */}
-            <div className="flex-1 overflow-y-auto px-6 py-1">
-              <div className="flex gap-3 mb-2">
+            <div className="flex-1 overflow-y-auto px-[24px] py-[4px]">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">Item Name</p>
                   {renderFilterDropdown('itemName', filterItemName, 'Select')}
                 </div>
               </div>
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
-                  <p className="text-[12px] font-medium text-black mb-1">Location</p>
+                  <p className="text-[12px] font-medium text-black mb-1">Current Location</p>
                   {renderFilterDropdown('location', filterLocation, 'Select')}
                 </div>
               </div>
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">Date</p>
                   <div className="relative">
@@ -1230,7 +1461,7 @@ const PendingItems = ({ user }) => {
                       onClick={handleDatePickerOpen}
                       onFocus={handleDatePickerOpen}
                       placeholder="dd-mm-yyyy"
-                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-3 pr-10 text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1245,7 +1476,7 @@ const PendingItems = ({ user }) => {
                   {renderFilterDropdown('entryNo', filterEntryNo, 'Select')}
                 </div>
               </div>
-              <div className="flex gap-3 mb-2">
+              <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">Item ID</p>
                   {renderFilterDropdown('itemId', filterItemId, 'Select')}
@@ -1257,7 +1488,7 @@ const PendingItems = ({ user }) => {
               </div>
             </div>
             {/* Footer: Cancel + Save */}
-            <div className="flex-shrink-0 flex gap-4 px-6 pb-6 pt-2">
+            <div className="flex-shrink-0 flex gap-[16px] px-[24px] pb-[24px] pt-[8px]">
               <button type="button" onClick={() => setShowFilterSheet(false)}
                 className="flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white"
               >

@@ -691,13 +691,13 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end justify-center"
+        className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center"
         style={{ fontFamily: "'Manrope', sans-serif" }}
         onClick={handleBackdropClick}
       >
-        <div className="bg-white w-full max-w-[360px] h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white w-full h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
           {/* Header with Title and Category */}
-          <div className="flex items-center justify-between px-6 pt-5 mb-3">
+          <div className="flex items-center justify-between px-[24px] pt-[20px] mb-3">
             {/* Title on the left */}
             <p className="text-[16px] font-medium text-black leading-normal">
               Add Items
@@ -711,9 +711,8 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
               {(formData.category || selectedCategory) || 'Category'}
             </button>
           </div>
-
           {/* Form fields - All fields are enabled and can be used independently of category selection */}
-          <div className="px-6 ">
+          <div className="px-[24px] ">
             {/* Item Name - Can be selected without category */}
             <div className="space-y-[6px]">
               <div className="relative">
@@ -730,7 +729,6 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
                   showAllOptions={true}
                 />
               </div>
-
               {/* Model - Can be selected without category */}
               <div className="relative">
                 <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
@@ -746,9 +744,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
                   showAllOptions={true}
                 />
               </div>
-
               {/* Brand - Can be selected without category */}
-
               <div className="w-full relative">
                 <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
                   Type<span className="text-[#eb2f8e]">*</span>
@@ -764,9 +760,8 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
                   showAllOptions={true}
                 />
               </div>
-
               {/* Type and Quantity row */}
-              <div className="flex gap-3">
+              <div className="flex gap-[12px]">
                 {/* Type - Can be selected without category */}
                 <div className="w-full relative">
                   <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
@@ -782,7 +777,6 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
                     showAllOptions={true}
                   />
                 </div>
-
                 {/* Quantity */}
                 <div className="w-[100px] relative">
                   <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
@@ -793,7 +787,7 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
                       type="text"
                       value={formData.quantity}
                       onChange={handleQuantityChange}
-                      className={`w-[100px] h-[32px] border rounded px-3 text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
+                      className={`w-[100px] h-[32px] border rounded px-[12px] text-[12px] font-medium bg-white focus:outline-none ${quantityError ? 'border-[#e06256] text-black' : 'border-[#d6d6d6] text-black'
                         }`}
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                       placeholder="Enter"
@@ -808,23 +802,21 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
               </div>
             </div>
             {/* Buttons */}
-            <div className="mt-5 mb-3 flex gap-4">
+            <div className="mt-5 mb-3 flex gap-[16px]">
               <button
                 onClick={onClose}
-                className="w-[175px] h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
+                className="w-full h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAdd}
-                className="w-[175px] h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
+                className="w-full h-[40px] bg-black border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white leading-normal"
               >
                 Add
               </button>
             </div>
           </div>
-
-
         </div>
       </div>
 

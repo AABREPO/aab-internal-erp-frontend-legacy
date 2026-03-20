@@ -835,8 +835,8 @@ const Report = () => {
       className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
-      <div className="px-4 pt-2 mb-2">
-        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-2">
+      <div className="px-[16px] pt-[8px] mb-2">
+        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
           <button
             type="button"
             onClick={openWeekYearModal}
@@ -844,7 +844,7 @@ const Report = () => {
           >
             #Week {week && year ? `${week}, ${year}` : 'Select'}
           </button>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-[4px]">
             <button
               onClick={() => setShowTypeModal(true)}
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer"
@@ -862,7 +862,7 @@ const Report = () => {
         </div>
       </div>
 
-      <div className="px-4 flex gap-2 items-center">
+      <div className="px-[16px] flex gap-[8px] items-center">
         <div className="flex-1">
           <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Date Range</p>
           <div
@@ -870,7 +870,7 @@ const Report = () => {
             tabIndex={0}
             onClick={openDateRangeModal}
             onKeyDown={(e) => e.key === 'Enter' && openDateRangeModal()}
-            className="relative w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[10px] font-medium bg-white flex items-center cursor-pointer whitespace-nowrap"
+            className="relative w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[10px] font-medium bg-white flex items-center cursor-pointer whitespace-nowrap"
             style={{ boxSizing: 'border-box', color: startDate && endDate ? '#000' : '#9E9E9E' }}
           >
             {dateRangeDisplayText}
@@ -887,7 +887,7 @@ const Report = () => {
           <div className="relative">
             <div
               onClick={() => setShowPaymentModeModal(true)}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
               style={{ boxSizing: 'border-box', color: paymentModeFilter ? '#000' : '#9E9E9E' }}
             >
               {paymentModeFilter || 'Select'}
@@ -917,7 +917,7 @@ const Report = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="px-4 mb-1 mt-2">
+      <div className="px-[16px] mb-1 mt-2">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -930,14 +930,14 @@ const Report = () => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[36px] pl-10 pr-3 text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
+            className="w-full h-[36px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
           />
         </div>
       </div>
 
-      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-0 flex-shrink-0">
+      <div className="px-[16px] pt-[12px] pb-[8px] flex items-center justify-between">
+        <div className="flex items-center gap-[8px] min-w-0">
+          <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-[8px] px-[0px] flex-shrink-0">
             <img src={Filter} alt="Filter" className="w-[12px] h-[11px]" />
             {!(typeFilter || vendorContractorFilter || projectNameFilter || paymentModeFilter) && (
               <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">
@@ -946,10 +946,10 @@ const Report = () => {
             )}
           </button>
           {/* Active Filter Tags - Next to Filter button */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {/* Type Filter Tag */}
             {typeFilter && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+              <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">{typeFilter}</span>
                 <button
                   onClick={() => setTypeFilter('')}
@@ -963,7 +963,7 @@ const Report = () => {
             )}
             {/* Contractor/Vendor Filter Tag */}
             {vendorContractorFilter && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+              <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">Vendor/Contractor</span>
                 <button
                   onClick={() => setVendorContractorFilter('')}
@@ -977,7 +977,7 @@ const Report = () => {
             )}
             {/* Project Name Filter Tag */}
             {projectNameFilter && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+              <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">Project</span>
                 <button
                   onClick={() => setProjectNameFilter('')}
@@ -991,7 +991,7 @@ const Report = () => {
             )}
             {/* Mode Filter Tag */}
             {paymentModeFilter && (
-              <div className="flex items-center gap-1.5 border px-2.5 py-1.5 rounded-full flex-shrink-0">
+              <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">Mode</span>
                 <button
                   onClick={() => setPaymentModeFilter('')}
@@ -1005,7 +1005,7 @@ const Report = () => {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[8px]">
           {(typeFilter || vendorContractorFilter || projectNameFilter || paymentModeFilter) && (
             <button 
               onClick={() => {
@@ -1025,7 +1025,7 @@ const Report = () => {
         </div>
       </div>
 
-      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-4 flex-1 max-h-[430px] pb-11">
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-[16px] flex-1 max-h-[430px] pb-[44px]">
         {transformed.length === 0 ? (
           <div className="flex flex-col items-center justify-center">
             <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
@@ -1041,8 +1041,8 @@ const Report = () => {
               key={item.id}
               className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
             >
-              <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out">
-                <div className="flex flex-col gap-0.5">
+              <div className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out">
+                <div className="flex flex-col gap-[2px]">
                   {/* Row 1: ref and payment mode */}
                   <div className="flex items-center justify-between">
                     <span
@@ -1069,7 +1069,7 @@ const Report = () => {
                       {item.ref}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 ${getTypeBadgeClass(
+                      className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getTypeBadgeClass(
                         item.type
                       )}`}
                     >
@@ -1146,9 +1146,9 @@ const Report = () => {
       {/* Select Week & Year modal - same style as DatePickerModal.jsx, week shown as "Week 1", "Week 2", etc. */}
       {showWeekYearModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center" onClick={() => setShowWeekYearModal(false)}>
-          <div className="bg-white w-[320px] rounded-[6px] p-6 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-[320px] rounded-[6px] p-[24px] relative" onClick={(e) => e.stopPropagation()}>
             <p className="text-[16px] font-medium text-black text-center mb-6">Select Week & Year</p>
-            <div className="flex justify-center gap-8 mb-6">
+            <div className="flex justify-center gap-[32px] mb-6">
               {/* Week column - show "Week 1", "Week 2", ... like 2nd image */}
               <div
                 className="flex flex-col items-center relative"
@@ -1156,7 +1156,7 @@ const Report = () => {
               >
                 {getVisibleWeeks().map((w, idx) => (
                   <div key={`${w}-${idx}`} className="relative w-full flex flex-col items-center">
-                    {idx > 0 && <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                    {idx > 0 && <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
                     <button
                       type="button"
                       onClick={() => setModalWeek(w)}
@@ -1175,7 +1175,7 @@ const Report = () => {
               >
                 {getVisibleYears().map((y, idx) => (
                   <div key={`${y}-${idx}`} className="relative w-full flex flex-col items-center">
-                    {idx > 0 && <div className="absolute top-0 left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
+                    {idx > 0 && <div className="absolute top-[0px] left-0 right-0 h-[0.5px] bg-[rgba(0,0,0,0.16)]" />}
                     <button
                       type="button"
                       onClick={() => setModalYear(String(y))}
@@ -1188,7 +1188,7 @@ const Report = () => {
                 ))}
               </div>
             </div>
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-[16px]">
               <button type="button" onClick={() => setShowWeekYearModal(false)} className="text-[#656565] text-[16px] font-semibold">
                 Cancel
               </button>
@@ -1203,24 +1203,24 @@ const Report = () => {
       {/* Date Range calendar modal (like 5th image) */}
       {showDateRangeModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40" onClick={() => setShowDateRangeModal(false)}>
-          <div className="bg-white rounded-xl shadow-lg w-[95%] max-w-[340px] p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-lg w-[95%] max-w-[340px] p-[16px]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={() => setCalendarView(new Date(calendarView.getFullYear(), calendarView.getMonth() - 1))} className="p-2 text-black">
+              <button type="button" onClick={() => setCalendarView(new Date(calendarView.getFullYear(), calendarView.getMonth() - 1))} className="p-[8px] text-black">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
               </button>
               <span className="text-[16px] font-semibold">
                 {calendarView.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
               </span>
-              <button type="button" onClick={() => setCalendarView(new Date(calendarView.getFullYear(), calendarView.getMonth() + 1))} className="p-2 text-black">
+              <button type="button" onClick={() => setCalendarView(new Date(calendarView.getFullYear(), calendarView.getMonth() + 1))} className="p-[8px] text-black">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>
-            <div className="grid grid-cols-7 gap-0.5 text-center text-[12px] font-medium text-[#9E9E9E] mb-1">
+            <div className="grid grid-cols-7 gap-[2px] text-center text-[12px] font-medium text-[#9E9E9E] mb-1">
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
                 <div key={d}>{d}</div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-0.5">
+            <div className="grid grid-cols-7 gap-[2px]">
               {(() => {
                 const y = calendarView.getFullYear();
                 const m = calendarView.getMonth();
@@ -1268,15 +1268,15 @@ const Report = () => {
                 });
               })()}
             </div>
-            <div className="flex justify-between mt-4 gap-2">
+            <div className="flex justify-between mt-4 gap-[8px]">
               <button type="button" onClick={() => { setRangeStart(null); setRangeEnd(null); }} className="text-[14px] font-semibold text-[#9E9E9E]">
                 Clear
               </button>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setShowDateRangeModal(false)} className="px-4 py-2 text-[14px] font-semibold text-[#9E9E9E]">
+              <div className="flex gap-[8px]">
+                <button type="button" onClick={() => setShowDateRangeModal(false)} className="px-[16px] py-[8px] text-[14px] font-semibold text-[#9E9E9E]">
                   Cancel
                 </button>
-                <button type="button" onClick={applyDateRange} className="px-4 py-2 text-[14px] font-semibold text-white bg-[#E4572E] rounded">
+                <button type="button" onClick={applyDateRange} className="px-[16px] py-[8px] text-[14px] font-semibold text-white bg-[#E4572E] rounded">
                   Done
                 </button>
               </div>
@@ -1288,7 +1288,7 @@ const Report = () => {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40" onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-[360px] p-4 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl w-full max-w-[360px] p-[16px] relative" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[16px] font-semibold text-black">Select Filters</p>
               <button
@@ -1302,14 +1302,14 @@ const Report = () => {
               </button>
             </div>
 
-            <div className="flex flex-col gap-4 mb-3">
+            <div className="flex flex-col gap-[16px] mb-3">
               {/* Vendor/Contractor Filter */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Vendor/Contractor</p>
                 <div className="relative">
                   <div
                     onClick={() => setShowVendorContractorModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: vendorContractorFilter ? '#000' : '#9E9E9E' }}
                   >
                     {vendorContractorFilter || 'Select'}
@@ -1343,7 +1343,7 @@ const Report = () => {
                 <div className="relative">
                   <div
                     onClick={() => setShowProjectNameModal(true)}
-                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: projectNameFilter ? '#000' : '#9E9E9E' }}
                   >
                     {projectNameFilter || 'Select'}
@@ -1372,7 +1372,7 @@ const Report = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-[16px]">
               <button
                 type="button"
                 onClick={() => {
@@ -1380,14 +1380,14 @@ const Report = () => {
                   setProjectNameFilter('');
                   setShowFilterModal(false);
                 }}
-                className="px-6 py-2 text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded"
+                className="px-[24px] py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => setShowFilterModal(false)}
-                className="px-6 py-2 text-[14px] font-semibold text-white bg-black rounded"
+                className="px-[24px] py-[8px] text-[14px] font-semibold text-white bg-black rounded"
               >
                 Save
               </button>
@@ -1442,7 +1442,7 @@ const Report = () => {
       {/* Select Type Modal */}
       {showTypeModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
           onClick={() => {
             setShowTypeModal(false);
             setTypeSearchQuery('');
@@ -1454,7 +1454,7 @@ const Report = () => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex justify-between items-center px-6 pt-5">
+            <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select Type</p>
               <button
                 onClick={() => {
@@ -1470,14 +1470,14 @@ const Report = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="px-6 pt-4 pb-4">
+            <div className="px-[24px] pt-[16px] pb-[16px]">
               <div className="relative">
                 <input
                   type="text"
                   value={typeSearchQuery}
                   onChange={(e) => setTypeSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
                   autoFocus
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -1490,7 +1490,7 @@ const Report = () => {
             </div>
 
             {/* Options List */}
-            <div className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Advance', 'Bill Settlement', 'Transfer', 'Refund']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
@@ -1505,11 +1505,11 @@ const Report = () => {
                           setShowTypeModal(false);
                           setTypeSearchQuery('');
                         }}
-                        className={`w-full h-[40px] px-6 flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                        className={`w-full h-[40px] px-[24px] flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                           }`}
                       >
                         {/* Left: Option Text */}
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
                           <p className="text-[14px] font-medium text-black text-left truncate">{type}</p>
                         </div>
 
@@ -1538,12 +1538,12 @@ const Report = () => {
       {/* Description Modal */}
       {showDescriptionModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-[16px]"
           onClick={() => setShowDescriptionModal(false)}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[320px] rounded-[12px] p-5 relative"
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Icon */}
@@ -1564,7 +1564,7 @@ const Report = () => {
               <button
                 type="button"
                 onClick={() => setShowDescriptionModal(false)}
-                className="px-8 py-2 bg-black text-white text-[14px] font-semibold rounded-[8px] hover:opacity-90 transition-opacity"
+                className="px-[32px] py-[8px] bg-black text-white text-[14px] font-semibold rounded-[8px] hover:opacity-90 transition-opacity"
               >
                 Okay
               </button>

@@ -4,7 +4,11 @@ import logo from '../Images/AABBlack.png'
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) => {
   const [expandedItems, setExpandedItems] = useState({
-    procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker',
+    procurement:
+      currentPage === 'request-for-quotation' ||
+      currentPage === 'purchase-order' ||
+      currentPage === 'inventory' ||
+      currentPage === 'tools-tracker',
     account: currentPage === 'project-advance' || currentPage === 'loan-portal'
   });
   const [roleModels, setRoleModels] = useState([]);
@@ -13,7 +17,11 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
   // Update expandedItems when currentPage changes
   useEffect(() => {
     setExpandedItems({
-      procurement: currentPage === 'purchase-order' || currentPage === 'inventory' || currentPage === 'tools-tracker',
+      procurement:
+        currentPage === 'request-for-quotation' ||
+        currentPage === 'purchase-order' ||
+        currentPage === 'inventory' ||
+        currentPage === 'tools-tracker',
       account: currentPage === 'project-advance' || currentPage === 'loan-portal'
     });
   }, [currentPage]);
@@ -88,6 +96,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       label: 'Procurement', 
       icon: 'cart',
       subItems: [
+        { id: 'request-for-quotation', label: 'RFQ', modelName: 'RFQ' },
         { id: 'purchase-order', label: 'Purchase Order', modelName: 'Purchase Order' },
         { id: 'inventory', label: 'Inventory', modelName: 'Inventory' },
         { id: 'tools-tracker', label: 'Tools Tracker', modelName: 'Tools Tracker' }
@@ -173,13 +182,13 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       {/* Overlay */}
       <div className="fixed inset-0 bg-black bg-opacity-50 z-[55]" onClick={onClose} />
       {/* Sidebar */}
-      <div className="fixed h-full w-[280px] bg-white z-[60] shadow-lg overflow-y-auto left-0 top-0"
+      <div className="fixed h-full w-[280px] bg-white z-[60] shadow-lg overflow-y-auto left-0 top-[0px] text-left"
         style={{ fontFamily: "'Manrope', sans-serif" }} onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between p-[16px] border-b border-gray-200">
+            <div className="flex items-center gap-[12px]">
                 <img src={logo} alt="logo" className="w-8 h-8" />
               <span className="font-semibold text-lg text-black">BUILDERS</span>
             </div>
@@ -190,18 +199,18 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
             </button>
           </div>
           {/* Menu Items */}
-          <div className="flex-1 py-4">
+          <div className="flex-1 py-[16px]">
             {menuItems.map((item) => (
               <div key={item.id}>
                 {item.subItems ? (
                   <>
                     <div
-                      className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 ${
+                      className={`flex items-center justify-between px-[16px] py-[12px] cursor-pointer hover:bg-gray-50 ${
                         expandedItems[item.id] ? 'bg-gray-50' : ''
                       }`}
                       onClick={item.id === 'procurement' ? handleProcurementClick : item.id === 'account' ? handleAccountClick : undefined}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-[12px]">
                         <div className="w-5 h-5 text-black">
                           {getIcon(item.icon)}
                         </div>
@@ -223,7 +232,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
                         {item.subItems.map((subItem) => (
                           <div
                             key={subItem.id}
-                            className={`px-4 py-2.5 pl-12 cursor-pointer hover:bg-gray-100 ${
+                            className={`px-[16px] py-[10px] pl-[48px] cursor-pointer hover:bg-gray-100 ${
                               currentPage === subItem.id ? 'bg-gray-100' : ''
                             }`}
                             onClick={() => handleItemClick(subItem.id, subItem.modelName)}
@@ -236,7 +245,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
                   </>
                 ) : (
                   <div
-                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 ${
+                    className={`flex items-center gap-[12px] px-[16px] py-[12px] cursor-pointer hover:bg-gray-50 ${
                       currentPage === item.id ? 'bg-gray-50' : ''
                     }`}
                     onClick={() => handleItemClick(item.id, item.modelName)}
@@ -251,7 +260,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
             ))}
           </div>
           {/* Footer - Last Updated */}
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-[16px] border-t border-gray-200">
             <p className="text-xs text-gray-600">
               Last Updated: {buildTime || 'Not available'}
             </p>

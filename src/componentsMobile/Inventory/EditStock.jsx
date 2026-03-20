@@ -1210,7 +1210,7 @@ const EditStock = () => {
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
       {/* Category Text */}
       {activeSubTab === 'update' && activeSubTab !== 'history' && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-1">
+        <div className="flex-shrink-0 pt-[8px] pb-[8px] border-b border-[#E0E0E0]">
           <div className="flex items-center justify-between flex-1">
             <p className="text-[12px] font-semibold text-black leading-normal">
               #
@@ -1225,15 +1225,15 @@ const EditStock = () => {
         </div>
       )}
       {activeSubTab === 'history' && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-1">
+        <div className="flex-shrink-0 pt-[8px] pb-[8px] border-b border-[#E0E0E0]">
           <div className="flex items-center justify-between flex-1">
             <div
               onClick={() => setShowEnoModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer flex items-center gap-1"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer flex items-center gap-[4px]"
             >
               {selectedEno ? `#${selectedEno}` : '# E.No'}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-[16px]">
               <button
                 onClick={() => setShowCategoryModal(true)}
                 className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
@@ -1245,7 +1245,7 @@ const EditStock = () => {
         </div>
       )}
       {activeSubTab === 'transfer' && (
-        <div className="flex-shrink-0 px-4 pt-2 pb-1 flex items-center justify-between">
+        <div className="flex-shrink-0 pt-[8px] pb-[8px] flex items-center justify-between border-b border-[#E0E0E0]">
           <div className="flex items-center justify-between flex-1">
             <p className="text-[12px] font-semibold text-black leading-normal">
               #
@@ -1264,7 +1264,7 @@ const EditStock = () => {
                 type="button"
                 onClick={handleTransferSubmit}
                 disabled={transferLoading}
-                className={`text-black px-4 rounded-full text-[12px] font-medium ${transferLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`text-black px-[16px] rounded-full text-[12px] font-medium ${transferLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {transferLoading ? 'Moving...' : 'Move Stock'}
               </button>
@@ -1279,12 +1279,12 @@ const EditStock = () => {
         </div>
       )}
       {/* Sub-navigation Tabs: Transfer, Update, History */}
-      <div className="flex-shrink-0 px-4">
-        <div className="flex bg-gray-100 items-center h-9 shadow-sm rounded-md flex-1">
+      <div className="flex-shrink-0 pt-[8px]">
+        <div className="flex bg-gray-100 items-center h-[32px] shadow-sm rounded-md flex-1">
           <button
             type="button"
             onClick={() => setActiveSubTab('transfer')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal ml-0.5 transition-colors duration-1000 ease-out ${activeSubTab === 'transfer'
+            className={`flex-1 h-[28px] rounded-md text-[12px] font-medium leading-normal ml-[2px] transition-colors duration-1000 ease-out ${activeSubTab === 'transfer'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1294,7 +1294,7 @@ const EditStock = () => {
           <button
             type="button"
             onClick={() => setActiveSubTab('update')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'update'
+            className={`flex-1 h-[28px] rounded-md text-[12px] font-medium leading-normal transition-colors duration-1000 ease-out ${activeSubTab === 'update'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1304,7 +1304,7 @@ const EditStock = () => {
           <button
             type="button"
             onClick={() => setActiveSubTab('history')}
-            className={`flex-1 h-[32px] rounded-md text-[12px] font-medium leading-normal mr-0.5 transition-colors duration-1000 ease-out ${activeSubTab === 'history'
+            className={`flex-1 h-[28px] rounded-md text-[12px] font-medium leading-normal mr-[2px] transition-colors duration-1000 ease-out ${activeSubTab === 'history'
               ? 'bg-white text-black'
               : 'bg-gray-100 text-gray-600'
               }`}
@@ -1316,7 +1316,7 @@ const EditStock = () => {
       {activeSubTab === 'history' && (
         <div
           ref={filterTagsContainerRef}
-          className="flex items-center justify-start mt-3 mb-0 px-5 gap-2 overflow-x-auto scrollbar-hide no-scrollbar scrollbar-none"
+          className="flex items-center justify-start mt-[8px] mb-0 gap-[4px] overflow-x-auto scrollbar-hide no-scrollbar scrollbar-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch', cursor: isDragging ? 'grabbing' : 'grab' }}
           onMouseDown={(e) => {
             if (e.target.closest('button')) return;
@@ -1340,7 +1340,7 @@ const EditStock = () => {
         >
           <button
             onClick={() => setShowFilterSheet(true)}
-            className="flex items-center gap-2 text-[12px] font-medium text-gray-700"
+            className="flex items-center gap-[4px] text-[12px] font-medium text-gray-700"
           >
             <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
             {!(filterData.stockingLocation || filterData.itemName || filterData.transfer || filterData.update) && (
@@ -1348,8 +1348,8 @@ const EditStock = () => {
             )}
           </button>
           {filterData.stockingLocation && (
-            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[13px] font-medium text-black">Stocking Location</span>
+            <div className="flex items-center gap-[4px] px-[6px] py-[2px] bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[12px] font-medium text-black">Stocking Location</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1365,8 +1365,8 @@ const EditStock = () => {
             </div>
           )}
           {filterData.itemName && (
-            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[13px] font-medium text-black">Item Name</span>
+            <div className="flex items-center gap-[4px] px-[6px] py-[2px] bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[12px] font-medium text-black">Item Name</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1382,8 +1382,8 @@ const EditStock = () => {
             </div>
           )}
           {filterData.transfer && (
-            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[13px] font-medium text-black">Transfer</span>
+            <div className="flex items-center gap-[4px] px-[6px] py-[2px] bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[12px] font-medium text-black">Transfer</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1399,8 +1399,8 @@ const EditStock = () => {
             </div>
           )}
           {filterData.update && (
-            <div className="flex items-center gap-1 px-6 py-1 bg-gray-100 rounded-full flex-shrink-0">
-              <span className="text-[13px] font-medium text-black">Update</span>
+            <div className="flex items-center gap-[4px] px-[6px] py-[2px] bg-gray-100 rounded-full flex-shrink-0">
+              <span className="text-[12px] font-medium text-black">Update</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1419,7 +1419,7 @@ const EditStock = () => {
       )}
       {/* Transfer Form Fields (shown when Transfer tab is active) */}
       {activeSubTab === 'transfer' && (
-        <div className="flex-1 px-4 pb-4">
+        <div className="flex-1 pb-[16px]">
           {/* From Field */}
           <div className="space-y-[6px]">
             <div className="mt-2">
@@ -1441,7 +1441,7 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowFromModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     color: fromLocation ? '#000' : '#9E9E9E',
                     fontFamily: "'Manrope', sans-serif"
@@ -1479,7 +1479,7 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowToModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     color: toLocation ? '#000' : '#9E9E9E',
                     fontFamily: "'Manrope', sans-serif"
@@ -1513,8 +1513,8 @@ const EditStock = () => {
           {/* Items Field - Show only after selecting both From and To */}
           {fromLocation && toLocation && fromLocation !== 'Stock Room A' && toLocation !== 'Stock Room B' && (
             <div>
-              <div className="flex items-center justify-between mt-3 mb-2 px-2">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between mt-3 mb-2 px-[8px]">
+                <div className="flex items-center gap-[8px]">
                   <p className="text-[12px] font-semibold text-black leading-normal">
                     Items
                   </p>
@@ -1547,12 +1547,12 @@ const EditStock = () => {
                   return (
                     <div
                       key={index}
-                      className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm cursor-pointer select-none"
+                      className="bg-white border border-gray-200 rounded-lg p-[12px] shadow-sm cursor-pointer select-none"
                     >
                       <div className=" ">
                         <div className="flex items-center justify-between">
                           <p className="text-[14px] font-semibold text-black">{item.itemName}</p>
-                          <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${getCategoryColor(item.category)}`}>
+                          <span className={`text-[10px] font-medium px-[10px] py-[4px] rounded-full ${getCategoryColor(item.category)}`}>
                             {(item.category || 'Electricals').toUpperCase()}
                           </span>
                         </div>
@@ -1588,7 +1588,7 @@ const EditStock = () => {
       {activeSubTab === 'update' && (
         <div className="flex flex-col h-full overflow-hidden">
           {/* Category Text and Filters */}
-          <div className="flex-shrink-0 px-4">
+          <div className="flex-shrink-0">
             {/* Stocking Location Filter */}
             <div className="mb-2">
               <p className="text-[12px] font-semibold text-black leading-normal mb-1 mt-2">
@@ -1597,7 +1597,7 @@ const EditStock = () => {
               <div className="relative">
                 <div
                   onClick={() => setShowUpdateLocationModal(true)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-8 text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
                     color: updateSelectedLocation ? '#000' : '#9E9E9E',
@@ -1644,7 +1644,7 @@ const EditStock = () => {
                     placeholder="Search"
                     value={updateSearchQuery}
                     onChange={(e) => setUpdateSearchQuery(e.target.value)}
-                    className="w-full h-[40px] rounded-full pl-10 pr-3 text-[12px] font-medium bg-white focus:outline-none"
+                    className="w-full h-[40px] rounded-full pl-[40px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
                     style={{ fontFamily: "'Manrope', sans-serif" }}
                   />
                 </div>
@@ -1666,7 +1666,7 @@ const EditStock = () => {
           </div>
           {/* Stock Items List - Only show after Stocking Location is selected */}
           {updateSelectedLocation && updateSelectedLocation !== 'Select Project' ? (
-            <div className="flex-1 overflow-y-auto px-3 pb-4 scrollbar-hide no-scrollbar">
+            <div className="flex-1 overflow-y-auto px-[12px] pb-[16px] scrollbar-hide no-scrollbar">
               {updateLoading ? (
                 <div className="flex justify-center items-center h-full">
                   <p className="text-[14px] text-gray-500">Loading...</p>
@@ -1695,7 +1695,7 @@ const EditStock = () => {
                           ref={(el) => {
                             if (el) cardRefs.current[itemId] = el;
                           }}
-                          className="flex-1 bg-white rounded-[8px] h-full px-3 py-1 transition-all duration-300 ease-out"
+                          className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[4px] transition-all duration-300 ease-out"
                           style={{
                             transform: `translateX(${swipeOffset}px)`,
                             touchAction: 'pan-y',
@@ -1718,7 +1718,7 @@ const EditStock = () => {
                         >
                           <div className="flex items-start justify-between">
                             {/* Left Side - Item Details */}
-                            <div className="flex-1 pr-2">
+                            <div className="flex-1 pr-[8px]">
                               <div className="flex items-center justify-between">
                                 {/* Item Name */}
                                 <p className="text-[14px] font-semibold text-black leading-tight mb-1">
@@ -1726,7 +1726,7 @@ const EditStock = () => {
                                 </p>
                                 {/* Category Tag */}
                                 {item.category && (
-                                  <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${getCategoryColor(item.category)} mb-2`}>
+                                  <span className={`px-[8px] py-[4px] rounded-full text-[10px] font-medium ${getCategoryColor(item.category)} mb-2`}>
                                     {item.category.toUpperCase()}
                                   </span>
                                 )}
@@ -1759,7 +1759,7 @@ const EditStock = () => {
                         </div>
                         {/* Edit Button - Behind the card on the right, revealed on swipe (ONLY EDIT, NO DELETE) */}
                         <div
-                          className="absolute right-0 top-0 flex items-center z-0"
+                          className="absolute right-0 top-[0px] flex items-center z-0"
                           style={{
                             opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                             transform: swipeOffset < 0
@@ -1775,7 +1775,7 @@ const EditStock = () => {
                               e.stopPropagation();
                               handleEditClick(item);
                             }}
-                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
                           >
                             <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" style={{ filter: 'brightness(0) invert(1)' }} />
                           </button>
@@ -1795,7 +1795,7 @@ const EditStock = () => {
       )}
       {/* History Tab Content */}
       {activeSubTab === 'history' && (
-        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mt-4 px-3 pb-">
+        <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mt-4 px-[12px] pb-">
           {filteredHistoryList.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-[14px] text-gray-500">No history records found</p>
@@ -1804,14 +1804,14 @@ const EditStock = () => {
             <div>
               {filteredHistoryList.map(record => (
                 <div key={record.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
-                  <div className="flex-1 bg-white rounded-[8px] h-full px-3 py-3">
+                  <div className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px]">
                     <div className="flex items-start justify-between mb-1">
-                      <div className="flex-1 pr-2">
+                      <div className="flex-1 pr-[8px]">
                         <div className="flex items-center justify-between">
                           <p className="text-[11px] font-semibold text-black truncate">{record.itemsText || 'No items'}</p>
                           <p>
                             {record.category && (
-                              <span className={`px-2 py-1 rounded-full text-[11px] font-medium ${getCategoryColor(record.category)} mb-2`}>
+                              <span className={`px-[8px] py-[4px] rounded-full text-[11px] font-medium ${getCategoryColor(record.category)} mb-2`}>
                                 {record.category.toUpperCase()}
                               </span>
                             )}
@@ -1828,7 +1828,7 @@ const EditStock = () => {
                         </div>
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] text-gray-400 mt-1">{record.formattedDate}</p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-[8px]">
                             {String(record.type || '').toLowerCase() === 'transfer' ? null : (
                               <p className="text-[10px] text-gray-400 mt-1">Old Count: <span className="font-semibold text-black">{(() => {
                                 const newCountAtRecord = getLocationStockAtTime(record.itemId, record.categoryId, record.modelId, record.brandId, record.typeId, record.stockingLocationId, record.dateValue);
@@ -2006,7 +2006,7 @@ const EditStock = () => {
           {/* Bottom Sheet */}
           <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200">
+            <div className="flex items-center justify-between px-[16px] pt-[16px] pb-[12px] border-b border-gray-200">
               <h2 className="text-[16px] font-semibold text-black">Update Stock</h2>
               <button
                 type="button"
@@ -2027,7 +2027,7 @@ const EditStock = () => {
               </button>
             </div>
             {/* Content */}
-            <div className="px-4 py-4 space-y-4">
+            <div className="px-[16px] py-[16px] space-y-4">
               {/* Current Stock */}
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-1">
@@ -2037,7 +2037,7 @@ const EditStock = () => {
                   type="text"
                   value={currentStock}
                   readOnly
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[12px] text-[12px] font-medium bg-gray-100 text-gray-600 cursor-not-allowed"
                   style={{ fontFamily: "'Manrope', sans-serif" }}
                 />
               </div>
@@ -2050,7 +2050,7 @@ const EditStock = () => {
                   type="number"
                   value={newCount}
                   onChange={(e) => setNewCount(e.target.value)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[12px] text-[12px] font-medium bg-white text-black"
                   style={{ fontFamily: "'Manrope', sans-serif" }}
                   placeholder="Enter new count"
                 />
@@ -2062,14 +2062,14 @@ const EditStock = () => {
                   type="text"
                   value={moveDescription}
                   onChange={(e) => setMoveDescription(e.target.value)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-3 pr-3 text-[12px] font-medium bg-white text-black"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[12px] text-[12px] font-medium bg-white text-black"
                   style={{ fontFamily: "'Manrope', sans-serif" }}
                   placeholder="Enter description"
                 />
               </div>
             </div>
             {/* Action Buttons */}
-            <div className="px-4 pb-4 pt-2 flex gap-3">
+            <div className="px-[16px] pb-[16px] pt-[8px] flex gap-[12px]">
               <button
                 type="button"
                 onClick={() => {
@@ -2127,14 +2127,14 @@ const EditStock = () => {
         <>
           {/* Overlay */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            className="fixed inset-0 bg-black bg-opacity-50 z-[100]"
             onClick={() => setShowFilterSheet(false)}
           />
           {/* Bottom Sheet */}
-          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-50 shadow-lg">
+          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-[101] shadow-lg">
             {/* Header */}
             <div className='flex justify-between items-center mt-3'>
-              <div className="flex justify-between items-center px-6">
+              <div className="flex justify-between items-center px-[24px]">
                 <h2 className="text-lg font-semibold text-gray-800">
                   Select Filters
                 </h2>
@@ -2146,7 +2146,7 @@ const EditStock = () => {
               </div>
             </div>
             {/* Filter Form */}
-            <div className="px-6 py-4 space-y-4 overflow-y-hidden overflow-x-hidden flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
+            <div className="px-[24px] py-[16px] space-y-4 overflow-y-hidden overflow-x-hidden flex-1" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Stocking Location */}
               <div className='space-y-[6px]'>
                 <div className="relative" data-dropdown="stockingLocationFilter">
@@ -2174,7 +2174,7 @@ const EditStock = () => {
                           setStockingLocationFilterSearch('');
                         }
                       }}
-                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                      className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                       style={{
                         paddingRight: filterData.stockingLocation ? '60px' : '40px',
                         fontFamily: "'Manrope', sans-serif"
@@ -2224,7 +2224,7 @@ const EditStock = () => {
                               setStockingLocationFilterOpen(false);
                               setStockingLocationFilterSearch('');
                             }}
-                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
+                            className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
                           >
                             All Locations
                           </button>
@@ -2241,7 +2241,7 @@ const EditStock = () => {
                                   setStockingLocationFilterOpen(false);
                                   setStockingLocationFilterSearch('');
                                 }}
-                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === location ? 'bg-gray-100' : ''}`}
+                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === location ? 'bg-gray-100' : ''}`}
                               >
                                 {location}
                               </button>
@@ -2277,7 +2277,7 @@ const EditStock = () => {
                           setItemNameFilterSearch('');
                         }
                       }}
-                      className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                      className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                       style={{
                         paddingRight: filterData.itemName ? '60px' : '40px',
                         fontFamily: "'Manrope', sans-serif"
@@ -2327,7 +2327,7 @@ const EditStock = () => {
                               setItemNameFilterOpen(false);
                               setItemNameFilterSearch('');
                             }}
-                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.itemName ? 'bg-gray-100' : ''}`}
+                            className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.itemName ? 'bg-gray-100' : ''}`}
                           >
                             All Items
                           </button>
@@ -2344,7 +2344,7 @@ const EditStock = () => {
                                   setItemNameFilterOpen(false);
                                   setItemNameFilterSearch('');
                                 }}
-                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.itemName === item ? 'bg-gray-100' : ''}`}
+                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.itemName === item ? 'bg-gray-100' : ''}`}
                               >
                                 {item}
                               </button>
@@ -2354,7 +2354,7 @@ const EditStock = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-[8px]">
                   {/* Transfer */}
                   <div className="relative" data-dropdown="transferFilter">
                     <label className="block text-sm font-medium text-black mb-0.5">
@@ -2381,7 +2381,7 @@ const EditStock = () => {
                             setTransferFilterSearch('');
                           }
                         }}
-                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                        className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                         style={{
                           paddingRight: filterData.transfer ? '60px' : '40px',
                           fontFamily: "'Manrope', sans-serif"
@@ -2431,7 +2431,7 @@ const EditStock = () => {
                                 setTransferFilterOpen(false);
                                 setTransferFilterSearch('');
                               }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.transfer ? 'bg-gray-100' : ''}`}
+                              className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.transfer ? 'bg-gray-100' : ''}`}
                             >
                               All
                             </button>
@@ -2446,7 +2446,7 @@ const EditStock = () => {
                                   setTransferFilterOpen(false);
                                   setTransferFilterSearch('');
                                 }}
-                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.transfer === option ? 'bg-gray-100' : ''}`}
+                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.transfer === option ? 'bg-gray-100' : ''}`}
                               >
                                 {option}
                               </button>
@@ -2482,7 +2482,7 @@ const EditStock = () => {
                             setUpdateFilterSearch('');
                           }
                         }}
-                        className="w-full h-[32px] px-4 py-2 border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
+                        className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
                         style={{
                           paddingRight: filterData.update ? '60px' : '40px',
                           fontFamily: "'Manrope', sans-serif"
@@ -2532,7 +2532,7 @@ const EditStock = () => {
                                 setUpdateFilterOpen(false);
                                 setUpdateFilterSearch('');
                               }}
-                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${!filterData.update ? 'bg-gray-100' : ''}`}
+                              className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.update ? 'bg-gray-100' : ''}`}
                             >
                               All
                             </button>
@@ -2547,7 +2547,7 @@ const EditStock = () => {
                                   setUpdateFilterOpen(false);
                                   setUpdateFilterSearch('');
                                 }}
-                                className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterData.update === option ? 'bg-gray-100' : ''}`}
+                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.update === option ? 'bg-gray-100' : ''}`}
                               >
                                 {option}
                               </button>
@@ -2561,17 +2561,17 @@ const EditStock = () => {
               </div>
             </div>
             {/* Action Buttons */}
-            <div className="flex-shrink-0 flex gap-3 px-6 py-4">
+            <div className="flex-shrink-0 flex gap-[12px] px-[24px] py-[16px]">
               <button
                 onClick={() => {
                   setFilterData({ stockingLocation: '', itemName: '', transfer: '', update: '' });
                   setShowFilterSheet(false);
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+                className="flex-1 px-[16px] py-[8px] border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
               >
                 Cancel
               </button>
-              <button onClick={() => setShowFilterSheet(false)} className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900">
+              <button onClick={() => setShowFilterSheet(false)} className="flex-1 px-[16px] py-[8px] bg-black text-white rounded-lg font-medium hover:bg-gray-900">
                 Save
               </button>
             </div>

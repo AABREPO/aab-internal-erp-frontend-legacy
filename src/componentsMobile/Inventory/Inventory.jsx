@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../PurchaseOrder/Header';
 import Sidebar from '../Bars/Sidebar';
@@ -23,6 +23,14 @@ const Inventory = ({ user, onLogout }) => {
     return savedTab || 'net-stock';
   });
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const handleMenuClick = () => {
     setSidebarOpen(true);
   };
@@ -32,7 +40,10 @@ const Inventory = ({ user, onLogout }) => {
   };
 
   const handleNavigate = (page) => {
-    if (page === 'purchase-order') {
+    if (page === 'request-for-quotation') {
+      setCurrentPage('request-for-quotation');
+      navigate('/rfq');
+    } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
     } else if (page === 'inventory') {
@@ -81,7 +92,10 @@ const Inventory = ({ user, onLogout }) => {
     }
   };
   return (
-    <div className="relative w-full  bg-white max-w-[360px] mx-auto" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div
+      className="relative w-full bg-white max-w-[360px] mx-auto h-screen overflow-hidden"
+      style={{ fontFamily: "'Manrope', sans-serif" }}
+    >
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -100,7 +114,7 @@ const Inventory = ({ user, onLogout }) => {
       {/* Tabs - Fixed */}
       <InventoryTabs activeTab={activeTab} onTabChange={handleTabChange} />
       {/* Content Area */}
-      <div className="mt-[90px]">
+      <div className="mt-[88px] h-[calc(100vh-90px-80px)] overflow-hidden">
         {renderTabContent()}
       </div>
       {/* Bottom Navigation */}

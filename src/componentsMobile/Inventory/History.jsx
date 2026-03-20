@@ -7,6 +7,20 @@ import Filter from '../Images/Filter.png'
 import Close from '../Images/close.png'
 
 const History = ({ onTabChange }) => {
+  // Prevent whole-page scroll; keep only inner list scrollable
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [historyData, setHistoryData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -811,9 +825,12 @@ const History = ({ onTabChange }) => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div
+      className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden"
+      style={{ fontFamily: "'Manrope', sans-serif", '--incoming-dropdown-max-height': 'calc(100vh - 90px - 80px)' }}
+    >
       {/* Date and Category Section */}
-      <div className="px-4 pt-2">
+      <div className="pt-[8px] border-b border-[#E0E0E0] pb-[8px]">
         <div className="flex items-center justify-between">
           <button className="text-[12px] font-semibold text-black leading-normal">
             {getTodayDate()}
@@ -824,14 +841,14 @@ const History = ({ onTabChange }) => {
         </div>
       </div>
       {/* Stack Return/Dispatch Toggle */}
-      <div className="px-4 mt-1">
+      <div className=" mt-[8px]">
         <div className="flex items-center ga">
           {/* Stack Return/Dispatch Tabs */}
-          <div className="flex bg-gray-100 items-center rounded-md h-9 flex-1">
+          <div className="flex bg-gray-100 items-center rounded-md h-[32px] flex-1">
             <button
               type="button"
               onClick={() => setActiveType('dispatch')}
-              className={`flex-1 py-1 px-4 ml-0.5 h-8 rounded-lg text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'dispatch'
+              className={`flex-1 ml-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${activeType === 'dispatch'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -841,7 +858,7 @@ const History = ({ onTabChange }) => {
             <button
               type="button"
               onClick={() => setActiveType('stack return')}
-              className={`flex-1 py-1 px-4 mr-0.5 h-8 rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${activeType === 'stack return'
+              className={`flex-1 mr-0.5 h-[28px] rounded text-[12px] font-semibold leading-normal duration-1000 ease-out transition-colors ${activeType === 'stack return'
                 ? 'bg-white text-black'
                 : 'bg-gray-100 text-gray-600'
                 }`}
@@ -851,9 +868,8 @@ const History = ({ onTabChange }) => {
           </div>
         </div>
       </div>
-
       {/* Search Bar */}
-      <div className="flex-shrink-0 px-4 pt-2 pb-2">
+      <div className="flex-shrink-0 pt-[8px]">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -866,120 +882,125 @@ const History = ({ onTabChange }) => {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-full text-[12px] font-medium text-black bg-white focus:outline-none focus:border-[#BF9853]"
+            className="w-full h-[40px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-full text-[12px] font-medium text-black bg-white focus:outline-none focus:border-[#BF9853]"
           />
         </div>
       </div>
-
       {/* Filter */}
-      <div className="flex-shrink-0 px-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 cursor-pointer">
-            <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
+      <div className="flex justify-between items-center gap-[4px] px-0 mt-[6px] flex-shrink-0">
+        <div className="flex items-center gap-[4px] min-w-0">
+          <button type="button" onClick={() => setShowFilterModal(true)} className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0">
+            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
             {!(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) && (
-              <span className="text-[14px] font-medium text-[#9E9E9E]">Filter</span>
+              <span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
             )}
           </button>
-          {filterProjectName && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
-              <span className="text-[12px] font-medium text-black">Project Name</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFilterProjectName('');
-                }}
-                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          )}
-          {filterProjectIncharge && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
-              <span className="text-[12px] font-medium text-black">Project Incharge</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFilterProjectIncharge('');
-                }}
-                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          )}
-          {filterStockingLocation && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
-              <span className="text-[12px] font-medium text-black">Stocking Location</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFilterStockingLocation('');
-                }}
-                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          )}
-          {filterSRNumber && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
-              <span className="text-[12px] font-medium text-black">{activeType === 'dispatch' ? 'DP Number' : 'SR Number'}</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFilterSRNumber('');
-                }}
-                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          )}
-          {filterDate && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full">
-              <span className="text-[12px] font-medium text-black">Date</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFilterDate('');
-                }}
-                className="w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {(filterProjectName || filterProjectIncharge || filterStockingLocation || filterSRNumber || filterDate) && (
+              <div className="flex items-center gap-[4px] flex-nowrap">
+                {filterProjectName && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Project Name</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterProjectName('');
+                      }}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterProjectIncharge && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Project Incharge</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterProjectIncharge('');
+                      }}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterStockingLocation && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Stocking Location</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterStockingLocation('');
+                      }}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterSRNumber && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">{activeType === 'dispatch' ? 'DP Number' : 'SR Number'}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterSRNumber('');
+                      }}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {filterDate && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Date</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterDate('');
+                      }}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* History List */}
-      <div className="flex overflow-y-auto no-scrollbar scrollbar-none px-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pt-[8px]">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-[32px]">
             <p className="text-[12px] text-gray-500">Loading...</p>
           </div>
         ) : filteredData.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-[32px]">
             <p className="text-[12px] text-gray-500">No history found</p>
           </div>
         ) : (
-          <div>
+          <div className="w-full">
             {filteredData.map((item) => {
               // Get created_date_time and add 5.30 hours
               const createdDateTime = item.created_date_time || item.createdDateTime || item.created_at;
@@ -1001,20 +1022,19 @@ const History = ({ onTabChange }) => {
               if (swipeState && swipeState.isSwiping) {
                 const deltaX = swipeState.currentX - swipeState.startX;
                 if (deltaX < 0) {
-                  swipeOffset = Math.max(-110, Math.min(0, deltaX));
+                  swipeOffset = Math.max(-96, Math.min(0, deltaX));
                 } else {
                   swipeOffset = Math.min(48, Math.max(0, deltaX));
                 }
               } else if (isExpanded) {
-                swipeOffset = -110;
+                swipeOffset = -96;
               } else if (isCloneExpanded) {
                 swipeOffset = 48;
               } else {
                 swipeOffset = 0;
               }
-
               return (
-                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]">
+                <div key={item.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
                   {/* Clone Button - Behind the card on the left, revealed on right swipe */}
                   <div
                     className="absolute left-0 top-0 flex gap-2 flex-shrink-0 z-0"
@@ -1029,7 +1049,7 @@ const History = ({ onTabChange }) => {
                         e.stopPropagation();
                         handleClone(item);
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="action-button w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                       title="Clone"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1047,78 +1067,68 @@ const History = ({ onTabChange }) => {
                         delete cardRefs.current[item.id];
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-3 py-3 transition-all duration-300 ease-out"
+                    className="rounded-[8px] h-full px-3 py-[10px] transition-all duration-300 ease-out select-none bg-white"
                     style={{
                       transform: `translateX(${swipeOffset}px)`,
                       touchAction: 'pan-y',
-                      userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                      WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                      MozUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-                      msUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      MozUserSelect: 'none',
+                      msUserSelect: 'none'
                     }}
                     onTouchStart={(e) => handleTouchStart(e, item.id)}
                     onTouchMove={(e) => handleTouchMove(e, item.id)}
                     onTouchEnd={() => handleTouchEnd(item.id)}
                     onMouseDown={(e) => handleTouchStart(e, item.id)}
                   >
-                    <div className="flex items-start justify-between">
-                      {/* Left side: Transaction ID, Customer/Location Name, Date and Time */}
-                      <div className="flex-1">
-                        {/* Transaction ID */}
-                        <div className="mb-0.5">
-                          <p
-                            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!isExpanded && !isCloneExpanded) {
-                                // Navigate to outgoing page (view mode from History)
-                                handleView(item);
-                              }
-                            }}
-                          >
-                            {item.transactionId}
-                          </p>
-                        </div>
-
-                        {/* Customer/Location Name */}
-                        <div className="mb-0.5">
-                          <p className="text-[12px] font-semibold text-black leading-normal">
-                            {customerLocation}
-                          </p>
-                        </div>
-
-                        {/* Date and Time */}
-                        <div>
-                          <p className="text-[11px] font-medium text-[#777777] leading-normal">
-                            {displayDate} • {displayTime}
-                          </p>
-                        </div>
+                    <div className="flex items-start justify-between mb-[2px]">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <p
+                          className="text-[12px] font-semibold text-black leading-snug cursor-pointer hover:underline truncate"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isExpanded && !isCloneExpanded) {
+                              // Navigate to outgoing page (view mode from History)
+                              handleView(item);
+                            }
+                          }}
+                        >
+                          {item.transactionId}
+                        </p>
                       </div>
-
-                      {/* Right side: Number of Items, Quantity, and Price */}
-                      <div className="flex flex-col items-end text-right flex-shrink-0">
-                        <p className="text-[11px] font-medium text-[#616161] leading-normal mb-0.5">
+                      <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                        <p className="text-[11px] font-medium text-[#616161] leading-snug">
                           No. of Items - {item.numberOfItems}
                         </p>
-                        <p className="text-[12px] font-semibold text-[#BF9853] leading-normal mb-0.5">
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between mb-[2px]">
+                      <p className="text-[12px] font-semibold text-black leading-normal truncate flex-1 min-w-0">
+                        {customerLocation}
+                      </p>
+                      <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                        <p className="text-[12px] font-semibold text-[#BF9853] leading-normal">
                           Quantity - {Math.abs(item.quantity)}
                         </p>
-                        <p className="text-[11px] font-semibold text-black leading-normal">
-                          {formatPrice(item.price)}
-                        </p>
                       </div>
-                      <div className="flex flex-col items-end text-right flex-shrink-0"></div>
+                    </div>
+                    <div className="flex items-start justify-between">
+                      <p className="text-[11px] font-medium text-[#777777] leading-normal flex-1 min-w-0">
+                        {displayDate} • {displayTime}
+                      </p>
+                      <p className="text-[11px] font-semibold text-black leading-normal flex-shrink-0 ml-2">
+                        {formatPrice(item.price)}
+                      </p>
                     </div>
                   </div>
-
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
                     className="absolute right-0 top-0 flex gap-2 flex-shrink-0 z-0"
                     style={{
                       opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                       transform: swipeOffset < 0
-                        ? `translateX(${Math.max(0, 110 + swipeOffset)}px)`
-                        : 'translateX(110px)',
+                        ? `translateX(${Math.max(0, 96 + swipeOffset)}px)`
+                        : 'translateX(96px)',
                       transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
                       pointerEvents: isExpanded ? 'auto' : 'none'
                     }}
@@ -1150,7 +1160,6 @@ const History = ({ onTabChange }) => {
           </div>
         )}
       </div>
-
       {/* Filter Modal */}
       {showFilterModal && (
         <div
@@ -1166,12 +1175,12 @@ const History = ({ onTabChange }) => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[360px] h-[370px] rounded-t-3xl shadow-lg"
+            className="bg-white w-full h-[370px] rounded-t-3xl shadow-lg"
             onClick={(e) => e.stopPropagation()}
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 pt-4 mb-3">
+            <div className="flex items-center justify-between px-[24px] pt-[16px] mb-3">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
               <button
                 type="button"
@@ -1188,7 +1197,7 @@ const History = ({ onTabChange }) => {
             </div>
 
             {/* Modal Content */}
-            <div className="px-6 overflow-visible">
+            <div className="px-[24px] overflow-visible">
               {/* Project Name */}
               <div className="space-y-[6px]">
                 <div className="relative">
@@ -1250,14 +1259,14 @@ const History = ({ onTabChange }) => {
                 </div>
 
 
-                <div className=" flex items-center gap-2 ">
+                <div className=" flex items-center gap-[8px] ">
                   {/* Date */}
                   <div className="flex-1">
                     <label className="block text-[13px] font-medium text-black mb-0.5">Date</label>
                     <button
                       type="button"
                       onClick={() => setShowDatePicker(true)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded text-[14px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
+                      className="w-full h-[32px] px-[12px] border border-gray-300 rounded text-[14px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                     >
                       <span className={`${filterDate ? 'text-black' : 'text-[#9E9E9E]'} truncate`}>
@@ -1276,14 +1285,14 @@ const History = ({ onTabChange }) => {
                       placeholder="Enter"
                       value={filterSRNumber}
                       onChange={(e) => setFilterSRNumber(e.target.value)}
-                      className="w-full h-[32px] px-3 border border-gray-300 rounded text-[12px] bg-white focus:outline-none focus:border-gray-400"
+                      className="w-full h-[32px] px-[12px] border border-gray-300 rounded text-[12px] bg-white focus:outline-none focus:border-gray-400"
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                     />
                   </div>
                 </div>
               </div>
               {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-3 mt-5">
+              <div className="flex items-center justify-end gap-[12px] mt-5">
                 <button
                   type="button"
                   onClick={() => {
@@ -1297,7 +1306,7 @@ const History = ({ onTabChange }) => {
                     setShowInchargeDropdown(false);
                     setShowLocationDropdown(false);
                   }}
-                  className="px-6 py-2 w-[175px] h-[40px] border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
+                  className="px-[24px] py-[8px] w-full h-[40px] border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
                 >
                   Cancel
                 </button>
@@ -1309,7 +1318,7 @@ const History = ({ onTabChange }) => {
                     setShowInchargeDropdown(false);
                     setShowLocationDropdown(false);
                   }}
-                  className="px-6 py-2 w-[175px] h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
+                  className="px-[24px] py-[8px] w-full h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
                 >
                   Save
                 </button>
@@ -1318,7 +1327,6 @@ const History = ({ onTabChange }) => {
           </div>
         </div>
       )}
-
       <DatePickerModal
         isOpen={showDatePicker}
         onClose={() => setShowDatePicker(false)}
@@ -1333,4 +1341,3 @@ const History = ({ onTabChange }) => {
 };
 
 export default History;
-

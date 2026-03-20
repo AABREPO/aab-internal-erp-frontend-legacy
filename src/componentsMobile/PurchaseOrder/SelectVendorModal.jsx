@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Close from '../Images/close.png'
+import Search from '../Images/Search.png'
 
 const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], fieldName = 'Vendor', onAddNew, showStarIcon = true }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +21,26 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
       setSearchQuery('');
       setShowConfirmModal(false);
       setPendingNewValue('');
+    }
+  }, [isOpen]);
+
+  // Lock body scroll when modal is open - prevents background/bottom sheet from scrolling when keyboard opens on mobile
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        window.scrollTo(0, scrollY);
+      };
     }
   }, [isOpen]);
 
@@ -109,8 +130,16 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
   };
 
   const handleBackdropClick = (e) => {
+    // Only close if clicking directly on backdrop, not on any child elements
     if (e.target === e.currentTarget) {
       onClose();
+    }
+  };
+
+  const handleBackdropMouseDown = (e) => {
+    // Prevent closing when mousedown happens on backdrop
+    if (e.target === e.currentTarget) {
+      e.stopPropagation();
     }
   };
 
@@ -138,17 +167,23 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-[10000] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black bg-opacity-50 z-[10000] flex items-center justify-center p-[16px]"
       onClick={handleBackdropClick}
-      style={{ fontFamily: "'Manrope', sans-serif" }}
+      onMouseDown={handleBackdropMouseDown}
+      style={{ 
+        fontFamily: "'Manrope', sans-serif",
+        overflow: 'hidden',
+        overscrollBehavior: 'contain'
+      }}
     >
       <div 
-        className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg flex flex-col transform -translate-y-24"
+        className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
-        style={{ height: '60vh', maxHeight: '60vh', minHeight: '60vh' }}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{ maxHeight: '80vh', overflow: 'hidden', touchAction: 'pan-y' }}
       >
         {/* Header */}
-        <div className="flex justify-between items-center px-6 pt-5 ">
+        <div className="flex justify-between items-center px-[24px] pt-[20px] ">
           <p className="text-[16px] font-semibold text-black">Select {fieldName}</p>
           <button 
             onClick={onClose} 
@@ -159,33 +194,59 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
         </div>
 
         {/* Search Bar */}
-        <div className="px-6 pt-4 pb-4">
+        <div className="px-[24px] pt-[4px] pb-[6px]">
           <div className="relative">
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                e.stopPropagation();
+                setSearchQuery(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+              }}
+              onKeyUp={(e) => {
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+              }}
+              onFocus={(e) => {
+                e.stopPropagation();
+              }}
+              onBlur={(e) => {
+                e.stopPropagation();
+              }}
               placeholder="Search"
-              className="w-full h-[32px] pl-10 pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+              className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
               autoFocus
             />
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
             </div>
           </div>
         </div>
 
         {/* Options List */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto mb-4 px-6 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
           <div className="shadow-md rounded-lg overflow-hidden">
             {/* Create New Option - Show when typing something that doesn't exist */}
             {canCreateNew && (
               <button
-                onClick={handleCreateNew}
-                className="w-full h-[36px] px-6 flex items-center bg-gray-100 gap-2 hover:bg-[#F5F5F5] transition-colors flex-shrink-0"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCreateNew();
+                }}
+                className="w-full h-[36px] px-[10px] flex items-center bg-gray-100 gap-[8px] hover:bg-[#F5F5F5] transition-colors flex-shrink-0"
                 style={{ minHeight: '36px', maxHeight: '36px', height: '36px' }}
               >
                 <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -206,14 +267,22 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
                     <button
                       key={index}
                       ref={isSelected ? selectedOptionRef : null}
-                      onClick={() => handleSelect(option)}
-                      className={`w-full px-4 flex items-center justify-between transition-colors flex-shrink-0 ${
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleSelect(option);
+                      }}
+                      className={`w-full px-[10px] flex items-center justify-between transition-colors flex-shrink-0 ${
                         isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                       }`}
-                      style={{ minHeight: '48px', maxHeight: '48px', height: '48px' }}
+                      style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                     >
                       {/* Left: Star Icon and Option Text */}
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-[12px] flex-1 min-w-0">
                         <button
                           onClick={(e) => handleToggleFavorite(e, option)}
                           className="w-6 h-6 flex items-center justify-center flex-shrink-0"
@@ -233,7 +302,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
                             const { firstLine, secondLine } = splitOptionText(option);
                             return (
                               <>
-                                <p className="text-[14px] font-medium text-black text-left truncate whitespace-nowrap">{firstLine}</p>
+                                <p className="text-[12px] font-medium text-black text-left truncate whitespace-nowrap">{firstLine}</p>
                                 {secondLine && (
                                   <p className="text-[12px] font-medium text-[#777777] text-left truncate whitespace-nowrap">{secondLine}</p>
                                 )}
@@ -247,7 +316,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-4">
+              <div className="flex flex-col items-center justify-center py-[16px]">
                 <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
                   {searchQuery ? `No ${fieldName.toLowerCase()}s found` : `No ${fieldName.toLowerCase()}s available`}
                 </p>
@@ -265,7 +334,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div 
-            className="bg-white w-full max-w-[360px] mx-4 rounded-[16px] p-6 shadow-lg"
+            className="bg-white w-full max-w-[360px] mx-4 rounded-[16px] p-[24px] shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-4">
@@ -282,7 +351,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
               Do you want to create "{pendingNewValue}" as a new {fieldName.toLowerCase()}?
             </p>
             
-            <div className="flex gap-4">
+            <div className="flex gap-[16px]">
               <button
                 onClick={handleCancelCreate}
                 className="flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white hover:bg-gray-50 transition-colors"

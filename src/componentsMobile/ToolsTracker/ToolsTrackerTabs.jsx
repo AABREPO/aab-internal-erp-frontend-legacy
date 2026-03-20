@@ -1,23 +1,26 @@
 import React, { useRef, useEffect, useState } from 'react';
+import Kebab from '../Images/Kebab.svg';
 
-const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
+const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange, embedded = false }) => {
   const tabs = [
     { id: 'transfer', label: 'Transfer' },
     { id: 'history', label: 'History' },
     { id: 'pending-items', label: 'Pending Items' },
-    { id: 'add-input', label: 'AddInput' },
+    { id: 'add-input', label: 'Input Data' },
     { id: 'net-stock', label: 'Net Stock' },
     { id: 'tools-history', label: 'Tools History' },
-    { id: 'service-history', label: 'Service' }
+    { id: 'service-history', label: 'Service' },
+    { id: 'locate', label: 'Locate' }
   ];
   const dropdownMenuItems = [
     { id: 'transfer', label: 'Transfer' },
     { id: 'history', label: 'History' },
     { id: 'pending-items', label: 'Pending Items' },
-    { id: 'add-input', label: 'AddInput' },
+    { id: 'add-input', label: 'Input Data' },
     { id: 'net-stock', label: 'Net Stock' },
     { id: 'tools-history', label: 'Tools History' },
-    { id: 'service-history', label: 'Service' }
+    { id: 'service-history', label: 'Service' },
+    { id: 'locate', label: 'Locate' }
   ];
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
@@ -90,9 +93,11 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
     const updateDropdownPosition = () => {
       if (isDropdownOpen && kebabButtonRef.current) {
         const buttonRect = kebabButtonRef.current.getBoundingClientRect();
+        const container = kebabButtonRef.current.closest('.tools-tracker-tabs-container');
+        const containerRect = container ? container.getBoundingClientRect() : null;
         setDropdownPosition({
           top: buttonRect.bottom + 5,
-          right: Math.max(8, window.innerWidth - buttonRect.right)
+          right: containerRect ? Math.max(8, containerRect.right - buttonRect.right) : 16
         });
       }
     };
@@ -114,9 +119,11 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
     e.stopPropagation();
     if (!isDropdownOpen && kebabButtonRef.current) {
       const buttonRect = kebabButtonRef.current.getBoundingClientRect();
+      const container = kebabButtonRef.current.closest('.tools-tracker-tabs-container');
+      const containerRect = container ? container.getBoundingClientRect() : null;
       setDropdownPosition({
         top: buttonRect.bottom + 5,
-        right: Math.max(8, window.innerWidth - buttonRect.right)
+        right: containerRect ? Math.max(8, containerRect.right - buttonRect.right) : 16
       });
     }
     setIsDropdownOpen(!isDropdownOpen);
@@ -140,11 +147,11 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
           scrollbar-width: none;
         }
       `}</style>
-      <div className="fixed top-[50px] transform w-full max-w-[357px] h-[40px] overflow-x-auto bg-white z-40 tools-tracker-tabs-container" style={{ fontFamily: "'Manrope', sans-serif" }}>
-        <div className="relative h-full px-4 pr-7 overflow-x-auto scrollbar-hide tools-tracker-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className={`w-full max-w-[360px] pb-[6px] overflow-x-auto bg-white z-40 tools-tracker-tabs-container ${embedded ? 'relative' : 'fixed transform'}`} style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="relative h-full px-[14px] pr-[14px] flex items-center justify-center overflow-x-auto scrollbar-hide tools-tracker-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div
             ref={tabsContainerRef}
-            className="flex items-center gap-4 h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing tools-tracker-tabs-scroll"
+            className="flex items-center gap-[16px] h-full overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing tools-tracker-tabs-scroll pr-[20px]"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             onMouseDown={(e) => {
               setIsDragging(true);
@@ -185,15 +192,11 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
               </button>
             ))}
           </div>
-          <div ref={dropdownRef} className="absolute right-1 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
+          <div ref={dropdownRef} className="absolute right-[-4px] top-0 bottom-0 flex items-center justify-center" style={{ zIndex: 31 }}>
             <button ref={kebabButtonRef} onClick={handleDropdownToggle}
-              className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto"
+              className="flex items-center justify-center w-[16px] h-[16px] cursor-pointer hover:opacity-7 " style={{ marginTop: '8px', marginLeft: '8px' }}
             >
-              <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="2" cy="2" r="1.5" fill="#000" />
-                <circle cx="2" cy="8" r="1.5" fill="#000" />
-                <circle cx="2" cy="14" r="1.5" fill="#000" />
-              </svg>
+              <img src={Kebab} alt="Kebab" className="w-[16px] h-[16px]" />
             </button>
           </div>
         </div>
@@ -202,8 +205,8 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
             className="absolute bottom-0 h-[1.70px] transition-all duration-300"
             style={{
               backgroundColor: '#BF9853',
-              left: `${underlineStyle.left}px`,
-              width: `${underlineStyle.width}px`
+              left: `${Math.max(0, underlineStyle.left - 8)}px`,
+              width: `${underlineStyle.width + 16}px`
             }}
           ></div>
         </div>
@@ -211,7 +214,7 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
       {isDropdownOpen && (
         <div 
           ref={dropdownMenuRef}
-          className="fixed bg-white rounded-lg shadow-lg py-2" 
+          className="fixed bg-white rounded-lg shadow-lg py-[8px]" 
           style={{ 
             zIndex: 9999,
             top: `${dropdownPosition.top}px`,
@@ -224,7 +227,7 @@ const ToolsTrackerTabs = ({ activeTab = 'entry', onTabChange }) => {
             <button
               key={item.id}
               onClick={() => handleMenuItemClick(item.id)}
-              className={`w-full text-left px-4 py-2 text-[12px] font-semibold transition-colors ${
+              className={`w-full text-left px-[16px] py-[8px] text-[12px] font-semibold transition-colors ${
                 activeTab === item.id 
                   ? 'text-black bg-[#E8E8E8]' 
                   : 'text-[#333333] hover:bg-[#E8E8E8]'

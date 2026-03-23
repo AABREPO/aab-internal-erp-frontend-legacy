@@ -1925,6 +1925,7 @@ const Incoming = ({ user }) => {
           return stockingLocationSite?.id || null;
         })()}
         disableAvailabilityCheck={true}
+        useInventoryData={true}
       />
       <SelectVendorModal
         isOpen={showPOModal}

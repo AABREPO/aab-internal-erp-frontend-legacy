@@ -1421,12 +1421,12 @@ const PendingItems = ({ user }) => {
       {/* Filter Bottom Sheet Modal */}
       {showFilterSheet && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterSheet(false)}>
-          <div className="bg-white w-full max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full h-[350px] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-[24px] pt-[20px] pb-[4px]">
               <p className="text-[16px] font-bold text-black">Select Filters</p>
               <button type="button" onClick={() => setShowFilterSheet(false)} className="text-[#e06256] text-xl font-bold leading-none">
-                ×
+              <img src={Close} alt="close" className="w-[11px] h-[11px]" />
               </button>
             </div>
             {/* Backdrop for dropdown */}
@@ -1486,19 +1486,6 @@ const PendingItems = ({ user }) => {
                   {renderFilterDropdown('projectIncharge', filterProjectIncharge, 'Select')}
                 </div>
               </div>
-            </div>
-            {/* Footer: Cancel + Save */}
-            <div className="flex-shrink-0 flex gap-[16px] px-[24px] pb-[24px] pt-[8px]">
-              <button type="button" onClick={() => setShowFilterSheet(false)}
-                className="flex-1 h-[40px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white"
-              >
-                Cancel
-              </button>
-              <button type="button" onClick={() => setShowFilterSheet(false)}
-                className="flex-1 h-[40px] rounded-[8px] text-[14px] font-bold text-white bg-black"
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>

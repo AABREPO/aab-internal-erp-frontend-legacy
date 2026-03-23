@@ -203,7 +203,9 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       // Merge with saved names from localStorage
       const savedItemNames = localStorage.getItem('itemNameOptions');
       const savedNames = savedItemNames ? JSON.parse(savedItemNames) : [];
-      const allItemNames = [...new Set([...filteredItemNames, ...savedNames])];
+      // Keep localStorage suggestions only if they belong to current category
+      const savedNamesInCategory = savedNames.filter((n) => filteredItemNames.includes(n));
+      const allItemNames = [...new Set([...filteredItemNames, ...savedNamesInCategory])];
       setItemNameOptions(allItemNames);
     } else {
       // If no API data, load from localStorage
@@ -217,7 +219,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       const filteredModels = filterByCategory(poModel, ['model', 'poModel', 'modelName', 'name'], 'category');
       const savedModels = localStorage.getItem('modelOptions');
       const savedModelNames = savedModels ? JSON.parse(savedModels) : [];
-      const allModels = [...new Set([...filteredModels, ...savedModelNames])];
+      const savedModelsInCategory = savedModelNames.filter((n) => filteredModels.includes(n));
+      const allModels = [...new Set([...filteredModels, ...savedModelsInCategory])];
       setModelOptions(allModels);
     } else {
       const savedModels = localStorage.getItem('modelOptions');
@@ -231,7 +234,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       const filteredBrands = filterByCategory(poBrand, ['brand', 'poBrand', 'brandName', 'name'], 'category');
       const savedBrands = localStorage.getItem('brandOptions');
       const savedBrandNames = savedBrands ? JSON.parse(savedBrands) : [];
-      const allBrands = [...new Set([...filteredBrands, ...savedBrandNames])];
+      const savedBrandsInCategory = savedBrandNames.filter((n) => filteredBrands.includes(n));
+      const allBrands = [...new Set([...filteredBrands, ...savedBrandsInCategory])];
       setBrandOptions(allBrands);
     } else {
       const savedBrands = localStorage.getItem('brandOptions');
@@ -248,7 +252,8 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
       const filteredTypesCombined = [...new Set([...filteredTypes1, ...filteredTypes2])];
       const savedTypes = localStorage.getItem('typeOptions');
       const savedTypeNames = savedTypes ? JSON.parse(savedTypes) : [];
-      const allTypes = [...new Set([...filteredTypesCombined, ...savedTypeNames])];
+      const savedTypesInCategory = savedTypeNames.filter((n) => filteredTypesCombined.includes(n));
+      const allTypes = [...new Set([...filteredTypesCombined, ...savedTypesInCategory])];
       setTypeOptions(allTypes);
     } else {
       const savedTypes = localStorage.getItem('typeOptions');
@@ -870,7 +875,7 @@ const AddItemsToOutgoing = ({ isOpen, onClose, onAdd, initialData = {}, selected
                 );
               })()}
             </div>
-            <div className="mt-5 mb-3 flex gap-[16px]">
+            <div className="mt-5 mb-3 flex gap-[16px] sticky bottom-0 bg-white z-[10]">
               <button
                 onClick={onClose}
                 className="w-full h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"

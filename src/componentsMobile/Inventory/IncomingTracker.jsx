@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
+import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Filter from '../Images/Filter.png'
 import Close from '../Images/close.png'
 import Edit from '../Images/edit1.png';
+import Search from '../Images/Search.png'
 
 const IncomingTracker = ({ user, onTabChange }) => {
   // Prevent whole-page scroll; keep only inner containers scrollable
@@ -34,6 +37,10 @@ const IncomingTracker = ({ user, onTabChange }) => {
   const [poModel, setPoModel] = useState([]);
   const [poType, setPoType] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [filterDate, setFilterDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [selectedLiveCardId, setSelectedLiveCardId] = useState(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterVendorName, setFilterVendorName] = useState('');
@@ -883,13 +890,39 @@ const IncomingTracker = ({ user, onTabChange }) => {
         <div className="pt-[8px]">
           <div className="flex items-center justify-between pb-[8px] border-b border-[#E0E0E0]">
             {/* Date Button */}
-            <button type="button" className="text-[12px] font-semibold text-black">
-              Date
+            <button
+              type="button"
+              className="text-[12px] font-semibold text-black"
+              onClick={() => setShowDatePicker(true)}
+            >
+              {filterDate || 'Date'}
             </button>
             {/* Category Button */}
-            <button type="button" className=" text-[12px] font-semibold text-black">
-              Category
-            </button>
+            <div className="flex items-center gap-[4px]">
+              <button
+                type="button"
+                className=" text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setShowCategoryModal(true)}
+              >
+                {filterCategory || 'Category'}
+              </button>
+              {filterCategory && (
+                <button
+                  type="button"
+                  aria-label="Clear category"
+                  title="Clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterCategory('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -897,7 +930,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
       <div className="pb-[8px] pt-[8px]">
         <div className="flex items-center gap-[8px]">
           {/* Live/Closed/History Tabs */}
-          <div className="flex bg-gray-100 items-center rounded-md h-[32px] shadow-sm flex-1">
+          <div className="flex bg-gray-100 items-center rounded-md h-[32px] flex-1">
             <button
               type="button"
               onClick={() => {
@@ -962,21 +995,16 @@ const IncomingTracker = ({ user, onTabChange }) => {
       {!showDetailView && (
         <div className="">
           <div className="relative">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+            </div>
             <input
               type="text"
               placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[40px] pl-[40px] pr-[16px] border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
+              className="w-full h-[40px] pl-[30px] pr-[16px] border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
             />
-            <svg
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
           </div>
         </div>
       )}
@@ -1390,8 +1418,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                       setShowDetailView(true);
                     }}
                   >
-                    <div className="flex items-center gap-[4px]">
-                      <span className="text-[12px] font-semibold text-[#BF9853]">
+                    <div className="flex items-center gap-[8px]">
+                      <span className="text-[12px] font-semibold text-[#BF9853] -ml-[3px]">
                         #{record.purchaseNo || record.entryNumber}
                       </span>
                       <span className="text-[12px] font-semibold text-black">
@@ -1483,28 +1511,41 @@ const IncomingTracker = ({ user, onTabChange }) => {
                             </svg>
                           </div>
                         )}
-                        <div className="flex items-start justify-between gap-[8px] mb-[2px]">
-                          {/* Left Side */}
-                          <div className="flex-1 min-w-0">
-                            <div
-                              className="flex items-center gap-[8px] mb-[2px] cursor-pointer hover:opacity-80"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedRecord(record);
-                                setShowDetailView(true);
-                              }}
-                            >
-                              <span className="text-[12px] font-semibold text-black leading-snug">
-                                #{record.purchaseNo || record.entryNumber}
-                              </span>
-                              <span className="text-[12px] font-semibold text-black leading-snug">
-                                , {record.vendorName}
-                              </span>
+                        <div className="flex flex-col gap-[2px]">
+                          <div className="flex items-start justify-between mb-[2px]">
+                            <div className="flex-1 min-w-0">
+                              <div
+                                className="flex items-center gap-[8px] cursor-pointer hover:opacity-80"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedRecord(record);
+                                  setShowDetailView(true);
+                                }}
+                              >
+                                <span className="text-[12px] font-semibold text-black leading-snug">
+                                  #{record.purchaseNo || record.entryNumber}
+                                </span>
+                                <span className="text-[12px] font-semibold text-black leading-snug">
+                                  , {record.vendorName}
+                                </span>
+                              </div>
                             </div>
-                            <p className="text-[12px] text-gray-600 leading-snug mb-0.5 break-words">
+                            <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                              <p className="text-[11px] font-medium text-gray-600 leading-snug">
+                                No. of Items - {displayItems}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start justify-between mb-[2px]">
+                            <p className="text-[12px] text-gray-600 leading-snug mb-0.5 break-words flex-1 min-w-0">
                               {record.stockingLocation}
                             </p>
-                            <p className="text-[11px] font-medium text-[#777777] leading-snug break-words">
+                            <div className="flex-shrink-0 ml-2" />
+                          </div>
+
+                          <div className="flex items-start justify-between">
+                            <p className="text-[11px] font-medium text-[#777777] leading-snug break-words flex-1 min-w-0">
                               {record.created_date_time && new Date(record.created_date_time).toLocaleString('en-GB', {
                                 day: '2-digit',
                                 month: '2-digit',
@@ -1514,14 +1555,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                                 hour12: true
                               })}
                             </p>
-                          </div>
-                          {/* Right Side */}
-                          <div className="flex-shrink-0 flex flex-col items-end gap-[4px]">
-                            <p className="text-[11px] font-medium text-gray-600 leading-snug">
-                              No. of Items - {displayItems}
-                            </p>
-                            <p className="hidden"></p>
-                            <p className="text-[12px] font-semibold text-[#BF9853] leading-snug">
+                            <p className="text-[12px] font-semibold text-[#BF9853] leading-snug flex-shrink-0 ml-2">
                               Quantity - {displayQuantity}
                             </p>
                           </div>
@@ -1728,7 +1762,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
           }}
         >
           <div
-            className="bg-white w-full rounded-t-3xl shadow-lg"
+            className="bg-white w-full h-[240px] rounded-t-3xl shadow-lg"
             style={{ maxHeight: '60vh' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1805,38 +1839,31 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 </div>
               </div>
             </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center gap-[12px] px-[24px] py-[16px] border-t border-[rgba(0,0,0,0.08)] flex-shrink-0 bg-white">
-              <button
-                type="button"
-                onClick={() => {
-                  setFilterVendorName('');
-                  setFilterStockingLocation('');
-                  setFilterPONo('');
-                  setShowFilterModal(false);
-                  setShowVendorDropdown(false);
-                  setShowLocationDropdown(false);
-                }}
-                className="flex-1 px-[24px] h-[40px] py-[8px] border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFilterModal(false);
-                  setShowVendorDropdown(false);
-                  setShowLocationDropdown(false);
-                }}
-                className="flex-1 px-[24px] py-[8px] h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
-              >
-                Save
-              </button>
-            </div>
           </div>
         </div>
       )}
+
+      <SelectVendorModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onSelect={(value) => {
+          setFilterCategory(value);
+          setShowCategoryModal(false);
+        }}
+        selectedValue={filterCategory}
+        options={Array.from(new Set(categoryOptions.map((c) => c.value || c.label || '').filter(Boolean)))}
+        fieldName="Category"
+        showStarIcon={false}
+      />
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        initialDate={filterDate}
+        onConfirm={(picked) => {
+          setFilterDate(picked);
+          setShowDatePicker(false);
+        }}
+      />
     </div>
   );
 };

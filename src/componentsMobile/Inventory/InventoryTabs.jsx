@@ -143,7 +143,7 @@ const InventoryTabs = ({ activeTab = 'net-stock', onTabChange }) => {
           scrollbar-width: none;
         }
       `}</style>
-      <div ref={fixedContainerRef} className="fixed top-[50px] left-1/2 transform -translate-x-1/2 w-full max-w-[360px] h-[38px] bg-white z-40 purchase-order-tabs-container tools-tracker-tabs-container" style={{ fontFamily: "'Manrope', sans-serif", zIndex: 30 }}>
+      <div ref={fixedContainerRef} className="fixed top-[50px] left-1/2 transform -translate-x-1/2 w-full max-w-[360px] h-[38px] bg-white z-40 purchase-order-tabs-container tools-tracker-tabs-container" style={{ fontFamily: "'Manrope', sans-serif", zIndex: 45 }}>
         <div className="relative h-full px-[16px] pr-[24px] overflow-x-auto scrollbar-hide inventory-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div 
             ref={tabsContainerRef}

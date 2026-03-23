@@ -13,7 +13,7 @@ const SearchableDropdown = ({
   fieldName = 'Option',
   showAddNew = true,
   showAllOptions = false,
-  maxHeight = '144px', // 4 items * 36px height = 144px
+  maxHeight = '80vh',
   className = '', // Allow custom className for width/height
   suggestedNewValue = '', // Pre-fill when opening "Add New" (e.g. next Item ID like "DH 03")
   addNewLabel = null // Override "Add New {fieldName}" (e.g. "+ DH 05" for Item ID)
@@ -350,7 +350,7 @@ const SearchableDropdown = ({
           }}
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
-          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg flex flex-col transform -translate-y-24 searchable-dropdown-content" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ height: '60vh', maxHeight: '60vh', minHeight: '60vh' }}>
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg flex flex-col transform  searchable-dropdown-content" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ height: maxHeight, maxHeight: maxHeight, minHeight: maxHeight }}>
             <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select {fieldName}</p>
               <button onClick={() => {

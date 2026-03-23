@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Close from '../Images/close.png'
 import Search from '../Images/Search.png'
 
-const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], fieldName = 'Vendor', onAddNew, showStarIcon = true }) => {
+const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options = [], fieldName = 'Vendor', onAddNew, showStarIcon = true, preserveOrder = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingNewValue, setPendingNewValue] = useState('');
@@ -90,8 +90,9 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
     return normalizedOpt === normalizedQuery;
   });
 
-  // Sort: favorites first, then alphabetically
-  const sortedOptions = [...filteredOptions].sort((a, b) => {
+  // Default behavior: favorites first, then alphabetically.
+  // Opt-in preserveOrder keeps the incoming options order (used by PO modal list).
+  const sortedOptions = preserveOrder ? filteredOptions : [...filteredOptions].sort((a, b) => {
     const aIsFavorite = favorites.includes(a);
     const bIsFavorite = favorites.includes(b);
     if (aIsFavorite && !bIsFavorite) return -1;
@@ -177,7 +178,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
       }}
     >
       <div 
-        className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
+        className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px]  -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         style={{ maxHeight: '80vh', overflow: 'hidden', touchAction: 'pan-y' }}

@@ -4,6 +4,8 @@ import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import Search from '../Images/Search.png'
+import CloseIcon from '../Images/Close F.svg'
 const NetStock = () => {
   const navigate = useNavigate();
   // Helper function for date
@@ -558,61 +560,59 @@ const NetStock = () => {
     doc.save(`NetStock_${selectedDate.replace(/\//g, '-')}.pdf`);
   };
   return (
-    <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Date Row */}
-      <div className="">
-        <div className=" pt-[8px] border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setShowDatePicker(true)}
-              className="text-[12px] font-semibold text-black leading-normal underline-offset-2 mb-1 hover:underline"
-            >
-              {selectedDate}
-            </button>
-            <div className="flex items-center gap-[12px]">
-              {selectedCards.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Get selected items data (include items selected even if currently filtered out)
-                    const selectedItemsData = selectedCards
-                      .map(selId => netStockData.find(item => item.id === selId))
-                      .filter(Boolean)
-                      .map(item => ({
-                        itemName: item.itemName || '',
-                        category: item.category || '',
-                        model: item.model || '',
-                        brand: item.brand || '',
-                        type: item.type || '',
-                        quantity: String(
-                          item.status === 'Available' ? (item.defaultQty || item.minQty || 1)
-                            : item.status === 'Place Order' ? (item.minQty || item.defaultQty || 1)
-                              : (item.defaultQty || item.minQty || 1)
-                        ),
-                        itemId: item.itemId || null,
-                        brandId: item.brandId || null,
-                        modelId: item.modelId || null,
-                        typeId: item.typeId || null,
-                        categoryId: item.categoryId || null
-                      }))
-                      .filter(item => item.itemId !== null && item.itemId !== undefined); // Only include items with valid itemId
-                    // Store in localStorage
-                    localStorage.setItem('netStockSelectedItems', JSON.stringify(selectedItemsData));
-                    // Navigate to PurchaseOrder page
-                    navigate('/purchaseorder');
-                  }}
-                  className="text-[13px] font-medium text-black leading-normal"
-                >
-                  Add to PO
-                </button>
-              )}
-            </div>
+      <div className="pb-[8px] pt-[8px] border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowDatePicker(true)}
+            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
+          >
+            {selectedDate}
+          </button>
+          <div className="flex items-center gap-[12px]">
+            {selectedCards.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Get selected items data (include items selected even if currently filtered out)
+                  const selectedItemsData = selectedCards
+                    .map(selId => netStockData.find(item => item.id === selId))
+                    .filter(Boolean)
+                    .map(item => ({
+                      itemName: item.itemName || '',
+                      category: item.category || '',
+                      model: item.model || '',
+                      brand: item.brand || '',
+                      type: item.type || '',
+                      quantity: String(
+                        item.status === 'Available' ? (item.defaultQty || item.minQty || 1)
+                          : item.status === 'Place Order' ? (item.minQty || item.defaultQty || 1)
+                            : (item.defaultQty || item.minQty || 1)
+                      ),
+                      itemId: item.itemId || null,
+                      brandId: item.brandId || null,
+                      modelId: item.modelId || null,
+                      typeId: item.typeId || null,
+                      categoryId: item.categoryId || null
+                    }))
+                    .filter(item => item.itemId !== null && item.itemId !== undefined); // Only include items with valid itemId
+                  // Store in localStorage
+                  localStorage.setItem('netStockSelectedItems', JSON.stringify(selectedItemsData));
+                  // Navigate to PurchaseOrder page
+                  navigate('/purchaseorder');
+                }}
+                className="text-[12px] font-medium text-black leading-normal"
+              >
+                Add to PO
+              </button>
+            )}
           </div>
         </div>
       </div>
       {/* Filters Section */}
-      <div className="pt-[8px] mb-2">
+      <div className="pt-[8px] mb-[8px]">
         {/* Category Filter */}
         <div className="space-y-[6px]">
           <div className="">
@@ -650,14 +650,12 @@ const NetStock = () => {
                   }}
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               ) : (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
               )}
@@ -688,14 +686,12 @@ const NetStock = () => {
                   }}
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               ) : (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
               )}
@@ -706,17 +702,14 @@ const NetStock = () => {
         <div className="flex items-center gap-[8px] mt-2">
           <div className="relative flex-1">
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
-                <path d="M11 11L14 14" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
             </div>
             <input
               type="text"
               placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[40px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none"
+              className="w-full h-[40px] pl-[30px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none"
             />
           </div>
           <div className="flex items-center gap-[8px]">
@@ -843,13 +836,13 @@ const NetStock = () => {
                         }
                       }
                     }}
-                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] cursor-pointer transition-all duration-300 ease-out"
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[10px] cursor-pointer transition-all duration-300 ease-out"
                   >
                     <div className="flex items-start justify-between">
                       {/* Left side: Item details */}
                       <div className="flex-1">
                         {/* Item ID and Favorite */}
-                        <div className="flex items-center gap-[4px] mb-1">
+                        <div className="flex items-center gap-[4px] mb-0.5">
                           {item.isFavorite && (
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M6 1L7.545 4.13L11 4.635L8.5 7.07L9.09 10.5L6 8.885L2.91 10.5L3.5 7.07L1 4.635L4.455 4.13L6 1Z" fill="#EF4444" />
@@ -857,7 +850,7 @@ const NetStock = () => {
                           )}
                         </div>
                         {/* Item Name */}
-                        <div className="mb-1 flex items-center justify-between">
+                        <div className="mb-0.5 flex items-center justify-between">
                           <p className="text-[13px] font-semibold text-black leading-tight">
                             {item.itemName}
                           </p>
@@ -872,13 +865,13 @@ const NetStock = () => {
                           )}
                         </div>
                         {/* Model */}
-                        <div className="mb-1">
+                        <div className="mb-0.5">
                           <p className="text-[13px] font-semibold text-black leading-tight">
                             {item.model ? `${item.model}` : ''}
                           </p>
                         </div>
                         {/* Brand and Type */}
-                        <div className="mb-1 flex items-center justify-between">
+                        <div className="mb-0.5 flex items-center justify-between">
                           <p className="text-[12px] font-medium text-[#616161]">
                             {item.brand && item.type ? `${item.brand}, ${item.type}` : item.brand || item.type || ''}
                           </p>

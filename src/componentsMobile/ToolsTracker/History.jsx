@@ -1778,7 +1778,7 @@ const History = ({ user, onTabChange }) => {
       {/* Filter Bottom Sheet */}
       {showFilterBottomSheet && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={() => setShowFilterBottomSheet(false)}>
-          <div className="bg-white w-full max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white w-full h-[440px] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
               <p className="text-[16px] font-bold text-black">Select Filters</p>
@@ -2325,19 +2325,6 @@ const History = ({ user, onTabChange }) => {
                   </div>
                 )}
               </div>
-            </div>
-            {/* Footer: Cancel + Add */}
-            <div className="flex-shrink-0 flex gap-[16px] px-6 pb-[20px] pt-[8px]">
-              <button type="button" onClick={() => setShowFilterBottomSheet(false)}
-                className="flex-1 h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
-              >
-                Cancel
-              </button>
-              <button type="button" onClick={() => setShowFilterBottomSheet(false)}
-                className="flex-1 h-[40px] border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white bg-black leading-normal"
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>

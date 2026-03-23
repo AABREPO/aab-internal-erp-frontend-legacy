@@ -1521,7 +1521,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
         >
           {/* Bottom Sheet - same as History.jsx */}
           <div
-            className="bg-white w-full max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col"
+            className="bg-white w-full h-[380px] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1687,20 +1687,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Footer: Cancel + Save - same as History.jsx */}
-            <div className="flex-shrink-0 flex gap-[16px] px-6 pb-[20px] pt-[8px]">
-              <button type="button" onClick={handleCloseFilterBottomSheet}
-                className="flex-1 h-[40px] border border-[#949494] rounded-[8px] text-[14px] font-bold text-[#363636] bg-white leading-normal"
-              >
-                Cancel
-              </button>
-              <button type="button" onClick={handleSaveFilterBottomSheet}
-                className="flex-1 h-[40px] border border-[#f4ede2] rounded-[8px] text-[14px] font-bold text-white bg-black leading-normal"
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>

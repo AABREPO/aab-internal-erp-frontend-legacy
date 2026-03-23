@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import CloseIcon from '../Images/Close F.svg';
 
-const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType }) => {
+const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType, onRefreshCategory }) => {
   const [formData, setFormData] = useState({
     itemName: initialData.itemName || '',
     model: initialData.model || '',
@@ -460,6 +460,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
           setCategoryOptions(options);
           const categoryStrings = options.map(item => item.label || item.value).filter(Boolean);
           setCategoryOptionsStrings(categoryStrings);
+        }
+        // Notify parent to refresh its category options (for PDF, resolveCategoryId, etc.)
+        if (onRefreshCategory) {
+          await onRefreshCategory();
         }
         if (!categoryOptionsStrings.includes(newCategory.trim())) {
           setCategoryOptionsStrings([...categoryOptionsStrings, newCategory.trim()]);

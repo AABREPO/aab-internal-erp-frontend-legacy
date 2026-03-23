@@ -5,6 +5,7 @@ import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
 import Filter from '../Images/Filter.png'
+import Search from '../Images/Search.png'
 
 const NonPOHistory = ({ onTabChange }) => {
   const [nonPORecords, setNonPORecords] = useState([]);
@@ -569,45 +570,71 @@ const NonPOHistory = ({ onTabChange }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden bg-white">
+      {/* Date/Category style header row */}
+      <div className="pt-[8px]">
+        <div className="flex items-center justify-between pb-[8px] border-b border-[#E0E0E0]">
+          <div />
+          <div className="flex items-center gap-[4px]">
+            <button
+              type="button"
+              onClick={() => setShowCategoryModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {filterData.category || 'Category'}
+            </button>
+            {filterData.category && (
+              <button
+                type="button"
+                aria-label="Clear category"
+                title="Clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterData({ ...filterData, category: '' });
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
       {/* Search Bar */}
       <div className="flex-shrink-0 pt-[8px] pb-[6px]">
         <div className="relative">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
+          </div>
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-[40px] pr-[16px] border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
+            className="w-full h-[40px] pl-[30px] pr-[16px] border border-gray-300 rounded-full text-[14px] bg-white focus:outline-none focus:border-gray-400"
           />
-          <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
         </div>
       </div>
       {/* Filter Button */}
-      <div className="flex-shrink-0 pb-[6px]">
-        <div className="flex items-center gap-[8px]">
+      <div className="flex justify-between items-center gap-[4px] px-0 pb-[6px] flex-shrink-0">
+        <div className="flex items-center gap-[4px] min-w-0">
           <button
             onClick={() => setShowFilterSheet(true)}
             type="button"
-            className="flex items-center gap-[8px] text-[14px] font-medium text-gray-700 flex-shrink-0"
+            className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0"
           >
             <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
-            {!(filterData.projectName || filterData.stockingLocation || filterData.date || filterData.entryNo || filterData.category) && (
-              <span className="text-[12px] font-medium text-black">Filter</span>
+            {!(filterData.projectName || filterData.stockingLocation || filterData.date || filterData.entryNo) && (
+              <span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
             )}
           </button>
           {/* Active Filter Tags - Next to Filter button */}
           <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {(filterData.projectName || filterData.stockingLocation || filterData.date || filterData.entryNo || filterData.category) && (
+            {(filterData.projectName || filterData.stockingLocation || filterData.date || filterData.entryNo) && (
               <div className="flex items-center gap-[4px] flex-nowrap">
                 {filterData.projectName && (
-                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Project</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, projectName: '' })}
@@ -620,7 +647,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.stockingLocation && (
-                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Location</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, stockingLocation: '' })}
@@ -633,7 +660,7 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.date && (
-                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Date</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, date: '' })}
@@ -646,23 +673,10 @@ const NonPOHistory = ({ onTabChange }) => {
                   </div>
                 )}
                 {filterData.entryNo && (
-                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                     <span className="text-[11px] font-medium text-black">Entry.No</span>
                     <button
                       onClick={() => setFilterData({ ...filterData, entryNo: '' })}
-                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-                {filterData.category && (
-                  <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
-                    <span className="text-[11px] font-medium text-black">Category</span>
-                    <button
-                      onClick={() => setFilterData({ ...filterData, category: '' })}
                       className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
                     >
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -707,7 +721,7 @@ const NonPOHistory = ({ onTabChange }) => {
               }
 
               return (
-                <div key={recordId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
+                <div key={recordId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px]">
                   {/* History Card */}
                   <div
                     ref={(el) => {
@@ -831,7 +845,7 @@ const NonPOHistory = ({ onTabChange }) => {
           >
           {/* Bottom Sheet */}
           <div 
-            className="w-full max-w-[360px] bg-white rounded-t-[20px] shadow-lg"
+            className="w-full bg-white rounded-t-[20px] h-[280px] shadow-lg"
             onClick={(e) => e.stopPropagation()}
             style={{ zIndex: 51 }}
           >
@@ -841,16 +855,6 @@ const NonPOHistory = ({ onTabChange }) => {
                 <h2 className="text-md font-semibold">
                   Select Filters
                 </h2>
-
-                <div className="flex items-center gap-[16px]">
-                  <button
-                    onClick={() => setShowCategoryModal(true)}
-                    className="text-[16px] font-semibold text-black decoration-solid"
-                    style={{ textUnderlinePosition: 'from-font' }}
-                  >
-                    {filterData.category || 'Category'}
-                  </button>
-                </div>
               </div>
             </div>
             {/* Filter Form */}
@@ -860,18 +864,20 @@ const NonPOHistory = ({ onTabChange }) => {
                 <label className="block text-[13px] font-medium text-black mb-0.5">
                   Project Name
                 </label>
-                <SearchableDropdown
-                  value={filterData.projectName}
-                  onChange={(value) => {
-                    setFilterData({ ...filterData, projectName: value });
-                  }}
-                  options={[...new Set(siteData.map((s) => s.siteName || s.name || '').filter(Boolean))]}
-                  placeholder="Select"
-                  fieldName="Project Name"
-                  showAddNew={false}
-                  showAllOptions={true}
-                  className="w-full h-[32px]"
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setProjectNameOpen(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center justify-between"
+                  >
+                    <span className={filterData.projectName ? 'text-black' : 'text-[#9E9E9E]'}>
+                      {filterData.projectName || 'Select'}
+                    </span>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Stocking Location */}
@@ -879,18 +885,20 @@ const NonPOHistory = ({ onTabChange }) => {
                 <label className="block text-[13px] font-medium text-black mb-0.5 mt-2">
                   Stocking Location
                 </label>
-                <SearchableDropdown
-                  value={filterData.stockingLocation}
-                  onChange={(value) => {
-                    setFilterData({ ...filterData, stockingLocation: value });
-                  }}
-                  options={[...new Set(siteData.map((s) => s.siteName || s.name || '').filter(Boolean))]}
-                  placeholder="Select"
-                  fieldName="Stocking Location"
-                  showAddNew={false}
-                  showAllOptions={true}
-                  className="w-full h-[32px]"
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setStockingLocationOpen(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center justify-between"
+                  >
+                    <span className={filterData.stockingLocation ? 'text-black' : 'text-[#9E9E9E]'}>
+                      {filterData.stockingLocation || 'Select'}
+                    </span>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Date and Entry No */}
@@ -926,22 +934,6 @@ const NonPOHistory = ({ onTabChange }) => {
                 </div>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex-shrink-0 flex gap-[12px] px-[24px] py-[16px]">
-              <button
-                onClick={() => setShowFilterSheet(false)}
-                className="flex-1 px-[16px] py-[8px] border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowFilterSheet(false)}
-                className="flex-1 px-[16px] py-[8px] bg-black text-white rounded-lg font-medium hover:bg-gray-900"
-              >
-                Save
-              </button>
-            </div>
           </div>
           </div>
         </>
@@ -958,6 +950,30 @@ const NonPOHistory = ({ onTabChange }) => {
         options={categoryOptionsStrings}
         fieldName="Category"
         onAddNew={handleAddNewCategory}
+      />
+
+      <SelectVendorModal
+        isOpen={projectNameOpen}
+        onClose={() => setProjectNameOpen(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, projectName: value });
+          setProjectNameOpen(false);
+        }}
+        selectedValue={filterData.projectName}
+        options={[...new Set(siteData.map((s) => s.siteName || s.name || '').filter(Boolean))]}
+        fieldName="Project Name"
+      />
+
+      <SelectVendorModal
+        isOpen={stockingLocationOpen}
+        onClose={() => setStockingLocationOpen(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, stockingLocation: value });
+          setStockingLocationOpen(false);
+        }}
+        selectedValue={filterData.stockingLocation}
+        options={[...new Set(siteData.map((s) => s.siteName || s.name || '').filter(Boolean))]}
+        fieldName="Stocking Location"
       />
 
       <DatePickerModal

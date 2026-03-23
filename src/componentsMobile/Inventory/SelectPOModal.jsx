@@ -142,28 +142,6 @@ const SelectPOModal = ({ isOpen, onClose, onSelect, selectedValue, vendorName, v
           />
         </div>
 
-        {/* Non PO Section */}
-        <div className="mb-2">
-          <p className="text-[14px] font-medium text-black mb-2">Non PO</p>
-          <div
-            onClick={() => handleSelect('')}
-            className={`flex items-center justify-between p-[12px] rounded-[8px] cursor-pointer transition-colors mb-2 ${
-              !selectedValue || selectedValue === '' ? 'bg-[#FFF4E6]' : 'hover:bg-gray-50'
-            }`}
-          >
-            <span className="text-[14px] font-medium text-black">Non PO</span>
-            <div className="flex items-center">
-              {!selectedValue || selectedValue === '' ? (
-                <div className="w-5 h-5 rounded-full bg-[#e4572e] flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-white"></div>
-                </div>
-              ) : (
-                <div className="w-5 h-5 rounded-full border-2 border-[#747474]"></div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* PO Numbers List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (

@@ -3,6 +3,7 @@ import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import SelectLocatorsModal from './SelectLocatorsModal';
 import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
+import CloseIcon from '../Images/Close F.svg'
 
 const AddInput = () => {
   // Form state (same as InputData)
@@ -1020,16 +1021,20 @@ const AddInput = () => {
 
   // Filter options based on selected category (same logic as PurchaseOrder page)
   const getFilteredItemNameOptions = () => {
+    const cleanedItemNames = (itemNameOptions || [])
+      .map(name => (typeof name === 'string' ? name.trim() : ''))
+      .filter(Boolean);
+
     if (!category) {
       // If no category selected, return all item names
-      return itemNameOptions;
+      return [...new Set(cleanedItemNames)];
     }
     const filtered = poItemName.filter(
       item => item.category?.toLowerCase() === category.toLowerCase()
     );
     const apiNames = filtered.map(item => item.itemName?.trim()).filter(Boolean);
     // Merge with localStorage options that match category
-    return [...new Set([...apiNames, ...itemNameOptions])];
+    return [...new Set([...apiNames, ...cleanedItemNames])];
   };
 
   const getFilteredModelOptions = () => {
@@ -1249,28 +1254,64 @@ const AddInput = () => {
         {/* New Input Header - Sticky */}
         <div className=" top-[100px] z-30 bg-white flex items-center justify-between mb-2 border-b border-[#E0E0E0] pb-[8px]">
           {/* Group Dropdown - Left Side */}
-          <button
-            onClick={() => setShowGroupModal(true)}
-            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            {selectedGroup || 'Group'}
-          </button>
+          <div className="flex items-center gap-[4px]">
+            <button
+              onClick={() => setShowGroupModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {selectedGroup || 'Group'}
+            </button>
+            {selectedGroup && (
+              <button
+                type="button"
+                aria-label="Clear group"
+                title="Clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedGroup('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-[8px]">
             {/* Locators - Middle */}
-            <button
-              onClick={() => setShowLocatorsModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              Locators
-            </button>
+              <button
+                onClick={() => setShowLocatorsModal(true)}
+                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                Locators
+              </button>
 
             {/* Category Dropdown - Right Side */}
-            <button
-              onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              {category || 'Category'}
-            </button>
+            <div className="flex items-center gap-[4px]">
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {category || 'Category'}
+              </button>
+              {category && (
+                <button
+                  type="button"
+                  aria-label="Clear category"
+                  title="Clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCategory('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {/* Form Fields */}
@@ -1294,9 +1335,9 @@ const AddInput = () => {
                   {formData.itemName || 'Select ...'}
                 </span>
                 {!formData.itemName && (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 )}
               </button>
               {formData.itemName && (
@@ -1309,21 +1350,7 @@ const AddInput = () => {
                   className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                   style={{ right: '8px' }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M9 3L3 9M3 3L9 9"
-                      stroke="#000"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               )}
             </div>
@@ -1348,9 +1375,9 @@ const AddInput = () => {
                   {formData.model || 'Select ...'}
                 </span>
                 {!formData.model && (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 )}
               </button>
               {formData.model && (
@@ -1363,21 +1390,7 @@ const AddInput = () => {
                   className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                   style={{ right: '8px' }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M9 3L3 9M3 3L9 9"
-                      stroke="#000"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               )}
             </div>
@@ -1402,9 +1415,9 @@ const AddInput = () => {
                   {formData.type || 'Select ...'}
                 </span>
                 {!formData.type && (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 )}
               </button>
               {formData.type && (
@@ -1417,21 +1430,7 @@ const AddInput = () => {
                   className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                   style={{ right: '8px' }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M9 3L3 9M3 3L9 9"
-                      stroke="#000"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               )}
             </div>
@@ -1457,9 +1456,9 @@ const AddInput = () => {
                     {formData.brand || 'Select ...'}
                   </span>
                   {!formData.brand && (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3 4.5L6 7.5L9 4.5" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   )}
                 </button>
                 {formData.brand && (
@@ -1472,21 +1471,7 @@ const AddInput = () => {
                     className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors z-10"
                     style={{ right: '8px' }}
                   >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M9 3L3 9M3 3L9 9"
-                        stroke="#000"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 )}
               </div>

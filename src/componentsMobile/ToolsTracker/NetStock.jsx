@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg';
+import Filter from '../Images/Filter.png';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
@@ -43,6 +44,16 @@ const NetStock = ({ user }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [itemNameSearchQuery, setItemNameSearchQuery] = useState('');
   const [itemIdSearchQuery, setItemIdSearchQuery] = useState('');
+  const [showFilterBottomSheet, setShowFilterBottomSheet] = useState(false);
+  const [selectedHomeLocation, setSelectedHomeLocation] = useState('');
+  const [selectedCurrentLocation, setSelectedCurrentLocation] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [showHomeLocationDropdown, setShowHomeLocationDropdown] = useState(false);
+  const [showCurrentLocationDropdown, setShowCurrentLocationDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [homeLocationSearchQuery, setHomeLocationSearchQuery] = useState('');
+  const [currentLocationSearchQuery, setCurrentLocationSearchQuery] = useState('');
+  const [statusSearchQuery, setStatusSearchQuery] = useState('');
 
   // Edit stock bottom sheet state
   const [showEditStockModal, setShowEditStockModal] = useState(false);
@@ -608,8 +619,17 @@ const NetStock = ({ user }) => {
     if (selectedBrand) {
       filtered = filtered.filter(item => item.brand === selectedBrand);
     }
+    if (selectedHomeLocation) {
+      filtered = filtered.filter(item => item.location === selectedHomeLocation);
+    }
+    if (selectedCurrentLocation) {
+      filtered = filtered.filter(item => item.currentLocation === selectedCurrentLocation);
+    }
+    if (selectedStatus) {
+      filtered = filtered.filter(item => item.status === selectedStatus);
+    }
     return filtered;
-  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, selectedBrand, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getCurrentToLocation, getLocationName, resolveMachineNumberText, resolveItemIdDisplay, resolveBrandDisplay, resolveItemNameDisplay]);
+  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, selectedBrand, selectedHomeLocation, selectedCurrentLocation, selectedStatus, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getCurrentToLocation, getLocationName, resolveMachineNumberText, resolveItemIdDisplay, resolveBrandDisplay, resolveItemNameDisplay]);
 
   // Apply universal search filter to tableData
   const filteredTableData = useMemo(() => {
@@ -754,6 +774,42 @@ const NetStock = ({ user }) => {
     );
   };
 
+  const homeLocationOptions = useMemo(() => {
+    return [...new Set(tableData.map((item) => item.location).filter((location) => location && location !== '-'))].sort();
+  }, [tableData]);
+
+  const currentLocationOptions = useMemo(() => {
+    return [...new Set(tableData.map((item) => item.currentLocation).filter((location) => location && location !== '-'))].sort();
+  }, [tableData]);
+
+  const statusOptions = useMemo(() => {
+    return [...new Set(tableData.map((item) => item.status).filter((status) => status && status !== '-'))].sort();
+  }, [tableData]);
+
+  const getFilteredHomeLocationOptions = () => {
+    const query = (homeLocationSearchQuery || '').trim().toLowerCase();
+    if (!query) return homeLocationOptions;
+    return homeLocationOptions.filter((option) =>
+      String(option).toLowerCase().includes(query)
+    );
+  };
+
+  const getFilteredCurrentLocationOptions = () => {
+    const query = (currentLocationSearchQuery || '').trim().toLowerCase();
+    if (!query) return currentLocationOptions;
+    return currentLocationOptions.filter((option) =>
+      String(option).toLowerCase().includes(query)
+    );
+  };
+
+  const getFilteredStatusOptions = () => {
+    const query = (statusSearchQuery || '').trim().toLowerCase();
+    if (!query) return statusOptions;
+    return statusOptions.filter((option) =>
+      String(option).toLowerCase().includes(query)
+    );
+  };
+
   // Reset search queries when dropdowns close
   useEffect(() => {
     if (!showItemNameDropdown) {
@@ -766,6 +822,24 @@ const NetStock = ({ user }) => {
       setItemIdSearchQuery('');
     }
   }, [showItemIdDropdown]);
+
+  useEffect(() => {
+    if (!showHomeLocationDropdown) {
+      setHomeLocationSearchQuery('');
+    }
+  }, [showHomeLocationDropdown]);
+
+  useEffect(() => {
+    if (!showCurrentLocationDropdown) {
+      setCurrentLocationSearchQuery('');
+    }
+  }, [showCurrentLocationDropdown]);
+
+  useEffect(() => {
+    if (!showStatusDropdown) {
+      setStatusSearchQuery('');
+    }
+  }, [showStatusDropdown]);
 
   // Swipe handlers for edit functionality
   const minSwipeDistance = 50;
@@ -1186,270 +1260,9 @@ const NetStock = ({ user }) => {
         </div>
       </div>
 
-      {/* Item Name and Item ID Dropdowns */}
-      <div className="flex gap-[12px] pt-[10px]">
-        {/* Item Name Dropdown */}
-        <div className="flex-1 relative dropdown-container">
-          <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Item Name</p>
-          <div className="relative">
-            <div
-              onClick={() => {
-                setShowItemNameDropdown(!showItemNameDropdown);
-                setShowItemIdDropdown(false);
-              }}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer truncate whitespace-nowrap overflow-hidden"
-              style={{
-                color: selectedItemName ? '#000' : '#9E9E9E',
-                boxSizing: 'border-box',
-                paddingRight: selectedItemName ? '40px' : '40px'
-              }}
-            >
-              {selectedItemName || 'Select'}
-            </div>
-            {selectedItemName && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedItemName(null);
-                }}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
-              </button>
-            )}
-            {!selectedItemName && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            )}
-            {showItemNameDropdown && (
-              <div
-                className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
-                onClick={(e) => {
-                  if (e.target === e.currentTarget) {
-                    setShowItemNameDropdown(false);
-                  }
-                }}
-                style={{ fontFamily: "'Manrope', sans-serif" }}
-              >
-                <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="flex justify-between items-center px-[24px] pt-[24px]">
-                    <p className="text-[16px] font-semibold text-black">Select Item Name</p>
-                    <button onClick={() => setShowItemNameDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                      <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
-                    </button>
-                  </div>
-                  <div className="px-[24px] pt-[4px] pb-[6px]">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={itemNameSearchQuery}
-                        onChange={(e) => setItemNameSearchQuery(e.target.value)}
-                        placeholder="Search"
-                        className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
-                        autoFocus
-                      />
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                        <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
-                    <div className="shadow-md rounded-lg overflow-hidden">
-                      {getFilteredItemNameOptions().length > 0 ? (
-                        <div className="space-y-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedItemName(null);
-                              setShowItemNameDropdown(false);
-                            }}
-                            className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${!selectedItemName ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                              }`}
-                            style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
-                          >
-                            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </div>
-                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">All</p>
-                          </button>
-                          {getFilteredItemNameOptions().map((name) => {
-                            const isSelected = selectedItemName === name;
-                            return (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedItemName(name);
-                                  setShowItemNameDropdown(false);
-                                }}
-                                className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                                  }`}
-                                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
-                              >
-                                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                </div>
-                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">{name}</p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-[16px]">
-                          <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
-                            {itemNameSearchQuery.trim() ? 'No options found' : 'No options available'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Item ID Dropdown */}
-        <div className="flex-1 relative dropdown-container">
-          <p className="text-[12px] font-medium text-black mb-0.5 leading-normal">Item ID</p>
-          <div className="relative">
-            <div
-              onClick={() => {
-                setShowItemIdDropdown(!showItemIdDropdown);
-                setShowItemNameDropdown(false);
-              }}
-              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                color: selectedItemId ? '#000' : '#9E9E9E',
-                boxSizing: 'border-box',
-                paddingRight: selectedItemId ? '40px' : '40px'
-              }}
-            >
-              {selectedItemId || 'Select'}
-            </div>
-            {selectedItemId && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedItemId(null);
-                }}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
-              </button>
-            )}
-            {!selectedItemId && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            )}
-            {showItemIdDropdown && (
-              <div
-                className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
-                onClick={(e) => {
-                  if (e.target === e.currentTarget) {
-                    setShowItemIdDropdown(false);
-                  }
-                }}
-                style={{ fontFamily: "'Manrope', sans-serif" }}
-              >
-                <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="flex justify-between items-center px-[24px] pt-[24px]">
-                    <p className="text-[16px] font-semibold text-black">Select Item ID</p>
-                    <button onClick={() => setShowItemIdDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity">
-                      <img src={Close} alt="Close" className="w-[11px] h-[11px]" />
-                    </button>
-                  </div>
-                  <div className="px-[24px] pt-[4px] pb-[6px]">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={itemIdSearchQuery}
-                        onChange={(e) => setItemIdSearchQuery(e.target.value)}
-                        placeholder="Search"
-                        className="w-full h-[32px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
-                        autoFocus
-                      />
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                        <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-[24px] min-h-[65vh]">
-                    <div className="shadow-md rounded-lg overflow-hidden">
-                      {getFilteredItemIdOptions().length > 0 ? (
-                        <div className="space-y-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedItemId(null);
-                              setShowItemIdDropdown(false);
-                            }}
-                            className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${!selectedItemId ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                              }`}
-                            style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
-                          >
-                            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </div>
-                            <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">All</p>
-                          </button>
-                          {getFilteredItemIdOptions().map((id) => {
-                            const isSelected = selectedItemId === id;
-                            return (
-                              <button
-                                key={id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedItemId(id);
-                                  setShowItemIdDropdown(false);
-                                }}
-                                className={`w-full px-[10px] flex items-center gap-[12px] transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                                  }`}
-                                style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
-                              >
-                                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M10 2L12.5 7.5L18.5 8.5L14 12.5L15 18.5L10 15.5L5 18.5L6 12.5L1.5 8.5L7.5 7.5L10 2Z" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                </div>
-                                <p className="text-[12px] font-medium text-black truncate whitespace-nowrap text-left flex-1">{id}</p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-[16px]">
-                          <p className="text-[14px] font-medium text-[#9E9E9E] text-center">
-                            {itemIdSearchQuery.trim() ? 'No options found' : 'No options available'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Universal Search and Download */}
-      <div className="flex items-center gap-[8px] pt-[6px] pb-[6px]">
-        <div className="flex-1 relative">
+      {/* Universal Search and Filter */}
+      <div className="mt-[6px] pb-[6px]">
+        <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
@@ -1464,7 +1277,88 @@ const NetStock = ({ user }) => {
             className="w-full h-[36px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)]"
           />
         </div>
-        
+        <div className="flex items-center mt-[6px] gap-[4px] min-w-0">
+          <button onClick={() => setShowFilterBottomSheet(true)} className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0">
+            <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" /> {!(selectedItemName || selectedItemId || selectedHomeLocation || selectedCurrentLocation || selectedStatus) && (
+              <span className="text-[12px] font-medium text-black">Filter</span>
+            )}
+          </button>
+          {/* Active Filter Chips */}
+          <div
+            className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {(selectedItemName || selectedItemId || selectedHomeLocation || selectedCurrentLocation || selectedStatus) && (
+              <>
+                {selectedItemName && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Item Name</span>
+                    <button
+                      onClick={() => setSelectedItemName(null)}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {selectedItemId && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Item ID</span>
+                    <button
+                      onClick={() => setSelectedItemId(null)}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {selectedHomeLocation && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Home</span>
+                    <button
+                      onClick={() => setSelectedHomeLocation('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {selectedCurrentLocation && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Current</span>
+                    <button
+                      onClick={() => setSelectedCurrentLocation('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {selectedStatus && (
+                  <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
+                    <span className="text-[11px] font-medium text-black">Status</span>
+                    <button
+                      onClick={() => setSelectedStatus('')}
+                      className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -1614,10 +1508,10 @@ const NetStock = ({ user }) => {
                   {/* Table Header - fixed, does not scroll */}
                   <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
                     <div className="grid grid-cols-12 gap-[8px] px-[12px] py-[8px]">
-                      <div className="col-span-1 text-[12px] font-medium font-semibold"></div>
-                      <div className="col-span-5 text-[12px] font-medium text-black font-semibold">Item Name</div>
-                      <div className="col-span-3 text-[12px] font-medium text-black font-semibold">Brand</div>
-                      <div className="col-span-3 text-[12px] font-medium text-black text-right font-semibold">Total Stock</div>
+                      <div className="col-span-1 text-[12px] font-semibold"></div>
+                      <div className="col-span-5 text-[12px] text-black font-semibold">Item Name</div>
+                      <div className="col-span-3 text-[12px] text-black font-semibold">Brand</div>
+                      <div className="col-span-3 text-[12px] text-black text-right font-semibold">Total Stock</div>
                     </div>
                   </div>
                   {/* Table Body - scrollable */}
@@ -1742,6 +1636,193 @@ const NetStock = ({ user }) => {
             </div>
           </div>
         </>
+      )}
+      {showFilterBottomSheet && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+          onClick={() => setShowFilterBottomSheet(false)}
+        >
+          <div
+            className="bg-white w-full h-[380px] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-1">
+              <p className="text-[16px] font-bold text-black">Select Filters</p>
+              <button type="button" onClick={() => setShowFilterBottomSheet(false)} className="text-[#e06256] text-xl font-bold leading-none">
+                <img src={Close} alt="close" className="w-[11px] h-[11px]" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-1">
+               <div className='flex items-start gap-[12px]'>
+                 <div className="mb-4 flex-1">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Item Name</p>
+                  <div className="relative">
+                    <div onClick={() => setShowItemNameDropdown(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0" style={{ color: selectedItemName ? '#000' : '#9E9E9E', boxSizing: 'border-box' }}>
+                      <span className="truncate">{selectedItemName || 'Select Item Name'}</span>
+                    </div>
+                    {selectedItemName && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedItemName(null); }} className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors">
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                 <div className="mb-4 flex-1">
+                  <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Item ID</p>
+                  <div className="relative">
+                    <div onClick={() => setShowItemIdDropdown(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0" style={{ color: selectedItemId ? '#000' : '#9E9E9E', boxSizing: 'border-box' }}>
+                      <span className="truncate">{selectedItemId || 'Select Item ID'}</span>
+                    </div>
+                    {selectedItemId && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedItemId(null); }} className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors">
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Home Location</p>
+                <div className="relative">
+                  <div onClick={() => setShowHomeLocationDropdown(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0" style={{ color: selectedHomeLocation ? '#000' : '#9E9E9E', boxSizing: 'border-box' }}>
+                    <span className="truncate">{selectedHomeLocation || 'Select Home Location'}</span>
+                  </div>
+                  {selectedHomeLocation && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedHomeLocation(''); }} className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors">
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Current Location</p>
+                <div className="relative">
+                  <div onClick={() => setShowCurrentLocationDropdown(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0" style={{ color: selectedCurrentLocation ? '#000' : '#9E9E9E', boxSizing: 'border-box' }}>
+                    <span className="truncate">{selectedCurrentLocation || 'Select Current Location'}</span>
+                  </div>
+                  {selectedCurrentLocation && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedCurrentLocation(''); }} className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors">
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Status</p>
+                <div className="relative">
+                  <div onClick={() => setShowStatusDropdown(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-3 pr-10 text-[12px] font-medium bg-white flex items-center cursor-pointer min-w-0" style={{ color: selectedStatus ? '#000' : '#9E9E9E', boxSizing: 'border-box' }}>
+                    <span className="truncate">{selectedStatus || 'Select Status'}</span>
+                  </div>
+                  {selectedStatus && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedStatus(''); }} className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors">
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showItemNameDropdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowItemNameDropdown(false); }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-[24px]">
+              <p className="text-[16px] font-semibold text-black">Select Item Name</p>
+              <button onClick={() => setShowItemNameDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"><img src={Close} alt="Close" className="w-[11px] h-[11px]" /></button>
+            </div>
+            <div className="px-6 pt-[4px] pb-[6px]">
+              <div className="relative">
+                <input type="text" value={itemNameSearchQuery} onChange={(e) => setItemNameSearchQuery(e.target.value)} placeholder="Search" className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none" autoFocus />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none"><img src={Search} alt="Search" className="w-[12px] h-[12px]" /></div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {getFilteredItemNameOptions().length > 0 ? (
+                  <div className="space-y-0">
+                    <button type="button" onClick={() => { setSelectedItemName(null); setShowItemNameDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${!selectedItemName ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}>
+                      <p className="text-[12px] font-medium text-black text-left">All</p>
+                    </button>
+                    {getFilteredItemNameOptions().map((name) => (
+                      <button key={name} type="button" onClick={() => { setSelectedItemName(name); setShowItemNameDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${selectedItemName === name ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}>
+                        <p className="text-[12px] font-medium text-black text-left">{name}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : <div className="flex flex-col items-center justify-center py-4"><p className="text-[14px] font-medium text-[#9E9E9E] text-center">{itemNameSearchQuery.trim() ? 'No options found' : 'No options available'}</p></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showItemIdDropdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowItemIdDropdown(false); }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-[24px]">
+              <p className="text-[16px] font-semibold text-black">Select Item ID</p>
+              <button onClick={() => setShowItemIdDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"><img src={Close} alt="Close" className="w-[11px] h-[11px]" /></button>
+            </div>
+            <div className="px-6 pt-[4px] pb-[6px]">
+              <div className="relative">
+                <input type="text" value={itemIdSearchQuery} onChange={(e) => setItemIdSearchQuery(e.target.value)} placeholder="Search" className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none" autoFocus />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none"><img src={Search} alt="Search" className="w-[12px] h-[12px]" /></div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]">
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {getFilteredItemIdOptions().length > 0 ? (
+                  <div className="space-y-0">
+                    <button type="button" onClick={() => { setSelectedItemId(null); setShowItemIdDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${!selectedItemId ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}>
+                      <p className="text-[12px] font-medium text-black text-left">All</p>
+                    </button>
+                    {getFilteredItemIdOptions().map((id) => (
+                      <button key={id} type="button" onClick={() => { setSelectedItemId(id); setShowItemIdDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${selectedItemId === id ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}>
+                        <p className="text-[12px] font-medium text-black text-left">{id}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : <div className="flex flex-col items-center justify-center py-4"><p className="text-[14px] font-medium text-[#9E9E9E] text-center">{itemIdSearchQuery.trim() ? 'No options found' : 'No options available'}</p></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHomeLocationDropdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowHomeLocationDropdown(false); }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-[24px]"><p className="text-[16px] font-semibold text-black">Select Home Location</p><button onClick={() => setShowHomeLocationDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"><img src={Close} alt="Close" className="w-[11px] h-[11px]" /></button></div>
+            <div className="px-6 pt-[4px] pb-[6px]"><div className="relative"><input type="text" value={homeLocationSearchQuery} onChange={(e) => setHomeLocationSearchQuery(e.target.value)} placeholder="Search" className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none" autoFocus /><div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none"><img src={Search} alt="Search" className="w-[12px] h-[12px]" /></div></div></div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]"><div className="shadow-md rounded-lg overflow-hidden">{getFilteredHomeLocationOptions().length > 0 ? <div className="space-y-0"><button type="button" onClick={() => { setSelectedHomeLocation(''); setShowHomeLocationDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${!selectedHomeLocation ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}><p className="text-[12px] font-medium text-black text-left">All</p></button>{getFilteredHomeLocationOptions().map((location) => (<button key={location} type="button" onClick={() => { setSelectedHomeLocation(location); setShowHomeLocationDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${selectedHomeLocation === location ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}><p className="text-[12px] font-medium text-black text-left">{location}</p></button>))}</div> : <div className="flex flex-col items-center justify-center py-4"><p className="text-[14px] font-medium text-[#9E9E9E] text-center">{homeLocationSearchQuery.trim() ? 'No options found' : 'No options available'}</p></div>}</div></div>
+          </div>
+        </div>
+      )}
+
+      {showCurrentLocationDropdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowCurrentLocationDropdown(false); }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-[24px]"><p className="text-[16px] font-semibold text-black">Select Current Location</p><button onClick={() => setShowCurrentLocationDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"><img src={Close} alt="Close" className="w-[11px] h-[11px]" /></button></div>
+            <div className="px-6 pt-[4px] pb-[6px]"><div className="relative"><input type="text" value={currentLocationSearchQuery} onChange={(e) => setCurrentLocationSearchQuery(e.target.value)} placeholder="Search" className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none" autoFocus /><div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none"><img src={Search} alt="Search" className="w-[12px] h-[12px]" /></div></div></div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]"><div className="shadow-md rounded-lg overflow-hidden">{getFilteredCurrentLocationOptions().length > 0 ? <div className="space-y-0"><button type="button" onClick={() => { setSelectedCurrentLocation(''); setShowCurrentLocationDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${!selectedCurrentLocation ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}><p className="text-[12px] font-medium text-black text-left">All</p></button>{getFilteredCurrentLocationOptions().map((location) => (<button key={location} type="button" onClick={() => { setSelectedCurrentLocation(location); setShowCurrentLocationDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${selectedCurrentLocation === location ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}><p className="text-[12px] font-medium text-black text-left">{location}</p></button>))}</div> : <div className="flex flex-col items-center justify-center py-4"><p className="text-[14px] font-medium text-[#9E9E9E] text-center">{currentLocationSearchQuery.trim() ? 'No options found' : 'No options available'}</p></div>}</div></div>
+          </div>
+        </div>
+      )}
+
+      {showStatusDropdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[102] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowStatusDropdown(false); }} style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-[24px]"><p className="text-[16px] font-semibold text-black">Select Status</p><button onClick={() => setShowStatusDropdown(false)} className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"><img src={Close} alt="Close" className="w-[11px] h-[11px]" /></button></div>
+            <div className="px-6 pt-[4px] pb-[6px]"><div className="relative"><input type="text" value={statusSearchQuery} onChange={(e) => setStatusSearchQuery(e.target.value)} placeholder="Search" className="w-full h-[32px] pl-[30px] pr-4 border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none" autoFocus /><div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none"><img src={Search} alt="Search" className="w-[12px] h-[12px]" /></div></div></div>
+            <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none mb-4 px-6 min-h-[65vh]"><div className="shadow-md rounded-lg overflow-hidden">{getFilteredStatusOptions().length > 0 ? <div className="space-y-0"><button type="button" onClick={() => { setSelectedStatus(''); setShowStatusDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${!selectedStatus ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}><p className="text-[12px] font-medium text-black text-left">All</p></button>{getFilteredStatusOptions().map((status) => (<button key={status} type="button" onClick={() => { setSelectedStatus(status); setShowStatusDropdown(false); }} className={`w-full px-[16px] flex items-center gap-3 transition-colors ${selectedStatus === status ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`} style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}><p className="text-[12px] font-medium text-black text-left">{status}</p></button>))}</div> : <div className="flex flex-col items-center justify-center py-4"><p className="text-[14px] font-medium text-[#9E9E9E] text-center">{statusSearchQuery.trim() ? 'No options found' : 'No options available'}</p></div>}</div></div>
+          </div>
+        </div>
       )}
       {/* Brand Modal */}
       <SelectOptionModal

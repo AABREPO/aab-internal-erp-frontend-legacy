@@ -215,48 +215,90 @@ const History = () => {
         ? 'https://backendaab.in/aabuildersDash/api/purchase_orders/getAll'
         : 'https://backendaab.in/aabuildersDash/api/purchase_orders/get/latest';
 
-      const [response, inventoryResponse] = await Promise.all([
-        fetch(apiUrl),
-        fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll').catch(() => null)
-      ]);
+      // Fetch purchase orders first so list displays immediately (inventory blocks for a long time)
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error('Failed to fetch purchase orders');
       }
       const data = await response.json();
-      const inventoryData = inventoryResponse && inventoryResponse.ok ? await inventoryResponse.json() : [];
 
-      // Build lookup map: purchase_no -> (composite item key -> total incoming qty)
-      const incomingQtyByPurchaseNo = {};
-      (Array.isArray(inventoryData) ? inventoryData : []).forEach((record) => {
-        const isDeleted = record?.delete_status === true || record?.deleteStatus === true;
-        if (isDeleted) return;
-        const inventoryType = (record?.inventory_type || record?.inventoryType || '').toString().toLowerCase();
-        if (inventoryType && inventoryType !== 'incoming') return;
+      // Build incomingQtyByPurchaseNo from empty - will be filled when inventory loads
+      let incomingQtyByPurchaseNo = {};
 
-        const purchaseNo = String(record?.purchase_no || record?.purchaseNo || record?.purchase_number || '')
-          .replace('#', '')
-          .trim();
-        if (!purchaseNo || purchaseNo === 'NO_PO') return;
+      // Helper to build lookup map from inventory data
+      const buildIncomingQtyMap = (inventoryData) => {
+        const map = {};
+        (Array.isArray(inventoryData) ? inventoryData : []).forEach((record) => {
+          const isDeleted = record?.delete_status === true || record?.deleteStatus === true;
+          if (isDeleted) return;
+          const inventoryType = (record?.inventory_type || record?.inventoryType || '').toString().toLowerCase();
+          if (inventoryType && inventoryType !== 'incoming') return;
 
-        if (!incomingQtyByPurchaseNo[purchaseNo]) {
-          incomingQtyByPurchaseNo[purchaseNo] = {};
-        }
-        const bucket = incomingQtyByPurchaseNo[purchaseNo];
-        const inventoryItems = record?.inventoryItems || record?.inventory_items || [];
-        if (!Array.isArray(inventoryItems)) return;
+          const purchaseNo = String(record?.purchase_no || record?.purchaseNo || record?.purchase_number || '')
+            .replace('#', '')
+            .trim();
+          if (!purchaseNo || purchaseNo === 'NO_PO') return;
 
-        inventoryItems.forEach((invItem) => {
-          const itemId = invItem?.item_id ?? invItem?.itemId ?? null;
-          const categoryId = invItem?.category_id ?? invItem?.categoryId ?? null;
-          const modelId = invItem?.model_id ?? invItem?.modelId ?? null;
-          const brandId = invItem?.brand_id ?? invItem?.brandId ?? null;
-          const typeId = invItem?.type_id ?? invItem?.typeId ?? null;
-          if (itemId === null || itemId === undefined) return;
-          const key = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
-          bucket[key] = (bucket[key] || 0) + Math.abs(Number(invItem?.quantity || 0));
+          if (!map[purchaseNo]) map[purchaseNo] = {};
+          const bucket = map[purchaseNo];
+          const inventoryItems = record?.inventoryItems || record?.inventory_items || [];
+          if (!Array.isArray(inventoryItems)) return;
+
+          inventoryItems.forEach((invItem) => {
+            const itemId = invItem?.item_id ?? invItem?.itemId ?? null;
+            const categoryId = invItem?.category_id ?? invItem?.categoryId ?? null;
+            const modelId = invItem?.model_id ?? invItem?.modelId ?? null;
+            const brandId = invItem?.brand_id ?? invItem?.brandId ?? null;
+            const typeId = invItem?.type_id ?? invItem?.typeId ?? null;
+            if (itemId === null || itemId === undefined) return;
+            const key = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+            bucket[key] = (bucket[key] || 0) + Math.abs(Number(invItem?.quantity || 0));
+          });
         });
-      });
+        return map;
+      };
 
+      // Fetch inventory in background - don't block display (inventory/getAll can be very slow)
+      fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll')
+        .then((invRes) => (invRes.ok ? invRes.json() : []))
+        .then((inventoryData) => {
+          const map = buildIncomingQtyMap(inventoryData);
+          setPurchaseOrders((prev) => {
+            if (prev.length === 0) return prev;
+            return prev.map((po) => {
+              const poNoForStock = String(po.eno || po.poNumber || '').replace('#', '').trim();
+              const poIncomingQtyMap = map[poNoForStock] || {};
+              const poRows = po.items || [];
+              let totalOrderedQty = 0;
+              let totalAddedQty = 0;
+              let hasAnyRowWithStock = false;
+              poRows.forEach((row) => {
+                const rowItemId = row?.item_id ?? row?.itemId ?? null;
+                const rowCategoryId = row?.category_id ?? row?.categoryId ?? null;
+                const rowModelId = row?.model_id ?? row?.modelId ?? null;
+                const rowBrandId = row?.brand_id ?? row?.brandId ?? null;
+                const rowTypeId = row?.type_id ?? row?.typeId ?? null;
+                if (rowItemId === null || rowItemId === undefined) return;
+                const orderedQty = Math.max(0, Number(row?.quantity || 0));
+                const rowKey = `${rowItemId || 'null'}-${rowCategoryId || 'null'}-${rowModelId || 'null'}-${rowBrandId || 'null'}-${rowTypeId || 'null'}`;
+                const addedQty = Math.max(0, Number(poIncomingQtyMap[rowKey] || 0));
+                const cappedAddedQty = Math.min(orderedQty, addedQty);
+                totalOrderedQty += orderedQty;
+                totalAddedQty += cappedAddedQty;
+                if (cappedAddedQty > 0) hasAnyRowWithStock = true;
+              });
+              let stockStatus = '';
+              let stockStatusType = '';
+              if (hasAnyRowWithStock) {
+                stockStatus = 'To Stock';
+                stockStatusType = totalOrderedQty > 0 && totalAddedQty >= totalOrderedQty ? 'full' : 'partial';
+              }
+              return { ...po, stockStatus, stockStatusType };
+            });
+          });
+        })
+        .catch(() => {});
+      incomingQtyByPurchaseNo = buildIncomingQtyMap([]);
       const transformedPOs = data
         .filter((po) => {
           return !(po.delete_status === true || po.deleteStatus === true);
@@ -289,7 +331,6 @@ const History = () => {
               }
             }
           }
-
           // Transform purchaseTable to items format
           const items = (po.purchaseTable || []).map(item => ({
             name: item.itemName || `${item.item_id || ''}`,
@@ -305,7 +346,6 @@ const History = () => {
             brandId: item.brand_id,
             typeId: item.type_id,
           }));
-
           // Extract year from date (format: DD/MM/YYYY)
           const getYearFromDate = (dateStr) => {
             if (!dateStr) return new Date().getFullYear();
@@ -321,7 +361,6 @@ const History = () => {
             }
           };
           const year = getYearFromDate(po.date);
-
           // Determine payment status from payment_complete_status field
           let paymentStatus = 'Unpaid';
           if (po.payment_complete_status !== undefined) {
@@ -332,7 +371,6 @@ const History = () => {
             // Fallback to existing paymentStatus field if available
             paymentStatus = po.paymentStatus;
           }
-
           // Determine stock status for this PO using incoming inventory records.
           // Full match => green (like Paid), partial match => red (like Unpaid), none => hidden.
           const poNoForStock = String(po.eno || po.ENO || po.poNumber || po.po_number || '')
@@ -343,7 +381,6 @@ const History = () => {
           let totalOrderedQty = 0;
           let totalAddedQty = 0;
           let hasAnyRowWithStock = false;
-
           poRows.forEach((row) => {
             const rowItemId = row?.item_id ?? row?.itemId ?? null;
             const rowCategoryId = row?.category_id ?? row?.categoryId ?? null;
@@ -351,19 +388,16 @@ const History = () => {
             const rowBrandId = row?.brand_id ?? row?.brandId ?? null;
             const rowTypeId = row?.type_id ?? row?.typeId ?? null;
             if (rowItemId === null || rowItemId === undefined) return;
-
             const orderedQty = Math.max(0, Number(row?.quantity || 0));
             const rowKey = `${rowItemId || 'null'}-${rowCategoryId || 'null'}-${rowModelId || 'null'}-${rowBrandId || 'null'}-${rowTypeId || 'null'}`;
             const addedQty = Math.max(0, Number(poIncomingQtyMap[rowKey] || 0));
             const cappedAddedQty = Math.min(orderedQty, addedQty);
-
             totalOrderedQty += orderedQty;
             totalAddedQty += cappedAddedQty;
             if (cappedAddedQty > 0) {
               hasAnyRowWithStock = true;
             }
           });
-
           let stockStatus = '';
           let stockStatusType = '';
           if (hasAnyRowWithStock) {
@@ -1855,7 +1889,6 @@ const History = () => {
               {/* Show filter tags when filters are active */}
               {(filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate) && (
                 <div className="flex items-center gap-[4px] flex-nowrap">
-                 
                   {filters.vendorName && (
                     <div className="flex items-center gap-[4px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                       <span className="text-[11px] font-medium text-black">Vendor</span>
@@ -1918,11 +1951,8 @@ const History = () => {
         </div>
       </div>
       {/* Purchase Orders List - Scrollable */}
-      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide mt-[6px] pb-8" style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
-        onClick={() => {
-          setExpandedPoId(null);
-          setCloneExpandedPoId(null);
-        }}
+      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide pb-8" style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
+        onClick={() => {setExpandedPoId(null); setCloneExpandedPoId(null);}}
       >
         {filteredPOs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8">
@@ -1997,11 +2027,7 @@ const History = () => {
                       pointerEvents: isCloneExpanded ? 'auto' : 'none'
                     }}
                   >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClone(po);
-                      }}
+                    <button onClick={(e) => { e.stopPropagation(); handleClone(po); }}
                       className="action-button w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center gap-[6px] transition-colors shadow-sm"
                       title="Clone"
                     >
@@ -2054,7 +2080,6 @@ const History = () => {
                           >
                             {po.poNumber || 'N/A'}
                           </button>
-
                         </div>
                         <p className="text-[12px] font-semibold text-black leading-snug break-words mb-0.5" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                           {po.vendorName || 'N/A'}
@@ -2185,9 +2210,7 @@ const History = () => {
                   <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Vendor Name
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowVendorFilterModal(true)}
+                  <button type="button" onClick={() => setShowVendorFilterModal(true)}
                     className="w-full h-[32px] px-[12px] border border-[#E0E0E0] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
                   >
                     <span className={`${filters.vendorName ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
@@ -2203,9 +2226,7 @@ const History = () => {
                   <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Project Name
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowProjectFilterModal(true)}
+                  <button type="button" onClick={() => setShowProjectFilterModal(true)}
                     className="w-full h-[32px] px-[12px] border border-[#E0E0E0] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
                   >
                     <span className={`${filters.clientName ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
@@ -2221,9 +2242,7 @@ const History = () => {
                   <label className="text-[12px] font-semibold text-black mb-0.5 block">
                     Site Incharge
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowInchargeFilterModal(true)}
+                  <button type="button" onClick={() => setShowInchargeFilterModal(true)}
                     className="w-full h-[32px] px-[12px] border border-[#E0E0E0] rounded text-[12px] font-medium bg-white flex items-center justify-between focus:outline-none"
                   >
                     <span className={`${filters.siteIncharge ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
@@ -2239,9 +2258,7 @@ const History = () => {
                   <div className="flex-1">
                     <label className="text-[12px] font-semibold text-black mb-0.5 block">Date</label>
                     <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowDatePicker(true)}
+                      <button type="button" onClick={() => setShowDatePicker(true)}
                         className="w-full h-[32px] px-[16px] border border-[#E0E0E0] rounded text-[10px] font-medium text-black bg-white flex items-center justify-between focus:outline-none"
                       >
                         <span className={`${(filters.startDate || filters.endDate) ? 'text-black' : 'text-[#9E9E9E]'} whitespace-nowrap overflow-hidden text-ellipsis`}>
@@ -2268,7 +2285,7 @@ const History = () => {
                         value={filters.poNumber}
                         onChange={(e) => setFilters({ ...filters, poNumber: e.target.value })}
                         placeholder="Enter"
-                        className="w-full h-[32px] px-[16px] border border-[#E0E0E0] rounded text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+                        className="w-full h-[32px] px-[16px] border border-[#E0E0E0] rounded text-[12px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
                       />
                     </div>
                   </div>

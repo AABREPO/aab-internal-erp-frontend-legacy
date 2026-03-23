@@ -7,6 +7,7 @@ import Change2 from '../Images/two-arrow.png'
 import { to } from 'mathjs';
 import Filter from '../Images/Filter.png'
 import Close from '../Images/close.png'
+import CloseIcon from '../Images/Close F.svg'
 
 const EditStock = () => {
   const [activeSubTab, setActiveSubTab] = useState('transfer'); // 'transfer', 'update', 'history'
@@ -44,6 +45,10 @@ const EditStock = () => {
   const [itemNameFilterOpen, setItemNameFilterOpen] = useState(false);
   const [transferFilterOpen, setTransferFilterOpen] = useState(false);
   const [updateFilterOpen, setUpdateFilterOpen] = useState(false);
+  const [stockingLocationFilterModalOpen, setStockingLocationFilterModalOpen] = useState(false);
+  const [itemNameFilterModalOpen, setItemNameFilterModalOpen] = useState(false);
+  const [transferFilterModalOpen, setTransferFilterModalOpen] = useState(false);
+  const [updateFilterModalOpen, setUpdateFilterModalOpen] = useState(false);
   const [stockingLocationFilterSearch, setStockingLocationFilterSearch] = useState('');
   const [itemNameFilterSearch, setItemNameFilterSearch] = useState('');
   const [transferFilterSearch, setTransferFilterSearch] = useState('');
@@ -1215,12 +1220,30 @@ const EditStock = () => {
             <p className="text-[12px] font-semibold text-black leading-normal">
               #
             </p>
-            <button
-              onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              Category
-            </button>
+            <div className="flex items-center gap-[4px]">
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {selectedCategory || 'Category'}
+              </button>
+              {selectedCategory && (
+                <button
+                  type="button"
+                  aria-label="Clear category"
+                  title="Clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCategory('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1234,12 +1257,30 @@ const EditStock = () => {
               {selectedEno ? `#${selectedEno}` : '# E.No'}
             </div>
             <div className="flex items-center gap-[16px]">
-              <button
-                onClick={() => setShowCategoryModal(true)}
-                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                Category
-              </button>
+              <div className="flex items-center gap-[4px]">
+                <button
+                  onClick={() => setShowCategoryModal(true)}
+                  className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {selectedCategory || 'Category'}
+                </button>
+                {selectedCategory && (
+                  <button
+                    type="button"
+                    aria-label="Clear category"
+                    title="Clear"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCategory('');
+                    }}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1250,12 +1291,30 @@ const EditStock = () => {
             <p className="text-[12px] font-semibold text-black leading-normal">
               #
             </p>
-            <button
-              onClick={() => setShowCategoryModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              Category
-            </button>
+            <div className="flex items-center gap-[4px]">
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {selectedCategory || 'Category'}
+              </button>
+              {selectedCategory && (
+                <button
+                  type="button"
+                  aria-label="Clear category"
+                  title="Clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCategory('');
+                  }}
+                  className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           {/* Action Buttons */}
           {items.length > 0 && (
@@ -1458,15 +1517,13 @@ const EditStock = () => {
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                   </div>
                 )}
               </div>
@@ -1496,15 +1553,13 @@ const EditStock = () => {
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                   </div>
                 )}
               </div>
@@ -1616,15 +1671,13 @@ const EditStock = () => {
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                   </div>
                 )}
               </div>
@@ -2122,6 +2175,50 @@ const EditStock = () => {
         options={updateStockingLocationOptions.map(loc => (loc.value || loc.label || loc))}
         fieldName="Stocking Location"
       />
+      <SelectVendorModal
+        isOpen={stockingLocationFilterModalOpen}
+        onClose={() => setStockingLocationFilterModalOpen(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, stockingLocation: value === 'All Locations' ? '' : value });
+          setStockingLocationFilterModalOpen(false);
+        }}
+        selectedValue={filterData.stockingLocation || 'All Locations'}
+        options={['All Locations', ...[...new Set(historyList.map(r => r.locationName).filter(Boolean))]]}
+        fieldName="Stocking Location"
+      />
+      <SelectVendorModal
+        isOpen={itemNameFilterModalOpen}
+        onClose={() => setItemNameFilterModalOpen(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, itemName: value === 'All Items' ? '' : value });
+          setItemNameFilterModalOpen(false);
+        }}
+        selectedValue={filterData.itemName || 'All Items'}
+        options={['All Items', ...[...new Set(historyList.map(r => r.itemsText).filter(Boolean))]]}
+        fieldName="Item Name"
+      />
+      <SelectVendorModal
+        isOpen={transferFilterModalOpen}
+        onClose={() => setTransferFilterModalOpen(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, transfer: value === 'All' ? '' : value });
+          setTransferFilterModalOpen(false);
+        }}
+        selectedValue={filterData.transfer || 'All'}
+        options={['All', 'Transfer']}
+        fieldName="Transfer"
+      />
+      <SelectVendorModal
+        isOpen={updateFilterModalOpen}
+        onClose={() => setUpdateFilterModalOpen(false)}
+        onSelect={(value) => {
+          setFilterData({ ...filterData, update: value === 'All' ? '' : value });
+          setUpdateFilterModalOpen(false);
+        }}
+        selectedValue={filterData.update || 'All'}
+        options={['All', 'Update']}
+        fieldName="Update"
+      />
       {/* Filter Bottom Sheet */}
       {showFilterSheet && (
         <>
@@ -2131,7 +2228,7 @@ const EditStock = () => {
             onClick={() => setShowFilterSheet(false)}
           />
           {/* Bottom Sheet */}
-          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-[360px] bg-white rounded-t-[20px] z-[101] shadow-lg">
+          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full bg-white rounded-t-[20px] h-[280px] z-[101] shadow-lg">
             {/* Header */}
             <div className='flex justify-between items-center mt-3'>
               <div className="flex justify-between items-center px-[24px]">
@@ -2154,99 +2251,30 @@ const EditStock = () => {
                     Stocking Location
                   </label>
                   <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Select Stocking Location"
-                      value={stockingLocationFilterOpen ? stockingLocationFilterSearch : (filterData.stockingLocation || '')}
-                      onChange={(e) => {
-                        setStockingLocationFilterSearch(e.target.value);
-                        setStockingLocationFilterOpen(true);
-                        setItemNameFilterOpen(false);
-                        setTransferFilterOpen(false);
-                        setUpdateFilterOpen(false);
-                      }}
-                      onFocus={() => {
-                        setStockingLocationFilterOpen(true);
-                        setItemNameFilterOpen(false);
-                        setTransferFilterOpen(false);
-                        setUpdateFilterOpen(false);
-                        if (!stockingLocationFilterOpen) {
-                          setStockingLocationFilterSearch('');
-                        }
-                      }}
-                      className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
-                      style={{
-                        paddingRight: filterData.stockingLocation ? '60px' : '40px',
-                        fontFamily: "'Manrope', sans-serif"
-                      }}
-                    />
-                    {filterData.stockingLocation && !stockingLocationFilterOpen && (
+                    <div
+                      onClick={() => setStockingLocationFilterModalOpen(true)}
+                      className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    >
+                      <span className={filterData.stockingLocation ? 'text-black' : 'text-[#9E9E9E]'}>
+                        {filterData.stockingLocation || 'Select Stocking Location'}
+                      </span>
+                    </div>
+                    {filterData.stockingLocation ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setFilterData({ ...filterData, stockingLocation: '' });
-                          setStockingLocationFilterSearch('');
                         }}
-                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '24px' }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
-                    )}
-                    <svg
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setStockingLocationFilterOpen(!stockingLocationFilterOpen);
-                        if (!stockingLocationFilterOpen) {
-                          setStockingLocationFilterSearch('');
-                        }
-                      }}
-                      className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${stockingLocationFilterOpen ? 'rotate-180' : ''}`}
-                      style={{ right: filterData.stockingLocation && !stockingLocationFilterOpen ? '40px' : '12px' }}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                    {stockingLocationFilterOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                        <div className="overflow-y-auto max-h-48">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilterData({ ...filterData, stockingLocation: '' });
-                              setStockingLocationFilterOpen(false);
-                              setStockingLocationFilterSearch('');
-                            }}
-                            className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.stockingLocation ? 'bg-gray-100' : ''}`}
-                          >
-                            All Locations
-                          </button>
-                          {[...new Set(historyList.map(r => r.locationName).filter(Boolean))]
-                            .filter(loc =>
-                              loc.toLowerCase().includes(stockingLocationFilterSearch.toLowerCase())
-                            )
-                            .map((location) => (
-                              <button
-                                key={location}
-                                type="button"
-                                onClick={() => {
-                                  setFilterData({ ...filterData, stockingLocation: location });
-                                  setStockingLocationFilterOpen(false);
-                                  setStockingLocationFilterSearch('');
-                                }}
-                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.stockingLocation === location ? 'bg-gray-100' : ''}`}
-                              >
-                                {location}
-                              </button>
-                            ))}
-                        </div>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                       </div>
                     )}
                   </div>
@@ -2257,323 +2285,105 @@ const EditStock = () => {
                     Item Name
                   </label>
                   <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Select Item Name"
-                      value={itemNameFilterOpen ? itemNameFilterSearch : (filterData.itemName || '')}
-                      onChange={(e) => {
-                        setItemNameFilterSearch(e.target.value);
-                        setItemNameFilterOpen(true);
-                        setStockingLocationFilterOpen(false);
-                        setTransferFilterOpen(false);
-                        setUpdateFilterOpen(false);
-                      }}
-                      onFocus={() => {
-                        setItemNameFilterOpen(true);
-                        setStockingLocationFilterOpen(false);
-                        setTransferFilterOpen(false);
-                        setUpdateFilterOpen(false);
-                        if (!itemNameFilterOpen) {
-                          setItemNameFilterSearch('');
-                        }
-                      }}
-                      className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
-                      style={{
-                        paddingRight: filterData.itemName ? '60px' : '40px',
-                        fontFamily: "'Manrope', sans-serif"
-                      }}
-                    />
-                    {filterData.itemName && !itemNameFilterOpen && (
+                    <div
+                      onClick={() => setItemNameFilterModalOpen(true)}
+                      className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    >
+                      <span className={filterData.itemName ? 'text-black' : 'text-[#9E9E9E]'}>
+                        {filterData.itemName || 'Select Item Name'}
+                      </span>
+                    </div>
+                    {filterData.itemName ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setFilterData({ ...filterData, itemName: '' });
-                          setItemNameFilterSearch('');
                         }}
-                        className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                        style={{ right: '24px' }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
-                    )}
-                    <svg
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setItemNameFilterOpen(!itemNameFilterOpen);
-                        if (!itemNameFilterOpen) {
-                          setItemNameFilterSearch('');
-                        }
-                      }}
-                      className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${itemNameFilterOpen ? 'rotate-180' : ''}`}
-                      style={{ right: filterData.itemName && !itemNameFilterOpen ? '40px' : '12px' }}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                    {itemNameFilterOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                        <div className="overflow-y-auto max-h-24">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilterData({ ...filterData, itemName: '' });
-                              setItemNameFilterOpen(false);
-                              setItemNameFilterSearch('');
-                            }}
-                            className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.itemName ? 'bg-gray-100' : ''}`}
-                          >
-                            All Items
-                          </button>
-                          {[...new Set(historyList.map(r => r.itemsText).filter(Boolean))]
-                            .filter(item =>
-                              item.toLowerCase().includes(itemNameFilterSearch.toLowerCase())
-                            )
-                            .map((item) => (
-                              <button
-                                key={item}
-                                type="button"
-                                onClick={() => {
-                                  setFilterData({ ...filterData, itemName: item });
-                                  setItemNameFilterOpen(false);
-                                  setItemNameFilterSearch('');
-                                }}
-                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.itemName === item ? 'bg-gray-100' : ''}`}
-                              >
-                                {item}
-                              </button>
-                            ))}
-                        </div>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                       </div>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-[8px]">
+                <div className="flex items-center gap-[8px] w-full">
                   {/* Transfer */}
-                  <div className="relative" data-dropdown="transferFilter">
+                  <div className="flex-1">
                     <label className="block text-sm font-medium text-black mb-0.5">
                       Transfer
                     </label>
                     <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Select Transfer"
-                        value={transferFilterOpen ? transferFilterSearch : (filterData.transfer || '')}
-                        onChange={(e) => {
-                          setTransferFilterSearch(e.target.value);
-                          setTransferFilterOpen(true);
-                          setStockingLocationFilterOpen(false);
-                          setItemNameFilterOpen(false);
-                          setUpdateFilterOpen(false);
-                        }}
-                        onFocus={() => {
-                          setTransferFilterOpen(true);
-                          setStockingLocationFilterOpen(false);
-                          setItemNameFilterOpen(false);
-                          setUpdateFilterOpen(false);
-                          if (!transferFilterOpen) {
-                            setTransferFilterSearch('');
-                          }
-                        }}
-                        className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
-                        style={{
-                          paddingRight: filterData.transfer ? '60px' : '40px',
-                          fontFamily: "'Manrope', sans-serif"
-                        }}
-                      />
-                      {filterData.transfer && !transferFilterOpen && (
+                      <div
+                        onClick={() => setTransferFilterModalOpen(true)}
+                        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      >
+                        <span className={filterData.transfer ? 'text-black' : 'text-[#9E9E9E]'}>
+                          {filterData.transfer || 'Select Transfer'}
+                        </span>
+                      </div>
+                      {filterData.transfer ? (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setFilterData({ ...filterData, transfer: '' });
-                            setTransferFilterSearch('');
                           }}
-                          className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                          style={{ right: '24px' }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                         >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                         </button>
-                      )}
-                      <svg
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTransferFilterOpen(!transferFilterOpen);
-                          if (!transferFilterOpen) {
-                            setTransferFilterSearch('');
-                          }
-                        }}
-                        className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${transferFilterOpen ? 'rotate-180' : ''}`}
-                        style={{ right: filterData.transfer && !transferFilterOpen ? '40px' : '12px' }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      {transferFilterOpen && (
-                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                          <div className="overflow-y-auto max-h-48">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, transfer: '' });
-                                setTransferFilterOpen(false);
-                                setTransferFilterSearch('');
-                              }}
-                              className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.transfer ? 'bg-gray-100' : ''}`}
-                            >
-                              All
-                            </button>
-                            {['Transfer'].filter(opt =>
-                              opt.toLowerCase().includes(transferFilterSearch.toLowerCase())
-                            ).map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => {
-                                  setFilterData({ ...filterData, transfer: option });
-                                  setTransferFilterOpen(false);
-                                  setTransferFilterSearch('');
-                                }}
-                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.transfer === option ? 'bg-gray-100' : ''}`}
-                              >
-                                {option}
-                              </button>
-                            ))}
-                          </div>
+                      ) : (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </div>
                       )}
                     </div>
                   </div>
                   {/* Update */}
-                  <div className="relative" data-dropdown="updateFilter">
+                  <div className="flex-1">
                     <label className="block text-sm font-medium text-black mb-0.5">
                       Update
                     </label>
                     <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Select Update"
-                        value={updateFilterOpen ? updateFilterSearch : (filterData.update || '')}
-                        onChange={(e) => {
-                          setUpdateFilterSearch(e.target.value);
-                          setUpdateFilterOpen(true);
-                          setStockingLocationFilterOpen(false);
-                          setItemNameFilterOpen(false);
-                          setTransferFilterOpen(false);
-                        }}
-                        onFocus={() => {
-                          setUpdateFilterOpen(true);
-                          setStockingLocationFilterOpen(false);
-                          setItemNameFilterOpen(false);
-                          setTransferFilterOpen(false);
-                          if (!updateFilterOpen) {
-                            setUpdateFilterSearch('');
-                          }
-                        }}
-                        className="w-full h-[32px] px-[16px] py-[8px] border border-gray-300 rounded text-gray-700 placeholder:text-[12px] focus:outline-none focus:border-gray-400 bg-white"
-                        style={{
-                          paddingRight: filterData.update ? '60px' : '40px',
-                          fontFamily: "'Manrope', sans-serif"
-                        }}
-                      />
-                      {filterData.update && !updateFilterOpen && (
+                      <div
+                        onClick={() => setUpdateFilterModalOpen(true)}
+                        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                      >
+                        <span className={filterData.update ? 'text-black' : 'text-[#9E9E9E]'}>
+                          {filterData.update || 'Select Update'}
+                        </span>
+                      </div>
+                      {filterData.update ? (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setFilterData({ ...filterData, update: '' });
-                            setUpdateFilterSearch('');
                           }}
-                          className="absolute top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                          style={{ right: '24px' }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                         >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                         </button>
-                      )}
-                      <svg
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setUpdateFilterOpen(!updateFilterOpen);
-                          if (!updateFilterOpen) {
-                            setUpdateFilterSearch('');
-                          }
-                        }}
-                        className={`absolute top-1/2 transform -translate-y-1/2 cursor-pointer transition-transform ${updateFilterOpen ? 'rotate-180' : ''}`}
-                        style={{ right: filterData.update && !updateFilterOpen ? '40px' : '12px' }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      {updateFilterOpen && (
-                        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                          <div className="overflow-y-auto max-h-48">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterData({ ...filterData, update: '' });
-                                setUpdateFilterOpen(false);
-                                setUpdateFilterSearch('');
-                              }}
-                              className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${!filterData.update ? 'bg-gray-100' : ''}`}
-                            >
-                              All
-                            </button>
-                            {['Update'].filter(opt =>
-                              opt.toLowerCase().includes(updateFilterSearch.toLowerCase())
-                            ).map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => {
-                                  setFilterData({ ...filterData, update: option });
-                                  setUpdateFilterOpen(false);
-                                  setUpdateFilterSearch('');
-                                }}
-                                className={`w-full px-[16px] py-[8px] text-left text-sm hover:bg-gray-100 ${filterData.update === option ? 'bg-gray-100' : ''}`}
-                              >
-                                {option}
-                              </button>
-                            ))}
-                          </div>
+                      ) : (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-            {/* Action Buttons */}
-            <div className="flex-shrink-0 flex gap-[12px] px-[24px] py-[16px]">
-              <button
-                onClick={() => {
-                  setFilterData({ stockingLocation: '', itemName: '', transfer: '', update: '' });
-                  setShowFilterSheet(false);
-                }}
-                className="flex-1 px-[16px] py-[8px] border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button onClick={() => setShowFilterSheet(false)} className="flex-1 px-[16px] py-[8px] bg-black text-white rounded-lg font-medium hover:bg-gray-900">
-                Save
-              </button>
             </div>
           </div>
         </>

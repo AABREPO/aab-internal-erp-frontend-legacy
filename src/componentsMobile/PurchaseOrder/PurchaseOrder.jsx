@@ -144,7 +144,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       document.documentElement.style.overflow = originalHtmlOverflow;
     };
   }, []);
-
   const fetchRfqsForSelectedVendor = async () => {
     if (!selectedVendor?.id) return;
     const vendorId = String(selectedVendor.id);
@@ -163,7 +162,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       const filtered = rfqs
         .filter((r) => String(r?.vendor_id ?? r?.vendorId ?? '') === vendorId)
         .sort((a, b) => Number(b?.eno || 0) - Number(a?.eno || 0));
-
       const labelToRfq = new Map();
       const labels = filtered.map((r) => {
         const rawDate = r?.date || r?.createdAt || r?.created_at;
@@ -183,12 +181,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
       setIsRfqLoading(false);
     }
   };
-
   const applyRfqToPo = async (rfqRow) => {
     if (!rfqRow) return;
     const rfqId = rfqRow?.id ?? rfqRow?._id ?? null;
     if (!rfqId) return;
-
     isLoadingFromEventRef.current = true;
     setIsPdfGenerated(false);
     setPdfBlob(null);
@@ -196,7 +192,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setIsEditFromHistory(false);
     setIsEditMode(true);
     setHasOpenedAdd(true);
-
     // Fetch full RFQ (ensures rfqTable exists)
     let apiRfq = null;
     try {
@@ -209,7 +204,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const rfqEno = source?.eno ?? source?.rfq_eno ?? source?.rfqEno ?? null;
     // Backend expects rfq_id (String). Prefer RFQ number; fallback to RFQ row id.
     setSelectedRfqIdentifier(String(rfqEno ?? rfqId ?? ''));
-
     // Project (client) hydrate
     const clientId = source?.client_id ?? source?.clientId ?? null;
     if (clientId) {
@@ -233,13 +227,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
         }
       }
     }
-
     // Incharge hydrate (employee/support staff)
     const inchargeId = source?.site_incharge_id ?? source?.siteInchargeId ?? null;
     const inchargeType = source?.site_incharge_type ?? source?.siteInchargeType ?? null;
     const inchargeMobile =
       source?.site_incharge_mobile_number ?? source?.siteInchargeMobileNumber ?? source?.contact ?? '';
-
     if (inchargeId) {
       if (!inchargeType || inchargeType === 'employee') {
         let emp = employeeList.find((e) => String(e?.id) === String(inchargeId)) || null;
@@ -271,7 +263,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         }
       }
     }
-
     // Items from rfqTable
     const rfqTable = source?.rfqTable || source?.items || [];
     const rows = Array.isArray(rfqTable) ? rfqTable : [];
@@ -282,7 +273,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       const typeId = row?.type_id ?? row?.typeId ?? null;
       const categoryId = row?.category_id ?? row?.categoryId ?? null;
       const isTileCategory = categoryId === 10 || String(categoryId) === '10';
-
       const categoryName =
         row?.categoryName ||
         row?.category ||
@@ -291,7 +281,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             categoryOptions.find((c) => String(c?.id) === String(categoryId))?.value ||
             '')
           : '');
-
       // RFQ rows often contain only IDs; resolve display names from our prefetched lists.
       let itemName = row?.itemName || row?.name || '';
       if (!itemName && itemId) {
@@ -310,7 +299,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             '';
         }
       }
-
       let brand = row?.brandName || row?.brand || '';
       if (!brand && brandId && poBrand && poBrand.length > 0) {
         brand =
@@ -319,7 +307,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           findNameById(poBrand, brandId, 'name') ||
           '';
       }
-
       let model = row?.modelName || row?.model || '';
       if (!model && modelId) {
         if (isTileCategory && tileSizeData && tileSizeData.length > 0) {
@@ -337,7 +324,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
             '';
         }
       }
-
       let type = row?.typeName || row?.typeColor || row?.type || '';
       if (!type && typeId && poType && poType.length > 0) {
         type =
@@ -347,7 +333,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           findNameById(poType, typeId, 'name') ||
           '';
       }
-
       const quantity = Number(row?.quantity || 0) || 0;
       const amount = Number(row?.amount || 0) || 0;
       const price = Number(row?.price || 0) || (quantity ? amount / quantity : 0);
@@ -369,10 +354,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
       };
     });
     setItems(mapped);
-
     // Keep vendor as-is (selected vendor), but ensure vendorName is set
     setPoData((prev) => ({ ...prev, vendorName: selectedVendor?.name || prev.vendorName }));
-
     // Close picker and reset loading flag shortly after state settles
     setTimeout(() => {
       isLoadingFromEventRef.current = false;
@@ -1142,6 +1125,30 @@ const PurchaseOrder = ({ user, onLogout }) => {
       window.removeEventListener('viewPO', handleViewPO);
     };
   }, [user, vendorNameOptions, siteOptions, employeeList, supportStaffList, poItemName, poBrand, poModel, poType, categoryOptions, tileData, tileSizeData]);
+  // Fetch PO categories (id + label) - extracted as reusable for refresh when new category is created
+  const fetchPoCategory = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        const options = (data || []).map(item => ({
+          value: item.category || item.categoryName || item.name || '',
+          label: item.category || item.categoryName || item.name || '',
+          id: item.id || item._id || null,
+        }));
+        setCategoryOptions(options);
+      } else {
+        console.log('Error fetching categories, using empty list.');
+        setCategoryOptions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setCategoryOptions([]);
+    }
+  }, []);
+  useEffect(() => {
+    fetchPoCategory();
+  }, [fetchPoCategory]);
   // Auto-generate PDF when in view-only mode and all required data is available
   useEffect(() => {
     const generateViewOnlyPDF = async () => {
@@ -1153,7 +1160,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
           fetchPoItemName(),
           fetchPoModel(),
           fetchPoBrand(),
-          fetchPoType()
+          fetchPoType(),
+          fetchPoCategory()
         ]);
         // Construct payload for PDF generation
         const currentPoNo = poData.poNumber.replace('#', '').trim();
@@ -1188,6 +1196,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
               type_id: item.typeId || null,
               quantity: item.quantity,
               amount: item.amount || (item.quantity * item.price) || 0,
+              _itemName: itemNameOnly,
+              _category: categoryName,
+              _model: item.model || '',
+              _brand: item.brand || '',
+              _type: item.type || '',
             };
           })
         };
@@ -1196,7 +1209,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       }
     };
     generateViewOnlyPDF();
-  }, [isViewOnlyFromHistory, isPdfGenerated, selectedVendor, selectedSite, selectedIncharge, items, poData, user]);
+  }, [isViewOnlyFromHistory, isPdfGenerated, selectedVendor, selectedSite, selectedIncharge, items, poData, user, fetchPoCategory]);
   // Save activeTab to localStorage whenever it changes
   useEffect(() => {
     if (activeTab) {
@@ -1352,10 +1365,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
           const employeeData = await employeeResponse.json();
           const employees = Array.isArray(employeeData) ? employeeData : [];
           siteEngineersCache.data = employees;
-          console.log("employees", employees);
           setEmployeeList(employees);
         }
-
         if (supportStaffResponse.ok) {
           const supportStaffData = await supportStaffResponse.json();
           const staff = Array.isArray(supportStaffData) ? supportStaffData : [];
@@ -1400,42 +1411,33 @@ const PurchaseOrder = ({ user, onLogout }) => {
       type: 'support staff'
     }))
   ];
-
   // Auto-fill project incharge for new POs using logged-in username match
   useEffect(() => {
     const username = (user && user.username) ? String(user.username).trim().toLowerCase() : '';
     if (!username) return;
-
     // Avoid overwriting History/edit/view data
     if (isEditMode || isEditFromHistory || isViewOnlyFromHistory) return;
     if (poData.projectIncharge || poData.contact) return;
-
     if (!Array.isArray(employeeList) || employeeList.length === 0) return;
-
     // Backend returns `user_name` field for employees; match to `user.username`
     const matchedEmployee = employeeList.find(emp => {
       const empUserName = emp.user_name || emp.userName || emp.username || '';
       return String(empUserName).trim().toLowerCase() === username;
     });
-
     if (!matchedEmployee) return;
-
     const resolvedName =
       matchedEmployee.employeeName ||
       matchedEmployee.name ||
       matchedEmployee.fullName ||
       matchedEmployee.employee_name ||
       '';
-
     const resolvedMobile =
       matchedEmployee.employee_mobile_number ||
       matchedEmployee.mobileNumber ||
       matchedEmployee.mobile_number ||
       matchedEmployee.contact ||
       '';
-
     if (!resolvedName) return;
-
     setSelectedIncharge({
       id: matchedEmployee.id,
       name: resolvedName,
@@ -1456,7 +1458,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     poData.contact,
     employeeList
   ]);
-
   // Fetch PO item names from API - extracted as reusable function
   const fetchPoItemName = useCallback(async () => {
     try {
@@ -1518,28 +1519,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   useEffect(() => {
     fetchPoType();
   }, []);
-  // Fetch PO categories (id + label)
   useEffect(() => {
-    const fetchPoCategory = async () => {
-      try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const options = (data || []).map(item => ({
-            value: item.category || item.categoryName || item.name || '',
-            label: item.category || item.categoryName || item.name || '',
-            id: item.id || item._id || null,
-          }));
-          setCategoryOptions(options);
-        } else {
-          console.log('Error fetching categories, using empty list.');
-          setCategoryOptions([]);
-        }
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        setCategoryOptions([]);
-      }
-    };
     fetchPoCategory();
   }, []);
   // Fetch tiles data (for TILE category)
@@ -1611,62 +1591,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
     }
   };
   // Handlers for adding new options
-  const handleAddNewVendor = async (newVendor) => {
-    if (!newVendor || !newVendor.trim()) {
-      return;
-    }
-    try {
-      // Create vendor data with only vendorName (other fields will be null/empty)
-      const vendorData = {
-        vendorName: newVendor.trim(),
-        account_holder_name: '',
-        account_number: '',
-        bank_name: '',
-        ifsc_code: '',
-        branch: '',
-        gpay_number: '',
-        upi_id: '',
-        contact_number: '',
-        contact_email: ''
-      };
-      // Create FormData object
-      const formData = new FormData();
-      // Create a blob for the vendor data
-      const vendorBlob = new Blob([JSON.stringify(vendorData)], { type: 'application/json' });
-      formData.append("vendor", vendorBlob);
-      // No file appended since we're only saving vendor name
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/save", {
-        method: "POST",
-        body: formData
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Failed to save vendor: ${response.status} - ${errorText}`);
-        throw new Error(`Failed to save vendor: ${response.status} - ${errorText}`);
-      }
-      const result = await response.json();
-      await fetchVendorNames();
-      if (!vendorOptions.includes(newVendor)) {
-        setVendorOptions([...vendorOptions, newVendor]);
-      }
-    } catch (error) {
-      console.error("Error saving vendor:", error);
-      alert(`Failed to save vendor: ${error.message}`);
-      if (!vendorOptions.includes(newVendor)) {
-        setVendorOptions([...vendorOptions, newVendor]);
-      }
-    }
-  };
-  const handleAddNewProject = (newProject) => {
-    if (!projectOptions.includes(newProject)) {
-      setProjectOptions([...projectOptions, newProject]);
-    }
-  };
-  const handleAddNewIncharge = (newIncharge) => {
-    if (!inchargeOptions.includes(newIncharge)) {
-      setCustomInchargeOptions(prev => [...prev, newIncharge]);
-    }
-  };
   // Search functionality (legacy - may not be used anymore)
   useEffect(() => {
     if (searchQuery.trim().length > 0) {
@@ -2029,6 +1953,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           ? {
             ...item,
             name: `${itemData.itemName}, ${itemData.category}`,
+            category: itemData.category || '',
             brand: itemData.brand,
             model: itemData.model,
             type: itemData.type,
@@ -2294,6 +2219,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
             type_id: typeId || null,
             quantity: item.quantity,
             amount: item.amount || (item.quantity * 0) || 0,
+            _itemName: itemNameOnly,
+            _category: categoryName,
+            _model: item.model || '',
+            _brand: item.brand || '',
+            _type: item.type || '',
           };
         })
       };
@@ -2333,7 +2263,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       generatePoClickLockRef.current = false;
     }
   };
-
   const generatePO = async () => {
     if (generatePoClickLockRef.current || isGenerating) return;
     generatePoClickLockRef.current = true;
@@ -2344,7 +2273,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         alert("Please select a Vendor before generating a PO.");
         return;
       }
-
       // Check for duplicate PO only when creating new PO (not editing)
       if (!isEditMode || !poData.originalId) {
         const clientIdForCheck = selectedSite?.id ?? poData.originalClientId ?? null;
@@ -2352,7 +2280,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         if (clientIdForCheck && items.length > 0) {
           // Fetch previous PO for same vendor and project
           const previousPO = await fetchPreviousPO(selectedVendor.id, clientIdForCheck);
-
           if (previousPO && previousPO.purchaseTable && previousPO.purchaseTable.length > 0) {
             // Prepare current items for comparison (same structure as payload.purchaseTable)
             const currentItemsForComparison = items.map(item => {
@@ -2364,7 +2291,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               let modelId = item.modelId;
               let typeId = item.typeId;
               let categoryId = item.categoryId;
-
               if (!itemId && itemNameOnly && poItemName && poItemName.length > 0) {
                 const foundItem = poItemName.find(i =>
                   (i.itemName || i.name || '').toLowerCase() === itemNameOnly.toLowerCase()
@@ -2392,7 +2318,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
               if (!categoryId && categoryName && categoryOptions && categoryOptions.length > 0) {
                 categoryId = resolveCategoryId(categoryName);
               }
-
               return {
                 item_id: itemId || null,
                 category_id: categoryId || null,
@@ -2401,7 +2326,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 type_id: typeId || null,
               };
             });
-
             // Compare items (ignoring quantity)
             if (areItemsSame(currentItemsForComparison, previousPO.purchaseTable)) {
               // Items are the same - show custom confirmation modal
@@ -2416,7 +2340,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           }
         }
       }
-
       // No duplicate detected or editing mode - proceed directly
       await proceedWithPOGeneration();
     } catch (error) {
@@ -2429,7 +2352,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
       }
     }
   };
-
   const generatePDF = (payload, skipSaveAndDownload = false) => {
     const doc = new jsPDF();
     const findNameById = (options, id, key) => {
@@ -2533,10 +2455,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
       let model = '';
       let brand = '';
       let type = '';
-
       // Check if this is TILE category (category_id = 10)
       const isTileCategory = item.category_id === 10 || String(item.category_id) === '10';
-
       if (item.item_id) {
         if (isTileCategory && tileData && tileData.length > 0) {
           // For TILE category, look up from tileData
@@ -2926,7 +2846,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
         {activeTab === 'create' && (
           <div className="flex flex-col h-full bg-white overflow-hidden">
             {/* PO Number and Date Row - Only show date when not in empty state */}
-
             <div className="sticky top-0 bg-white z-10 flex-shrink-0">
               <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
                 <div className="flex items-center gap-[8px]">
@@ -3200,7 +3119,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                             // Use item.id as-is (can be string or number) for consistent swipe state lookup
                             if (!item || !item.id) return null;
                             const itemId = item.id; // Use ID as-is, don't force to number
-
                             const minSwipeDistance = 50;
                             const handleTouchStart = (e, id) => {
                               if (!id) return;
@@ -3359,6 +3277,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           onRefreshModel={fetchPoModel}
           onRefreshBrand={fetchPoBrand}
           onRefreshType={fetchPoType}
+          onRefreshCategory={fetchPoCategory}
         />
         <DatePickerModal
           isOpen={showDatePicker}

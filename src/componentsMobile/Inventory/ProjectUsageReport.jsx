@@ -3,7 +3,8 @@ import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
-
+import Search from '../Images/Search.png'
+import CloseIcon from '../Images/Close F.svg'
 const ProjectUsageReport = () => {
   // Helper function for date
   const getTodayDate = () => {
@@ -642,18 +643,36 @@ const ProjectUsageReport = () => {
           >
             {date}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowCategoryModal(true)}
-            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            {selectedCategory || 'Category'}
-          </button>
+          <div className="flex items-center gap-[4px]">
+            <button
+              type="button"
+              onClick={() => setShowCategoryModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {selectedCategory || 'Category'}
+            </button>
+            {selectedCategory && (
+              <button
+                type="button"
+                aria-label="Clear category"
+                title="Clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCategory('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {/* Report/History Tabs */}
       <div className="flex-shrink-0 pt-[8px]">
-        <div className="flex bg-gray-100 items-center h-[32px] shadow-sm flex-1 rounded-md">
+        <div className="flex bg-gray-100 items-center h-[32px] flex-1 rounded-md">
           <button
             type="button"
             onClick={() => setActiveTab('history')}
@@ -703,14 +722,12 @@ const ProjectUsageReport = () => {
                 }}
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
               >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
               </button>
             ) : (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             )}
@@ -719,17 +736,14 @@ const ProjectUsageReport = () => {
         {/* Search Bar */}
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
-              <path d="M11 11L14 14" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
           </div>
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-[40px] pr-[12px] text-[12px] font-medium bg-white"
+            className="w-full h-[40px] border border-[rgba(0,0,0,0.16)] rounded-full pl-[30px] pr-[12px] text-[12px] font-medium bg-white"
           />
         </div>
       </div>
@@ -773,13 +787,13 @@ const ProjectUsageReport = () => {
                 if (item.type) detailsParts.push(item.type);
                 const details = detailsParts.join(', ');
                 return (
-                  <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[100px]">
+                  <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px]">
                     {/* Card */}
                     <div
                       ref={(el) => {
                         if (el) cardRefs.current[itemId] = el;
                       }}
-                      className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out"
+                      className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[10px] transition-all duration-300 ease-out"
                       style={{
                         transform: `translateX(${swipeOffset}px)`,
                         touchAction: 'pan-y',
@@ -926,7 +940,7 @@ const ProjectUsageReport = () => {
                       : 0;
 
                 return (
-                  <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px] h-[112px]">
+                  <div key={itemId} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-gray-50 rounded-[8px]">
                     {/* Card */}
                     <div
                       ref={(el) => {

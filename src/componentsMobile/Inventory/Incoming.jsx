@@ -6,9 +6,9 @@ import ItemCard from '../PurchaseOrder/ItemCard';
 import DeleteConfirmModal from '../PurchaseOrder/DeleteConfirmModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
-import SelectPOModal from './SelectPOModal';
 import editIcon from '../Images/edit.png';
 import jsPDF from 'jspdf';
+import CloseIcon from '../Images/Close F.svg'
 const Incoming = ({ user }) => {
   // Prevent whole-page scroll; keep only inner lists scrollable
   useEffect(() => {
@@ -52,6 +52,7 @@ const Incoming = ({ user }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showSearchItemsModal, setShowSearchItemsModal] = useState(false);
   const [showPOModal, setShowPOModal] = useState(false);
+  const [poOptionsLoading, setPoOptionsLoading] = useState(false);
   const [poItemName, setPoItemName] = useState([]);
   const [poBrand, setPoBrand] = useState([]);
   const [poModel, setPoModel] = useState([]);
@@ -488,6 +489,30 @@ const Incoming = ({ user }) => {
       setLoadingPOItems(false);
     }
   }, [poItemName, poBrand, poModel, poType, categoryOptions, allPurchaseOrders, incomingData.vendorId, fetchAllPurchaseOrders]);
+  // Ensure PO list is available when PO modal opens
+  useEffect(() => {
+    if (showPOModal && allPurchaseOrders.length === 0) {
+      setPoOptionsLoading(true);
+      fetchAllPurchaseOrders().finally(() => setPoOptionsLoading(false));
+    } else if (showPOModal) {
+      setPoOptionsLoading(false);
+    }
+  }, [showPOModal, allPurchaseOrders.length, fetchAllPurchaseOrders]);
+  const poNumberOptions = (() => {
+    const vendorPOs = incomingData.vendorId
+      ? allPurchaseOrders.filter(po => String(po.vendor_id || po.vendorId) === String(incomingData.vendorId))
+      : [];
+    const enoSet = new Set();
+    vendorPOs.forEach(po => {
+      const eno = po.eno || po.ENO || po.poNumber || po.po_number || '';
+      if (eno) {
+        enoSet.add(String(eno).replace('#', '').trim());
+      }
+    });
+    return [...enoSet]
+      .filter(Boolean)
+      .sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
+  })();
   // Initial fetch on mount
   useEffect(() => {
     fetchPoItemName();
@@ -1596,14 +1621,12 @@ const Incoming = ({ user }) => {
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 )}
@@ -1635,14 +1658,12 @@ const Incoming = ({ user }) => {
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 )}
@@ -1905,10 +1926,11 @@ const Incoming = ({ user }) => {
         })()}
         disableAvailabilityCheck={true}
       />
-      <SelectPOModal
+      <SelectVendorModal
         isOpen={showPOModal}
         onClose={() => setShowPOModal(false)}
-        onSelect={async (poNumber, cachedPOData) => {
+        onSelect={async (poNumber) => {
+          if (poNumber === 'Loading...') return;
           // If PO number changed, clear existing items first to avoid duplicates
           if (poNumber !== incomingData.poNumber && poNumber) {
             setItems([]);
@@ -1917,7 +1939,7 @@ const Incoming = ({ user }) => {
           setShowPOModal(false);
           // Fetch and add PO items to the items list - use cached data if available
           if (poNumber) {
-            await fetchPOItems(poNumber, cachedPOData);
+            await fetchPOItems(poNumber);
             // Set hasOpenedAdd to true so items are visible
             setHasOpenedAdd(true);
           } else {
@@ -1926,11 +1948,9 @@ const Incoming = ({ user }) => {
           }
         }}
         selectedValue={incomingData.poNumber}
-        vendorName={incomingData.vendorName}
-        vendorId={incomingData.vendorId}
-        stockingLocation={incomingData.stockingLocation}
-        allPurchaseOrders={allPurchaseOrders}
-        onFetchPOs={fetchAllPurchaseOrders}
+        options={poOptionsLoading ? ['Loading...'] : poNumberOptions}
+        fieldName="PO"
+        preserveOrder={true}
       />
       {/* File Upload Modal */}
       {showFileUploadModal && (

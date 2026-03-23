@@ -3,8 +3,10 @@ import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
+import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import Filter from '../Images/Filter.png'
 import Close from '../Images/close.png'
+import Search from '../Images/Search.png'
 
 const History = ({ onTabChange }) => {
   // Prevent whole-page scroll; keep only inner list scrollable
@@ -40,6 +42,9 @@ const History = ({ onTabChange }) => {
   const [filterDate, setFilterDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [employeeData, setEmployeeData] = useState([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState([]);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showInchargeDropdown, setShowInchargeDropdown] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
@@ -92,6 +97,26 @@ const History = ({ onTabChange }) => {
       }
     };
     fetchEmployees();
+  }, []);
+
+  // Fetch category options for header Category popup
+  useEffect(() => {
+    const fetchPoCategory = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          const options = (data || []).map(item => item.category || item.categoryName || item.name || '').filter(Boolean);
+          setCategoryOptions([...new Set(options)]);
+        } else {
+          setCategoryOptions([]);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategoryOptions([]);
+      }
+    };
+    fetchPoCategory();
   }, []);
 
   // Fetch inventory history data
@@ -835,9 +860,31 @@ const History = ({ onTabChange }) => {
           <button className="text-[12px] font-semibold text-black leading-normal">
             {getTodayDate()}
           </button>
-          <button className="text-[12px] font-semibold text-black leading-normal">
-            Category
-          </button>
+          <div className="flex items-center gap-[4px]">
+            <button
+              type="button"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setShowCategoryModal(true)}
+            >
+              {filterCategory || 'Category'}
+            </button>
+            {filterCategory && (
+              <button
+                type="button"
+                aria-label="Clear category"
+                title="Clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterCategory('');
+                }}
+                className="w-4 h-4 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {/* Stack Return/Dispatch Toggle */}
@@ -872,17 +919,14 @@ const History = ({ onTabChange }) => {
       <div className="flex-shrink-0 pt-[8px]">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="7" cy="7" r="5.5" stroke="#747474" strokeWidth="1.5" />
-              <path d="M11 11L14 14" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <img src={Search} alt="Search" className="w-[12px] h-[12px]" />
           </div>
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-full text-[12px] font-medium text-black bg-white focus:outline-none focus:border-[#BF9853]"
+            className="w-full h-[40px] pl-[30px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-full text-[12px] font-medium text-black bg-white focus:outline-none focus:border-[#BF9853]"
           />
         </div>
       </div>
@@ -990,7 +1034,7 @@ const History = ({ onTabChange }) => {
       </div>
 
       {/* History List */}
-      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pt-[8px]">
+      <div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none pt-[6px]">
         {loading ? (
           <div className="flex items-center justify-center py-[32px]">
             <p className="text-[12px] text-gray-500">Loading...</p>
@@ -1175,7 +1219,7 @@ const History = ({ onTabChange }) => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full h-[370px] rounded-t-3xl shadow-lg"
+            className="bg-white w-full h-[340px] rounded-t-3xl shadow-lg"
             onClick={(e) => e.stopPropagation()}
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
@@ -1266,7 +1310,7 @@ const History = ({ onTabChange }) => {
                     <button
                       type="button"
                       onClick={() => setShowDatePicker(true)}
-                      className="w-full h-[32px] px-[12px] border border-gray-300 rounded text-[14px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
+                      className="w-full h-[32px] px-[12px] border border-gray-300 rounded font-semibold text-[12px] bg-white focus:outline-none focus:border-gray-400 flex items-center justify-between"
                       style={{ fontFamily: "'Manrope', sans-serif" }}
                     >
                       <span className={`${filterDate ? 'text-black' : 'text-[#9E9E9E]'} truncate`}>
@@ -1291,38 +1335,6 @@ const History = ({ onTabChange }) => {
                   </div>
                 </div>
               </div>
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-[12px] mt-5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilterProjectName('');
-                    setFilterProjectIncharge('');
-                    setFilterStockingLocation('');
-                    setFilterSRNumber('');
-                    setFilterDate('');
-                    setShowFilterModal(false);
-                    setShowProjectDropdown(false);
-                    setShowInchargeDropdown(false);
-                    setShowLocationDropdown(false);
-                  }}
-                  className="px-[24px] py-[8px] w-full h-[40px] border border-black rounded-lg text-[14px] font-medium text-black bg-white hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFilterModal(false);
-                    setShowProjectDropdown(false);
-                    setShowInchargeDropdown(false);
-                    setShowLocationDropdown(false);
-                  }}
-                  className="px-[24px] py-[8px] w-full h-[40px] bg-black text-white rounded-lg text-[14px] font-medium hover:bg-gray-800"
-                >
-                  Save
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -1335,6 +1347,18 @@ const History = ({ onTabChange }) => {
           setFilterDate(formatISOFromDDMMYYYY(picked));
           setShowDatePicker(false);
         }}
+      />
+      <SelectVendorModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onSelect={(value) => {
+          setFilterCategory(value);
+          setShowCategoryModal(false);
+        }}
+        selectedValue={filterCategory}
+        options={categoryOptions}
+        fieldName="Category"
+        showStarIcon={false}
       />
     </div>
   );

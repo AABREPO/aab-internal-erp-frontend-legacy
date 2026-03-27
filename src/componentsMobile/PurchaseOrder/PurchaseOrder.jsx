@@ -3393,6 +3393,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
           existingItems={items}
           onRefreshData={fetchPoItemName}
           useInventoryData={true}
+          useMappedItemNameDisplay={true}
         />
         <DuplicatePOConfirmModal
           isOpen={showDuplicatePOConfirm}

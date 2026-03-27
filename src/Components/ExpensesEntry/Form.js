@@ -1422,7 +1422,7 @@ const Form = ({ username, userRoles = [] }) => {
     }, []);
     
     return (
-        <body className=' bg-[#FAF6ED]'>
+        <div className='bg-[#FAF6ED] min-h-screen'>
             <style jsx>{`
                 input:hover, select:hover {
                     border-color: rgba(191, 152, 83, 0.2) !important;
@@ -1432,7 +1432,7 @@ const Form = ({ username, userRoles = [] }) => {
                     outline: none !important;
                 }
             `}</style>
-            <div className=" mx-auto p-6 bg-white rounded-lg shadow-lg lg:w-[1824px]">
+            <div className="mx-auto p-6 pb-10 bg-white rounded-lg shadow-lg w-full max-w-[1824px]">
                 <form onSubmit={handleFormSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
@@ -1553,7 +1553,7 @@ const Form = ({ username, userRoles = [] }) => {
                                         className="custom-select rounded-lg w-[290px] h-[45px]"
                                     />
                                 </div>
-                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') && (
+                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') ? (
                                     <div className='text-left'>
                                         <label className="text-md font-semibold mb-2 block">Payment Mode <span className="text-red-500">*</span></label>
                                         <select
@@ -1569,7 +1569,20 @@ const Form = ({ username, userRoles = [] }) => {
                                             <option value="Cheque">Cheque</option>
                                         </select>
                                     </div>
-                                )}
+                                ) : showMachineTools ? (
+                                    <div className='text-left'>
+                                        <label className="text-md font-semibold mb-2 block">Machine Tool</label>
+                                        <Select
+                                            options={machineToolsOptions}
+                                            value={selectedMachineTools}
+                                            onChange={setSelectedMachine}
+                                            styles={customStyles}
+                                            isClearable
+                                            placeholder="Select a machine tool..."
+                                            className="custom-select rounded-lg w-[290px] h-[45px]"
+                                        />
+                                    </div>
+                                ) : null}
                             </div>
                             {selectedAccountType === 'Utility Bills' && (
                                 <>
@@ -1657,20 +1670,6 @@ const Form = ({ username, userRoles = [] }) => {
                                 )}
                             </div>
                         </div>
-                        {showMachineTools && (
-                            <div className='text-left lg:ml-[-570px]'>
-                                <label className="text-md font-semibold mb-2 block">Item ID</label>
-                                <Select
-                                    options={machineToolsOptions}
-                                    value={selectedMachineTools}
-                                    onChange={setSelectedMachine}
-                                    styles={customStyles}
-                                    isClearable
-                                    placeholder="Select a machine tool..."
-                                    className="custom-select rounded-lg w-[290px] h-[45px]"
-                                />
-                            </div>
-                        )}
                         {/* Advance history table for selected project and vendor/contractor (same logic as Advance Portal) */}
                         <div className="hidden lg:flex flex-col items-stretch -ml-[120px]">
                             <div className="flex items-center mb-2">
@@ -2286,7 +2285,7 @@ const Form = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
-        </body>
+        </div>
     );
 };
 export default Form;

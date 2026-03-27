@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import SelectLocatorsModal from './SelectLocatorsModal';
 import Edit from '../Images/edit1.png';
@@ -751,9 +751,67 @@ const AddInput = () => {
     }
   };
 
+  const normalizeCategory = (value) => String(value || '').trim().toLowerCase();
+
+  const itemNameOptionsForCategory = useMemo(() => {
+    if (!category) {
+      return itemNameOptions;
+    }
+
+    if (!Array.isArray(poItemNameData) || poItemNameData.length === 0) {
+      return itemNameOptions;
+    }
+
+    const normalizedSelectedCategory = normalizeCategory(category);
+    const filtered = poItemNameData.filter((item) => {
+      const itemCategory =
+        item.category ||
+        item.categoryName ||
+        item.Category ||
+        '';
+      return normalizeCategory(itemCategory) === normalizedSelectedCategory;
+    });
+
+    const names = filtered
+      .map((item) => item.itemName || item.poItemName || item.name || item.item_name || '')
+      .filter((name) => name && typeof name === 'string');
+
+    if (names.length === 0) {
+      return itemNameOptions;
+    }
+
+    return [...new Set(names)];
+  }, [category, poItemNameData, itemNameOptions]);
+
   // Handle category select (same as InputData)
   const handleCategorySelect = (selectedCategory) => {
     setCategory(selectedCategory);
+
+    // Keep data in sync with selected category
+    const normalizedSelectedCategory = normalizeCategory(selectedCategory);
+    const selectedItemCategory = normalizeCategory(selectedItemData?.category || '');
+    if (formData.itemName && normalizedSelectedCategory !== selectedItemCategory) {
+      setFormData(prev => ({
+        ...prev,
+        itemName: '',
+        model: '',
+        type: '',
+        brand: '',
+        minQty: '',
+        defaultQty: ''
+      }));
+      setSelectedItemData(null);
+      setOtherPOEntityList([]);
+      setPoItemNameId(null);
+      setPoEditItemList({
+        itemName: '',
+        category: '',
+        groupName: '',
+        otherPOEntityList: []
+      });
+      setEditingRowIndex(null);
+      setExpandedRowIndex(null);
+    }
   };
 
   // Handle field change (same as InputData)
@@ -1020,22 +1078,6 @@ const AddInput = () => {
   };
 
   // Filter options based on selected category (same logic as PurchaseOrder page)
-  const getFilteredItemNameOptions = () => {
-    const cleanedItemNames = (itemNameOptions || [])
-      .map(name => (typeof name === 'string' ? name.trim() : ''))
-      .filter(Boolean);
-
-    if (!category) {
-      // If no category selected, return all item names
-      return [...new Set(cleanedItemNames)];
-    }
-    const filtered = poItemName.filter(
-      item => item.category?.toLowerCase() === category.toLowerCase()
-    );
-    const apiNames = filtered.map(item => item.itemName?.trim()).filter(Boolean);
-    // Merge with localStorage options that match category
-    return [...new Set([...apiNames, ...cleanedItemNames])];
-  };
 
   const getFilteredModelOptions = () => {
     if (!category) {
@@ -1673,7 +1715,7 @@ const AddInput = () => {
           setShowItemNameModal(false);
         }}
         selectedValue={formData.itemName}
-        options={getFilteredItemNameOptions()}
+        options={itemNameOptionsForCategory}
         fieldName="Item Name"
         onAddNew={handleAddNewItemName}
         showStarIcon={false}

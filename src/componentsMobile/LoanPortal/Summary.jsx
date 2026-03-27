@@ -293,12 +293,16 @@ const Summary = () => {
     <div className="relative w-full bg-white max-w-[360px] flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header */}
       <div className="flex-shrink-0">
-        <div className="pt-[10px] mb-[8px]">
-          <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
-            <span className="text-[12px] font-semibold text-black leading-normal">#Week</span>
-            <button type="button" className=" flex items-center justify-center hover:bg-gray-100 rounded-full">
-              <img src={Download} alt="Download" className="w-[16px] h-[16px]" />
-            </button>
+        <div className="">
+          <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pt-[8px] pb-[8px]">
+            <div className="flex items-center gap-[8px]">
+              <span className="text-[12px] font-semibold text-black leading-normal">#Week</span>
+            </div>
+            <div className="flex items-center gap-[8px]">
+              <button type="button" className="flex items-center justify-center hover:bg-gray-100 rounded-full">
+                <img src={Download} alt="Download" className="w-[16px] h-[16px]" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -308,7 +312,7 @@ const Summary = () => {
             <button
               type="button"
               onClick={() => setActiveFilter('Associate')}
-              className={`flex-1 px-[16px] ml-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+              className={`flex-1 px-[16px] ml-0.5 h-[28px] rounded text-[12px] font-medium transition-colors duration-1000 ease-out ${
                 activeFilter === 'Associate'
                   ? 'bg-white text-black'
                   : 'text-[#9E9E9E]'
@@ -319,7 +323,7 @@ const Summary = () => {
             <button
               type="button"
               onClick={() => setActiveFilter('Purpose')}
-              className={`flex-1 px-[16px] mr-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${
+              className={`flex-1 px-[16px] mr-0.5 h-[28px] rounded text-[12px] font-medium transition-colors duration-1000 ease-out ${
                 activeFilter === 'Purpose'
                   ? 'bg-white text-black'
                   : 'text-[#9E9E9E]'

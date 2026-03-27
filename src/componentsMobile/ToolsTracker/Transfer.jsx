@@ -4074,7 +4074,7 @@ const Transfer = ({ user }) => {
     }
   };
   return (
-    <div className="flex flex-col min-h-[calc(100vh-90px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col h-[calc(100vh-90px-80px)] min-h-0 overflow-hidden bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       <div className="sticky top-0 bg-white z-10 flex-shrink-0">
         <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
           <div className="flex items-center  gap-[8px] ">
@@ -5482,7 +5482,7 @@ const Transfer = ({ user }) => {
         </div>
       )}
       {items.length > 0 && (
-        <div className="flex-1 overflow-y-auto no-scrollbar  scrollbar-none pt-[8px] pb-[120px]">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none pt-[8px] pb-[24px]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="shadow-md rounded-lg space-y-2">
             {items.map((item, index) => {
               const itemId = item.id;
@@ -5497,29 +5497,35 @@ const Transfer = ({ user }) => {
                     ? -buttonWidth
                     : 0;
               const handleTouchStart = (e) => {
-                const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+                const touch = e.touches ? e.touches[0] : { clientX: e.clientX, clientY: e.clientY };
                 setSwipeStates(prev => ({
                   ...prev,
                   [itemId]: {
                     startX: touch.clientX,
                     currentX: touch.clientX,
+                    startY: touch.clientY ?? 0,
+                    currentY: touch.clientY ?? 0,
                     isSwiping: false
                   }
                 }));
               };
               const handleTouchMove = (e) => {
-                e.preventDefault();
-                const touch = e.touches ? e.touches[0] : { clientX: e.clientX };
+                const touch = e.touches ? e.touches[0] : { clientX: e.clientX, clientY: e.clientY };
                 setSwipeStates(prev => {
                   const state = prev[itemId];
                   if (!state) return prev;
                   const deltaX = touch.clientX - state.startX;
-                  if (deltaX < 0 || (isExpanded && deltaX > 0)) {
+                  const deltaY = (touch.clientY ?? state.currentY ?? state.startY ?? 0) - (state.startY ?? 0);
+                  const absDeltaX = Math.abs(deltaX);
+                  const absDeltaY = Math.abs(deltaY);
+                  const isHorizontalSwipe = absDeltaX > 10 && absDeltaX > absDeltaY;
+                  if (isHorizontalSwipe && (deltaX < 0 || (isExpanded && deltaX > 0))) {
                     return {
                       ...prev,
                       [itemId]: {
                         ...state,
                         currentX: touch.clientX,
+                        currentY: touch.clientY ?? state.currentY ?? state.startY ?? 0,
                         isSwiping: true
                       }
                     };

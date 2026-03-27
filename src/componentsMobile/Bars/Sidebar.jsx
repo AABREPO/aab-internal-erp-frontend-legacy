@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import logo from '../Images/AABBlack.png'
+import { prefetchIncomingTrackerData } from '../Inventory/incomingTrackerPrefetch';
+import { prefetchInventoryNetStockData } from '../Inventory/inventoryNetStockPrefetch';
+import { prefetchToolsNetStockData } from '../ToolsTracker/netStockPrefetch';
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) => {
   const [expandedItems, setExpandedItems] = useState({
@@ -64,6 +67,22 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       if (modelName && !hasAccessToModel(modelName)) {
         alert("No permissions for this page");
         return;
+      }
+      if (page === 'inventory') {
+        try {
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const vendorId = storedUser?.vendor_id ?? storedUser?.vendorId ?? null;
+          // Fire-and-forget prefetch to warm IncomingTracker data.
+          prefetchIncomingTrackerData({ vendorId });
+          // Fire-and-forget prefetch to warm Inventory Net Stock data.
+          prefetchInventoryNetStockData();
+        } catch (e) {
+          // ignore prefetch failures
+        }
+      }
+      if (page === 'tools-tracker') {
+        // Warm Tools Tracker Net Stock in background too.
+        prefetchToolsNetStockData().catch(() => {});
       }
       onNavigate(page);
       onClose();

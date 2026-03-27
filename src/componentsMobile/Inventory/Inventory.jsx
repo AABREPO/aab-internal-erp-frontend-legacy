@@ -13,6 +13,21 @@ import IncomingTracker from './IncomingTracker';
 import NetStock from './NetStock';
 import NonPOHistory from './NonPOHistory';
 import EditStock from './EditStock';
+import { prefetchIncomingTrackerData } from './incomingTrackerPrefetch';
+import { prefetchInventoryNetStockData } from './inventoryNetStockPrefetch';
+
+const INVENTORY_TAB_IDS = [
+  'outgoing',
+  'incoming',
+  'net-stock',
+  'history',
+  'add-input',
+  'incoming-tracker',
+  'project-usage-report',
+  'project-usage-history',
+  'non-po-history',
+  'edit-stock'
+];
 
 const Inventory = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -22,6 +37,7 @@ const Inventory = ({ user, onLogout }) => {
     const savedTab = localStorage.getItem('inventoryActiveTab');
     return savedTab || 'net-stock';
   });
+  const [loadedTabs, setLoadedTabs] = useState(() => new Set([activeTab]));
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -30,6 +46,26 @@ const Inventory = ({ user, onLogout }) => {
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    setLoadedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
+
+  // Warm IncomingTracker + Net Stock as soon as Inventory opens.
+  useEffect(() => {
+    try {
+      const vendorId = user?.vendor_id ?? user?.vendorId ?? null;
+      prefetchIncomingTrackerData({ vendorId });
+      prefetchInventoryNetStockData();
+    } catch (e) {
+      // ignore prefetch failures
+    }
+  }, [user]);
 
   const handleMenuClick = () => {
     setSidebarOpen(true);
@@ -65,8 +101,9 @@ const Inventory = ({ user, onLogout }) => {
     setActiveTab(tab);
     localStorage.setItem('inventoryActiveTab', tab);
   };
-  const renderTabContent = () => {
-    switch (activeTab) {
+
+  const getTabComponent = (tabId) => {
+    switch (tabId) {
       case 'outgoing':
         return <Outgoing user={user} />;
       case 'incoming':
@@ -115,7 +152,18 @@ const Inventory = ({ user, onLogout }) => {
       <InventoryTabs activeTab={activeTab} onTabChange={handleTabChange} />
       {/* Content Area */}
       <div className="mt-[88px] h-[calc(100vh-90px-80px)] overflow-hidden">
-        {renderTabContent()}
+        {INVENTORY_TAB_IDS.map((tabId) => {
+          if (!loadedTabs.has(tabId)) return null;
+
+          return (
+            <div
+              key={tabId}
+              className={activeTab === tabId ? 'block h-full' : 'hidden h-full'}
+            >
+              {getTabComponent(tabId)}
+            </div>
+          );
+        })}
       </div>
       {/* Bottom Navigation */}
       <BottomNav activeTab="home" />

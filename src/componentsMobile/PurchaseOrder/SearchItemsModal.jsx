@@ -270,7 +270,7 @@ const SplitItemModal = ({
         </div>
     );
 };
-const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingItems = [], onRefreshData, stockingLocationId = null, disableAvailabilityCheck = false, useInventoryData = false, isFromUpdate = false, fromProjectId = null, enableSplit = false, isOutgoingSplitMode = false, splitSiteInchargeId = null, splitSiteInchargeType = '' }) => {
+const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingItems = [], onRefreshData, stockingLocationId = null, disableAvailabilityCheck = false, useInventoryData = false, isFromUpdate = false, fromProjectId = null, enableSplit = false, isOutgoingSplitMode = false, splitSiteInchargeId = null, splitSiteInchargeType = '', useMappedItemNameDisplay = false }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -745,28 +745,34 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     }
                 }
             }
-            setSearchResults(results);
-            // Clean up itemQuantities for inventory-based results
-            setItemQuantities(prev => {
-                const cleaned = {};
-                const existingItemsMap = {};
-                existingItems.forEach(item => {
-                    const itemKey = getItemKey(item);
-                    if (itemKey && item.quantity > 0) {
-                        existingItemsMap[itemKey] = item.quantity;
-                    }
+            // Only mapped-name flows (PO/Incoming) should fallback to getAvailableItems() when
+            // inventory search temporarily returns no matches during async refresh.
+            // Outgoing must stay inventory-only (previous behavior).
+            const shouldFallbackToAvailableItems = useMappedItemNameDisplay && !isFromUpdate;
+            if (results.length > 0 || isFromUpdate || !shouldFallbackToAvailableItems) {
+                setSearchResults(results);
+                // Clean up itemQuantities for inventory-based results
+                setItemQuantities(prev => {
+                    const cleaned = {};
+                    const existingItemsMap = {};
+                    existingItems.forEach(item => {
+                        const itemKey = getItemKey(item);
+                        if (itemKey && item.quantity > 0) {
+                            existingItemsMap[itemKey] = item.quantity;
+                        }
+                    });
+                    results.forEach(item => {
+                        const itemId = getItemKey(item);
+                        if (existingItemsMap[itemId] !== undefined) {
+                            cleaned[itemId] = existingItemsMap[itemId];
+                        } else if (prev[itemId] !== undefined && prev[itemId] > 0) {
+                            cleaned[itemId] = prev[itemId];
+                        }
+                    });
+                    return cleaned;
                 });
-                results.forEach(item => {
-                    const itemId = getItemKey(item);
-                    if (existingItemsMap[itemId] !== undefined) {
-                        cleaned[itemId] = existingItemsMap[itemId];
-                    } else if (prev[itemId] !== undefined && prev[itemId] > 0) {
-                        cleaned[itemId] = prev[itemId];
-                    }
-                });
-                return cleaned;
-            });
-            return;
+                return;
+            }
         }
         const data = getAvailableItems();
         // Check if using nested structure from API (with otherPOEntityList)
@@ -1177,6 +1183,20 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
     const resolveTypeName = (typeId) => {
         if (!typeId || typeId === 0) return '';
         return findNameById(poTypes, typeId, 'typeColor') || findNameById(poTypes, typeId, 'type') || findNameById(poTypes, typeId, 'typeName') || findNameById(poTypes, typeId, 'name') || '';
+    };
+    const getDisplayItemName = (item) => {
+        const rawItemName = (item?.itemName || '').toString().trim();
+        if (!useMappedItemNameDisplay) return rawItemName;
+        const rawItemId = item?.itemId ?? item?.item_id ?? null;
+        if (!rawItemId) return rawItemName;
+        const normalizedName = rawItemName.toLowerCase();
+        const normalizedId = String(rawItemId).trim().toLowerCase();
+        // When itemName is missing or only contains the ID, resolve it from PO item master.
+        if (!rawItemName || normalizedName === normalizedId) {
+            const resolvedName = resolveItemName(rawItemId);
+            if (resolvedName) return resolvedName;
+        }
+        return rawItemName;
     };
     const resolveCategoryName = (categoryId) => {
         if (!categoryId) return '';
@@ -2047,7 +2067,7 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                                                     {/* Item Name */}
                                                     <div className="flex items-center gap-[6px] mb-1 relative">
                                                         <p className={`text-[12px] font-semibold leading-normal ${isSplitItem ? 'text-[#BF9853]' : 'text-black'}`}>
-                                                            {highlightText(item.itemName || '', debouncedSearchQuery)}
+                                                            {highlightText(getDisplayItemName(item), debouncedSearchQuery)}
                                                         </p>
                                                         {isSplitItem && (
                                                             <span

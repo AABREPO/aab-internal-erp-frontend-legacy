@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Search from '../Images/Search.png'
 import CloseIcon from '../Images/Close F.svg'
+import { getInventoryNetStockPrefetchCache } from './inventoryNetStockPrefetch';
 const NetStock = () => {
   const navigate = useNavigate();
   // Helper function for date
@@ -41,10 +42,60 @@ const NetStock = () => {
     description: '',
     pinned: false
   });
+
+  // Hydrate from prefetched in-memory cache (if available) to avoid waiting on network.
+  useEffect(() => {
+    const cached = getInventoryNetStockPrefetchCache();
+    if (!cached) return;
+
+    if (Array.isArray(cached.categories) && categoryOptions.length === 0) {
+      const options = cached.categories.map(item => ({
+        value: item.category || item.name || item.label,
+        label: item.category || item.name || item.label,
+        id: item.id
+      })).filter(item => item.value);
+      setCategoryOptions(options);
+    }
+
+    if (Array.isArray(cached.projects)) {
+      if (stockingLocationOptions.length === 0) {
+        const locations = cached.projects
+          .filter(site => site.markedAsStockingLocation === true)
+          .map(site => ({
+            value: site.siteName,
+            label: site.siteName,
+            id: site.id
+          }));
+        setStockingLocationOptions(locations);
+      }
+      if (Object.keys(locationNamesMap).length === 0) {
+        const nameMap = {};
+        cached.projects.forEach(site => {
+          if (site.id) {
+            nameMap[String(site.id)] = site.siteName || '';
+          }
+        });
+        setLocationNamesMap(nameMap);
+      }
+    }
+
+    if (Array.isArray(cached.itemNames) && itemNamesData.length === 0) setItemNamesData(cached.itemNames);
+    if (Array.isArray(cached.brands) && poBrand.length === 0) setPoBrand(cached.brands);
+    if (Array.isArray(cached.models) && poModel.length === 0) setPoModel(cached.models);
+    if (Array.isArray(cached.types) && poType.length === 0) setPoType(cached.types);
+
+    if (Array.isArray(cached.inventoryAll) && inventoryData.length === 0) {
+      setInventoryData(cached.inventoryAll);
+      const inventoryItems = calculateNetStock(cached.inventoryAll, null);
+      setStockQuantities(inventoryItems);
+      setLoading(false);
+    }
+  }, []);
   // Fetch category options
   useEffect(() => {
     const fetchCategories = async () => {
       try {
+        if (categoryOptions.length > 0) return;
         const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
@@ -60,11 +111,12 @@ const NetStock = () => {
       }
     };
     fetchCategories();
-  }, []);
+  }, [categoryOptions.length]);
   // Fetch stocking locations
   useEffect(() => {
     const fetchStockingLocations = async () => {
       try {
+        if (stockingLocationOptions.length > 0) return;
         const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -88,11 +140,12 @@ const NetStock = () => {
       }
     };
     fetchStockingLocations();
-  }, []);
+  }, [stockingLocationOptions.length]);
   // Fetch location names mapping
   useEffect(() => {
     const fetchLocationNames = async () => {
       try {
+        if (Object.keys(locationNamesMap).length > 0) return;
         const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
@@ -115,11 +168,12 @@ const NetStock = () => {
       }
     };
     fetchLocationNames();
-  }, []);
+  }, [locationNamesMap]);
   // Fetch item names from API (for getting names and minQty/defaultQty)
   useEffect(() => {
     const fetchItemNames = async () => {
       try {
+        if (itemNamesData.length > 0) return;
         const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
         if (response.ok) {
           const data = await response.json();
@@ -130,11 +184,12 @@ const NetStock = () => {
       }
     };
     fetchItemNames();
-  }, []);
+  }, [itemNamesData.length]);
   // Fetch brand, model, type APIs for name resolution
   useEffect(() => {
     const fetchAll = async () => {
       try {
+        if (poBrand.length > 0 && poModel.length > 0 && poType.length > 0) return;
         const [brandRes, modelRes, typeRes] = await Promise.all([
           fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll'),
           fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll'),
@@ -157,7 +212,7 @@ const NetStock = () => {
       }
     };
     fetchAll();
-  }, []);
+  }, [poBrand.length, poModel.length, poType.length]);
   // Calculate net stock from inventory data based on selected stocking location
   const calculateNetStock = (inventoryRecords, selectedLocationId) => {
     // Best-effort extraction of description from inventory/inventoryItems payload.
@@ -293,6 +348,7 @@ const NetStock = () => {
   useEffect(() => {
     const fetchInventory = async () => {
       try {
+        if (inventoryData.length > 0) return;
         setLoading(true);
         const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
         if (!response.ok) {

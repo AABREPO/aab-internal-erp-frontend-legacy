@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../PurchaseOrder/Header';
 import Sidebar from '../Bars/Sidebar';
@@ -12,6 +12,23 @@ import NetStock from './NetStock';
 import ToolsHistory from './ToolsHistory';
 import ServiceHistory from './ServiceHistory';
 import Locate from './Locate';
+import { prefetchToolsNetStockData } from './netStockPrefetch';
+
+const TOOLS_TRACKER_TAB_IDS = [
+  'transfer',
+  'history',
+  'pending-items',
+  'add-input',
+  'net-stock',
+  'tools-history',
+  'service-history',
+  'locate'
+];
+
+const normalizeToolsTrackerTab = (tab) => {
+  if (!tab) return 'transfer';
+  return tab.toLowerCase() === 'transfer' ? 'transfer' : tab;
+};
 
 const ToolsTracker = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -19,8 +36,23 @@ const ToolsTracker = ({ user, onLogout }) => {
   const [currentPage, setCurrentPage] = useState('tools-tracker');
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('toolsTrackerActiveTab');
-    return savedTab || 'Transfer';
+    return normalizeToolsTrackerTab(savedTab || 'transfer');
   });
+  const [loadedTabs, setLoadedTabs] = useState(() => new Set([activeTab]));
+
+  useEffect(() => {
+    setLoadedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
+
+  // Warm Net Stock APIs as soon as Tools Tracker opens.
+  useEffect(() => {
+    prefetchToolsNetStockData().catch(() => {});
+  }, []);
   const handleMenuClick = () => {
     setSidebarOpen(true);
   };
@@ -49,12 +81,13 @@ const ToolsTracker = ({ user, onLogout }) => {
     }
   };
   const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    localStorage.setItem('toolsTrackerActiveTab', tab);
+    const normalizedTab = normalizeToolsTrackerTab(tab);
+    setActiveTab(normalizedTab);
+    localStorage.setItem('toolsTrackerActiveTab', normalizedTab);
   };
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'Transfer':
+
+  const getTabComponent = (tabId) => {
+    switch (tabId) {
       case 'transfer':
         return <Transfer user={user} />;
       case 'history':
@@ -99,7 +132,18 @@ const ToolsTracker = ({ user, onLogout }) => {
       </Header>
       {/* Content Area - height ends before BottomNav */}
       <div className="mt-[96px] h-[calc(100vh-96px-80px)] overflow-hidden">
-        {renderTabContent()}
+        {TOOLS_TRACKER_TAB_IDS.map((tabId) => {
+          if (!loadedTabs.has(tabId)) return null;
+
+          return (
+            <div
+              key={tabId}
+              className={activeTab === tabId ? 'block h-full' : 'hidden h-full'}
+            >
+              {getTabComponent(tabId)}
+            </div>
+          );
+        })}
       </div>
       {/* Bottom Navigation */}
       <BottomNav activeTab="home" />

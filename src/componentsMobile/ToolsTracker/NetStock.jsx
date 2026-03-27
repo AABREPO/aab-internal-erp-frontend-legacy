@@ -7,6 +7,7 @@ import autoTable from 'jspdf-autotable';
 import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg';
 import Filter from '../Images/Filter.png';
+import { getToolsNetStockPrefetchCache } from './netStockPrefetch';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
@@ -80,6 +81,119 @@ const NetStock = ({ user }) => {
     return [];
   }, []);
 
+  // Hydrate from prefetched in-memory cache (if available) to avoid waiting on network.
+  useEffect(() => {
+    const cached = getToolsNetStockPrefetchCache();
+    if (!cached) return;
+
+    const stock = extractArrayFromResponse(cached.stockManagement);
+    const tracker = extractArrayFromResponse(cached.trackerManagement);
+    if (stockManagementData.length === 0 && Array.isArray(stock) && stock.length > 0) setStockManagementData(stock);
+    if (toolsTrackerManagementData.length === 0 && Array.isArray(tracker) && tracker.length > 0) setToolsTrackerManagementData(tracker);
+
+    const itemNames = extractArrayFromResponse(cached.itemNames);
+    if (toolsItemNameFullData.length === 0 && Array.isArray(itemNames) && itemNames.length > 0) {
+      setToolsItemNameFullData(itemNames);
+      const map = {};
+      const names = [];
+      itemNames.forEach((i) => {
+        const pk = i.id ?? i._id;
+        const itemName = (i.item_name ?? i.itemName ?? '').toString().trim();
+        if (pk != null) {
+          map[pk] = itemName;
+          map[String(pk)] = itemName;
+        }
+        if (itemName) names.push(itemName);
+      });
+      setItemNamesMap(map);
+      setItemNameOptions([...new Set(names)].sort());
+    }
+
+    const itemIds = extractArrayFromResponse(cached.itemIds);
+    if (toolsItemIdFullData.length === 0 && Array.isArray(itemIds) && itemIds.length > 0) {
+      setToolsItemIdFullData(itemIds);
+      const map = {};
+      const ids = [];
+      itemIds.forEach((i) => {
+        const pk = i.id ?? i._id;
+        const itemId = (i.item_id ?? i.itemId ?? i.item_ids_id ?? i.itemIdsId ?? '').toString().trim();
+        if (pk != null) {
+          map[pk] = itemId;
+          map[String(pk)] = itemId;
+        }
+        if (itemId) ids.push(itemId);
+      });
+      setItemIdsMap(map);
+      setItemIdOptions([...new Set(ids)].sort());
+    }
+
+    const brands = extractArrayFromResponse(cached.brands);
+    if (toolsBrandFullData.length === 0 && Array.isArray(brands) && brands.length > 0) {
+      setToolsBrandFullData(brands);
+      const map = {};
+      const brandNames = [];
+      brands.forEach((b) => {
+        const pk = b.id ?? b._id;
+        const brandName = (b.tools_brand ?? b.toolsBrand ?? '').toString().trim();
+        if (pk != null) {
+          map[pk] = brandName;
+          map[String(pk)] = brandName;
+        }
+        if (brandName) brandNames.push(brandName);
+      });
+      setBrandsMap(map);
+      setBrandOptions([...new Set(brandNames)].sort());
+    }
+
+    const projects = extractArrayFromResponse(cached.projects);
+    if (Object.keys(projectsMap).length === 0 && Array.isArray(projects) && projects.length > 0) {
+      const map = {};
+      projects.forEach((p) => {
+        const pk = p.id ?? p._id;
+        const projectName = (p.siteName ?? p.site_name ?? p.projectName ?? p.project_name ?? '').toString().trim();
+        if (pk != null) {
+          map[pk] = projectName;
+          map[String(pk)] = projectName;
+        }
+      });
+      setProjectsMap(map);
+    }
+
+    const vendors = extractArrayFromResponse(cached.vendors);
+    if (Object.keys(vendorsMap).length === 0 && Array.isArray(vendors) && vendors.length > 0) {
+      const map = {};
+      vendors.forEach((v) => {
+        const pk = v.id ?? v._id;
+        const vendorName = (v.vendorName ?? v.vendor_name ?? '').toString().trim();
+        if (pk != null) {
+          map[pk] = vendorName;
+          map[String(pk)] = vendorName;
+        }
+      });
+      setVendorsMap(map);
+    }
+
+    const machineNumbers = extractArrayFromResponse(cached.machineNumbers);
+    if (machineNumbersList.length === 0 && Array.isArray(machineNumbers) && machineNumbers.length > 0) {
+      setMachineNumbersList(machineNumbers);
+    }
+
+    const employees = extractArrayFromResponse(cached.employees);
+    if (Object.keys(employeesMap).length === 0 && Array.isArray(employees) && employees.length > 0) {
+      const map = {};
+      employees.forEach((e) => {
+        map[e.id] = e.employee_name || e.employeeName || '';
+        map[String(e.id)] = e.employee_name || e.employeeName || '';
+      });
+      setEmployeesMap(map);
+    }
+
+    // If we already have core datasets, avoid showing loader.
+    if ((Array.isArray(stock) && stock.length > 0) || (Array.isArray(tracker) && tracker.length > 0)) {
+      setLoading(false);
+    }
+  }, [extractArrayFromResponse]);
+
   // Resolve item_id from tools_item_id API using item_ids_id - never show raw item_ids_id
   const resolveItemIdDisplay = useCallback((itemIdsId) => {
     if (itemIdsId === null || itemIdsId === undefined || itemIdsId === '') return '-';
@@ -134,6 +248,14 @@ const NetStock = ({ user }) => {
   useEffect(() => {
     const fetchLookupData = async () => {
       try {
+        // If prefetched data already hydrated, skip network calls.
+        const hasLookups =
+          toolsItemNameFullData.length > 0 &&
+          toolsItemIdFullData.length > 0 &&
+          toolsBrandFullData.length > 0 &&
+          machineNumbersList.length > 0;
+        if (hasLookups) return;
+
         // Fetch item names
         const itemNamesRes = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
           method: 'GET',
@@ -282,7 +404,7 @@ const NetStock = ({ user }) => {
       }
     };
     fetchLookupData();
-  }, [extractArrayFromResponse]);
+  }, [extractArrayFromResponse, toolsItemNameFullData, toolsItemIdFullData, toolsBrandFullData, machineNumbersList]);
 
   // Resolve machine number id/text to display text (same idea as ToolsHistory Log tab)
   const resolveMachineNumberText = useCallback((machineNumberOrId) => {
@@ -304,6 +426,9 @@ const NetStock = ({ user }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        if (stockManagementData.length > 0 && toolsTrackerManagementData.length > 0) {
+          return;
+        }
         setLoading(true);
 
         const stockRes = await fetch(`${TOOLS_STOCK_MANAGEMENT_BASE_URL}/getAll`, {

@@ -1935,6 +1935,7 @@ const Incoming = ({ user }) => {
         })()}
         disableAvailabilityCheck={true}
         useInventoryData={true}
+        useMappedItemNameDisplay={true}
       />
       <SelectVendorModal
         isOpen={showPOModal}

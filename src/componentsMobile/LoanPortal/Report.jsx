@@ -371,23 +371,18 @@ const Report = () => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Week and Type Section */}
-      <div className="pt-[10px] mb-[8px]">
-        <div className="flex-shrink-0">
-          <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
-            <div className="flex items-center gap-[4px]">
-              <span className="text-[12px] font-semibold text-black leading-normal">#Week</span>
-            </div>
-            <div className="flex items-center gap-[4px]">
-              <button
-                onClick={() => setShowTypeModal(true)}
-                className="flex items-center gap-[4px] text-[12px] font-semibold text-black leading-normal cursor-pointer"
-              >
-                <span>Type</span>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7 1V13M7 13L1 7M7 13L13 7" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
+      <div className="">
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pt-[8px] pb-[8px]">
+          <div className="flex items-center gap-[8px]">
+            <span className="text-[12px] font-semibold text-black leading-normal">#Week</span>
+          </div>
+          <div className="flex items-center gap-[8px]">
+            <button
+              onClick={() => setShowTypeModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
+            >
+              Type
+            </button>
           </div>
         </div>
       </div>
@@ -775,7 +770,7 @@ const Report = () => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white rounded-t-2xl w-full p-[16px] relative"
+            className="bg-white rounded-t-2xl w-full h-[140px] p-[16px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-2">
@@ -853,26 +848,6 @@ const Report = () => {
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="flex gap-[16px]">
-              <button
-                type="button"
-                onClick={() => {
-                  setAssociateFilter('');
-                  setPurposeFilter('');
-                  setShowFilterModal(false);
-                }}
-                className="px-[24px] w-full py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="px-[24px] py-[8px] w-full text-[14px] font-semibold text-white bg-black rounded-lg"
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>

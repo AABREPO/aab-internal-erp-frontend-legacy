@@ -67,7 +67,7 @@ const LoanPortal = ({ user, onLogout }) => {
       {/* Tabs - Fixed */}
       <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
       {/* Content Area - fixed height so only inner content (e.g. cards) scrolls, not the page */}
-      <div className="pt-[85px] flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 85px)' }}>
+      <div className="pt-[88px] flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 85px)' }}>
         {/* Loan Form Tab Content */}
         {activeTab === 'loanform' && (
           <LoanForm />

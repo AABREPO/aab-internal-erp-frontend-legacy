@@ -337,28 +337,20 @@ const History = () => {
     ...labourOptions.map(opt => opt.label)
   ];
 
-  if (loading) {
-    return (
-      <div className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden flex-1 items-center justify-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
-  }
-
   return (
     <div
       className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Date and Category Section */}
-      <div className="pt-[10px]">
-        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
+      <div className="">
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pt-[8px] pb-[8px]">
           <div />
-          <div className="flex items-center gap-[4px]">
+          <div className="flex items-center gap-[8px]">
             <button
               type="button"
               onClick={() => setShowTypeModal(true)}
-              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:opacity-80 transition-opacity"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
               {typeFilter || 'Type'}
             </button>
@@ -706,7 +698,7 @@ const History = () => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white rounded-t-2xl w-full p-[16px] relative"
+            className="bg-white rounded-t-2xl w-full h-[220px] p-[16px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-2">
@@ -846,28 +838,6 @@ const History = () => {
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="flex gap-[16px]">
-              <button
-                type="button"
-                onClick={() => {
-                  setAssociateFilter('');
-                  setEntryNoFilter('');
-                  setPurposeFilter('');
-                  setPaymentModeFilter('');
-                  setShowFilterModal(false);
-                }}
-                className="px-[24px] w-full py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="px-[24px] py-[8px] w-full text-[14px] font-semibold text-white bg-black rounded-lg"
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>

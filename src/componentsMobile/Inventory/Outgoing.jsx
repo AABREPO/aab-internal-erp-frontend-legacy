@@ -465,6 +465,7 @@ const Outgoing = ({ user }) => {
             model: model || '',
             type: type || '',
             category: category || '',
+            item_type: invItem.item_type ?? invItem.itemType ?? invItem.inventory_type ?? invItem.inventoryType ?? null,
             quantity: Math.abs(invItem.qty || invItem.quantity || invItem.Qty || invItem.Quantity || 0),
             price: 0,
             itemId: itemId,
@@ -635,6 +636,9 @@ const Outgoing = ({ user }) => {
     const newModel = normalizeValue(item.model);
     const newBrand = normalizeValue(item.brand);
     const newType = normalizeValue(item.type);
+    const newItemType = normalizeValue(
+      item.item_type || item.itemType || item.inventory_type || item.inventoryType || ''
+    );
     // Check if an item with the same properties (including category) already exists
     const existingItemIndex = items.findIndex(existingItem => {
       const nameParts = existingItem.name ? existingItem.name.split(',') : [];
@@ -643,13 +647,17 @@ const Outgoing = ({ user }) => {
       const existingModel = normalizeValue(existingItem.model);
       const existingBrand = normalizeValue(existingItem.brand);
       const existingType = normalizeValue(existingItem.type);
+      const existingItemType = normalizeValue(
+        existingItem.item_type || existingItem.itemType || existingItem.inventory_type || existingItem.inventoryType || ''
+      );
       // Match if all properties including category are the same
       return (
         existingItemName === newItemName &&
         existingCategory === newCategory &&
         existingModel === newModel &&
         existingBrand === newBrand &&
-        existingType === newType
+        existingType === newType &&
+        existingItemType === newItemType
       );
     });
     // Calculate what the final quantity would be (considering merge with existing item)
@@ -740,6 +748,7 @@ const Outgoing = ({ user }) => {
         model: item.model,
         type: item.type,
         category: item.category || '',
+        item_type: item.item_type || item.itemType || item.inventory_type || item.inventoryType || null,
         quantity: quantity,
         price: itemPrice, // Use price fetched from inventory (first amount if multiple exist)
         itemId: item.itemId || null,
@@ -832,6 +841,7 @@ const Outgoing = ({ user }) => {
             type: itemData.type,
             quantity: parseInt(itemData.quantity),
             category: itemData.category || '',
+            item_type: itemData.item_type || itemData.itemType || itemData.inventory_type || itemData.inventoryType || null,
             itemId: itemData.itemId || item.itemId || null,
             brandId: itemData.brandId || item.brandId || null,
             modelId: itemData.modelId || item.modelId || null,
@@ -850,6 +860,9 @@ const Outgoing = ({ user }) => {
       const newModel = normalizeValue(itemData.model);
       const newBrand = normalizeValue(itemData.brand);
       const newType = normalizeValue(itemData.type);
+      const newItemType = normalizeValue(
+        itemData.item_type || itemData.itemType || itemData.inventory_type || itemData.inventoryType || ''
+      );
       const newQuantity = parseInt(itemData.quantity) || 0;
       // Check if an item with the same properties exists
       const existingItemIndex = items.findIndex(item => {
@@ -859,13 +872,17 @@ const Outgoing = ({ user }) => {
         const existingModel = normalizeValue(item.model);
         const existingBrand = normalizeValue(item.brand);
         const existingType = normalizeValue(item.type);
+        const existingItemType = normalizeValue(
+          item.item_type || item.itemType || item.inventory_type || item.inventoryType || ''
+        );
         // Match if all properties are the same
         return (
           existingItemName === newItemName &&
           existingCategory === newCategory &&
           existingModel === newModel &&
           existingBrand === newBrand &&
-          existingType === newType
+          existingType === newType &&
+          existingItemType === newItemType
         );
       });
       if (existingItemIndex !== -1) {
@@ -889,6 +906,7 @@ const Outgoing = ({ user }) => {
           model: itemData.model,
           type: itemData.type,
           category: itemData.category || '',
+          item_type: itemData.item_type || itemData.itemType || itemData.inventory_type || itemData.inventoryType || null,
           quantity: newQuantity,
           price: 0,
           itemId: itemData.itemId || null,
@@ -1227,7 +1245,10 @@ const Outgoing = ({ user }) => {
           brand_id: item.brandId || null,
           type_id: item.typeId || null,
           quantity: quantity,
-          amount: Math.abs((item.price || 0) * baseQuantity)
+          // `amount` is treated as per-1 quantity amount (unit amount)
+          amount: Math.abs(item.price || 0),
+          // Preserve item_type from UI/inventory payload when available (e.g. Split vs NULL)
+          item_type: item.item_type || item.itemType || item.inventory_type || item.inventoryType || null
         };
       });
       // Prepare payload
@@ -1601,6 +1622,7 @@ const Outgoing = ({ user }) => {
                         <ItemCard
                           key={item.id}
                           item={item}
+                          amountDisplayMode="unit"
                           isExpanded={expandedItemId === item.id}
                           swipeState={swipeStates[item.id]}
                           onSwipeStart={handleTouchStart}
@@ -1762,6 +1784,14 @@ const Outgoing = ({ user }) => {
           return stockingLocationSite?.id || null;
         })()}
         useInventoryData={true}
+        enableSplit={true}
+        isOutgoingSplitMode={true}
+        fromProjectId={(() => {
+          const projectSite = outgoingSiteOptions.find(site => site.value === outgoingData.projectName);
+          return projectSite?.id || null;
+        })()}
+        splitSiteInchargeId={selectedIncharge?.id || null}
+        splitSiteInchargeType={selectedIncharge?.type || 'employee'}
       />
     </div>
   );

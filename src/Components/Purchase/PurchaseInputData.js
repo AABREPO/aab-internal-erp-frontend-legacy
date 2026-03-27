@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import CreatableSelect from 'react-select/creatable';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
@@ -1076,33 +1076,95 @@ const PurchaseInputData = () => {
     updatedFields.splice(index, 1);
     setFields(updatedFields);
   };
-  const filteredPocategory = poCategory.filter((item) =>
-    item.category.toLowerCase().includes(poCategorySearch.toLowerCase())
-  );
-  const filteredPoModel = poModel.filter((item) =>
-    item.model.toLowerCase().includes(poModelSearch.toLowerCase())
-  );
-  const filteredPoBrand = poBrand.filter((item) =>
-    item.brand.toLowerCase().includes(poBrandSearch.toLowerCase())
-  );
-  const filteredPoTypeColor = poType.filter((item) =>
-    (item.typeColor ?? '').toLowerCase().includes((poTypeSearch ?? '').toLowerCase())
-  );
-  const filteredPoItemName = poItemName.filter((item) =>
-    (item.itemName ?? '').toLowerCase().includes((poItemNameSearch ?? '').toLowerCase()) &&
-    (!selectedCategory || item.category === selectedCategory.value)
-  );
-  const filteredSiteIncharge = siteIncharge.filter((item) =>
-    item.siteEngineer.toLowerCase().includes(siteInchargeSearch.toLowerCase())
-  );
-  const filteredGroupName = groupNameList.filter((item) =>
-    item.groupName.toLowerCase().includes(groupNameSearch.toLowerCase())
-  );
-  const getItemNamesForModel = (modelName) => {
-    return poItemName
-      .filter(item => item.otherPOEntityList?.some(entry => entry.modelName === modelName))
-      .map(item => item.itemName);
-  };
+  // Performance: avoid O(n^2) work during table renders by memoizing derived data.
+  const filteredPocategory = useMemo(() => {
+    const q = (poCategorySearch ?? '').toLowerCase();
+    if (!q) return poCategory;
+    return poCategory.filter((item) => (item.category ?? '').toLowerCase().includes(q));
+  }, [poCategory, poCategorySearch]);
+
+  const filteredPoModel = useMemo(() => {
+    const q = (poModelSearch ?? '').toLowerCase();
+    if (!q) return poModel;
+    return poModel.filter((item) => (item.model ?? '').toLowerCase().includes(q));
+  }, [poModel, poModelSearch]);
+
+  const filteredPoBrand = useMemo(() => {
+    const q = (poBrandSearch ?? '').toLowerCase();
+    if (!q) return poBrand;
+    return poBrand.filter((item) => (item.brand ?? '').toLowerCase().includes(q));
+  }, [poBrand, poBrandSearch]);
+
+  const filteredPoTypeColor = useMemo(() => {
+    const q = (poTypeSearch ?? '').toLowerCase();
+    if (!q) return poType;
+    return poType.filter((item) => (item.typeColor ?? '').toLowerCase().includes(q));
+  }, [poType, poTypeSearch]);
+
+  const filteredPoItemName = useMemo(() => {
+    const q = (poItemNameSearch ?? '').toLowerCase();
+    const selectedCat = selectedCategory?.value;
+    return poItemName.filter((item) => {
+      const nameOk = (item.itemName ?? '').toLowerCase().includes(q);
+      const catOk = !selectedCat || item.category === selectedCat;
+      return nameOk && catOk;
+    });
+  }, [poItemName, poItemNameSearch, selectedCategory]);
+
+  const filteredSiteIncharge = useMemo(() => {
+    const q = (siteInchargeSearch ?? '').toLowerCase();
+    if (!q) return siteIncharge;
+    return siteIncharge.filter((item) => (item.siteEngineer ?? '').toLowerCase().includes(q));
+  }, [siteIncharge, siteInchargeSearch]);
+
+  const filteredGroupName = useMemo(() => {
+    const q = (groupNameSearch ?? '').toLowerCase();
+    if (!q) return groupNameList;
+    return groupNameList.filter((item) => (item.groupName ?? '').toLowerCase().includes(q));
+  }, [groupNameList, groupNameSearch]);
+
+  const sNoByPoItemNameId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poItemName.length; i++) map.set(poItemName[i]?.id, i + 1);
+    return map;
+  }, [poItemName]);
+
+  const sNoByPoModelId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poModel.length; i++) map.set(poModel[i]?.id, i + 1);
+    return map;
+  }, [poModel]);
+
+  const sNoByPoBrandId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poBrand.length; i++) map.set(poBrand[i]?.id, i + 1);
+    return map;
+  }, [poBrand]);
+
+  const sNoByPoTypeId = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < poType.length; i++) map.set(poType[i]?.id, i + 1);
+    return map;
+  }, [poType]);
+
+  // Build once: modelName -> [itemName, ...] for quick hover popover.
+  const itemNamesByModelName = useMemo(() => {
+    const map = new Map();
+    for (const item of poItemName) {
+      const itemName = item?.itemName;
+      if (!itemName) continue;
+      const list = item?.otherPOEntityList;
+      if (!Array.isArray(list) || list.length === 0) continue;
+      for (const entry of list) {
+        const modelName = entry?.modelName;
+        if (!modelName) continue;
+        const existing = map.get(modelName);
+        if (existing) existing.push(itemName);
+        else map.set(modelName, [itemName]);
+      }
+    }
+    return map;
+  }, [poItemName]);
 
   const handleSubmitSiteIncharge = async () => {
     // Basic validation
@@ -1397,7 +1459,9 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPoItemName.map((item, index) => (
                     <tr className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poItemName.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                        {(sNoByPoItemNameId.get(item.id) ?? 0).toString().padStart(2, '0')}
+                      </td>
                       <td className="p-2 group flex justify-between items-center font-semibold">
                         {item.itemName}
                         <div className="flex flex-grow">
@@ -1510,7 +1574,7 @@ const PurchaseInputData = () => {
               <table className="table-auto w-full">
                 <tbody>
                   {filteredPoModel.map((modelItem, index) => {
-                    const itemNamesForThisModel = getItemNamesForModel(modelItem.model);
+                    const itemNamesForThisModel = itemNamesByModelName.get(modelItem.model) || [];
                     return (
                       <tr
                         key={modelItem.id}
@@ -1519,7 +1583,7 @@ const PurchaseInputData = () => {
                         onMouseLeave={() => setHoveredModelName(null)}
                       >
                         <td className="p-2 text-left font-semibold lg:table-cell hidden">
-                          {(poModel.findIndex(acc => acc.id === modelItem.id) + 1).toString().padStart(2, '0')}
+                          {(sNoByPoModelId.get(modelItem.id) ?? 0).toString().padStart(2, '0')}
                         </td>
                         <td className="p-2 text-left group flex font-semibold relative">
                           <div className="flex flex-grow">{modelItem.model}</div>
@@ -1664,7 +1728,9 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPoBrand.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poBrand.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                        {(sNoByPoBrandId.get(item.id) ?? 0).toString().padStart(2, '0')}
+                      </td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.brand}
@@ -1800,7 +1866,9 @@ const PurchaseInputData = () => {
                 <tbody>
                   {filteredPoTypeColor.map((item, index) => (
                     <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold lg:table-cell hidden">{(poType.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                      <td className="p-2 text-left font-semibold lg:table-cell hidden">
+                        {(sNoByPoTypeId.get(item.id) ?? 0).toString().padStart(2, '0')}
+                      </td>
                       <td className="p-2 text-left group flex font-semibold">
                         <div className="flex flex-grow">
                           {item.typeColor}

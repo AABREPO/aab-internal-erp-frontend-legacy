@@ -36,6 +36,11 @@ const NetStock = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [selectionFilter, setSelectionFilter] = useState('All'); // 'All' | 'Minimum' | 'Default' | 'Excess' - controls dropdown selection
   const [selectAllFiltered, setSelectAllFiltered] = useState(false); // toggle: select all filtered items when true
+  const [splitTagPanel, setSplitTagPanel] = useState({
+    key: null,
+    description: '',
+    pinned: false
+  });
   // Fetch category options
   useEffect(() => {
     const fetchCategories = async () => {
@@ -155,6 +160,29 @@ const NetStock = () => {
   }, []);
   // Calculate net stock from inventory data based on selected stocking location
   const calculateNetStock = (inventoryRecords, selectedLocationId) => {
+    // Best-effort extraction of description from inventory/inventoryItems payload.
+    const getItemDescription = (invItem, record) => {
+      const raw =
+        invItem?.description ??
+        invItem?.item_description ??
+        invItem?.itemDescription ??
+        invItem?.inventory_description ??
+        invItem?.inventoryDescription ??
+        invItem?.description_text ??
+        invItem?.descriptionText ??
+        invItem?.notes ??
+        invItem?.note ??
+        invItem?.details ??
+        invItem?.detail ??
+        record?.description ??
+        record?.description_text ??
+        record?.descriptionText ??
+        record?.inventory_description ??
+        record?.inventoryDescription ??
+        '';
+      if (raw === null || raw === undefined) return '';
+      return String(raw);
+    };
     // Filter out deleted records
     const activeRecords = inventoryRecords.filter(record => {
       const recordDeleteStatus = record.delete_status !== undefined ? record.delete_status : record.deleteStatus;
@@ -174,9 +202,11 @@ const NetStock = () => {
           const modelId = invItem.model_id || invItem.modelId || null;
           const brandId = invItem.brand_id || invItem.brandId || null;
           const typeId = invItem.type_id || invItem.typeId || null;
+          const itemTypeRaw = invItem.item_type ?? invItem.itemType ?? null;
+          const itemTypeKey = itemTypeRaw ? itemTypeRaw.toString().trim() : 'NULL';
           if (itemId !== null && itemId !== undefined) {
             // Create composite key for unique combination
-            const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+            const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}-${itemTypeKey}`;
             if (!stockMap[compositeKey]) {
               stockMap[compositeKey] = {
                 itemId: itemId,
@@ -184,6 +214,9 @@ const NetStock = () => {
                 modelId: modelId,
                 brandId: brandId,
                 typeId: typeId,
+                item_type: itemTypeRaw,
+                itemTypeKey,
+                description: getItemDescription(invItem, record),
                 quantity: 0
               };
             }
@@ -219,6 +252,12 @@ const NetStock = () => {
               }
             }
             stockMap[compositeKey].quantity += delta;
+            // If we grouped multiple records and we didn't capture a description yet,
+            // fill it when we find a non-empty one.
+            if (!stockMap[compositeKey].description) {
+              const nextDesc = getItemDescription(invItem, record);
+              if (nextDesc) stockMap[compositeKey].description = nextDesc;
+            }
           }
         });
       }
@@ -229,6 +268,27 @@ const NetStock = () => {
       netStock: Math.max(0, item.quantity) // Ensure non-negative
     }));
   };
+
+  // Close Split tooltip when clicking outside (like PurchaseOrder SearchItemsModal)
+  useEffect(() => {
+    if (!splitTagPanel.key) return;
+    const onDocumentMouseDown = (e) => {
+      const target = e.target;
+      if (!target || !(target instanceof Element)) {
+        setSplitTagPanel({ key: null, description: '', pinned: false });
+        return;
+      }
+      const clickedInsideButton = target.closest('[data-split-tag-button="true"]');
+      const clickedInsideTooltip = target.closest('[data-split-tag-tooltip="true"]');
+      if (!clickedInsideButton && !clickedInsideTooltip) {
+        setSplitTagPanel({ key: null, description: '', pinned: false });
+      }
+    };
+    document.addEventListener('mousedown', onDocumentMouseDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocumentMouseDown, true);
+    };
+  }, [splitTagPanel.key]);
   // Fetch inventory data
   useEffect(() => {
     const fetchInventory = async () => {
@@ -309,11 +369,14 @@ const NetStock = () => {
       const modelId = invItem.modelId;
       const brandId = invItem.brandId;
       const typeId = invItem.typeId;
+      const itemTypeRaw = invItem.item_type ?? invItem.itemType ?? null;
+      const itemTypeKey = invItem.itemTypeKey ?? (itemTypeRaw ? itemTypeRaw.toString().trim() : 'NULL');
       const netStock = invItem.netStock;
       // Create composite key to match with entity
-      const compositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
-      // Try to find matching entity first
-      const matchedEntity = entityMap[compositeKey];
+      const baseCompositeKey = `${itemId || 'null'}-${categoryId || 'null'}-${modelId || 'null'}-${brandId || 'null'}-${typeId || 'null'}`;
+      const compositeKeyWithType = `${baseCompositeKey}-${itemTypeKey || 'NULL'}`;
+      // Try to find matching entity first (entity doesn't depend on item_type)
+      const matchedEntity = entityMap[baseCompositeKey];
       if (matchedEntity) {
         // Found matching entity - use its data
         const itemName = matchedEntity.itemName || '';
@@ -325,7 +388,7 @@ const NetStock = () => {
         const categoryIdFromEntity = matchedEntity.categoryId || categoryId;
         // Log resolved qtys for items that will be displayed (from entityMap)
         try {
-          console.log('Displayed item (entityMap)', compositeKey, { itemName, defaultQty, minQty });
+          console.log('Displayed item (entityMap)', compositeKeyWithType, { itemName, defaultQty, minQty });
         } catch (e) { /* ignore */ }
         // Resolve category name
         let categoryName = '';
@@ -342,7 +405,7 @@ const NetStock = () => {
           status = 'Place Order';
         }
         processedData.push({
-          id: compositeKey,
+          id: compositeKeyWithType,
           itemId: itemId,
           itemName: itemName,
           model: model,
@@ -357,7 +420,10 @@ const NetStock = () => {
           brandId: brandId,
           modelId: modelId,
           typeId: typeId,
-          categoryId: categoryIdFromEntity
+          categoryId: categoryIdFromEntity,
+          item_type: itemTypeRaw,
+          itemTypeKey: itemTypeKey,
+          description: invItem.description || ''
         });
       } else {
         // No matching entity found - try to get item name from itemNameMap and resolve brand/model/type
@@ -408,7 +474,7 @@ const NetStock = () => {
                 defaultQtyFromItem = defaultQtyFromItem || fallbackEntity.defaultQty || fallbackEntity.default_qty || '25';
                 minQtyFromItem = minQtyFromItem || fallbackEntity.minimumQty || fallbackEntity.minimum_qty || fallbackEntity.minQty || fallbackEntity.min_qty || '5';
               } else {
-                try { console.log('No matching or fallback otherPOEntityList entry for', compositeKey, { defaultQtyFromItem, minQtyFromItem }); } catch (e) { }
+                try { console.log('No matching or fallback otherPOEntityList entry for', compositeKeyWithType, { defaultQtyFromItem, minQtyFromItem }); } catch (e) { }
               }
             }
           }
@@ -419,7 +485,7 @@ const NetStock = () => {
             status = 'Place Order';
           }
           processedData.push({
-            id: compositeKey,
+            id: compositeKeyWithType,
             itemId: itemId,
             itemName: itemName,
             model: modelName,
@@ -434,7 +500,10 @@ const NetStock = () => {
             brandId: brandId,
             modelId: modelId,
             typeId: typeId,
-            categoryId: categoryIdFromItem
+            categoryId: categoryIdFromItem,
+            item_type: itemTypeRaw,
+            itemTypeKey: itemTypeKey,
+            description: invItem.description || ''
           });
         }
         // If item not found in itemNameMap, skip it (shouldn't happen if inventory is correct)
@@ -595,7 +664,9 @@ const NetStock = () => {
                       brandId: item.brandId || null,
                       modelId: item.modelId || null,
                       typeId: item.typeId || null,
-                      categoryId: item.categoryId || null
+                      categoryId: item.categoryId || null,
+                      item_type: item.item_type || item.itemType || null,
+                      description: item.description || ''
                     }))
                     .filter(item => item.itemId !== null && item.itemId !== undefined); // Only include items with valid itemId
                   // Store in localStorage
@@ -809,10 +880,12 @@ const NetStock = () => {
           <div>
             {filteredData.map((item) => {
               const isSelected = selectedCards.includes(item.id);
+              const isSplitItem =
+                String(item.item_type ?? item.itemType ?? item.itemTypeKey ?? '').toLowerCase().trim() === 'split';
               return (
                 <div
                   key={item.id}
-                  className={`relative overflow-hidden shadow-lg border bg-gray-50 rounded-[8px] h-[100px] ${isSelected ? 'border-[#007233] border-opacity-100' : 'border-[#E0E0E0] border-opacity-30'}`}
+                  className={`relative overflow-visible shadow-lg border bg-gray-50 rounded-[8px] h-[100px] ${isSelected ? 'border-[#007233] border-opacity-100' : 'border-[#E0E0E0] border-opacity-30'}`}
                 >
                   {/* Checkmark icon for selected cards */}
                   {isSelected && (
@@ -851,9 +924,61 @@ const NetStock = () => {
                         </div>
                         {/* Item Name */}
                         <div className="mb-0.5 flex items-center justify-between">
-                          <p className="text-[13px] font-semibold text-black leading-tight">
-                            {item.itemName}
-                          </p>
+                          <div className="flex items-center gap-[4px]">
+                            <p className="text-[13px] font-semibold text-black leading-tight">
+                              {item.itemName}
+                            </p>
+                            {isSplitItem && (
+                              <div
+                                className="relative inline-block"
+                                onMouseEnter={() => {
+                                  setSplitTagPanel(prev => {
+                                    if (prev.key === item.id && prev.pinned) return prev;
+                                    return { key: item.id, description: item.description || '', pinned: false };
+                                  });
+                                }}
+                                onMouseLeave={() => {
+                                  setSplitTagPanel(prev => (prev.pinned ? prev : { key: null, description: '', pinned: false }));
+                                }}
+                              >
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  data-split-tag-button="true"
+                                  className="text-[9px] font-semibold px-[6px] rounded-full bg-[#FFF3E0] text-[#BF9853] border border-[#F2D4A2] cursor-pointer"
+                                  onClick={() => {
+                                    setSplitTagPanel(prev => {
+                                      if (prev.key === item.id && prev.pinned) {
+                                        return { key: null, description: '', pinned: false };
+                                      }
+                                      return { key: item.id, description: item.description || '', pinned: true };
+                                    });
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      setSplitTagPanel(prev => {
+                                        if (prev.key === item.id && prev.pinned) {
+                                          return { key: null, description: '', pinned: false };
+                                        }
+                                        return { key: item.id, description: item.description || '', pinned: true };
+                                      });
+                                    }
+                                  }}
+                                >
+                                  SPLIT
+                                </span>
+                                {splitTagPanel.key === item.id && (
+                                  <div
+                                    data-split-tag-tooltip="true"
+                                    className="absolute z-[80] top-full left-0 mt-[6px] w-[240px] max-w-[240px] rounded-[8px] border border-[#F2D4A2] bg-white shadow-lg px-[10px] py-[8px] text-[11px] font-medium text-black break-words"
+                                  >
+                                    {splitTagPanel.description || 'Split description not available'}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           {item.status === 'Place Order' ? (
                             <button className="bg-[#007233] text-white text-[11px] font-medium px-[12px] rounded-[4px]">
                               Place Order

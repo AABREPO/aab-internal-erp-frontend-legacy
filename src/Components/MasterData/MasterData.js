@@ -17,11 +17,37 @@ const MasterData = ({ username, userRoles = [] }) => {
   const roleNames = useMemo(() => (
     (userRoles || []).map(r => (typeof r === 'string' ? r : r?.roles)).filter(Boolean)
   ), [userRoles]);
+  const [userPermissions, setUserPermissions] = useState([]);
+  const moduleName = "Master Data";
+  // Permission helpers based on resolved module permissions
+  const hasCreatePermission = userPermissions.includes('Create');
+  const hasEditPermission = userPermissions.includes('Edit');
+  const hasDeletePermission = userPermissions.includes('Delete');
 
-  // Permission helpers based on userRoles
-  const hasCreatePermission = roleNames.includes('Create');
-  const hasEditPermission = roleNames.includes('Edit');
-  const hasDeletePermission = roleNames.includes('Delete');
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+        const allRoles = response.data || [];
+        const matchedRoles = allRoles.filter(role =>
+          roleNames.includes(role.userRoles)
+        );
+        const models = matchedRoles.flatMap(role => role.userModels || []);
+        const matchedModel = models.find(model => model.models === moduleName);
+        const permissions = matchedModel?.permissions?.[0]?.userPermissions || [];
+        setUserPermissions(permissions);
+      } catch (error) {
+        console.error("Error fetching user role permissions:", error);
+        setUserPermissions([]);
+      }
+    };
+
+    if (roleNames.length > 0) {
+      fetchUserPermissions();
+    } else {
+      setUserPermissions([]);
+    }
+  }, [roleNames]);
 
   const handleAddClick = (openFn) => {
     if (hasCreatePermission) {

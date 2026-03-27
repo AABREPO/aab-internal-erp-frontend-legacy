@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
-import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 
 const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType }) => {
   const [formData, setFormData] = useState({
@@ -13,6 +12,10 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
   });
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showItemNameModal, setShowItemNameModal] = useState(false);
+  const [showModelModal, setShowModelModal] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
   const [quantityError, setQuantityError] = useState('');
 
   // State for PO item names from API
@@ -178,10 +181,9 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
       if (!Array.isArray(items) || items.length === 0) return [];
 
       if (!currentCategory) {
-        // If no category selected, return all items
-        return items
-          .map(item => extractName(item, nameFields))
-          .filter(name => name !== '');
+        // If no category selected, don't show any options.
+        // This enforces: user picks Category first, then sees filtered lists.
+        return [];
       }
       // Filter items that match the selected category
       return items
@@ -639,25 +641,55 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
     }
 
     // Resolve IDs for the selected values
+    // Important: when editing, initialData contains the old values.
+    // We must resolve IDs from current formData selections first; only fall back to initialData when the user didn't change that field.
+    const norm = (v) => (v ?? '').toString().toLowerCase().trim();
+
+    const itemNameChanged = norm(formData.itemName) !== norm(initialData?.itemName);
+    const modelChanged = norm(formData.model) !== norm(initialData?.model);
+    const brandChanged = norm(formData.brand) !== norm(initialData?.brand);
+    const typeChanged = norm(formData.type) !== norm(initialData?.type);
+    const categoryChanged = norm(formData.category) !== norm(initialData?.category);
+
+    const resolvedItemIdFromForm =
+      formData.itemName
+        ? findIdByLabel(poItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name'])
+        : null;
+    const resolvedModelIdFromForm =
+      formData.model
+        ? findIdByLabel(poModel, formData.model, ['model', 'poModel', 'modelName', 'name'])
+        : null;
+    const resolvedBrandIdFromForm =
+      formData.brand
+        ? findIdByLabel(poBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name'])
+        : null;
+    const resolvedTypeIdFromForm =
+      formData.type
+        ? findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor'])
+        : null;
+    const resolvedCategoryIdFromForm =
+      formData.category
+        ? findIdByLabel(categoryOptions, formData.category, ['label', 'name', 'categoryName', 'category'])
+        : null;
+
     const resolvedItemId =
-      initialData.itemId ||
-      findIdByLabel(poItemName, formData.itemName, ['itemName', 'poItemName', 'name', 'item_name']);
+      resolvedItemIdFromForm ?? (!itemNameChanged ? (initialData?.itemId ?? null) : null);
     const resolvedModelId =
-      initialData.modelId ||
-      findIdByLabel(poModel, formData.model, ['model', 'poModel', 'modelName', 'name']);
+      resolvedModelIdFromForm ?? (!modelChanged ? (initialData?.modelId ?? null) : null);
     const resolvedBrandId =
-      initialData.brandId ||
-      findIdByLabel(poBrand, formData.brand, ['brand', 'poBrand', 'brandName', 'name']);
+      resolvedBrandIdFromForm ?? (!brandChanged ? (initialData?.brandId ?? null) : null);
     const resolvedTypeId =
-      initialData.typeId ||
-      findIdByLabel(poType, formData.type, ['type', 'poType', 'typeName', 'name', 'typeColor']);
+      resolvedTypeIdFromForm ?? (!typeChanged ? (initialData?.typeId ?? null) : null);
 
     let resolvedCategoryId =
-      initialData.categoryId ||
-      findIdByLabel(categoryOptions, formData.category, ['label', 'name', 'categoryName', 'category']);
+      resolvedCategoryIdFromForm ?? (!categoryChanged ? (initialData?.categoryId ?? null) : null);
     if (!resolvedCategoryId && categoryOptions.length > 0) {
       resolvedCategoryId = categoryOptions[0].id || null;
     }
+
+    const isEditMode =
+      Boolean(initialData) &&
+      (initialData.itemId !== undefined || initialData.itemName !== undefined);
 
     onAdd({
       ...formData,
@@ -688,6 +720,39 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
     }
   };
 
+  const SelectField = ({ label, required, value, placeholder, onOpen }) => {
+    return (
+      <div className="relative">
+        <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
+          {label}{required ? <span className="text-[#eb2f8e]">*</span> : null}
+        </p>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onOpen}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpen();
+            }
+          }}
+          className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+          style={{
+            boxSizing: 'border-box',
+            color: value ? '#000' : '#9E9E9E'
+          }}
+        >
+          <span className="truncate">{value || placeholder}</span>
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div
@@ -695,7 +760,14 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
         style={{ fontFamily: "'Manrope', sans-serif" }}
         onClick={handleBackdropClick}
       >
-        <div className="bg-white w-full h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="bg-white w-full h-[370px] rounded-tl-[16px] rounded-tr-[16px] relative z-50"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            // Keep the sheet anchored even when mobile keyboard opens (avoid 100vh shrink jumps)
+            transform: 'translateZ(0)'
+          }}
+        >
           {/* Header with Title and Category */}
           <div className="flex items-center justify-between px-[24px] pt-[20px] mb-3">
             {/* Title on the left */}
@@ -715,66 +787,65 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
           <div className="px-[24px] ">
             {/* Item Name - Can be selected without category */}
             <div className="space-y-[6px]">
-              <div className="relative">
-                <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                  Item Name<span className="text-[#eb2f8e]">*</span>
-                </p>
-                <SearchableDropdown
-                  value={formData.itemName}
-                  onChange={(value) => handleFieldSelect('itemName', value)}
-                  onAddNew={(value) => handleFieldAddNew('itemName', value)}
-                  options={itemNameOptions}
-                  placeholder="12A Switch"
-                  fieldName="Item Name"
-                  showAllOptions={true}
-                />
-              </div>
+              <SelectField
+                label="Item Name"
+                required={true}
+                value={formData.itemName}
+                placeholder={formData.category || selectedCategory ? "12A Switch" : "Select Category first"}
+                onOpen={() => {
+                  if (!(formData.category || selectedCategory)) {
+                    setShowCategoryModal(true);
+                    return;
+                  }
+                  setShowItemNameModal(true);
+                }}
+              />
               {/* Model - Can be selected without category */}
-              <div className="relative">
-                <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                  Model<span className="text-[#eb2f8e]">*</span>
-                </p>
-                <SearchableDropdown
-                  value={formData.model}
-                  onChange={(value) => handleFieldSelect('model', value)}
-                  onAddNew={(value) => handleFieldAddNew('model', value)}
-                  options={modelOptions}
-                  placeholder="Natural Cream"
-                  fieldName="Model"
-                  showAllOptions={true}
-                />
-              </div>
+              <SelectField
+                label="Model"
+                required={true}
+                value={formData.model}
+                placeholder={formData.category || selectedCategory ? "Natural Cream" : "Select Category first"}
+                onOpen={() => {
+                  if (!(formData.category || selectedCategory)) {
+                    setShowCategoryModal(true);
+                    return;
+                  }
+                  setShowModelModal(true);
+                }}
+              />
               {/* Brand - Can be selected without category */}
               <div className="w-full relative">
-                <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                  Type<span className="text-[#eb2f8e]">*</span>
-                </p>
-                <SearchableDropdown
+                <SelectField
+                  label="Type"
+                  required={true}
                   value={formData.type}
-                  onChange={(value) => handleFieldSelect('type', value)}
-                  onAddNew={(value) => handleFieldAddNew('type', value)}
-                  options={typeOptions}
-                  placeholder="Flip Type"
-                  className="w-full h-[32px]"
-                  fieldName="Type"
-                  showAllOptions={true}
+                  placeholder={formData.category || selectedCategory ? "Flip Type" : "Select Category first"}
+                  onOpen={() => {
+                    if (!(formData.category || selectedCategory)) {
+                      setShowCategoryModal(true);
+                      return;
+                    }
+                    setShowTypeModal(true);
+                  }}
                 />
               </div>
               {/* Type and Quantity row */}
               <div className="flex gap-[12px]">
                 {/* Type - Can be selected without category */}
                 <div className="w-full relative">
-                  <p className="text-[13px] font-medium text-black mb-0.5 leading-normal">
-                    Brand<span className="text-[#eb2f8e]">*</span>
-                  </p>
-                  <SearchableDropdown
+                  <SelectField
+                    label="Brand"
+                    required={true}
                     value={formData.brand}
-                    onChange={(value) => handleFieldSelect('brand', value)}
-                    onAddNew={(value) => handleFieldAddNew('brand', value)}
-                    options={brandOptions}
-                    placeholder="Kundan"
-                    fieldName="Brand"
-                    showAllOptions={true}
+                    placeholder={formData.category || selectedCategory ? "Kundan" : "Select Category first"}
+                    onOpen={() => {
+                      if (!(formData.category || selectedCategory)) {
+                        setShowCategoryModal(true);
+                        return;
+                      }
+                      setShowBrandModal(true);
+                    }}
                   />
                 </div>
                 {/* Quantity */}
@@ -831,6 +902,58 @@ const AddItemsToIncoming = ({ isOpen, onClose, onAdd, initialData = {}, selected
         options={categoryOptionsStrings}
         fieldName="Category"
         onAddNew={handleAddNewCategory}
+      />
+
+      <SelectVendorModal
+        isOpen={showItemNameModal}
+        onClose={() => setShowItemNameModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('itemName', value);
+          setShowItemNameModal(false);
+        }}
+        selectedValue={formData.itemName}
+        options={itemNameOptions}
+        fieldName="Item Name"
+        onAddNew={(value) => handleFieldAddNew('itemName', value)}
+      />
+
+      <SelectVendorModal
+        isOpen={showModelModal}
+        onClose={() => setShowModelModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('model', value);
+          setShowModelModal(false);
+        }}
+        selectedValue={formData.model}
+        options={modelOptions}
+        fieldName="Model"
+        onAddNew={(value) => handleFieldAddNew('model', value)}
+      />
+
+      <SelectVendorModal
+        isOpen={showTypeModal}
+        onClose={() => setShowTypeModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('type', value);
+          setShowTypeModal(false);
+        }}
+        selectedValue={formData.type}
+        options={typeOptions}
+        fieldName="Type"
+        onAddNew={(value) => handleFieldAddNew('type', value)}
+      />
+
+      <SelectVendorModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onSelect={(value) => {
+          handleFieldSelect('brand', value);
+          setShowBrandModal(false);
+        }}
+        selectedValue={formData.brand}
+        options={brandOptions}
+        fieldName="Brand"
+        onAddNew={(value) => handleFieldAddNew('brand', value)}
       />
     </>
   );

@@ -4,6 +4,7 @@ import 'jspdf-autotable';
 import Filter from '../Images/Filter.png';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import Download from '../Images/Download.svg'
+import CloseIcon from '../Images/Close F.svg'
 
 const PREDEFINED_SITE_OPTIONS = [
   { value: 'Mason Advance', label: 'Mason Advance', id: 1, sNo: '1' },
@@ -701,11 +702,11 @@ const Summary = () => {
 
   return (
     <div
-      className="relative w-full bg-white max-w-[360px] mx-auto flex flex-col scrollbar-none overflow-hidden"
+      className="relative w-full bg-white max-w-[360px] flex flex-col scrollbar-none overflow-hidden"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Date and Category Section */}
-      <div className="px-[16px] pt-[8px] mb-2">
+      <div className=" pt-[10px] mb-[8px]">
         <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
           <button className="text-[12px] font-semibold text-black leading-normal">#Week</button>
           <button
@@ -719,16 +720,16 @@ const Summary = () => {
       </div>
 
       {/* View Mode Toggle */}
-      <div className="px-[16px] mb-3">
-        <div className="flex gap-[4px] bg-gray-100 rounded-lg p-[4px]">
+      <div className=" mb-[8px]">
+        <div className="flex bg-[#F2F4F7] items-center h-[32px] rounded-md">
           <button
             onClick={() => {
               setViewMode('Contractor/Vendor');
               setSelectedProject(null);
             }}
-            className={`flex-1 py-[8px] px-[12px] rounded text-[12px] font-semibold transition-colors ${viewMode === 'Contractor/Vendor'
-                ? 'bg-white text-black shadow-sm'
-                : 'text-gray-600'
+            className={`flex-1 px-[16px] ml-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'Contractor/Vendor'
+                ? 'bg-white text-black'
+                : 'text-[#9E9E9E]'
               }`}
           >
             Contractor/Vendor
@@ -738,9 +739,9 @@ const Summary = () => {
               setViewMode('Project');
               setSelectedContractorOrVendorOption(null);
             }}
-            className={`flex-1 py-[8px] px-[12px] rounded text-[12px] font-semibold transition-colors ${viewMode === 'Project'
-                ? 'bg-white text-black shadow-sm'
-                : 'text-gray-600'
+            className={`flex-1 px-[16px] mr-0.5 h-[28px] rounded text-[14px] font-medium transition-colors duration-1000 ease-out ${viewMode === 'Project'
+                ? 'bg-white text-black'
+                : 'text-[#9E9E9E]'
               }`}
           >
             Project
@@ -750,10 +751,10 @@ const Summary = () => {
 
       {/* Contractor/Vendor Selection */}
       {viewMode === 'Contractor/Vendor' && (
-        <div className="px-[16px] mb-1">
+        <div className=" mb-[8px]">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-[12px] font-semibold text-black leading-normal">
-              Contractor/Vendor<span className="text-[#eb2f8e]">*</span>
+              Contractor/Vendor<span className="text-[#E4572E]">*</span>
             </p>
             <span className="text-[12px] font-medium text-[#007233]">
               Bill Amount : {totalBillAmount.toLocaleString('en-IN')}
@@ -778,15 +779,13 @@ const Summary = () => {
                   }}
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               ) : (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                   <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                 </div>
               )}
             </div>
@@ -796,10 +795,10 @@ const Summary = () => {
 
       {/* Project Selection */}
       {viewMode === 'Project' && (
-        <div className="px-[16px] mb-1">
+        <div className=" mb-[8px]">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-[12px] font-semibold text-black leading-normal">
-              Project<span className="text-[#eb2f8e]">*</span>
+              Project<span className="text-[#E4572E]">*</span>
             </p>
             <span className="text-[12px] font-medium text-[#007233]">
               Bill Amount : {totalBillAmount.toLocaleString('en-IN')}
@@ -824,15 +823,13 @@ const Summary = () => {
                   }}
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                 </button>
               ) : (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                   <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                 </div>
               )}
             </div>
@@ -841,7 +838,7 @@ const Summary = () => {
       )}
 
       {/* Search Bar */}
-      <div className="px-[16px] mb-1">
+      <div className=" mb-[8px]">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -860,7 +857,7 @@ const Summary = () => {
       </div>
 
       {/* Filter and Pending Advance */}
-      <div className="px-[16px] pt-[4px] pb-[8px] flex items-center justify-between flex-wrap gap-[8px]">
+      <div className=" pb-[8px] flex items-center justify-between flex-wrap gap-[8px]">
         <div className="flex items-center gap-[8px] min-w-0">
           <button
             type="button"
@@ -926,7 +923,7 @@ const Summary = () => {
 
       {/* Cards List - Scrollable */}
       <div
-        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-[16px] mt-1 flex-1 max-h-[380px] pb-[110px]"
+        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide max-h-[calc(100vh-210px-90px)] pb-[105px]"
       >
         {filteredSummaryData.length === 0 ? (
           <div className="flex flex-col items-center justify-center">
@@ -1045,7 +1042,7 @@ const Summary = () => {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40" onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white rounded-t-2xl w-full max-w-[360px] p-[16px] relative" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl w-full p-[16px] relative" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[16px] font-semibold text-black">Select Filters</p>
               <button
@@ -1079,15 +1076,13 @@ const Summary = () => {
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                         <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                       </div>
                     )}
                   </div>
@@ -1113,15 +1108,13 @@ const Summary = () => {
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                         <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                       </div>
                     )}
                   </div>

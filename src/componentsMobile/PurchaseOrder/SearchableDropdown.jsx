@@ -14,6 +14,7 @@ const SearchableDropdown = ({
   showAddNew = true,
   showAllOptions = false,
   maxHeight = '80vh',
+  disableKeyboardReposition = false,
   className = '', // Allow custom className for width/height
   suggestedNewValue = '', // Pre-fill when opening "Add New" (e.g. next Item ID like "DH 03")
   addNewLabel = null // Override "Add New {fieldName}" (e.g. "+ DH 05" for Item ID)
@@ -127,7 +128,7 @@ const SearchableDropdown = ({
           
           // Use fixed positioning for better mobile keyboard support
           // Always position above input when keyboard is open or when there's not enough space below
-          if (keyboardOpen || spaceBelow < 200) {
+          if (!disableKeyboardReposition && (keyboardOpen || spaceBelow < 200)) {
             // Position above input (keyboard is open or not enough space)
             const maxHeight = Math.min(spaceAbove - 20, 200); // Limit height to available space
             setDropdownStyle({

@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import Kebab from '../Images/Kebab.svg';
 
 const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
   const tabs = [
@@ -10,10 +11,15 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
   const fixedContainerRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const kebabButtonRef = useRef(null);
+  const dropdownMenuRef = useRef(null);
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
 
   const updateUnderlinePosition = () => {
     if (activeTabRef.current && fixedContainerRef.current) {
@@ -56,6 +62,58 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        dropdownMenuRef.current &&
+        !dropdownMenuRef.current.contains(event.target)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const updateDropdownPosition = () => {
+      if (isDropdownOpen && kebabButtonRef.current) {
+        const buttonRect = kebabButtonRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: buttonRect.bottom + 5,
+          right: window.innerWidth - buttonRect.right
+        });
+      }
+    };
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+      window.addEventListener('resize', updateDropdownPosition);
+      window.addEventListener('scroll', updateDropdownPosition, true);
+      updateDropdownPosition();
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isDropdownOpen]);
+
+  const handleDropdownToggle = (e) => {
+    e.stopPropagation();
+    if (!isDropdownOpen && kebabButtonRef.current) {
+      const buttonRect = kebabButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: buttonRect.bottom + 5,
+        right: window.innerWidth - buttonRect.right
+      });
+    }
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  const handleMenuItemClick = (tabId) => {
+    onTabChange(tabId);
+    setIsDropdownOpen(false);
+  };
+
   return (
     <>
       <style>{`
@@ -71,7 +129,7 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
           scrollbar-width: none;
         }
       `}</style>
-      <div ref={fixedContainerRef} className="fixed top-[50px] transform w-full max-w-[357px] h-[40px] overflow-x-auto bg-white loan-portal-tabs-container" style={{ fontFamily: "'Manrope', sans-serif", zIndex: 30 }}>
+      <div ref={fixedContainerRef} className="fixed top-[50px] transform w-full max-w-[360px] h-[38px] overflow-x-auto bg-white loan-portal-tabs-container" style={{ fontFamily: "'Manrope', sans-serif", zIndex: 30 }}>
         <div className="relative h-full px-[16px] pr-[24px] overflow-x-auto scrollbar-hide loan-portal-tabs-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div 
             ref={tabsContainerRef}
@@ -109,7 +167,7 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
                 key={tab.id}
                 ref={activeTab === tab.id ? activeTabRef : null}
                 onClick={() => onTabChange(tab.id)}
-                className={`font-semibold text-[12px] leading-normal whitespace-nowrap flex-shrink-0 ${
+                className={`font-semibold text-[12px] leading-normal mt-[8px] whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id ? 'text-black' : 'text-[#848484]'
                 }`}
               >
@@ -118,15 +176,14 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
             ))}
           </div>
         </div>
-        <div className="absolute right-1.5 top-1/2 transform -translate-y-1/2" style={{ zIndex: 31 }}>
+        <div ref={dropdownRef} className="absolute right-[-4px] top-0 bottom-0 flex items-center justify-center" style={{ zIndex: 31 }}>
           <button
-            className="w-[20px] h-[20px] flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity bg-white pointer-events-auto"
+            ref={kebabButtonRef}
+            onClick={handleDropdownToggle}
+            className="flex items-center justify-center w-[16px] h-[16px] cursor-pointer hover:opacity-7 "
+            style={{ marginTop: '8px', marginLeft: '8px' }}
           >
-            <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="2" cy="2" r="1.5" fill="#000"/>
-              <circle cx="2" cy="8" r="1.5" fill="#000"/>
-              <circle cx="2" cy="14" r="1.5" fill="#000"/>
-            </svg>
+            <img src={Kebab} alt="Kebab" className="w-[16px] h-[16px]" />
           </button>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-[1px]" style={{ backgroundColor: '#D9D9D9' }}>
@@ -134,12 +191,39 @@ const Tabs = ({ activeTab = 'loanform', onTabChange }) => {
             className="absolute bottom-0 h-[1.70px] transition-all duration-300"
             style={{ 
               backgroundColor: '#BF9853',
-              left: `${underlineStyle.left}px`,
-              width: `${underlineStyle.width}px`
+              left: `${Math.max(0, underlineStyle.left - 8)}px`,
+              width: `${underlineStyle.width + 16}px`
             }}
           ></div>
         </div>
       </div>
+      {isDropdownOpen && (
+        <div
+          ref={dropdownMenuRef}
+          className="fixed bg-white rounded-lg shadow-lg py-[8px]"
+          style={{
+            zIndex: 9999,
+            top: `${dropdownPosition.top}px`,
+            right: `${dropdownPosition.right}px`,
+            width: '140px',
+            maxWidth: '140px'
+          }}
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleMenuItemClick(tab.id)}
+              className={`w-full text-left px-[16px] py-[8px] text-[12px] font-semibold transition-colors ${
+                activeTab === tab.id
+                  ? 'text-black bg-[#E8E8E8]'
+                  : 'text-[#333333] hover:bg-[#E8E8E8]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 };

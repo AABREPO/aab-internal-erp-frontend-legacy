@@ -5048,7 +5048,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             comments: categoryComments || "",
                                             machineTools: "",
                                             source: "Cash Register",
-                                            billCopyUrl: currentProjectAdvanceRow.bill_copy_url || '',
+                                            billCopyUrl: cleanUrl(currentProjectAdvanceRow.bill_copy_url),
                                             branchId: activeBranchId ?? null,
                                             enteredBy: username
                                         };
@@ -5062,6 +5062,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                         if (!expensesFormResponse.ok) {
                                             throw new Error('Failed to save to expenses form');
                                         }
+                                        console.log(expensesFormData);
+                                        console.log(expensesFormResponse);
                                         const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
                                             method: 'PUT',
                                             headers: {

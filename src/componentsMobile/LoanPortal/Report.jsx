@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Filter from '../Images/Filter.png';
 import DateRangePickerModal from '../PurchaseOrder/DateRangePickerModal';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import CloseIcon from '../Images/Close F.svg'
 
 const Report = () => {
   const [loanData, setLoanData] = useState([]);
@@ -36,11 +37,11 @@ const Report = () => {
         if (response.ok) {
           const data = await response.json();
           setLoanData(data);
-          
+
           const loan = data.filter(e => e.type === 'Loan').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
           const refund = data.filter(e => e.type === 'Refund').reduce((sum, e) => sum + (parseFloat(e.loan_refund_amount) || 0), 0);
           const transfer = data.filter(e => e.type === 'Transfer').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-          
+
           setTotalLoan(loan);
           setTotalRefund(refund);
           setTotalTransfer(transfer);
@@ -216,7 +217,7 @@ const Report = () => {
         const associateName = getAssociateName(entry);
         const purposeName = getPurposeName(entry.from_purpose_id);
         const entryType = entry.type || 'Loan';
-        
+
         let amount = 0;
         if (entryType === 'Loan' || entryType === 'Transfer') {
           amount = parseFloat(entry.amount) || 0;
@@ -226,7 +227,7 @@ const Report = () => {
 
         const dateStr = entry.timestamp || entry.createdAt || entry.created_at || entry.date || '';
         const formattedDate = dateStr ? formatDateOnly(dateStr) : '';
-        
+
         let prefix = 'LN';
         if (entryType === 'Refund') {
           prefix = 'RF';
@@ -265,19 +266,19 @@ const Report = () => {
 
   const filtered = (() => {
     let result = transformed;
-    
+
     // Type filter
     if (typeFilter) {
       result = result.filter((item) => (item.type || '').toLowerCase() === typeFilter.toLowerCase());
     }
-    
+
     // Date range filter
     if (startDate || endDate) {
       result = result.filter((item) => {
         if (!item.timestamp) return false;
         const itemDate = new Date(item.timestamp);
         itemDate.setHours(0, 0, 0, 0);
-        
+
         if (startDate && endDate) {
           const start = new Date(startDate);
           start.setHours(0, 0, 0, 0);
@@ -296,7 +297,7 @@ const Report = () => {
         return true;
       });
     }
-    
+
     // Payment mode filter
     if (paymentModeFilter) {
       result = result.filter((item) => {
@@ -304,7 +305,7 @@ const Report = () => {
         return paymentMode.toLowerCase() === paymentModeFilter.toLowerCase();
       });
     }
-    
+
     // Associate filter
     if (associateFilter) {
       result = result.filter((item) => {
@@ -312,7 +313,7 @@ const Report = () => {
         return associateName.toLowerCase() === associateFilter.toLowerCase();
       });
     }
-    
+
     // Purpose filter
     if (purposeFilter) {
       result = result.filter((item) => {
@@ -320,7 +321,7 @@ const Report = () => {
         return purposeName.toLowerCase() === purposeFilter.toLowerCase();
       });
     }
-    
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase().trim();
@@ -335,7 +336,7 @@ const Report = () => {
         );
       });
     }
-    
+
     return result;
   })();
 
@@ -370,13 +371,13 @@ const Report = () => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Week and Type Section */}
-      <div className="px-[16px]">
+      <div className="pt-[10px] mb-[8px]">
         <div className="flex-shrink-0">
-          <div className="mb-2 items-center border-b border-gray-200 pb-[6px] mt-2 flex justify-between">
-            <div className="flex items-center gap-[8px] pt-[2px]">
+          <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
+            <div className="flex items-center gap-[4px]">
               <span className="text-[12px] font-semibold text-black leading-normal">#Week</span>
             </div>
-            <div>
+            <div className="flex items-center gap-[4px]">
               <button
                 onClick={() => setShowTypeModal(true)}
                 className="flex items-center gap-[4px] text-[12px] font-semibold text-black leading-normal cursor-pointer"
@@ -390,10 +391,9 @@ const Report = () => {
           </div>
         </div>
       </div>
-
       {/* Date Range and Payment Mode Section */}
-      <div className="px-[16px] pt-[8px]">
-        <div className="flex gap-[8px]">
+      <div className="px-0 pt-0">
+        <div className="flex gap-[8px] items-center">
           {/* Date Range */}
           <div className="flex-1">
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Date Range</p>
@@ -438,14 +438,12 @@ const Report = () => {
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 )}
@@ -454,16 +452,15 @@ const Report = () => {
           </div>
         </div>
       </div>
-
       {/* Search Bar */}
-      <div className="px-[16px] pt-[8px]">
+      <div className="mt-2">
         <div className="relative">
           <input
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-[40px] pr-[16px] border border-[#E0E0E0] rounded-3xl text-[14px] font-medium text-black placeholder:text-[#9E9E9E] focus:outline-none"
+            className="w-full h-[36px] pl-[40px] pr-[12px] text-[12px] rounded-full font-medium bg-white focus:outline-none border border-[rgba(0,0,0,0.12)] text-black placeholder:text-[#9E9E9E]"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -473,27 +470,26 @@ const Report = () => {
           </div>
         </div>
       </div>
-
       {/* Filter Section */}
-      <div className="flex-shrink-0 px-[16px] pt-[8px]">
-        <div className="flex items-center justify-between gap-[20px]">
-          <div className="flex items-center gap-[8px] min-w-0">
+      <div className="pt-[8px] pb-[8px] flex items-center justify-between w-full">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-[4px] min-w-0">
             <button
               type="button"
               onClick={() => setShowFilterModal(true)}
-              className="flex items-center gap-[8px] px-[0px] flex-shrink-0"
+              className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0"
             >
-              <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
+              <img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
               {!hasActiveFilters && (
-                <span className="text-[14px] font-medium flex-shrink-0 text-[#9E9E9E]">
+                <span className="text-[12px] font-medium text-black flex-shrink-0">
                   Filter
                 </span>
               )}
             </button>
             {/* Active Filter Tags */}
-            <div className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {typeFilter && (
-                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">{typeFilter}</span>
                   <button
                     onClick={() => setTypeFilter('')}
@@ -506,7 +502,7 @@ const Report = () => {
                 </div>
               )}
               {(startDate || endDate) && (
-                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Date</span>
                   <button
                     onClick={() => {
@@ -522,7 +518,7 @@ const Report = () => {
                 </div>
               )}
               {paymentModeFilter && (
-                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Mode</span>
                   <button
                     onClick={() => setPaymentModeFilter('')}
@@ -535,7 +531,7 @@ const Report = () => {
                 </div>
               )}
               {associateFilter && (
-                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Associate</span>
                   <button
                     onClick={() => setAssociateFilter('')}
@@ -548,7 +544,7 @@ const Report = () => {
                 </div>
               )}
               {purposeFilter && (
-                <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
+                <div className="flex items-center gap-[6px] border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Purpose</span>
                   <button
                     onClick={() => setPurposeFilter('')}
@@ -562,28 +558,29 @@ const Report = () => {
               )}
             </div>
           </div>
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setTypeFilter('');
-                setStartDate('');
-                setEndDate('');
-                setPaymentModeFilter('');
-                setAssociateFilter('');
-                setPurposeFilter('');
-              }}
-              className="text-[14px] font-medium hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
-            >
-              x
-            </button>
-          )}
-          <span className="text-[14px] font-medium text-black flex-shrink-0">TA : ₹{totalAmount.toLocaleString('en-IN')}</span>
+          <div className="flex items-center gap-[4px]">
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setTypeFilter('');
+                  setStartDate('');
+                  setEndDate('');
+                  setPaymentModeFilter('');
+                  setAssociateFilter('');
+                  setPurposeFilter('');
+                }}
+                className="text-[13px] font-semibold hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
+              >
+                x
+              </button>
+            )}
+            <span className="text-[12px] font-semibold text-black flex-shrink-0">TA : ₹{totalAmount.toLocaleString('en-IN')}</span>
+          </div>
         </div>
       </div>
-
       {/* Transaction List - Scrollable */}
       <div
-        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide px-[16px] mt-1"
+        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide pb-[96px]"
         style={{ height: 'calc(100vh - 180px - 80px)', maxHeight: 'calc(100vh - 180px - 80px)' }}
       >
         {filtered.length === 0 ? (
@@ -605,9 +602,8 @@ const Report = () => {
                 <div
                   key={item.id}
                   className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
-                  style={{ height: '95px' }}
                 >
-                  <div className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px]">
+                  <div className="flex-1 bg-white rounded-[8px] px-[12px] py-[12px]">
                     <div className="flex flex-col gap-[2px]">
                       {/* Row 1: ref and payment mode */}
                       <div className="flex items-center justify-between">
@@ -660,7 +656,6 @@ const Report = () => {
           </div>
         )}
       </div>
-
       {/* Type Modal */}
       {showTypeModal && (
         <div
@@ -672,7 +667,7 @@ const Report = () => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-[24px] pt-[20px]">
@@ -689,7 +684,7 @@ const Report = () => {
                 </svg>
               </button>
             </div>
-            <div className="px-[24px] pt-[16px] pb-[16px]">
+            <div className="px-[24px] pt-[4px] pb-[6px]">
               <div className="relative">
                 <input
                   type="text"
@@ -707,7 +702,10 @@ const Report = () => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div
+              className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+            >
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Loan', 'Refund', 'Transfer']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
@@ -747,7 +745,6 @@ const Report = () => {
           </div>
         </div>
       )}
-
       {/* Date Range Picker Modal */}
       <DateRangePickerModal
         isOpen={showDatePicker}
@@ -770,7 +767,6 @@ const Report = () => {
         fieldName="Payment Mode"
         showStarIcon={false}
       />
-
       {/* Filter Modal */}
       {showFilterModal && (
         <div
@@ -779,7 +775,7 @@ const Report = () => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white rounded-t-2xl w-full max-w-[360px] p-[16px] relative"
+            className="bg-white rounded-t-2xl w-full p-[16px] relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-2">
@@ -814,14 +810,12 @@ const Report = () => {
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                         <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
                     )}
@@ -847,14 +841,12 @@ const Report = () => {
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                       </button>
                     ) : (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                         <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
                     )}
@@ -885,7 +877,6 @@ const Report = () => {
           </div>
         </div>
       )}
-
       {/* Associate Modal */}
       <SelectVendorModal
         isOpen={showAssociateModal}
@@ -899,7 +890,6 @@ const Report = () => {
         fieldName="Associate"
         showStarIcon={false}
       />
-
       {/* Purpose Modal */}
       <SelectVendorModal
         isOpen={showPurposeModal}

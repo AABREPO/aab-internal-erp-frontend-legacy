@@ -460,7 +460,7 @@ const ToolsTrackerAddInput = () => {
                 className="rounded-l-lg"
                 style={{ borderLeft: '8px solid #BF9853' }}
               >
-                <table className="text-left w-full sm:w-[314px]">
+                <table className="text-left w-full sm:w-[348px]">
                   <thead className="bg-[#FAF6ED]">
                     <tr>
                       <th className="px-2 sm:px-4 py-2 font-bold text-sm sm:text-base">Sl.No</th>

@@ -17,6 +17,11 @@ const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_bra
 const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
 const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/employee_details';
 
+const isQuantityTransferEntryType = (entry) => {
+  const t = (entry.tools_entry_type || entry.toolsEntryType || '').toLowerCase().trim();
+  return t === 'entry' || t === 'relocation' || t === 'relocate';
+};
+
 const NetStock = ({ user }) => {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
   const [selectedItemName, setSelectedItemName] = useState(null);
@@ -338,7 +343,7 @@ const NetStock = ({ user }) => {
   }, [extractArrayFromResponse]);
 
   // Helper to get location name
-  const getLocationName = (id) => {
+  const getLocationName = useCallback((id) => {
     if (!id) return '-';
     const idStr = String(id);
     if (projectsMap[idStr]) return projectsMap[idStr];
@@ -346,7 +351,7 @@ const NetStock = ({ user }) => {
     if (vendorsMap[idStr]) return vendorsMap[idStr];
     if (vendorsMap[id]) return vendorsMap[id];
     return '-';
-  };
+  }, [projectsMap, vendorsMap]);
 
   // Helper function to get home location ID - get the LAST (most recent) home_location_id from tools_tracker_management, fallback to stock_management
   // Matches the logic from PendingItems.jsx
@@ -486,10 +491,134 @@ const NetStock = ({ user }) => {
     return homeLocationId;
   };
 
+  // Quantity-only (no item_ids_id): overall total from stock rows; per-location qty from stock ± tracker transfers
+  // (same model as Transfer.jsx getAvailableQuantityAtLocation).
+  const buildQuantityOnlyLocationSummary = useCallback(
+    (itemNameId, brandId, homeStockRows) => {
+      const getAvailableQuantityAtLocationForQuantityOnly = (locItemNameId, locBrandId, locationId) => {
+        if (!locItemNameId || !locationId) return 0;
+        const itemNameIdStr = String(locItemNameId);
+        const brandIdStr = locBrandId != null && locBrandId !== '' ? String(locBrandId) : null;
+        const locationIdStr = String(locationId);
+        let availableQuantity = 0;
+
+        const stockItems = stockManagementData.filter((stock) => {
+          const stockItemNameId = stock.item_name_id || stock.itemNameId;
+          const stockBrandId = stock.brand_name_id || stock.brandNameId;
+          const stockHomeLocationId = stock.home_location_id || stock.homeLocationId;
+          const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
+          const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+          const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+          const locationMatch = stockHomeLocationId && String(stockHomeLocationId) === locationIdStr;
+          return itemNameMatch && brandMatch && locationMatch && noItemIdsId;
+        });
+        stockItems.forEach((stock) => {
+          availableQuantity += parseInt(stock.quantity || 0, 10);
+        });
+
+        for (const entry of toolsTrackerManagementData) {
+          if (!isQuantityTransferEntryType(entry)) continue;
+          const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+          const entryToProjectId = entry.to_project_id || entry.toProjectId;
+          const entryFromProjectId = entry.from_project_id || entry.fromProjectId;
+
+          for (const entryItem of entryItems) {
+            const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+            if (entryItemIdsId) continue;
+
+            const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+            const entryBrandId = entryItem.brand_id || entryItem.brandId;
+            const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+            const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+
+            if (itemNameMatch && brandMatch) {
+              const itemQuantity = parseInt(entryItem.quantity || 0, 10);
+              if (entryToProjectId && String(entryToProjectId) === locationIdStr) {
+                availableQuantity += itemQuantity;
+              }
+              if (entryFromProjectId && String(entryFromProjectId) === locationIdStr) {
+                availableQuantity -= itemQuantity;
+              }
+            }
+          }
+        }
+
+        return Math.max(0, availableQuantity);
+      };
+
+      const collectLocationIdsForQuantityOnlyItem = (locItemNameId, locBrandId) => {
+        const ids = new Set();
+        const itemNameIdStr = String(locItemNameId);
+        const brandIdStr = locBrandId != null && locBrandId !== '' ? String(locBrandId) : null;
+
+        stockManagementData.forEach((stock) => {
+          const stockItemNameId = stock.item_name_id || stock.itemNameId;
+          const stockBrandId = stock.brand_name_id || stock.brandNameId;
+          const stockHomeLocationId = stock.home_location_id || stock.homeLocationId;
+          const noItemIdsId = !stock.item_ids_id && !stock.itemIdsId;
+          const itemNameMatch = stockItemNameId && String(stockItemNameId) === itemNameIdStr;
+          const brandMatch = !brandIdStr || (stockBrandId && String(stockBrandId) === brandIdStr);
+          if (itemNameMatch && brandMatch && noItemIdsId && stockHomeLocationId) {
+            ids.add(String(stockHomeLocationId));
+          }
+        });
+
+        toolsTrackerManagementData.forEach((entry) => {
+          if (!isQuantityTransferEntryType(entry)) return;
+          const entryItems = entry.tools_tracker_item_name_table || entry.toolsTrackerItemNameTable || [];
+          const toId = entry.to_project_id || entry.toProjectId;
+          const fromId = entry.from_project_id || entry.fromProjectId;
+          entryItems.forEach((entryItem) => {
+            const entryItemIdsId = entryItem.item_ids_id || entryItem.itemIdsId;
+            if (entryItemIdsId) return;
+            const entryItemNameId = entryItem.item_name_id || entryItem.itemNameId;
+            const entryBrandId = entryItem.brand_id || entryItem.brandId;
+            const itemNameMatch = entryItemNameId && String(entryItemNameId) === itemNameIdStr;
+            const brandMatch = !brandIdStr || (entryBrandId && String(entryBrandId) === brandIdStr);
+            if (itemNameMatch && brandMatch) {
+              if (toId) ids.add(String(toId));
+              if (fromId) ids.add(String(fromId));
+            }
+          });
+        });
+
+        return Array.from(ids);
+      };
+
+      const totalStock = homeStockRows.reduce(
+        (acc, s) => acc + parseInt(s.quantity || 0, 10),
+        0
+      );
+      const homeLabel = [
+        ...new Set(
+          homeStockRows
+            .map((s) => getLocationName(s.home_location_id || s.homeLocationId))
+            .filter((n) => n && n !== '-')
+        )
+      ].join(', ') || '-';
+
+      const locIds = collectLocationIdsForQuantityOnlyItem(itemNameId, brandId);
+      const parts = [];
+      locIds.forEach((locId) => {
+        const q = getAvailableQuantityAtLocationForQuantityOnly(itemNameId, brandId, locId);
+        if (q > 0) {
+          parts.push({ locationId: String(locId), name: getLocationName(locId), q });
+        }
+      });
+      parts.sort((a, b) => b.q - a.q);
+      const currentLocationStr =
+        parts.map((p) => `${p.name} (${p.q})`).join(', ') || '-';
+
+      return { totalStock, homeLabel, currentLocationStr, parts };
+    },
+    [stockManagementData, toolsTrackerManagementData, getLocationName]
+  );
+
   // Process data for table view (individual items) - merge items with same location, itemName, brand
   const tableData = useMemo(() => {
     const itemsMap = new Map(); // Use Map to merge items
     const processedItemIds = new Set();
+    const quantityOnlyGroups = new Map();
 
     // Process items from stock management
     stockManagementData.forEach((stock) => {
@@ -497,7 +626,6 @@ const NetStock = ({ user }) => {
       const itemIdsId = stock.item_ids_id ?? stock.itemIdsId;
       const brandId = stock.brand_name_id ?? stock.brandNameId ?? stock.brand_id ?? stock.brandId;
       const homeLocationId = stock.home_location_id || stock.homeLocationId;
-      const quantity = parseInt(stock.quantity || 0, 10);
       // Resolve machine number: check machine_number_id first, then machine_number
       const machineNumberId = stock.machine_number_id || stock.machineNumberId;
       const machineNumberRaw = stock.machine_number || stock.machineNumber || '';
@@ -541,53 +669,79 @@ const NetStock = ({ user }) => {
           });
         }
       } else if (!hasItemIdsId) {
-        // Item with quantity only (can be positive or negative) - use home location
-        const homeLocation = getLocationName(homeLocationId);
-
-        // Create merge key: location + itemName + brand
-        const mergeKey = `${homeLocation}_${itemName}_${brand}_qty`;
-
-        if (itemsMap.has(mergeKey)) {
-          // Merge: add quantities (including negative values)
-          const existing = itemsMap.get(mergeKey);
-          existing.quantity += quantity;
-          // Store stock record IDs for API calls
-          if (!existing.stockRecordIds) {
-            existing.stockRecordIds = [];
-          }
-          existing.stockRecordIds.push({
-            stockId: stock.id,
+        // Quantity-only: group by item_name_id + brand (overall qty from stock; splits from tracker)
+        const mergeKey = `qty_${itemNameId}_${brandId || ''}`;
+        if (!quantityOnlyGroups.has(mergeKey)) {
+          quantityOnlyGroups.set(mergeKey, {
             itemNameId,
             brandId,
-            homeLocationId,
-            quantity: parseInt(stock.quantity || 0, 10)
-          });
-        } else {
-          itemsMap.set(mergeKey, {
-            id: `qty_${itemNameId}_${brandId || ''}_${homeLocationId}`,
             itemName,
-            itemId: '-',
-            location: homeLocation,
-            currentLocation: '-',
             brand,
-            model: (stock.model || '').trim() || '-',
-            machineNumber: '-',
-            status: '-',
-            quantity,
-            hasItemId: false,
-            // Store IDs needed for API calls
-            itemNameId,
-            brandId,
-            homeLocationId,
-            stockRecordIds: [{
-              stockId: stock.id,
-              itemNameId,
-              brandId,
-              homeLocationId,
-              quantity: parseInt(stock.quantity || 0, 10)
-            }]
+            stocks: []
           });
         }
+        quantityOnlyGroups.get(mergeKey).stocks.push(stock);
+      }
+    });
+
+    quantityOnlyGroups.forEach((group, mergeKey) => {
+      const { itemNameId, brandId, itemName, brand, stocks } = group;
+      const stockRecordIds = stocks.map((s) => ({
+        stockId: s.id,
+        itemNameId,
+        brandId,
+        homeLocationId: s.home_location_id || s.homeLocationId,
+        quantity: parseInt(s.quantity || 0, 10)
+      }));
+      const firstStock = stocks[0];
+      const summary = buildQuantityOnlyLocationSummary(itemNameId, brandId, stocks);
+
+      // Create one card per location with available quantity at that location
+      const parts = Array.isArray(summary.parts) ? summary.parts : [];
+      if (parts.length === 0) {
+        // Fallback: keep a single card with total when we cannot resolve locations
+        itemsMap.set(mergeKey, {
+          id: mergeKey,
+          itemName,
+          itemId: '-',
+          location: summary.homeLabel,
+          currentLocation: '-',
+          brand,
+          model: (firstStock.model || '').trim() || '-',
+          machineNumber: '-',
+          status: '-',
+          quantity: summary.totalStock,
+          hasItemId: false,
+          itemNameId,
+          brandId,
+          homeLocationId: firstStock.home_location_id || firstStock.homeLocationId,
+          stockRecordIds,
+          isQuantityLocationCard: true,
+          isEditableQuantityCard: false
+        });
+      } else {
+        parts.forEach((p) => {
+          const perLocKey = `${mergeKey}_${p.locationId}`;
+          itemsMap.set(perLocKey, {
+            id: perLocKey,
+            itemName,
+            itemId: '-',
+            location: summary.homeLabel,
+            currentLocation: p.name,
+            brand,
+            model: (firstStock.model || '').trim() || '-',
+            machineNumber: '-',
+            status: '-',
+            quantity: p.q,
+            hasItemId: false,
+            itemNameId,
+            brandId,
+            homeLocationId: firstStock.home_location_id || firstStock.homeLocationId,
+            stockRecordIds,
+            isQuantityLocationCard: true,
+            isEditableQuantityCard: false
+          });
+        });
       }
     });
     // Convert Map to array
@@ -620,16 +774,28 @@ const NetStock = ({ user }) => {
       filtered = filtered.filter(item => item.brand === selectedBrand);
     }
     if (selectedHomeLocation) {
-      filtered = filtered.filter(item => item.location === selectedHomeLocation);
+      filtered = filtered.filter((item) => {
+        const loc = item.location;
+        if (!loc || loc === '-') return false;
+        if (loc === selectedHomeLocation) return true;
+        return loc.split(',').map((s) => s.trim()).includes(selectedHomeLocation);
+      });
     }
     if (selectedCurrentLocation) {
-      filtered = filtered.filter(item => item.currentLocation === selectedCurrentLocation);
+      filtered = filtered.filter((item) => {
+        const cur = item.currentLocation;
+        if (!cur || cur === '-') return false;
+        return (
+          cur === selectedCurrentLocation ||
+          cur.toLowerCase().includes(selectedCurrentLocation.toLowerCase())
+        );
+      });
     }
     if (selectedStatus) {
       filtered = filtered.filter(item => item.status === selectedStatus);
     }
     return filtered;
-  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, selectedBrand, selectedHomeLocation, selectedCurrentLocation, selectedStatus, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getCurrentToLocation, getLocationName, resolveMachineNumberText, resolveItemIdDisplay, resolveBrandDisplay, resolveItemNameDisplay]);
+  }, [stockManagementData, toolsTrackerManagementData, itemNamesMap, itemIdsMap, brandsMap, projectsMap, vendorsMap, selectedItemName, selectedItemId, selectedBrand, selectedHomeLocation, selectedCurrentLocation, selectedStatus, machineNumbersList, getHomeLocationId, getCurrentLocationForItem, getCurrentToLocation, buildQuantityOnlyLocationSummary, getLocationName, resolveMachineNumberText, resolveItemIdDisplay, resolveBrandDisplay, resolveItemNameDisplay]);
 
   // Apply universal search filter to tableData
   const filteredTableData = useMemo(() => {
@@ -1379,8 +1545,12 @@ const NetStock = ({ user }) => {
                     const itemId = item.id || index;
                     const swipeState = swipeStates[itemId];
                     const isExpanded = expandedItemId === itemId;
-                    // Allow editing for items without itemId that have a non-zero quantity (can be positive or negative)
-                    const canEdit = !item.hasItemId && item.quantity !== 0;
+                    // Allow editing only for the legacy single-card quantity rows.
+                    // For quantity split-by-location cards, editing would be ambiguous.
+                    const canEdit =
+                      !item.hasItemId &&
+                      item.quantity !== 0 &&
+                      item.isEditableQuantityCard !== false;
 
                     // Calculate swipe offset (button width is 48px)
                     const buttonWidth = 48;

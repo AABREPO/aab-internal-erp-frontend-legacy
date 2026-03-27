@@ -560,7 +560,7 @@ const History = ({ username, userRoles = [] }) => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ billCopyUrl: pdfUrl })
+                body: JSON.stringify(pdfUrl)
             });
             if (!updateResponse.ok) {
                 throw new Error("Failed to update bill copy URL");
@@ -4843,7 +4843,7 @@ const History = ({ username, userRoles = [] }) => {
                                             comments: categoryComments || "",
                                             machineTools: "",
                                             source: "Cash Register",
-                                            billCopyUrl: currentProjectAdvanceRow.bill_copy_url,
+                                            billCopyUrl: cleanUrl(currentProjectAdvanceRow.bill_copy_url || ''),
                                             branchId: activeBranchId ?? null,
                                             enteredBy: username,
                                         };

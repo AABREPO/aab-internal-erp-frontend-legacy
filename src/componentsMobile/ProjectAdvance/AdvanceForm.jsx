@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Attach from '../Images/Attachfile.svg';
+import CloseIcon from '../Images/Close F.svg'
 
 const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], initialFromHistory = null, onConsumedInitialFromHistory }) => {
   const resolveActiveBranchId = () => {
@@ -1120,7 +1121,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
   // Check if all required fields are filled (except description)
   const areAllRequiredFieldsFilled = () => {
     if (!selectedType) return false;
-    
+
     if (selectedType === 'Advance' || selectedType === 'Refund') {
       return !!(selectedOption && selectedSite && advanceAmount && paymentMode);
     } else if (selectedType === 'Bill Settlement') {
@@ -1159,371 +1160,360 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     setDateValue(convertedDate);
   };
 
-   // Handle cheque date confirmation from DatePickerModal (Payment Details bottom sheet)
-   const handleChequeDateConfirm = (dateString) => {
-     const convertedDate = convertToDateValue(dateString);
-     setPaymentModalData(prev => ({ ...prev, chequeDate: convertedDate }));
-     setShowChequeDatePicker(false);
-   };
+  // Handle cheque date confirmation from DatePickerModal (Payment Details bottom sheet)
+  const handleChequeDateConfirm = (dateString) => {
+    const convertedDate = convertToDateValue(dateString);
+    setPaymentModalData(prev => ({ ...prev, chequeDate: convertedDate }));
+    setShowChequeDatePicker(false);
+  };
 
   return (
     <div
-      className="px-[16px] flex flex-col flex-1 min-h-0 overflow-hidden"
+      className=" flex flex-col flex-1 min-h-0 overflow-hidden"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Form section - no scroll */}
       <div className="flex-shrink-0">
-      {/* Advance Number and Date */}
-      <div className="mb-2 items-center border-b border-gray-200 pb-[4px] mt-1.5 flex justify-between">
-        <div className="flex items-center gap-[8px] mt-0.5">
-          <button
-            type="button"
-            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-          >
-            # {entryNo}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDatePicker(true)}
-            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-          >
-            {formattedDate}
-          </button>
-        </div>
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowTypeModal(true)}
-            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-          >
-            {selectedType || 'Select Type'}
-          </button>
-        </div>
-      </div>
-      <div className="space-y-[6px]">
-        {/* Contractor/Vendor Field */}
-        <div className="">
-          <p className="flex justify-between items-center text-[12px] font-semibold text-black leading-normal mb-0.5">
-            <span>Contractor/Vendor<span className="text-[#eb2f8e]">*</span></span>
-            <span className="text-[12px] font-medium text-[#9E9E9E]">{formatWithCommas(overallAdvance)}</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowContractorVendorModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                boxSizing: 'border-box',
-                color: selectedOption ? '#000' : '#9E9E9E'
-              }}
+        {/* Advance Number and Date */}
+        <div className="mb-[8px] items-center border-b border-gray-200 pb-[6px] mt-[6px] flex justify-between">
+          <div className="flex items-center gap-[8px] mt-[4px]">
+            <button
+              type="button"
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
-              {selectedOption ? selectedOption.label : 'Select'}
-              {selectedOption ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedOption(null);
-                    setOverallAdvance(0);
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        {/* Project Name Field */}
-        <div className="">
-          <p className="text-[12px] flex justify-between items-center font-semibold text-black leading-normal mb-0.5">
-            <span>{selectedType === 'Transfer' ? 'From Project' : 'Project Name'}<span className="text-[#eb2f8e]">*</span></span>
-            <span className="text-[12px] font-medium text-[#9E9E9E]">{projectAdvance || '0.00'}</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowProjectModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                boxSizing: 'border-box',
-                color: selectedSite ? '#000' : '#9E9E9E'
-              }}
+              # {entryNo}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
-              {selectedSite ? selectedSite.label : 'Select'}
-              {selectedSite ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedSite(null);
-                    setProjectAdvance('');
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
-            </div>
+              {formattedDate}
+            </button>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowTypeModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
+            >
+              {selectedType || 'Select Type'}
+            </button>
           </div>
         </div>
-        {/* Bill Amount Field - Only for Bill Settlement */}
-        {selectedType === 'Bill Settlement' && (
+        <div className="space-y-[6px]">
+          {/* Contractor/Vendor Field */}
           <div className="">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Bill Amount<span className="text-[#eb2f8e]">*</span>
-            </p>
-            <div className="relative">
-              <input
-                type="text"
-                value={formatWithCommas(billAmount)}
-                onChange={(e) => {
-                  const rawValue = e.target.value.replace(/,/g, "");
-                  if (!isNaN(rawValue)) {
-                    setBillAmount(rawValue);
-                  }
-                }}
-                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
-                style={{
-                  boxSizing: 'border-box',
-                  color: billAmount ? '#000' : '#9E9E9E'
-                }}
-                placeholder="Enter bill amount"
-              />
-            </div>
-          </div>
-        )}
-        {/* Category Field - Only for Bill Settlement */}
-        {selectedType === 'Bill Settlement' && (
-          <div className="">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Category<span className="text-[#eb2f8e]">*</span>
+            <p className="flex justify-between items-center text-[12px] font-semibold text-black leading-normal mb-0.5">
+              <span>Contractor/Vendor<span className="text-[#eb2f8e]">*</span></span>
+              <span className="text-[12px] font-medium text-[#9E9E9E]">{formatWithCommas(overallAdvance)}</span>
             </p>
             <div className="relative">
               <div
-                onClick={() => setShowCategoryModal(true)}
-                className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                onClick={() => setShowContractorVendorModal(true)}
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
-                  color: selectedCategory ? '#000' : '#9E9E9E'
+                  color: selectedOption ? '#000' : '#9E9E9E'
                 }}
               >
-                {selectedCategory ? selectedCategory.label : 'Select'}
-                {selectedCategory ? (
+                {selectedOption ? selectedOption.label : 'Select'}
+                {selectedOption ? (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedCategory(null);
+                      setSelectedOption(null);
+                      setOverallAdvance(0);
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        )}
-        {/* Amount Given Field */}
-        {selectedType === 'Transfer' ? (
-          <>
-            {/* To Project Field - Full Width */}
-            <div className="">
-              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                To Project<span className="text-[#eb2f8e]">*</span>
-              </p>
-              <div className="relative">
-                <div
-                  onClick={() => setShowTransferSiteModal(true)}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-                  style={{
-                    boxSizing: 'border-box',
-                    color: transferSiteId ? '#000' : '#9E9E9E'
-                  }}
-                >
-                  {transferSiteId ? (siteOptions.find(opt => opt.id === parseInt(transferSiteId))?.label || 'Select') : 'Select'}
-                  {transferSiteId ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setTransferSiteId('');
-                      }}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            {/* Transfer Amount Field - Full Width */}
-            <div className="">
-              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                Transfer Amount<span className="text-[#eb2f8e]">*</span>
-              </p>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatWithCommas(advanceAmount)}
-                  onChange={handleAmountChange}
-                  className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
-                  style={{
-                    boxSizing: 'border-box',
-                    color: advanceAmount ? '#000' : '#9E9E9E'
-                  }}
-                  placeholder="Enter amount"
-                />
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex justify-between items-center w-[328px]">
-            <div className="">
-              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                {selectedType === 'Refund' ? 'Refund Amount' : 'Amount Given'}<span className="text-[#eb2f8e]">*</span>
-              </p>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatWithCommas(advanceAmount)}
-                  onChange={handleAmountChange}
-                  className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
-                  style={{
-                    boxSizing: 'border-box',
-                    color: advanceAmount ? '#000' : '#9E9E9E'
-                  }}
-                  placeholder="Enter amount"
-                />
-              </div>
-            </div>
-            {/* Payment Mode Field */}
-            <div className="">
-              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                Payment Mode<span className="text-[#eb2f8e]">*</span>
-              </p>
-              <div className="relative">
-                <div
-                  onClick={() => setShowPaymentModeModal(true)}
-                  className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-                  style={{
-                    boxSizing: 'border-box',
-                    color: paymentMode ? '#000' : '#9E9E9E'
-                  }}
-                >
-                  {paymentMode || 'Select'}
-                  {paymentMode ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPaymentMode('');
-                      }}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
+          {/* Project Name Field */}
+          <div className="">
+            <p className="text-[12px] flex justify-between items-center font-semibold text-black leading-normal mb-0.5">
+              <span>{selectedType === 'Transfer' ? 'From Project' : 'Project Name'}<span className="text-[#eb2f8e]">*</span></span>
+              <span className="text-[12px] font-medium text-[#9E9E9E]">{projectAdvance || '0.00'}</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => setShowProjectModal(true)}
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  boxSizing: 'border-box',
+                  color: selectedSite ? '#000' : '#9E9E9E'
+                }}
+              >
+                {selectedSite ? selectedSite.label : 'Select'}
+                {selectedSite ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSite(null);
+                      setProjectAdvance('');
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                  </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
-        {/* Description Field */}
-        <div className="">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-            Description
-          </p>
-          <textarea
-            className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] pt-[4px] items-center text-[12px] font-medium bg-white focus:outline-none"
-            placeholder="Type Here"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            style={{
-              boxSizing: 'border-box',
-              color: description ? '#000' : '#9E9E9E'
-            }}
-          />
+          {/* Bill Amount Field - Only for Bill Settlement */}
+          {selectedType === 'Bill Settlement' && (
+            <div className="">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Bill Amount<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formatWithCommas(billAmount)}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/,/g, "");
+                    if (!isNaN(rawValue)) {
+                      setBillAmount(rawValue);
+                    }
+                  }}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
+                  style={{
+                    boxSizing: 'border-box',
+                    color: billAmount ? '#000' : '#9E9E9E'
+                  }}
+                  placeholder="Enter bill amount"
+                />
+              </div>
+            </div>
+          )}
+          {/* Category Field - Only for Bill Settlement */}
+          {selectedType === 'Bill Settlement' && (
+            <div className="">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Category<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowCategoryModal(true)}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  style={{
+                    boxSizing: 'border-box',
+                    color: selectedCategory ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  {selectedCategory ? selectedCategory.label : 'Select'}
+                  {selectedCategory ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCategory(null);
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  ) : (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Amount Given Field */}
+          {selectedType === 'Transfer' ? (
+            <>
+              {/* To Project Field - Full Width */}
+              <div className="">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  To Project<span className="text-[#eb2f8e]">*</span>
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowTransferSiteModal(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{
+                      boxSizing: 'border-box',
+                      color: transferSiteId ? '#000' : '#9E9E9E'
+                    }}
+                  >
+                    {transferSiteId ? (siteOptions.find(opt => opt.id === parseInt(transferSiteId))?.label || 'Select') : 'Select'}
+                    {transferSiteId ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTransferSiteId('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Transfer Amount Field - Full Width */}
+              <div className="">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  Transfer Amount<span className="text-[#eb2f8e]">*</span>
+                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formatWithCommas(advanceAmount)}
+                    onChange={handleAmountChange}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
+                    style={{
+                      boxSizing: 'border-box',
+                      color: advanceAmount ? '#000' : '#9E9E9E'
+                    }}
+                    placeholder="Enter amount"
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex gap-[10px] items-center">
+              <div className="">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  {selectedType === 'Refund' ? 'Refund Amount' : 'Amount Given'}<span className="text-[#eb2f8e]">*</span>
+                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formatWithCommas(advanceAmount)}
+                    onChange={handleAmountChange}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
+                    style={{
+                      boxSizing: 'border-box',
+                      color: advanceAmount ? '#000' : '#9E9E9E'
+                    }}
+                    placeholder="Enter amount"
+                  />
+                </div>
+              </div>
+              {/* Payment Mode Field */}
+              <div className="flex-1">
+                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                  Payment Mode<span className="text-[#eb2f8e]">*</span>
+                </p>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowPaymentModeModal(true)}
+                    className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                    style={{
+                      boxSizing: 'border-box',
+                      color: paymentMode ? '#000' : '#9E9E9E'
+                    }}
+                  >
+                    {paymentMode || 'Select'}
+                    {paymentMode ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPaymentMode('');
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                      </button>
+                    ) : (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Description Field */}
+          <div className="">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+              Description
+            </p>
+            <textarea
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] pt-[4px] items-center text-[12px] font-medium bg-white focus:outline-none"
+              placeholder="Type Here"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{
+                boxSizing: 'border-box',
+                color: description ? '#000' : '#9E9E9E'
+              }}
+            />
+          </div>
         </div>
-      </div>
-      {/* Attach File - same pattern as AdvancePortal: label wraps clickable area */}
-      <div className="flex flex-wrap items-center gap-x-[8px] mb-1 gap-y-[4px] w-full max-w-[328px]">
-        <input
-          type="file"
-          id="fileInput"
-          ref={fileInputRef}
-          className="hidden"
-          onChange={handleFileAttach}
-          accept="image/*,.pdf,.doc,.docx"
-        />
-        <label
-          htmlFor="fileInput"
-          className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
-        >
-          <img className='w-4 h-3' alt='#' src={Attach}></img>
-          <span className="text-[12px] font-medium underline">Attach File</span>
-        </label>
-        {selectedAdvanceFile && (
-          <span className="text-[11px] font-medium text-[#666] break-words min-w-0 flex-1">
-            {selectedAdvanceFile.name}
-          </span>
-        )}
-      </div>
-      {/* Pay Advance Button */}
-      <button
-        onClick={handlePayAdvance}
-        disabled={isSubmitting || checkingDuplicate || !areAllRequiredFieldsFilled()}
-        className={`w-[328px] h-[40px] font-semibold rounded text-[14px] leading-normal ${
-          areAllRequiredFieldsFilled() && !isSubmitting && !checkingDuplicate
+        {/* Attach File - same pattern as AdvancePortal: label wraps clickable area */}
+        <div className="flex flex-wrap items-center gap-x-[8px] mb-1 gap-y-[4px] w-full max-w-[328px]">
+          <input
+            type="file"
+            id="fileInput"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileAttach}
+            accept="image/*,.pdf,.doc,.docx"
+          />
+          <label
+            htmlFor="fileInput"
+            className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
+          >
+            <img className='w-4 h-3' alt='#' src={Attach}></img>
+            <span className="text-[12px] font-medium underline">Attach File</span>
+          </label>
+          {selectedAdvanceFile && (
+            <span className="text-[11px] font-medium text-[#666] break-words min-w-0 flex-1">
+              {selectedAdvanceFile.name}
+            </span>
+          )}
+        </div>
+        {/* Pay Advance Button */}
+        <button
+          onClick={handlePayAdvance}
+          disabled={isSubmitting || checkingDuplicate || !areAllRequiredFieldsFilled()}
+          className={`w-full h-[40px] font-semibold rounded text-[14px] leading-normal ${areAllRequiredFieldsFilled() && !isSubmitting && !checkingDuplicate
             ? 'bg-black text-white'
             : 'bg-[#D9D9D9] text-black'
-        }`}
-      >
-        {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Submitting...' : getButtonLabel()}
-      </button>
+            }`}
+        >
+          {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Submitting...' : getButtonLabel()}
+        </button>
       </div>
 
       {/* Advance Records - only this section scrolls */}
-      <div className="mt-3 w-full max-w-[328px] flex-1 min-h-0 flex flex-col">
+      <div className="mt-3 w-full flex-1 min-h-0 flex flex-col">
         {!selectedOption || !selectedSite ? (
           <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
             <p className="text-[12px] font-medium text-[#9E9E9E]">
@@ -1574,7 +1564,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                   refund_amount,
                   entry_no
                 } = entry;
-                
+
                 // Get type code
                 const getTypeCode = (type) => {
                   switch (type) {
@@ -1585,7 +1575,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                     default: return '';
                   }
                 };
-                
+
                 // Format date as DD/MM/YYYY
                 const formatDate = (dateString) => {
                   const date = new Date(dateString);
@@ -1594,16 +1584,16 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                   const year = date.getFullYear();
                   return `${day}/${month}/${year}`;
                 };
-                
+
                 const typeCode = getTypeCode(type);
                 const formattedDate = formatDate(date);
                 const transactionId = `${typeCode} - ${formattedDate} - ${entry_no || ''}`;
-                
+
                 // Get transfer site label for Transfer type
-                const transferSiteLabel = type === 'Transfer' && transfer_site_id 
+                const transferSiteLabel = type === 'Transfer' && transfer_site_id
                   ? siteOptions.find(site => site.id === parseInt(transfer_site_id))?.label || transfer_site_id
                   : null;
-                
+
                 return (
                   <div
                     key={entry.advancePortalId || index}
@@ -1625,41 +1615,40 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                         </p>
                       )}
                     </div>
-                    
+
                     {/* Right side: Payment Mode and Amount(s) */}
                     <div className="flex flex-col items-end gap-[4px] flex-shrink-0">
                       {(payment_mode || (type === 'Transfer' && !payment_mode)) && (
                         <span
-                          className={`inline-block text-[10px] font-medium pl-[8px] pr-[8px] rounded-full ${
-                            type === 'Transfer'
-                              ? 'bg-[#FFF3E0] text-black'
-                              : type === 'Bill Settlement'
-                                ? 'bg-[#007233] text-white'
-                                : 'bg-[#FFF3E0] text-[#E4572E]'
-                          }`}
+                          className={`inline-block text-[10px] font-medium pl-[8px] pr-[8px] rounded-full ${type === 'Transfer'
+                            ? 'bg-[#FFF3E0] text-black'
+                            : type === 'Bill Settlement'
+                              ? 'bg-[#007233] text-white'
+                              : 'bg-[#FFF3E0] text-[#E4572E]'
+                            }`}
                         >
                           {type === 'Transfer' && !payment_mode ? 'Online' : (payment_mode || '')}
                         </span>
                       )}
-                      
+
                       {type === 'Refund' && (
                         <span className="text-[12px] font-semibold text-[#E4572E]">
                           -₹{Math.abs(parseFloat(refund_amount || 0) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </span>
                       )}
-                      
+
                       {type === 'Transfer' && (
                         <span className={`text-[12px] font-semibold ${parseFloat(amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
                           {parseFloat(amount || 0) < 0 ? '-' : ''}₹{Math.abs(parseFloat(amount || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </span>
                       )}
-                      
+
                       {type === 'Bill Settlement' && (
                         <span className={`text-[12px] font-semibold ${parseFloat(amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
                           ₹{parseFloat(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </span>
                       )}
-                      
+
                       {type === 'Advance' && (
                         <span className={`text-[12px] font-semibold ${parseFloat(amount || 0) < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
                           ₹{parseFloat(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
@@ -1685,7 +1674,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1705,7 +1694,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
             </div>
 
             {/* Search Bar */}
-            <div className="px-[24px] pt-[16px] pb-[16px]">
+            <div className="px-[24px] pt-[4px] pb-[6px]">
               <div className="relative">
                 <input
                   type="text"
@@ -1725,7 +1714,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
             </div>
 
             {/* Options List */}
-            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Advance', 'Bill Settlement', 'Transfer', 'Refund']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))
@@ -1740,27 +1729,11 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                           setShowTypeModal(false);
                           setTypeSearchQuery('');
                         }}
-                        className={`w-full h-[40px] px-[24px] flex items-center justify-between transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                        className={`w-full px-[16px] flex items-center gap-3 transition-colors ${isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
                           }`}
+                        style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                       >
-                        {/* Left: Option Text */}
-                        <div className="flex items-center gap-[12px] flex-1 min-w-0">
-                          <p className="text-[14px] font-medium text-black text-left truncate">{type}</p>
-                        </div>
-
-                        {/* Right: Radio Button */}
-                        <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 ml-3">
-                          {isSelected ? (
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="10" cy="10" r="9" stroke="#e4572e" strokeWidth="2" fill="none" />
-                              <circle cx="10" cy="10" r="4" fill="#e4572e" />
-                            </svg>
-                          ) : (
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="10" cy="10" r="9" stroke="#9E9E9E" strokeWidth="1.5" fill="none" />
-                            </svg>
-                          )}
-                        </div>
+                        <p className="text-[12px] font-medium text-black text-left">{type}</p>
                       </button>
                     );
                   }))}
@@ -1915,7 +1888,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold text-black mb-1">Payment Mode</p>
-                  <div className="h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] flex items-center text-[12px] font-medium bg-[#F5F5F5] text-[#666]">
+                  <div className="h-[36px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] flex items-center text-[12px] font-medium bg-[#F5F5F5] text-[#666]">
                     {paymentModalData.paymentMode || '-'}
                   </div>
                 </div>

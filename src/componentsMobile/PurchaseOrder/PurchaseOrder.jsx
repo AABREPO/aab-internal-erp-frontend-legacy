@@ -2590,8 +2590,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
         2: { cellWidth: 75 }, // ITEM NAME
         3: { cellWidth: 28 }, // MODEL
         4: { cellWidth: 20 }, // TYPE
-        5: { cellWidth: 13 }, // QTY
-        6: { cellWidth: 17 }  // PRICE
+        5: { cellWidth: 15 }, // QTY
+        6: { cellWidth: 15 }  // PRICE
       }
       : isVATradersVendor
         ? {
@@ -2611,8 +2611,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
           3: { cellWidth: 28 }, // MODEL
           4: { cellWidth: 20 }, // BRAND
           5: { cellWidth: 20 }, // TYPE
-          6: { cellWidth: 13 }, // QTY
-          7: { cellWidth: 17 }  // PRICE
+          6: { cellWidth: 15 }, // QTY
+          7: { cellWidth: 15 }  // PRICE
         };
     autoTable(doc, {
       startY: 52,

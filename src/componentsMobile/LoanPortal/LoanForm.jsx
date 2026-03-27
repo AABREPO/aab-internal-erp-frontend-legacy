@@ -3,6 +3,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Attach from '../Images/Attachfile.svg';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
+import CloseIcon from '../Images/Close F.svg'
 
 const LoanForm = () => {
   const resolveActiveBranchId = () => {
@@ -331,7 +332,7 @@ const LoanForm = () => {
       formData.append('from_purpose_id', purpose);
       formData.append('entry_no', entryNo);
       formData.append('description', description || '');
-      
+
       if (selectedOption.type === 'Vendor') {
         formData.append('vendor_id', selectedOption.id);
       } else if (selectedOption.type === 'Contractor') {
@@ -377,7 +378,7 @@ const LoanForm = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
+
       // Increment entry number
       setEntryNo(prev => prev + 1);
     } catch (error) {
@@ -394,221 +395,213 @@ const LoanForm = () => {
 
   return (
     <div
-      className="px-[16px] flex flex-col flex-1 min-h-0 overflow-hidden"
+      className="flex flex-col flex-1 min-h-0 overflow-hidden"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Form section - no scroll */}
       <div className="flex-shrink-0">
-      {/* Loan Number and Date */}
-      <div className="mb-2 items-center border-b border-gray-200 pb-[4px] mt-1.5 flex justify-between">
-        <div className="flex items-center gap-[8px] mt-0.5">
-          <span className="text-[12px] font-semibold text-black leading-normal"># {entryNo}</span>
-          <span className="text-[12px] font-semibold text-black leading-normal">{formatDate(dateValue)}</span>
-        </div>
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowTypeModal(true)}
-            className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
-          >
-            {selectedLoanType || 'Select Type'}
-          </button>
-        </div>
-      </div>
-      <div className="space-y-[6px]">
-        {/* Associate */}
-        <div className="">
-          <p className="flex justify-between items-center text-[12px] font-semibold text-black leading-normal mb-0.5">
-            <span>Associate<span className="text-[#eb2f8e]">*</span></span>
-            <span className="text-[12px] font-medium text-[#9E9E9E]">{formatWithCommas(overallLoan)}</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowAssociateModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                boxSizing: 'border-box',
-                color: selectedOption ? '#000' : '#9E9E9E'
-              }}
+        {/* Loan Number and Date */}
+        <div className="mb-[8px] items-center border-b border-gray-200 pb-[6px] mt-[6px] flex justify-between">
+          <div className="flex items-center gap-[8px] mt-[4px]">
+            <span className="text-[12px] font-semibold text-black leading-normal"># {entryNo}</span>
+            <span className="text-[12px] font-semibold text-black leading-normal">{formatDate(dateValue)}</span>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowTypeModal(true)}
+              className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
-              {selectedOption ? selectedOption.label : 'Select'}
-              {selectedOption ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedOption(null);
-                    setOverallLoan(0);
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
-            </div>
+              {selectedLoanType || 'Select Type'}
+            </button>
           </div>
         </div>
-
-        {/* Purpose */}
-        <div className="">
-          <p className="text-[12px] flex justify-between items-center font-semibold text-black leading-normal mb-0.5">
-            <span>Purpose<span className="text-[#eb2f8e]">*</span></span>
-            <span className="text-[12px] font-medium text-[#9E9E9E]">0.00</span>
-          </p>
-          <div className="relative">
-            <div
-              onClick={() => setShowPurposeModal(true)}
-              className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-              style={{
-                boxSizing: 'border-box',
-                color: purpose ? '#000' : '#9E9E9E'
-              }}
-            >
-              {purpose ? (purposeOptions.find(opt => opt.id === parseInt(purpose))?.label || 'Select') : 'Select'}
-              {purpose ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPurpose('');
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Amount Given and Payment Mode - Side by Side */}
-        <div className="flex justify-between items-center w-[328px]">
+        <div className="space-y-[6px]">
+          {/* Associate */}
           <div className="">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Amount Given<span className="text-[#eb2f8e]">*</span>
-            </p>
-            <div className="relative">
-              <input
-                type="text"
-                value={formatWithCommas(amountGiven)}
-                onChange={handleAmountChange}
-                placeholder="Enter amount"
-                className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
-                style={{
-                  boxSizing: 'border-box',
-                  color: amountGiven ? '#000' : '#9E9E9E'
-                }}
-              />
-            </div>
-          </div>
-          {/* Payment Mode Field */}
-          <div className="">
-            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-              Payment Mode<span className="text-[#eb2f8e]">*</span>
+            <p className="flex justify-between items-center text-[12px] font-semibold text-black leading-normal mb-0.5">
+              <span>Associate<span className="text-[#eb2f8e]">*</span></span>
+              <span className="text-[12px] font-medium text-[#9E9E9E]">{formatWithCommas(overallLoan)}</span>
             </p>
             <div className="relative">
               <div
-                onClick={() => setShowPaymentModeModal(true)}
-                className="w-[160px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                onClick={() => setShowAssociateModal(true)}
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
-                  color: paymentMode ? '#000' : '#9E9E9E'
+                  color: selectedOption ? '#000' : '#9E9E9E'
                 }}
               >
-                {paymentMode || 'Select'}
-                {paymentMode ? (
+                {selectedOption ? selectedOption.label : 'Select'}
+                {selectedOption ? (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPaymentMode('');
+                      setSelectedOption(null);
+                      setOverallLoan(0);
                     }}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
                   </button>
                 ) : (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1 1L6 6L11 1" stroke="#9E9E9E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Description Field */}
-        <div className="">
-          <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-            Description
-          </p>
-          <textarea
-            className="w-[328px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] pt-[4px] items-center text-[12px] font-medium bg-white focus:outline-none"
-            placeholder="Type Here"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            style={{
-              boxSizing: 'border-box',
-              color: description ? '#000' : '#9E9E9E'
-            }}
-          />
+          {/* Purpose */}
+          <div className="">
+            <p className="text-[12px] flex justify-between items-center font-semibold text-black leading-normal mb-0.5">
+              <span>Purpose<span className="text-[#eb2f8e]">*</span></span>
+              <span className="text-[12px] font-medium text-[#9E9E9E]">0.00</span>
+            </p>
+            <div className="relative">
+              <div
+                onClick={() => setShowPurposeModal(true)}
+                className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                style={{
+                  boxSizing: 'border-box',
+                  color: purpose ? '#000' : '#9E9E9E'
+                }}
+              >
+                {purpose ? (purposeOptions.find(opt => opt.id === parseInt(purpose))?.label || 'Select') : 'Select'}
+                {purpose ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPurpose('');
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                  </button>
+                ) : (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          {/* Amount Given and Payment Mode - Side by Side */}
+          <div className="flex gap-[10px] items-center">
+            <div className="flex-1">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Amount Given<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formatWithCommas(amountGiven)}
+                  onChange={handleAmountChange}
+                  placeholder="Enter amount"
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
+                  style={{
+                    boxSizing: 'border-box',
+                    color: amountGiven ? '#000' : '#9E9E9E'
+                  }}
+                />
+              </div>
+            </div>
+            {/* Payment Mode Field */}
+            <div className="flex-1">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Payment Mode<span className="text-[#eb2f8e]">*</span>
+              </p>
+              <div className="relative">
+                <div
+                  onClick={() => setShowPaymentModeModal(true)}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+                  style={{
+                    boxSizing: 'border-box',
+                    color: paymentMode ? '#000' : '#9E9E9E'
+                  }}
+                >
+                  {paymentMode || 'Select'}
+                  {paymentMode ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPaymentMode('');
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+                    </button>
+                  ) : (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Description Field */}
+          <div className="">
+            <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+              Description
+            </p>
+            <textarea
+              className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] pt-[4px] items-center text-[12px] font-medium bg-white focus:outline-none"
+              placeholder="Type Here"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{
+                boxSizing: 'border-box',
+                color: description ? '#000' : '#9E9E9E'
+              }}
+            />
+          </div>
         </div>
-      </div>
-      {/* Attach File - same pattern as AdvanceForm */}
-      <div className="flex flex-wrap items-center gap-x-[8px] mb-1 gap-y-[4px] w-full max-w-[328px]">
-        <input
-          type="file"
-          id="fileInput"
-          ref={fileInputRef}
-          className="hidden"
-          onChange={handleFileChange}
-          accept="image/*,.pdf"
-        />
-        <label
-          htmlFor="fileInput"
-          className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
+        {/* Attach File - same pattern as AdvanceForm */}
+        <div className="flex flex-wrap items-center gap-x-[8px] mb-1 gap-y-[4px] w-full max-w-[328px]">
+          <input
+            type="file"
+            id="fileInput"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileChange}
+            accept="image/*,.pdf"
+          />
+          <label
+            htmlFor="fileInput"
+            className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
+          >
+            <img className='w-4 h-3' alt='#' src={Attach}></img>
+            <span className="text-[12px] font-medium underline">Attach File</span>
+          </label>
+          {selectedLoanFile && (
+            <span className="text-[11px] font-medium text-[#666] break-words min-w-0 flex-1">
+              {selectedLoanFile.name}
+            </span>
+          )}
+        </div>
+        {/* Loan Button */}
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting || !selectedOption || !purpose || !amountGiven || !paymentMode}
+          className={`w-full h-[40px] font-semibold rounded text-[14px] leading-normal ${selectedOption && purpose && amountGiven && paymentMode && !isSubmitting
+              ? 'bg-black text-white'
+              : 'bg-[#D9D9D9] text-black'
+            }`}
         >
-          <img className='w-4 h-3' alt='#' src={Attach}></img>
-          <span className="text-[12px] font-medium underline">Attach File</span>
-        </label>
-        {selectedLoanFile && (
-          <span className="text-[11px] font-medium text-[#666] break-words min-w-0 flex-1">
-            {selectedLoanFile.name}
-          </span>
-        )}
-      </div>
-      {/* Loan Button */}
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting || !selectedOption || !purpose || !amountGiven || !paymentMode}
-        className={`w-[328px] h-[40px] font-semibold rounded text-[14px] leading-normal ${
-          selectedOption && purpose && amountGiven && paymentMode && !isSubmitting
-            ? 'bg-black text-white'
-            : 'bg-[#D9D9D9] text-black'
-        }`}
-      >
-        {isSubmitting ? 'Submitting...' : 'Loan'}
-      </button>
+          {isSubmitting ? 'Submitting...' : 'Loan'}
+        </button>
       </div>
 
       {/* Select Type Modal */}
@@ -622,7 +615,7 @@ const LoanForm = () => {
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           <div
-            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col"
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -642,7 +635,7 @@ const LoanForm = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="px-[24px] pt-[16px] pb-[16px]">
+            <div className="px-[24px] pt-[4px] pb-[6px]">
               <div className="relative">
                 <input
                   type="text"
@@ -662,7 +655,10 @@ const LoanForm = () => {
             </div>
 
             {/* Options List */}
-            <div className="flex-1 overflow-y-auto mb-4 px-[24px] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div
+              className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+            >
               <div className="shadow-md rounded-lg overflow-hidden">
                 {(['Loan', 'Refund', 'Transfer']
                   .filter(type => type.toLowerCase().includes(typeSearchQuery.toLowerCase()))

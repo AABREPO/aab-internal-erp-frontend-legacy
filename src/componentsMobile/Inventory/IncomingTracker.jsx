@@ -335,7 +335,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
     const fetchIncomingRecords = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll', {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getIncoming', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -346,17 +346,9 @@ const IncomingTracker = ({ user, onTabChange }) => {
           throw new Error('Network response was not ok');
         }
         const inventoryData = await response.json();
-        // Filter for incoming type only and exclude deleted
-        // Only show records where inventory_type is exactly 'incoming'
-        const incomingItems = inventoryData.filter(item => {
-          const inventoryType = item.inventory_type || item.inventoryType || '';
-          const isIncoming = String(inventoryType).toLowerCase() === 'incoming';
-          const isDeleted = item.delete_status || item.deleteStatus;
-          return isIncoming && !isDeleted;
-        });
         // Process each incoming record (only those with PO numbers)
         const processedRecords = await Promise.all(
-          incomingItems
+          inventoryData
             .filter(record => {
               // Only process records with valid PO numbers (exclude NO_PO, empty, or null)
               const recordPurchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
@@ -555,7 +547,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
         const fetchIncomingRecords = async () => {
           try {
             setLoading(true);
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll', {
+            const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getIncoming', {
               method: 'GET',
               credentials: 'include',
               headers: {
@@ -569,15 +561,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
 
             const inventoryData = await response.json();
 
-            const incomingItems = inventoryData.filter(item => {
-              const inventoryType = item.inventory_type || item.inventoryType || '';
-              const isIncoming = String(inventoryType).toLowerCase() === 'incoming';
-              const isDeleted = item.delete_status || item.deleteStatus;
-              return isIncoming && !isDeleted;
-            });
-
             const processedRecords = await Promise.all(
-              incomingItems
+              inventoryData
                 .filter(record => {
                   const recordPurchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
                   const purchaseNoStr = String(recordPurchaseNo).trim();
@@ -1625,7 +1610,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   }
                   // Refresh data once after all closes
                   setLoading(true);
-                  const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll', {
+                  const response = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getIncoming', {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
@@ -1634,14 +1619,8 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   });
                   if (response.ok) {
                     const inventoryData = await response.json();
-                    const incomingItems = inventoryData.filter(item => {
-                      const inventoryType = item.inventory_type || item.inventoryType || '';
-                      const isIncoming = String(inventoryType).toLowerCase() === 'incoming';
-                      const isDeleted = item.delete_status || item.deleteStatus;
-                      return isIncoming && !isDeleted;
-                    });
                     const processedRecords = await Promise.all(
-                      incomingItems
+                      inventoryData
                         .filter(record => {
                           const recordPurchaseNo = record.purchase_no || record.purchaseNo || record.purchase_number || '';
                           const purchaseNoStr = String(recordPurchaseNo).trim();

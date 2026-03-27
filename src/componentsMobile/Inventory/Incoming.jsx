@@ -575,13 +575,19 @@ const Incoming = ({ user }) => {
       const poNumber = inventoryItem.purchase_no || inventoryItem.purchaseNo || inventoryItem.purchase_number || '';
 
       // Set incoming data (including inventoryId if in edit mode)
+      const resolvedInventoryId =
+        inventoryItem.id ||
+        inventoryItem.inventoryId ||
+        inventoryItem.inventoryManagementId ||
+        inventoryItem.inventory_management_id ||
+        null;
       setIncomingData({
         poNumber: poNumber === 'NO_PO' ? '' : poNumber,
         vendorName: vendorName,
         vendorId: vendorId,
         stockingLocation: stockingLocation,
         date: formattedDate,
-        inventoryId: editMode && inventoryItem.id ? inventoryItem.id : null
+        inventoryId: editMode ? resolvedInventoryId : null
       });
 
       // Process inventory items
@@ -1501,8 +1507,11 @@ const Incoming = ({ user }) => {
   };
   return (
     <div
-      className="flex flex-col h-[calc(100vh-90px-80px)] overflow-hidden"
-      style={{ '--incoming-dropdown-max-height': 'calc(100vh - 90px - 80px)' }}
+      className="flex flex-col overflow-hidden"
+      style={{
+        height: 'calc(100svh - 90px - 80px)',
+        '--incoming-dropdown-max-height': 'calc(100svh - 90px - 80px)'
+      }}
     >
       {/* PO Number and Date Row - Only show when not in empty state */}
       {!isEmptyState && (
@@ -1921,7 +1930,7 @@ const Incoming = ({ user }) => {
         stockingLocationId={(() => {
           const stockingLocationSite = siteOptions.find(
             site => site.value === incomingData.stockingLocation && site.markedAsStockingLocation === true
-          ); console.log("stockingLocationId", stockingLocationSite?.id);
+          ); 
           return stockingLocationSite?.id || null;
         })()}
         disableAvailabilityCheck={true}

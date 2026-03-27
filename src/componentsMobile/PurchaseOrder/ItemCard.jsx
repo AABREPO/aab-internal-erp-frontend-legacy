@@ -51,7 +51,8 @@ const ItemCard = ({
   onSwipeMove,
   onSwipeEnd,
   swipeState,
-  onAmountChange      // Optional callback when amount changes
+  onAmountChange,     // Optional callback when amount changes
+  amountDisplayMode = 'total' // 'total' (price*qty) | 'unit' (price only)
 }) => {
   const [isEditingAmount, setIsEditingAmount] = useState(false);
   const [amountValue, setAmountValue] = useState(item?.price || 0);
@@ -60,15 +61,18 @@ const ItemCard = ({
   // Must be called before any conditional returns
   const cardRef = useRef(null);
 
-  // Calculate total amount from price and quantity (before early return)
-  const totalAmount = ((item?.price || 0) * (item?.quantity || 1));
+  const qty = Number(item?.quantity || 0) || 0;
+  const unitAmount = Number(item?.price || 0) || 0;
+  const displayAmount = amountDisplayMode === 'unit'
+    ? unitAmount
+    : (unitAmount * (qty || 1));
 
   // Update amount value when item changes (must be before early return)
   useEffect(() => {
     if (!isEditingAmount && item) {
-      setAmountValue(totalAmount);
+      setAmountValue(displayAmount);
     }
-  }, [totalAmount, isEditingAmount, item]);
+  }, [displayAmount, isEditingAmount, item]);
 
   // Focus input when editing starts (must be before early return)
   useEffect(() => {
@@ -179,9 +183,11 @@ const ItemCard = ({
     setIsEditingAmount(false);
     const numericValue = parseFloat(amountValue) || 0;
     setAmountValue(numericValue);
-    // Calculate price per unit from total amount
-    const quantity = item.quantity || 1;
-    const pricePerUnit = quantity > 0 ? numericValue / quantity : 0;
+    // In 'unit' mode, the edited value is already per-unit
+    const pricePerUnit =
+      amountDisplayMode === 'unit'
+        ? numericValue
+        : ((qty || 1) > 0 ? numericValue / (qty || 1) : 0);
     if (onAmountChange) {
       onAmountChange(item.id, pricePerUnit);
     }
@@ -191,7 +197,7 @@ const ItemCard = ({
     if (e.key === 'Enter') {
       e.target.blur();
     } else if (e.key === 'Escape') {
-      setAmountValue(totalAmount);
+      setAmountValue(displayAmount);
       setIsEditingAmount(false);
     }
   };
@@ -268,7 +274,7 @@ const ItemCard = ({
                   />
                 ) : (
                   <p className="text-[12px] font-semibold text-black leading-snug cursor-text" style={{ marginTop: 0, marginBottom: 0 }}>
-                    ₹{totalAmount}
+                    ₹{displayAmount}
                   </p>
                 )}
               </div>

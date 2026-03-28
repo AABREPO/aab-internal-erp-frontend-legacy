@@ -344,10 +344,9 @@ const Report = () => {
 
   const getPaymentModeBadgeClass = (mode) => {
     if (!mode || mode === '') return 'bg-gray-100 text-gray-600';
-    if (mode.toLowerCase() === 'cash') return 'bg-[#E3F2FD] text-[#1976D2]';
-    if (mode.toLowerCase() === 'gpay' || mode.toLowerCase() === 'g-pay') return 'bg-gray-100 text-gray-600';
-    if (mode.toLowerCase() === 'online') return 'bg-gray-100 text-gray-600';
-    return 'bg-gray-100 text-gray-600';
+    const m = String(mode).toLowerCase();
+    if (m === 'cash') return 'bg-[#E7F4FD] text-[#336EA8]';
+    return 'bg-[#FFEFFF] text-[#815182]';
   };
 
   const handleDateConfirm = (startDate, endDate) => {

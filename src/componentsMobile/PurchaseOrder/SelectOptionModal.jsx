@@ -103,7 +103,7 @@ const SelectOptionModal = ({ isOpen, onClose, onSelect, selectedValue, options =
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 -top-[16px] flex items-center justify-center p-[16px]"
+      className="fixed inset-0 bg-black bg-opacity-50 z-[200] -top-[16px] flex items-center justify-center p-[16px]"
       onClick={handleBackdropClick}
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >

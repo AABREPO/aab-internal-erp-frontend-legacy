@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import SelectOptionModal from '../PurchaseOrder/SelectOptionModal';
+import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 
@@ -41,8 +41,16 @@ const ToolsHistory = ({ user }) => {
   const [fileUrl, setFileUrl] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerField, setDatePickerField] = useState(null);
-  const [sheetOpenPicker, setSheetOpenPicker] = useState(null);
-  const [sheetPickerSearch, setSheetPickerSearch] = useState('');
+  const [showEditSheetItemNameModal, setShowEditSheetItemNameModal] = useState(false);
+  const [showEditSheetItemIdModal, setShowEditSheetItemIdModal] = useState(false);
+  const [showEditSheetBrandModal, setShowEditSheetBrandModal] = useState(false);
+  const [showEditSheetHomeLocationModal, setShowEditSheetHomeLocationModal] = useState(false);
+  const [showEditSheetPurchaseStoreModal, setShowEditSheetPurchaseStoreModal] = useState(false);
+  const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false);
+  const [pendingCreateValue, setPendingCreateValue] = useState('');
+  const [pendingCreateType, setPendingCreateType] = useState('itemId'); // 'itemName' | 'brand' | 'itemId'
+  /** When false, successful create applies to edit bottom sheet fields instead of main filters */
+  const [pendingCreateApplyToMain, setPendingCreateApplyToMain] = useState(true);
   const [purchaseStoreOptions, setPurchaseStoreOptions] = useState([]);
   const [homeLocationOptions, setHomeLocationOptions] = useState([]);
   const [purchaseStoreFullData, setPurchaseStoreFullData] = useState([]);
@@ -348,6 +356,76 @@ const ToolsHistory = ({ user }) => {
     });
     return Array.from(collected).sort();
   }, [selectedItemIdDbId, selectedToolsDetails, resolveMachineNumberText]);
+
+  // Edit sheet: same option sources as main filters, keyed off editFormData (AddInput-style SelectVendorModal)
+  const editSheetItemNameRecord = useMemo(() => {
+    if (!showEditSheet) return null;
+    if (editFormData.itemNameId) {
+      const byId = toolsItemNameListData.find((i) => i != null && String(i.id) === String(editFormData.itemNameId));
+      if (byId) return byId;
+    }
+    const name = (editFormData.itemName || '').trim();
+    if (name) {
+      return toolsItemNameListData.find((i) => (i?.item_name ?? i?.itemName) === name) || null;
+    }
+    return null;
+  }, [showEditSheet, editFormData.itemName, editFormData.itemNameId, toolsItemNameListData]);
+
+  const editSheetToolsDetails = useMemo(() => {
+    const details = editSheetItemNameRecord?.tools_details ?? editSheetItemNameRecord?.toolsDetails;
+    return Array.isArray(details) ? details : [];
+  }, [editSheetItemNameRecord]);
+
+  const editSheetBrandOptions = useMemo(() => {
+    if (!showEditSheet || !editSheetItemNameRecord) return [];
+    if (editSheetToolsDetails.length === 0) return brandOptions;
+    const brandIds = new Set();
+    editSheetToolsDetails.forEach((d) => {
+      const bid = d?.brand_id ?? d?.brandId;
+      if (bid != null) brandIds.add(String(bid));
+    });
+    if (brandIds.size === 0) return brandOptions;
+    return brandOptions.filter((name) => {
+      const b = toolsBrandFullData.find((x) => (x?.tools_brand ?? x?.toolsBrand ?? '').trim() === name);
+      return b && brandIds.has(String(b.id));
+    });
+  }, [showEditSheet, editSheetItemNameRecord, editSheetToolsDetails, brandOptions, toolsBrandFullData]);
+
+  const editSheetItemIdOptions = useMemo(() => {
+    if (!showEditSheet) return [];
+    const itemNameId =
+      editSheetItemNameRecord?.id ??
+      editFormData.itemNameId ??
+      toolsItemNameListData.find((i) => (i?.item_name ?? i?.itemName) === (editFormData.itemName || '').trim())?.id;
+    if (!itemNameId) return [];
+    if (editSheetToolsDetails.length > 0) {
+      const itemIdsIds = new Set();
+      editSheetToolsDetails.forEach((d) => {
+        const iid = d?.item_ids_id ?? d?.itemIdsId;
+        if (iid != null) itemIdsIds.add(String(iid));
+      });
+      const filtered = itemIdOptions.filter((name) => {
+        const row = toolsItemIdFullData.find((x) => (x?.item_id ?? x?.itemId ?? '').trim() === name);
+        return row && itemIdsIds.has(String(row.id));
+      });
+      if (filtered.length > 0) return filtered;
+    }
+    return toolsItemIdFullData
+      .filter((item) => String(item?.item_name_id ?? item?.itemNameId ?? '') === String(itemNameId))
+      .map((item) => (item?.item_id ?? item?.itemId ?? '').trim())
+      .filter(Boolean)
+      .filter((x, idx, a) => a.indexOf(x) === idx)
+      .sort();
+  }, [
+    showEditSheet,
+    editSheetItemNameRecord,
+    editSheetToolsDetails,
+    editFormData.itemName,
+    editFormData.itemNameId,
+    itemIdOptions,
+    toolsItemIdFullData,
+    toolsItemNameListData
+  ]);
 
   // When Item ID is cleared, clear Machine Number
   useEffect(() => {
@@ -923,10 +1001,131 @@ const ToolsHistory = ({ user }) => {
     }
   }, [selectedItemNameId]);
 
-  const handleSelectItemName = (value) => {
-    setSelectedItemName(value || '');
-    const found = toolsItemNameListData.find(
-      i => (i?.item_name ?? i?.itemName ?? '').trim() === value
+  const normalizeTextValue = (v) =>
+    String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizeItemIdValue = (v) =>
+    String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const findItemNameRecordByValue = (value, source = toolsItemNameListData) => {
+    const n = normalizeTextValue(value);
+    if (!n) return null;
+    return (Array.isArray(source) ? source : []).find(
+      (item) => normalizeTextValue(item?.item_name ?? item?.itemName) === n
+    ) || null;
+  };
+  const findBrandRecordByValue = (value, source = toolsBrandFullData) => {
+    const n = normalizeTextValue(value);
+    if (!n) return null;
+    return (Array.isArray(source) ? source : []).find(
+      (item) => normalizeTextValue(item?.tools_brand ?? item?.toolsBrand) === n
+    ) || null;
+  };
+  const findItemIdRecordByValue = (value, source = toolsItemIdFullData) => {
+    const n = normalizeItemIdValue(value);
+    if (!n) return null;
+    return (Array.isArray(source) ? source : []).find(
+      (item) => normalizeItemIdValue(item?.item_id ?? item?.itemId) === n
+    ) || null;
+  };
+
+  const closeCreateConfirmModal = () => {
+    setShowCreateConfirmModal(false);
+    setPendingCreateValue('');
+    setPendingCreateType('itemId');
+    setPendingCreateApplyToMain(true);
+  };
+
+  const requestCreateItemNameConfirmation = (raw, applyToMain = true) => {
+    const trimmed = String(raw || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed) {
+      alert('Please enter an Item Name');
+      return;
+    }
+    const existing = findItemNameRecordByValue(trimmed);
+    if (existing) {
+      const label = existing?.item_name ?? existing?.itemName ?? trimmed;
+      if (applyToMain) {
+        handleSelectItemName(label, toolsItemNameListData);
+      } else {
+        setEditFormData((prev) => ({
+          ...prev,
+          itemName: label,
+          itemNameId: existing?.id ?? null
+        }));
+      }
+      alert('This Item Name already exists. Please enter a different one.');
+      return;
+    }
+    setPendingCreateApplyToMain(applyToMain);
+    setPendingCreateValue(trimmed);
+    setPendingCreateType('itemName');
+    setShowCreateConfirmModal(true);
+  };
+
+  const requestCreateBrandConfirmation = (raw, applyToMain = true) => {
+    const trimmed = String(raw || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed) {
+      alert('Please enter a Brand');
+      return;
+    }
+    const existing = findBrandRecordByValue(trimmed);
+    if (existing) {
+      const label = existing?.tools_brand ?? existing?.toolsBrand ?? trimmed;
+      if (applyToMain) {
+        handleSelectBrand(label, toolsBrandFullData);
+      } else {
+        setEditFormData((prev) => ({
+          ...prev,
+          brand: label,
+          brandId: existing?.id ?? null
+        }));
+      }
+      alert('This Brand already exists. Please enter a different one.');
+      return;
+    }
+    setPendingCreateApplyToMain(applyToMain);
+    setPendingCreateValue(trimmed);
+    setPendingCreateType('brand');
+    setShowCreateConfirmModal(true);
+  };
+
+  const requestCreateItemIdConfirmation = (raw, applyToMain = true) => {
+    const trimmed = String(raw || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed) {
+      alert('Please enter an Item ID');
+      return;
+    }
+    const effectiveItemName = applyToMain ? selectedItemName : (editFormData.itemName || '').trim();
+    if (!effectiveItemName) {
+      alert('Please select an Item Name before creating an Item ID.');
+      return;
+    }
+    const existing = findItemIdRecordByValue(trimmed);
+    if (existing) {
+      if (applyToMain) {
+        handleSelectItemId(trimmed, toolsItemIdFullData);
+      } else {
+        setEditFormData((prev) => ({
+          ...prev,
+          itemId: trimmed,
+          itemIdDbId: existing?.id ?? null,
+          quantity: '0'
+        }));
+      }
+      alert('This Item ID already exists. Please enter a different one.');
+      return;
+    }
+    setPendingCreateApplyToMain(applyToMain);
+    setPendingCreateValue(trimmed);
+    setPendingCreateType('itemId');
+    setShowCreateConfirmModal(true);
+  };
+
+  const handleSelectItemName = (value, nameListOverride = null) => {
+    const list = nameListOverride ?? toolsItemNameListData;
+    const v = (value || '').trim();
+    setSelectedItemName(v);
+    const found = list.find(
+      i => (i?.item_name ?? i?.itemName ?? '').trim() === v
     );
     setSelectedItemNameId(found ? found.id : null);
     setSelectedBrand('');
@@ -937,22 +1136,26 @@ const ToolsHistory = ({ user }) => {
     setShowItemNamePopup(false);
   };
 
-  const handleSelectBrand = (value) => {
-    setSelectedBrand(value || '');
-    const found = toolsBrandFullData.find(
-      b => (b?.tools_brand ?? b?.toolsBrand ?? '').trim() === value
+  const handleSelectBrand = (value, brandListOverride = null) => {
+    const list = brandListOverride ?? toolsBrandFullData;
+    const v = (value || '').trim();
+    setSelectedBrand(v);
+    const found = list.find(
+      b => (b?.tools_brand ?? b?.toolsBrand ?? '').trim() === v
     );
     setSelectedBrandId(found ? found.id : null);
     setShowBrandPopup(false);
   };
 
-  const handleSelectItemId = (value) => {
+  const handleSelectItemId = (value, itemIdFullDataOverride = null) => {
+    const fullData = itemIdFullDataOverride ?? toolsItemIdFullData;
+    const v = (value || '').trim();
     // When Item ID changes, always clear the previously selected machine number and log history
-    setSelectedItemId(value || '');
+    setSelectedItemId(v);
     setSelectedMachineNumber('');
     setMachineStatusHistory([]);
-    const found = toolsItemIdFullData.find(
-      i => (i?.item_id ?? i?.itemId ?? '').trim() === value
+    const found = fullData.find(
+      i => (i?.item_id ?? i?.itemId ?? '').trim() === v
     );
     const itemIdDbId = found ? found.id : null;
     setSelectedItemIdDbId(itemIdDbId);
@@ -1015,6 +1218,229 @@ const ToolsHistory = ({ user }) => {
   const handleSelectMachineNumber = (value) => {
     setSelectedMachineNumber(value || '');
     setShowMachineNumberPopup(false);
+  };
+
+  const handleConfirmCreate = async () => {
+    const pendingValue = String(pendingCreateValue || '').trim().replace(/\s+/g, ' ');
+    if (!pendingValue) {
+      closeCreateConfirmModal();
+      return;
+    }
+    const typeSnapshot = pendingCreateType;
+    const applyMainSnapshot = pendingCreateApplyToMain;
+    const editItemNameSnapshot = editFormData.itemName;
+    const editItemNameIdSnapshot = editFormData.itemNameId;
+    setShowCreateConfirmModal(false);
+    try {
+      if (typeSnapshot === 'itemName') {
+        const existingRes = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (existingRes.ok) {
+          const existingData = await existingRes.json();
+          const existingArray = Array.isArray(existingData) ? existingData : [];
+          const existingRecord = findItemNameRecordByValue(pendingValue, existingArray);
+          if (existingRecord) {
+            setToolsItemNameListData(existingArray);
+            const names = existingArray.map((item) => item?.item_name ?? item?.itemName).filter(Boolean);
+            setItemNameOptions([...new Set(names)]);
+            const existingLabel = existingRecord?.item_name ?? existingRecord?.itemName ?? pendingValue;
+            if (applyMainSnapshot) {
+              handleSelectItemName(existingLabel, existingArray);
+            } else {
+              setEditFormData((prev) => ({
+                ...prev,
+                itemName: existingLabel,
+                itemNameId: existingRecord?.id ?? null
+              }));
+            }
+            alert('This Item Name already exists. Please enter a different one.');
+            return;
+          }
+        }
+        const payload = { category_id: null, item_name: pendingValue, tools_details: [] };
+        const saveRes = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/save`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!saveRes.ok) {
+          throw new Error(`Failed to save: ${saveRes.status} ${saveRes.statusText}`);
+        }
+        const refreshed = await fetch(`${TOOLS_ITEM_NAME_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (refreshed.ok) {
+          const data = await refreshed.json();
+          const dataArray = Array.isArray(data) ? data : [];
+          setToolsItemNameListData(dataArray);
+          const names = dataArray.map((item) => item?.item_name ?? item?.itemName).filter(Boolean);
+          setItemNameOptions([...new Set(names)]);
+          const created = findItemNameRecordByValue(pendingValue, dataArray);
+          const createdLabel = created?.item_name ?? created?.itemName ?? pendingValue;
+          if (applyMainSnapshot) {
+            handleSelectItemName(createdLabel, dataArray);
+          } else {
+            setEditFormData((prev) => ({
+              ...prev,
+              itemName: createdLabel,
+              itemNameId: created?.id ?? null
+            }));
+          }
+        }
+      } else if (typeSnapshot === 'brand') {
+        const existingRes = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (existingRes.ok) {
+          const existingData = await existingRes.json();
+          const existingArray = Array.isArray(existingData) ? existingData : [];
+          const existingRecord = findBrandRecordByValue(pendingValue, existingArray);
+          if (existingRecord) {
+            setToolsBrandFullData(existingArray);
+            const brandOpts = existingArray
+              .map((b) => b?.tools_brand?.trim() ?? b?.toolsBrand?.trim())
+              .filter(Boolean);
+            setBrandOptions([...new Set(brandOpts)]);
+            const existingLabel = existingRecord?.tools_brand ?? existingRecord?.toolsBrand ?? pendingValue;
+            if (applyMainSnapshot) {
+              handleSelectBrand(existingLabel, existingArray);
+            } else {
+              setEditFormData((prev) => ({
+                ...prev,
+                brand: existingLabel,
+                brandId: existingRecord?.id ?? null
+              }));
+            }
+            alert('This Brand already exists. Please enter a different one.');
+            return;
+          }
+        }
+        const saveRes = await fetch(`${TOOLS_BRAND_BASE_URL}/save`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tools_brand: pendingValue })
+        });
+        if (!saveRes.ok) {
+          throw new Error(`Failed to save: ${saveRes.status} ${saveRes.statusText}`);
+        }
+        const refreshed = await fetch(`${TOOLS_BRAND_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (refreshed.ok) {
+          const data = await refreshed.json();
+          const dataArray = Array.isArray(data) ? data : [];
+          setToolsBrandFullData(dataArray);
+          const brandOpts = dataArray
+            .map((b) => b?.tools_brand?.trim() ?? b?.toolsBrand?.trim())
+            .filter(Boolean);
+          setBrandOptions([...new Set(brandOpts)]);
+          const created = findBrandRecordByValue(pendingValue, dataArray);
+          const createdLabel = created?.tools_brand ?? created?.toolsBrand ?? pendingValue;
+          if (applyMainSnapshot) {
+            handleSelectBrand(createdLabel, dataArray);
+          } else {
+            setEditFormData((prev) => ({
+              ...prev,
+              brand: createdLabel,
+              brandId: created?.id ?? null
+            }));
+          }
+        }
+      } else {
+        const existingRes = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (existingRes.ok) {
+          const existingData = await existingRes.json();
+          const existingArray = Array.isArray(existingData) ? existingData : [];
+          const existingRecord = findItemIdRecordByValue(pendingValue, existingArray);
+          if (existingRecord) {
+            setToolsItemIdFullData(existingArray);
+            const itemIdOpts = existingArray
+              .map((item) => item?.item_id?.trim() ?? item?.itemId?.trim())
+              .filter(Boolean);
+            setItemIdOptions([...new Set(itemIdOpts)]);
+            if (applyMainSnapshot) {
+              handleSelectItemId(pendingValue, existingArray);
+            } else {
+              setEditFormData((prev) => ({
+                ...prev,
+                itemId: pendingValue,
+                itemIdDbId: existingRecord?.id ?? null,
+                quantity: '0'
+              }));
+            }
+            alert('This Item ID already exists. Please enter a different one.');
+            return;
+          }
+        }
+        const itemNameRecordForSave = applyMainSnapshot
+          ? findItemNameRecordByValue(selectedItemName)
+          : findItemNameRecordByValue(editItemNameSnapshot) ||
+            (editItemNameIdSnapshot != null
+              ? toolsItemNameListData.find((i) => i != null && String(i.id) === String(editItemNameIdSnapshot))
+              : null);
+        const relatedItemNameId = itemNameRecordForSave?.id ?? editItemNameIdSnapshot ?? null;
+        const res = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/save`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: pendingValue, item_name_id: relatedItemNameId })
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to save: ${res.status} ${res.statusText}`);
+        }
+        const refreshed = await fetch(`${TOOLS_ITEM_ID_BASE_URL}/getAll`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (refreshed.ok) {
+          const data = await refreshed.json();
+          const dataArray = Array.isArray(data) ? data : [];
+          setToolsItemIdFullData(dataArray);
+          const itemIdOpts = dataArray
+            .map((item) => item?.item_id?.trim() ?? item?.itemId?.trim())
+            .filter(Boolean);
+          setItemIdOptions([...new Set(itemIdOpts)]);
+          if (applyMainSnapshot) {
+            handleSelectItemId(pendingValue, dataArray);
+          } else {
+            const createdRow = findItemIdRecordByValue(pendingValue, dataArray);
+            setEditFormData((prev) => ({
+              ...prev,
+              itemId: pendingValue,
+              itemIdDbId: createdRow?.id ?? null,
+              quantity: '0'
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error creating master data:', e);
+      if (typeSnapshot === 'itemName') {
+        alert('Failed to save new Item Name. Please try again.');
+      } else if (typeSnapshot === 'brand') {
+        alert('Failed to save new Brand. Please try again.');
+      } else {
+        alert('Failed to save new Item ID. Please try again.');
+      }
+    } finally {
+      closeCreateConfirmModal();
+    }
   };
 
   const renderDropdownTrigger = (label, value, placeholder, onClick, disabled = false, onClear = null) => (
@@ -1144,8 +1570,11 @@ const ToolsHistory = ({ user }) => {
 
   const handleCloseEditSheet = () => {
     setShowEditSheet(false);
-    setSheetOpenPicker(null);
-    setSheetPickerSearch('');
+    setShowEditSheetItemNameModal(false);
+    setShowEditSheetItemIdModal(false);
+    setShowEditSheetBrandModal(false);
+    setShowEditSheetHomeLocationModal(false);
+    setShowEditSheetPurchaseStoreModal(false);
     setShowDatePicker(false);
     setDatePickerField(null);
   };
@@ -1453,22 +1882,33 @@ const ToolsHistory = ({ user }) => {
     }
   };
 
+  const openEditSheetPicker = (field) => {
+    if (field === 'itemId' && !(editFormData.itemName || '').trim()) {
+      alert('Please select an Item Name first.');
+      return;
+    }
+    if (field === 'itemName') setShowEditSheetItemNameModal(true);
+    else if (field === 'itemId') setShowEditSheetItemIdModal(true);
+    else if (field === 'brand') setShowEditSheetBrandModal(true);
+    else if (field === 'homeLocation') setShowEditSheetHomeLocationModal(true);
+    else if (field === 'purchaseStore') setShowEditSheetPurchaseStoreModal(true);
+  };
+
   const renderSheetDropdown = (field, value, placeholder) => (
     <div className="relative w-full">
-      <div onClick={() => {
-        setSheetOpenPicker(field);
-        setSheetPickerSearch('');
-      }}
-        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-        style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box', paddingRight: '40px' }}
+      <button
+        type="button"
+        onClick={() => openEditSheetPicker(field)}
+        className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded-[8px] pl-[12px] pr-[40px] text-[12px] font-medium bg-white flex items-center cursor-pointer text-left"
+        style={{ color: value ? '#000' : '#9E9E9E', boxSizing: 'border-box' }}
       >
         {value || placeholder}
-      </div>
+      </button>
       {value && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); handleEditFieldChange(field, ''); }}
-          className="absolute right-8 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3L9 9" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
@@ -1478,31 +1918,6 @@ const ToolsHistory = ({ user }) => {
       </div>
     </div>
   );
-
-  const getPickerOptions = () => {
-    if (!sheetOpenPicker) return [];
-    let opts = [];
-    if (sheetOpenPicker === 'itemName') {
-      opts = itemNameOptions || [];
-    } else if (sheetOpenPicker === 'itemId') {
-      opts = itemIdOptionsFiltered || [];
-    } else if (sheetOpenPicker === 'brand') {
-      opts = brandOptionsFiltered || [];
-    } else if (sheetOpenPicker === 'purchaseStore') {
-      opts = purchaseStoreOptions || [];
-    } else if (sheetOpenPicker === 'homeLocation') {
-      opts = homeLocationOptions || [];
-    }
-    const q = (sheetPickerSearch || '').trim().toLowerCase();
-    if (!q) return opts;
-    return opts.filter(o => String(o).toLowerCase().includes(q));
-  };
-
-  const handleSheetPickerSelect = (field, value) => {
-    handleEditFieldChange(field, value);
-    setSheetOpenPicker(null);
-    setSheetPickerSearch('');
-  };
 
   return (
     <div className="flex flex-col bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
@@ -1712,7 +2127,6 @@ const ToolsHistory = ({ user }) => {
           )}
         </>
       )}
-
       {/* Log tab: no dropdowns, just log entries list (Item ID is already in top right as button) */}
       {activeSegment === 'log' && (
         <div className="flex-1 pb-[16px] mt-4 min-h-[200px] overflow-y-auto">
@@ -1794,32 +2208,44 @@ const ToolsHistory = ({ user }) => {
       {activeSegment === 'item' && (
         <div className="flex-1 px-[16px] pb-[16px] mt-4 min-h-[200px]" />
       )}
-      {/* Popups */}
-      <SelectOptionModal
+      {/* Popups — SelectVendorModal with Add New (search + confirm), same pattern as AddInput */}
+      <SelectVendorModal
         isOpen={showItemNamePopup}
         onClose={() => setShowItemNamePopup(false)}
         onSelect={handleSelectItemName}
         selectedValue={selectedItemName}
         options={itemNameOptions}
         fieldName="Item Name"
+        onAddNew={(v) => {
+          setShowItemNamePopup(false);
+          requestCreateItemNameConfirmation(v);
+        }}
       />
-      <SelectOptionModal
+      <SelectVendorModal
         isOpen={showBrandPopup}
         onClose={() => setShowBrandPopup(false)}
         onSelect={handleSelectBrand}
         selectedValue={selectedBrand}
         options={brandOptionsFiltered}
         fieldName="Brand"
+        onAddNew={(v) => {
+          setShowBrandPopup(false);
+          requestCreateBrandConfirmation(v);
+        }}
       />
-      <SelectOptionModal
+      <SelectVendorModal
         isOpen={showItemIdPopup}
         onClose={() => setShowItemIdPopup(false)}
         onSelect={handleSelectItemId}
         selectedValue={selectedItemId}
         options={itemIdOptionsFiltered}
         fieldName="Item ID"
+        onAddNew={(v) => {
+          setShowItemIdPopup(false);
+          requestCreateItemIdConfirmation(v);
+        }}
       />
-      <SelectOptionModal
+      <SelectVendorModal
         isOpen={showMachineNumberPopup}
         onClose={() => setShowMachineNumberPopup(false)}
         onSelect={handleSelectMachineNumber}
@@ -1827,37 +2253,84 @@ const ToolsHistory = ({ user }) => {
         options={machineNumberOptions}
         fieldName="Machine Number"
       />
+      {showCreateConfirmModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[10050] flex items-center justify-center p-[16px]"
+          onClick={closeCreateConfirmModal}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[360px] rounded-[16px] p-[20px] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[18px] font-semibold text-black leading-none">Confirm Create?</h3>
+              <button
+                type="button"
+                onClick={closeCreateConfirmModal}
+                className="text-[#E4572E] text-[20px] leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-[13px] text-[#6D6D6D] leading-relaxed mb-5">
+              Do you want to create &quot;{pendingCreateValue}&quot; as a new{' '}
+              {pendingCreateType === 'itemName' ? 'item name' : pendingCreateType === 'brand' ? 'brand' : 'item id'}?
+            </p>
+            <div className="flex gap-[12px]">
+              <button
+                type="button"
+                onClick={closeCreateConfirmModal}
+                className="flex-1 h-[44px] border border-black rounded-[8px] text-[14px] font-bold text-black bg-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCreate}
+                className="flex-1 h-[44px] bg-black rounded-[8px] text-[14px] font-bold text-white"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Edit Bottom Sheet Modal */}
       {showEditSheet && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center" style={{ fontFamily: "'Manrope', sans-serif" }} onClick={handleCloseEditSheet}>
-          <div className="bg-white w-full max-w-[360px] max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center"
+          style={{ fontFamily: "'Manrope', sans-serif", overflow: 'hidden', overscrollBehavior: 'contain' }}
+          onClick={handleCloseEditSheet}
+        >
+          <div className="bg-white w-full max-h-[70vh] rounded-tl-[16px] rounded-tr-[16px] relative z-[101] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex-shrink-0 flex items-center justify-between px-[24px] pt-[20px] pb-[4px]">
-              <p className="text-[16px] font-bold text-black">Select Filters</p>
+              <p className="text-[16px] font-bold text-black">Add Item</p>
               <button type="button" onClick={handleCloseEditSheet} className="text-[#e06256] text-xl font-bold leading-none">
                 ×
               </button>
             </div>
-            {/* Form - scrollable */}
-            <div className="flex-1 overflow-y-auto px-[24px] py-[4px]">
+            {/* Form — layout matches AddInput bottom sheet; scroll when content exceeds max height */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-[24px] py-[4px]">
               {/* Row 1: Item Name* + Quantity */}
-              <div className="flex gap-[12px] mb-2">
-                <div className="flex-1">
+              <div className="flex gap-[12px] mb-2 w-full">
+                <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Item Name<span className="text-[#eb2f8e]">*</span>
+                    Item Name<span className="text-[#E4572E]">*</span>
                   </p>
-                  <div className='w-[220px]'>
+                  <div className="w-full min-w-0">
                     {renderSheetDropdown('itemName', editFormData.itemName, 'Select')}
                   </div>
                 </div>
-                <div className="flex-1">
+                <div className="w-[120px] flex-shrink-0">
                   <p className="text-[12px] font-medium text-black mb-1">Quantity</p>
                   <input
                     type="text"
                     value={editFormData.quantity}
                     onChange={(e) => handleEditFieldChange('quantity', e.target.value)}
                     disabled={!!editFormData.itemId}
-                    className={`w-full h-[32px] border border-[#d6d6d6] px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 ${!!editFormData.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    className={`w-[120px] max-w-[120px] box-border h-[32px] border border-[#d6d6d6] rounded px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 text-left ${!!editFormData.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="0"
                   />
                 </div>
@@ -1872,13 +2345,13 @@ const ToolsHistory = ({ user }) => {
                 </div>
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Model{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
+                    Model{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
                   <input
                     type="text"
                     value={editFormData.model}
                     onChange={(e) => handleEditFieldChange('model', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
+                    className="w-full h-[32px] border border-[#d6d6d6] rounded px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
                     placeholder="Enter"
                   />
                 </div>
@@ -1887,19 +2360,19 @@ const ToolsHistory = ({ user }) => {
               <div className="flex gap-[12px] mb-2">
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Machine Number{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
+                    Machine Number{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
                   <input
                     type="text"
                     value={editFormData.machineNumber}
                     onChange={(e) => handleEditFieldChange('machineNumber', e.target.value)}
-                    className="w-full h-[32px] border border-[#d6d6d6] px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
+                    className="w-full h-[32px] border border-[#d6d6d6] rounded px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500"
                     placeholder="Enter"
                   />
                 </div>
                 <div className="flex-1">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Brand{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
+                    Brand{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
                   {renderSheetDropdown('brand', editFormData.brand, 'Select')}
                 </div>
@@ -1926,7 +2399,7 @@ const ToolsHistory = ({ user }) => {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[12px] font-medium text-black">
-                      Purchase Store{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
+                      Purchase Store{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                     </p>
                     {editFormData.purchaseStore && (() => {
                       const selectedStore = purchaseStoreFullData.find(item => (item?.vendorName || item?.vendor_name) === editFormData.purchaseStore);
@@ -1939,12 +2412,12 @@ const ToolsHistory = ({ user }) => {
                 </div>
               </div>
               {/* Purchase Date + Warranty Date */}
-              <div className="flex gap-[12px] mb-2">
-                <div className="flex-1">
+              <div className="flex gap-[12px] mb-2 w-full">
+                <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Purchase Date{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
+                    Purchase Date{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
-                  <div className="relative">
+                  <div className="relative w-full min-w-0">
                     <input
                       type="text"
                       readOnly
@@ -1952,7 +2425,7 @@ const ToolsHistory = ({ user }) => {
                       onClick={() => handleDatePickerOpen('purchaseDate')}
                       onFocus={() => handleDatePickerOpen('purchaseDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer box-border"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1962,11 +2435,11 @@ const ToolsHistory = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-black mb-1">
-                    Warranty Date{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#eb2f8e]">*</span>}
+                    Warranty Date{!(editFormData.quantity && editFormData.quantity !== '0' && editFormData.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
-                  <div className="relative">
+                  <div className="relative w-full min-w-0">
                     <input
                       type="text"
                       readOnly
@@ -1974,7 +2447,7 @@ const ToolsHistory = ({ user }) => {
                       onClick={() => handleDatePickerOpen('warrantyDate')}
                       onFocus={() => handleDatePickerOpen('warrantyDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer box-border"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2040,63 +2513,62 @@ const ToolsHistory = ({ user }) => {
           </div>
         </div>
       )}
-      {/* Sheet dropdown picker modal */}
-      {showEditSheet && sheetOpenPicker && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-[16px]"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setSheetOpenPicker(null);
-              setSheetPickerSearch('');
-            }
-          }}
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] rounded-b-[20px] shadow-lg max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-[24px] pt-[20px]">
-              <p className="text-[16px] font-semibold text-black">
-                Select {({ itemName: 'Item Name', itemId: 'Item ID', brand: 'Brand', purchaseStore: 'Purchase Store', homeLocation: 'Home Location' })[sheetOpenPicker] || sheetOpenPicker}
-              </p>
-              <button type="button" onClick={() => {
-                setSheetOpenPicker(null);
-                setSheetPickerSearch('');
-              }} className="text-red-500 text-[20px] font-semibold hover:opacity-80">
-                ×
-              </button>
-            </div>
-            <div className="px-[24px] pt-[16px] pb-[16px]">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={sheetPickerSearch}
-                  onChange={(e) => setSheetPickerSearch(e.target.value)}
-                  placeholder="Search"
-                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
-                />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" /><path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" /></svg>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto mb-4 px-[24px]">
-              <div className="shadow-md rounded-lg overflow-hidden">
-                {getPickerOptions().length > 0 ? (
-                  getPickerOptions().map((opt) => (
-                    <button key={opt} type="button" onClick={() => handleSheetPickerSelect(sheetOpenPicker, opt)}
-                      className="w-full h-[40px] px-[24px] flex items-center text-left hover:bg-[#F5F5F5] transition-colors text-[14px] font-medium text-black"
-                    >
-                      {opt}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-[14px] font-medium text-[#9E9E9E] text-center py-[16px]">
-                    {sheetPickerSearch.trim() ? 'No options found' : 'No options available'}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Edit sheet pickers — same SelectVendorModal UX as AddInput (stars, two-line labels, Add New) */}
+      {showEditSheet && (
+        <>
+          <SelectVendorModal
+            isOpen={showEditSheetItemNameModal}
+            onClose={() => setShowEditSheetItemNameModal(false)}
+            onSelect={(v) => handleEditFieldChange('itemName', v)}
+            selectedValue={editFormData.itemName}
+            options={itemNameOptions}
+            fieldName="Item Name"
+            onAddNew={(v) => {
+              setShowEditSheetItemNameModal(false);
+              requestCreateItemNameConfirmation(v, false);
+            }}
+          />
+          <SelectVendorModal
+            isOpen={showEditSheetItemIdModal}
+            onClose={() => setShowEditSheetItemIdModal(false)}
+            onSelect={(v) => handleEditFieldChange('itemId', v)}
+            selectedValue={editFormData.itemId}
+            options={editSheetItemIdOptions}
+            fieldName="Item ID"
+            onAddNew={(v) => {
+              setShowEditSheetItemIdModal(false);
+              requestCreateItemIdConfirmation(v, false);
+            }}
+          />
+          <SelectVendorModal
+            isOpen={showEditSheetBrandModal}
+            onClose={() => setShowEditSheetBrandModal(false)}
+            onSelect={(v) => handleEditFieldChange('brand', v)}
+            selectedValue={editFormData.brand}
+            options={editSheetBrandOptions}
+            fieldName="Brand"
+            onAddNew={(v) => {
+              setShowEditSheetBrandModal(false);
+              requestCreateBrandConfirmation(v, false);
+            }}
+          />
+          <SelectVendorModal
+            isOpen={showEditSheetHomeLocationModal}
+            onClose={() => setShowEditSheetHomeLocationModal(false)}
+            onSelect={(v) => handleEditFieldChange('homeLocation', v)}
+            selectedValue={editFormData.homeLocation}
+            options={homeLocationOptions}
+            fieldName="Home Location"
+          />
+          <SelectVendorModal
+            isOpen={showEditSheetPurchaseStoreModal}
+            onClose={() => setShowEditSheetPurchaseStoreModal(false)}
+            onSelect={(v) => handleEditFieldChange('purchaseStore', v)}
+            selectedValue={editFormData.purchaseStore}
+            options={purchaseStoreOptions}
+            fieldName="Purchase Store"
+          />
+        </>
       )}
       {/* Date Picker Modal */}
       {showDatePicker && (

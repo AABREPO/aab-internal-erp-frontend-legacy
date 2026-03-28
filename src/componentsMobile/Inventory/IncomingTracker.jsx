@@ -1849,8 +1849,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
           <div
             className="bg-white w-full h-[240px] rounded-t-3xl shadow-lg"
             style={{ maxHeight: '60vh' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+            onClick={(e) => e.stopPropagation()} >
             {/* Modal Header */}
             <div className="flex items-center justify-between px-[24px] pt-[16px] pb-3 border-b border-[rgba(0,0,0,0.08)] flex-shrink-0">
               <h2 className="text-[16px] font-semibold text-black">Select Filters</h2>
@@ -1927,7 +1926,6 @@ const IncomingTracker = ({ user, onTabChange }) => {
           </div>
         </div>
       )}
-
       <SelectVendorModal
         isOpen={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}

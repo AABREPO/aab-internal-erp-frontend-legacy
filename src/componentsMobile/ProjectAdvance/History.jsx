@@ -353,19 +353,11 @@ const History = ({ onVendorClick }) => {
     return result;
   })();
 
-  const getTypeBadgeClass = (type) => {
-    switch (type) {
-      case 'Advance':
-        return 'bg-[#E8F5E9] text-[#2E7D32]';
-      case 'Bill Settlement':
-        return 'bg-[#E3F2FD] text-[#1976D2]';
-      case 'Refund':
-        return 'bg-[#FFF3E0] text-[#F57C00]';
-      case 'Transfer':
-        return 'bg-[#FFF3E0] text-black';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
+  const getPaymentModeBadgeClass = (mode) => {
+    if (!mode || mode === '') return 'bg-gray-100 text-gray-600';
+    const m = String(mode).toLowerCase();
+    if (m === 'cash') return 'bg-[#E7F4FD] text-[#336EA8]';
+    return 'bg-[#FFEFFF] text-[#815182]';
   };
 
   const openWeekYearModal = () => {
@@ -648,7 +640,7 @@ const History = ({ onVendorClick }) => {
     >
       {/* Date and Category Section */}
       <div className="pt-[10px]">
-        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
+        <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[10px]">
           <div />
           <div className="flex items-center gap-[4px]">
             <button
@@ -892,22 +884,10 @@ const History = ({ onVendorClick }) => {
                           {item.ref}
                         </span>
                         <span
-                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getTypeBadgeClass(
-                            item.type
+                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getPaymentModeBadgeClass(
+                            item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')
                           )}`}
                         >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${item.type === 'Advance'
-                              ? 'bg-[#2E7D32]'
-                              : item.type === 'Bill Settlement'
-                                ? 'bg-[#1976D2]'
-                                : item.type === 'Refund'
-                                  ? 'bg-[#F57C00]'
-                                  : item.type === 'Transfer'
-                                    ? ''
-                                    : ''
-                              }`}
-                          />
                           {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
                         </span>
                       </div>

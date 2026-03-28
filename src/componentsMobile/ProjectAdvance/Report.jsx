@@ -837,7 +837,7 @@ const Report = () => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       <div className="pt-[10px] mb-[8px]">
-        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
+        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[10px]">
           <button
             type="button"
             onClick={openWeekYearModal}
@@ -1058,23 +1058,16 @@ const Report = () => {
                       {item.ref}
                     </span>
                     <span
-                      className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getTypeBadgeClass(
-                        item.type
-                      )}`}
+                      className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${
+                        (() => {
+                          const mode = item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '');
+                          if (!mode) return 'bg-gray-100 text-gray-600';
+                          const m = String(mode).toLowerCase();
+                          if (m === 'cash') return 'bg-[#E7F4FD] text-[#336EA8]';
+                          return 'bg-[#FFEFFF] text-[#815182]';
+                        })()
+                      }`}
                     >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          item.type === 'Advance'
-                            ? 'bg-[#2E7D32]'
-                            : item.type === 'Bill Settlement'
-                              ? 'bg-[#1976D2]'
-                              : item.type === 'Refund'
-                                ? 'bg-[#F57C00]'
-                                : item.type === 'Transfer'
-                                  ? ''
-                                  : ''
-                        }`}
-                      />
                       {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
                     </span>
                   </div>

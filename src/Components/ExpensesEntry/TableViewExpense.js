@@ -10,6 +10,7 @@ import autoTable from "jspdf-autotable";
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
+const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
 // Date Range Picker Component
 const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChange }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -288,6 +289,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
+    const [machineToolsCatalog, setMachineToolsCatalog] = useState([]);
     const [branchOptions, setBranchOptions] = useState([]);
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
@@ -531,7 +533,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 setFilteredExpenses(sortedExpenses);
                 const uniqueEnos = [...new Set(response.data.map(expense => expense.eno))];
                 const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-                const uniqueMachineTools = [...new Set(response.data.map(expense => expense.machineTools))];
                 const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
                 const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
                 const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
@@ -542,7 +543,6 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
                 setEnoOptions(uniqueEnos);
                 setAccountTypeOptions(uniqueAccountTypes);
-                setMachineToolsOptions(uniqueMachineTools.map(tool => ({ value: tool, label: tool })));
                 setSiteOptions(siteOptions);
                 setVendorOptions(vendorOptions);
                 setContractorOptions(contractorOption);
@@ -684,6 +684,66 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         fetchMachinTools();
     }, []);
     useEffect(() => {
+        const fetchToolsItemIds = async () => {
+            try {
+                const response = await fetch(`${TOOLS_API_BASE}/api/tools_item_id/getAll`, {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                const formattedData = list
+                    .map((item) => {
+                        const rowId = item.id;
+                        const itemIdStr = item.item_id ?? item.itemId ?? "";
+                        const itemNameIdStr = item.item_name_id ?? item.itemNameId ?? "";
+                        const label =
+                            itemIdStr ||
+                            (rowId != null ? String(rowId) : "");
+                        return {
+                            value: rowId != null ? String(rowId) : itemIdStr,
+                            label,
+                            id: rowId,
+                            item_id: itemIdStr,
+                            item_name_id: itemNameIdStr,
+                        };
+                    })
+                    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+                setMachineToolsCatalog(formattedData);
+            } catch (error) {
+                console.error("Fetch error (tools_item_id): ", error);
+            }
+        };
+        fetchToolsItemIds();
+    }, []);
+    const machineToolsIdToLabel = useMemo(() => {
+        const map = {};
+        machineToolsCatalog.forEach((opt) => {
+            if (opt.id != null) {
+                const label = String(opt.label ?? opt.item_id ?? opt.id);
+                map[opt.id] = label;
+                map[String(opt.id)] = label;
+                map[Number(opt.id)] = label;
+            }
+        });
+        return map;
+    }, [machineToolsCatalog]);
+    const getMachineToolsItemIdDisplay = useCallback((val) => {
+        if (val == null || val === "") return "";
+        const resolved =
+            machineToolsIdToLabel[val] ??
+            machineToolsIdToLabel[String(val)] ??
+            machineToolsIdToLabel[Number(val)];
+        if (resolved != null && resolved !== "") return resolved;
+        return String(val);
+    }, [machineToolsIdToLabel]);
+    useEffect(() => {
         const fetchBranches = async () => {
             try {
                 const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
@@ -804,7 +864,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 exp.comments,
                 exp.category,
                 exp.accountType,
-                exp.machineTools,
+                getMachineToolsItemIdDisplay(exp.machineTools),
                 exp.eno
             ]),
             styles: {
@@ -841,7 +901,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 (selectedVendor ? expense.vendor === selectedVendor : true) &&
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
-                (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
+                (selectedMachineTools ? String(expense.machineTools ?? '') === String(selectedMachineTools) : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === 'Unknown' ?
                         (!expense.accountType || expense.accountType === '') :
@@ -874,7 +934,16 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
-        setMachineToolsOptions(getOptions(filtered, "machineTools"));
+        const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter((v) => v != null && v !== ''))];
+        setMachineToolsOptions(
+            uniqueToolIds.map((id) => ({
+                value: String(id),
+                label:
+                    machineToolsIdToLabel[id] ??
+                    machineToolsIdToLabel[String(id)] ??
+                    String(id),
+            }))
+        );
         setAccountTypeOptions(getOptions(filtered, "accountType"));
         setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
     }, [
@@ -887,7 +956,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         startDate,
         endDate,
         selectedEno,
-        expenses
+        expenses,
+        machineToolsIdToLabel
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
@@ -1130,6 +1200,9 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         } else if (sortField === 'eno') {
             aValue = parseInt(aValue) || 0;
             bValue = parseInt(bValue) || 0;
+        } else if (sortField === 'machineTools') {
+            aValue = String(getMachineToolsItemIdDisplay(a.machineTools) || '').toLowerCase();
+            bValue = String(getMachineToolsItemIdDisplay(b.machineTools) || '').toLowerCase();
         } else {
             aValue = String(aValue || '').toLowerCase();
             bValue = String(bValue || '').toLowerCase();
@@ -1345,7 +1418,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             expense.comments,
             expense.category,
             expense.accountType,
-            expense.machineTools,
+            getMachineToolsItemIdDisplay(expense.machineTools),
             expense.eno,
             expense.billCopy || ""
         ]);
@@ -1430,7 +1503,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                     {selectedMachineTools && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Tools: </span>
-                                            <span className="font-bold">{selectedMachineTools}</span>
+                                            <span className="font-bold">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
                                             <button onClick={() => setSelectedMachineTools('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
@@ -1570,7 +1643,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 <Select
                                                     className="w-full"
                                                     options={machineToolsOptions}
-                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === selectedMachineTools) : null}
+                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Machine..."
                                                     menuPlacement="bottom"
@@ -1601,7 +1674,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
                                             <td className=" text-sm text-left ">{expense.accountType}</td>
-                                            <td className=" text-sm text-left ">{expense.machineTools}</td>
+                                            <td className=" text-sm text-left ">{getMachineToolsItemIdDisplay(expense.machineTools)}</td>
                                             <td className=" text-sm text-left ">{expense.source}</td>
                                             <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
                                             <td className=" text-sm text-left pl-3 ">{expense.eno}</td>

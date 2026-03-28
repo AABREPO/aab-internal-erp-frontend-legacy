@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import EditIcon from '../Images/edit1.png';
 import DeleteIcon from '../Images/delete.png';
 import Filter from '../Images/Filter.png';
@@ -16,8 +16,33 @@ const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_bra
 const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
 const TOOLS_MACHINE_STATUS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools-machine-status';
 const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
+const EXPENSES_FORM_GET_URL = 'https://backendaab.in/aabuilderDash/expenses_form/get_form';
+
+const resolveActiveBranchId = () => {
+  try {
+    const selectedBranchId = localStorage.getItem('selectedBranchId');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+    const resolved = Number(selectedBranchId || fallbackBranchId);
+    return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeExpenseToolId = (exp) => {
+  const v = exp?.machineTools ?? exp?.itemIdsId ?? exp?.item_ids_id;
+  if (v == null || v === '') return '';
+  return String(v).trim();
+};
+
+const isMachineRepairExpense = (exp) =>
+  String(exp?.category || '')
+    .trim()
+    .toLowerCase() === 'machine repair';
 
 const ServiceHistory = ({ user, onTabChange }) => {
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
   const [viewMode, setViewMode] = useState('live'); // 'live' or 'history'
   const [historyData, setHistoryData] = useState([]);
   const [serviceReturnData, setServiceReturnData] = useState([]);
@@ -95,6 +120,43 @@ const ServiceHistory = ({ user, onTabChange }) => {
   useEffect(() => {
     expandedEntryIdRef.current = expandedEntryId;
   }, [expandedEntryId]);
+
+  const [expensesFormList, setExpensesFormList] = useState([]);
+
+  useEffect(() => {
+    const syncBranch = () => {
+      const next = resolveActiveBranchId();
+      setActiveBranchId((prev) => (prev === next ? prev : next));
+    };
+    syncBranch();
+    window.addEventListener('branchSelectionChanged', syncBranch);
+    return () => window.removeEventListener('branchSelectionChanged', syncBranch);
+  }, []);
+
+  useEffect(() => {
+    const fetchExpensesForm = async () => {
+      try {
+        const url = new URL(EXPENSES_FORM_GET_URL);
+        if (activeBranchId != null) {
+          url.searchParams.set('branchId', String(activeBranchId));
+        }
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+          throw new Error('expenses_form get_form failed');
+        }
+        const data = await response.json();
+        setExpensesFormList(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching expenses form:', error);
+        setExpensesFormList([]);
+      }
+    };
+    fetchExpensesForm();
+  }, [activeBranchId]);
 
   const getMachineStatusKey = (itemIdsId, machineNumberId, machineNumber) => {
     const itemId = String(itemIdsId || '').trim();
@@ -507,6 +569,61 @@ const ServiceHistory = ({ user, onTabChange }) => {
     }
 
     return '-';
+  };
+
+  const toolIdsInHistory = useMemo(() => {
+    const s = new Set();
+    historyData.forEach((e) => {
+      const id = String(e.itemIdsId || '').trim();
+      if (id) s.add(id);
+    });
+    return s;
+  }, [historyData]);
+
+  const machineRepairExpensesForTrackedTools = useMemo(
+    () =>
+      expensesFormList.filter(
+        (exp) =>
+          isMachineRepairExpense(exp) &&
+          toolIdsInHistory.has(normalizeExpenseToolId(exp))
+      ),
+    [expensesFormList, toolIdsInHistory]
+  );
+
+  const headerServiceCostTotal = useMemo(() => {
+    let list = machineRepairExpensesForTrackedTools;
+    if (selectedShopName?.label) {
+      const shop = String(selectedShopName.label).trim();
+      list = list.filter((e) => String(e.vendor || '').trim() === shop);
+    }
+    return list.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+  }, [machineRepairExpensesForTrackedTools, selectedShopName]);
+
+  const formatServiceCostRs = (n) => {
+    const v = Math.round(Number(n) || 0);
+    return v.toLocaleString('en-IN');
+  };
+
+  const computeServiceCostForEntry = (entry) => {
+    const tid = String(entry.itemIdsId || '').trim();
+    if (!tid) return 0;
+    let shopName = getLocationName(entry.serviceStoreId, true);
+    const fromVendor = shopName !== '-';
+    if (!fromVendor) {
+      shopName = getLocationName(entry.toProjectId, false);
+    }
+    return machineRepairExpensesForTrackedTools.reduce((sum, exp) => {
+      if (normalizeExpenseToolId(exp) !== tid) return sum;
+      if (shopName === '-') {
+        return sum + Math.abs(Number(exp.amount) || 0);
+      }
+      if (fromVendor) {
+        if (String(exp.vendor || '').trim() !== String(shopName).trim()) return sum;
+      } else {
+        if (String(exp.siteName || '').trim() !== String(shopName).trim()) return sum;
+      }
+      return sum + Math.abs(Number(exp.amount) || 0);
+    }, 0);
   };
 
   // Image viewer handlers - fetch images on demand via API
@@ -941,7 +1058,9 @@ const ServiceHistory = ({ user, onTabChange }) => {
               </span>
               <span className="text-[12px] font-semibold text-[#BF9853] leading-normal flex items-center gap-[4px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#BF9853]" />
-                {selectedShopName ? 'S C: 0' : 'Service Cost: 0'}
+                {selectedShopName
+                  ? `S C: ${formatServiceCostRs(headerServiceCostTotal)}`
+                  : `Service Cost: ${formatServiceCostRs(headerServiceCostTotal)}`}
               </span>
             </div>
           </div>
@@ -1134,8 +1253,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
               // Get status display
               const statusDisplay = getStatusDisplay(entry.machineStatus);
 
-              // Service cost (placeholder - you may need to add this field to the data)
-              const serviceCost = entry.serviceCost || 0;
+              const serviceCost = computeServiceCostForEntry(entry);
 
               // Swipe state and offset calculation
               const entryId = entry.id;

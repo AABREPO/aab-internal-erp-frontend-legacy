@@ -1175,8 +1175,8 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
       {/* Form section - no scroll */}
       <div className="flex-shrink-0">
         {/* Advance Number and Date */}
-        <div className="mb-[8px] items-center border-b border-gray-200 pb-[6px] mt-[6px] flex justify-between">
-          <div className="flex items-center gap-[8px] mt-[4px]">
+        <div className="mb-[8px] items-center border-b border-gray-200 pb-[6px] pt-[8px] flex justify-between">
+          <div className="flex items-center gap-[8px]">
             <button
               type="button"
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"

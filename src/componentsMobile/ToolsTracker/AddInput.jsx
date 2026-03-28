@@ -1075,13 +1075,66 @@ const AddInput = ({ user }) => {
     }
     e.target.value = '';
   };
+
+  /** Machine number already on stock for another Item ID under the same Item Name (not the selected Item ID). */
+  const checkMachineNumberConflictForSheet = React.useCallback((machineNumberText, itemNameId, currentItemIdDbId) => {
+    const mn = String(machineNumberText || '').trim().replace(/\s+/g, ' ');
+    if (!mn || !itemNameId || !currentItemIdDbId) return { conflict: false, otherItemIdLabel: null };
+
+    const itemIdRowsForName = (toolsItemIdFullData || []).filter(
+      (row) => String(row?.item_name_id ?? row?.itemNameId ?? '') === String(itemNameId)
+    );
+    const dbIdSet = new Set(itemIdRowsForName.map((r) => String(r?.id)).filter(Boolean));
+    const mnNorm = mn.toLowerCase();
+    const currentStr = String(currentItemIdDbId);
+
+    for (const stock of stockManagementData || []) {
+      const sid = stock?.item_ids_id ?? stock?.itemIdsId;
+      if (sid == null || sid === '') continue;
+      const sidStr = String(sid);
+      if (!dbIdSet.has(sidStr)) continue;
+      if (sidStr === currentStr) continue;
+
+      const resolvedMn = resolveMachineNumFromStock(stock);
+      if (!resolvedMn) continue;
+      const resolvedNorm = String(resolvedMn).trim().replace(/\s+/g, ' ').toLowerCase();
+      if (resolvedNorm === mnNorm) {
+        const row = itemIdRowsForName.find((r) => String(r?.id) === sidStr);
+        const label = (row?.item_id ?? row?.itemId ?? '').trim() || sidStr;
+        return { conflict: true, otherItemIdLabel: label };
+      }
+    }
+    return { conflict: false, otherItemIdLabel: null };
+  }, [stockManagementData, toolsItemIdFullData, resolveMachineNumFromStock]);
+
   const handleAddSheetFieldChange = (field, value) => {
     setAddSheetForm(prev => {
+      if (field === 'machineNumber') {
+        const itemNameId = prev.itemNameId ?? findItemNameRecordByValue(prev.itemName || selectedItemName)?.id;
+        const mnTrim = String(value || '').trim();
+        if (mnTrim && prev.itemIdDbId && itemNameId) {
+          const { conflict, otherItemIdLabel } = checkMachineNumberConflictForSheet(value, itemNameId, prev.itemIdDbId);
+          if (conflict) {
+            alert(`This machine number is already used for Item ID "${otherItemIdLabel}" under this item name. Enter a different machine number.`);
+            return prev;
+          }
+        }
+      }
+
       const updated = { ...prev, [field]: value };
       if (field === 'itemId' && value) {
         updated.quantity = '0';
         const itemIdObj = findItemIdRecordByValue(value);
-        updated.itemIdDbId = itemIdObj?.id ?? null;
+        const newDbId = itemIdObj?.id ?? null;
+        const itemNameId = updated.itemNameId ?? findItemNameRecordByValue(updated.itemName || selectedItemName)?.id;
+        if (newDbId && itemNameId && String(updated.machineNumber || '').trim()) {
+          const { conflict, otherItemIdLabel } = checkMachineNumberConflictForSheet(updated.machineNumber, itemNameId, newDbId);
+          if (conflict) {
+            alert(`This machine number is already used for Item ID "${otherItemIdLabel}" under this item name. Choose a different Item ID or change the machine number.`);
+            return prev;
+          }
+        }
+        updated.itemIdDbId = newDbId;
       } else if (field === 'itemId' && !value) {
         updated.itemIdDbId = null;
       } else if (field === 'quantity' && value && value !== '0' && value.trim() !== '') {
@@ -1217,6 +1270,20 @@ const AddInput = ({ user }) => {
       const { inUse, machineNumber } = isItemIdInUseWithMachine(addSheetForm.itemIdDbId, addSheetForm.itemId);
       if (inUse) {
         alert(`Item ID "${addSheetForm.itemId}" is already assigned to machine number "${machineNumber}" and the tool status is not Dead. Please select a different Item ID.`);
+        return;
+      }
+    }
+    const resolvedItemNameForMnCheck = findItemNameRecordByValue(itemName);
+    const itemNameIdForMnCheck = addSheetForm.itemNameId ?? resolvedItemNameForMnCheck?.id ?? null;
+    const machineNumberTrimmedEarly = (addSheetForm.machineNumber || '').trim();
+    if (machineNumberTrimmedEarly && addSheetForm.itemIdDbId && itemNameIdForMnCheck) {
+      const { conflict, otherItemIdLabel } = checkMachineNumberConflictForSheet(
+        machineNumberTrimmedEarly,
+        itemNameIdForMnCheck,
+        addSheetForm.itemIdDbId
+      );
+      if (conflict) {
+        alert(`This machine number is already used for Item ID "${otherItemIdLabel}" under this item name. Enter a different machine number.`);
         return;
       }
     }
@@ -1609,24 +1676,24 @@ const AddInput = ({ user }) => {
             </div>
             {/* Form - scrollable */}
             <div className="flex-1 overflow-hidden px-[24px] py-[4px]">
-              {/* Row 1: Item Name* + Quantity (half) */}
-              <div className="flex gap-[12px] mb-2">
-                <div className="flex-1">
+              {/* Row 1: Item Name* + Quantity */}
+              <div className="flex gap-[12px] mb-2 w-full">
+                <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-black mb-1">
                     Item Name<span className="text-[#E4572E]">*</span>
                   </p>
-                  <div className='w-[220px]'>
+                  <div className="w-full min-w-0">
                     {renderSheetDropdown('itemName', addSheetForm.itemName, 'Select')}
                   </div>
                 </div>
-                <div className="flex-1">
+                <div className="w-[120px] flex-shrink-0">
                   <p className="text-[12px] font-medium text-black mb-1">Quantity</p>
                   <input
                     type="text"
                     value={addSheetForm.quantity}
                     onChange={(e) => handleAddSheetFieldChange('quantity', e.target.value)}
                     disabled={!!addSheetForm.itemId}
-                    className={`w-full h-[32px] border border-[#d6d6d6] rounded px-[12px] text-[12px] font-medium focus:outline-none text-gray-700 ${!!addSheetForm.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    className={`w-[120px] max-w-[120px] box-border h-[32px] border border-[#d6d6d6] rounded text-[12px] px-[12px] font-medium focus:outline-none text-gray-700 text-left ${!!addSheetForm.itemId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="0"
                   />
                 </div>
@@ -1705,13 +1772,13 @@ const AddInput = ({ user }) => {
                   {renderSheetDropdown('purchaseStore', addSheetForm.purchaseStore, 'Select')}
                 </div>
               </div>
-              {/* Row 4: Purchase Date* + Warranty Date* */}
-              <div className="flex gap-[12px] w-[100px] mb-2">
-                <div className="flex-1">
+              {/* Row: Purchase Date* + Warranty Date* */}
+              <div className="flex gap-[12px] mb-2 w-full">
+                <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-black mb-1">
                     Purchase Date{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
-                  <div className="relative">
+                  <div className="relative w-full min-w-0">
                     <input
                       type="text"
                       readOnly
@@ -1719,7 +1786,7 @@ const AddInput = ({ user }) => {
                       onClick={() => handleDatePickerOpen('purchaseDate')}
                       onFocus={() => handleDatePickerOpen('purchaseDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer box-border"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1729,11 +1796,11 @@ const AddInput = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-black mb-1">
                     Warranty Date{!(addSheetForm.quantity && addSheetForm.quantity !== '0' && addSheetForm.quantity.trim() !== '') && <span className="text-[#E4572E]">*</span>}
                   </p>
-                  <div className="relative">
+                  <div className="relative w-full min-w-0">
                     <input
                       type="text"
                       readOnly
@@ -1741,7 +1808,7 @@ const AddInput = ({ user }) => {
                       onClick={() => handleDatePickerOpen('warrantyDate')}
                       onFocus={() => handleDatePickerOpen('warrantyDate')}
                       placeholder="dd-mm-yyyy"
-                      className="w-[150px] h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer"
+                      className="w-full h-[32px] border border-[#d6d6d6] rounded pl-[12px] pr-[40px] text-[12px] font-medium focus:outline-none text-gray-700 placeholder-gray-500 cursor-pointer box-border"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

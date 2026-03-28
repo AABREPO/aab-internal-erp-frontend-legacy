@@ -14,6 +14,7 @@ import autoTable from "jspdf-autotable";
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
+const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
 
 const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const resolveActiveBranchId = useCallback(() => {
@@ -41,6 +42,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [contractorOptions, setContractorOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
+    const [machineToolsCatalog, setMachineToolsCatalog] = useState([]);
     const [accountTypeOption, setAccountTypeOption] = useState([]);
     const [editAccountTypeOptions, setEditAccountTypeOptions] = useState([]);
     const [siteOption, setSiteOption] = useState([]);
@@ -377,7 +379,6 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 setExpenses(sortedExpenses);
                 setFilteredExpenses(sortedExpenses);
                 const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-                const uniqueMachineTools = [...new Set(response.data.map(expense => expense.machineTools))];
                 const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
                 const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
                 const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
@@ -388,7 +389,6 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
                 // Set the unique dropdown options in state
                 setAccountTypeOptions(uniqueAccountTypes);
-                setMachineToolsOptions(uniqueMachineTools.map(tool => ({ value: tool, label: tool })));
                 setSiteOptions(siteOptions);
                 setVendorOptions(vendorOptions);
                 setContractorOptions(contractorOption);
@@ -530,6 +530,66 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         fetchMachinTools();
     }, []);
     useEffect(() => {
+        const fetchToolsItemIds = async () => {
+            try {
+                const response = await fetch(`${TOOLS_API_BASE}/api/tools_item_id/getAll`, {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                const formattedData = list
+                    .map((item) => {
+                        const rowId = item.id;
+                        const itemIdStr = item.item_id ?? item.itemId ?? "";
+                        const itemNameIdStr = item.item_name_id ?? item.itemNameId ?? "";
+                        const label =
+                            itemIdStr ||
+                            (rowId != null ? String(rowId) : "");
+                        return {
+                            value: rowId != null ? String(rowId) : itemIdStr,
+                            label,
+                            id: rowId,
+                            item_id: itemIdStr,
+                            item_name_id: itemNameIdStr,
+                        };
+                    })
+                    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+                setMachineToolsCatalog(formattedData);
+            } catch (error) {
+                console.error("Fetch error (tools_item_id): ", error);
+            }
+        };
+        fetchToolsItemIds();
+    }, []);
+    const machineToolsIdToLabel = useMemo(() => {
+        const map = {};
+        machineToolsCatalog.forEach((opt) => {
+            if (opt.id != null) {
+                const label = String(opt.label ?? opt.item_id ?? opt.id);
+                map[opt.id] = label;
+                map[String(opt.id)] = label;
+                map[Number(opt.id)] = label;
+            }
+        });
+        return map;
+    }, [machineToolsCatalog]);
+    const getMachineToolsItemIdDisplay = useCallback((val) => {
+        if (val == null || val === "") return "";
+        const resolved =
+            machineToolsIdToLabel[val] ??
+            machineToolsIdToLabel[String(val)] ??
+            machineToolsIdToLabel[Number(val)];
+        if (resolved != null && resolved !== "") return resolved;
+        return String(val);
+    }, [machineToolsIdToLabel]);
+    useEffect(() => {
         const fetchAccountType = async () => {
             try {
                 const response = await fetch("https://backendaab.in/aabuilderDash/api/account_type/getAll", {
@@ -658,7 +718,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 exp.comments,
                 exp.category,
                 exp.accountType,
-                exp.machineTools,
+                getMachineToolsItemIdDisplay(exp.machineTools),
                 exp.eno
             ]),
             styles: {
@@ -714,7 +774,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 (selectedVendor ? expense.vendor === selectedVendor : true) &&
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
-                (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
+                (selectedMachineTools ? String(expense.machineTools ?? '') === String(selectedMachineTools) : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === 'Unknown' ?
                         (!expense.accountType || expense.accountType === '') :
@@ -738,11 +798,20 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
-        setMachineToolsOptions(getOptions(filtered, "machineTools"));
+        const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter((v) => v != null && v !== ''))];
+        setMachineToolsOptions(
+            uniqueToolIds.map((id) => ({
+                value: String(id),
+                label:
+                    machineToolsIdToLabel[id] ??
+                    machineToolsIdToLabel[String(id)] ??
+                    String(id),
+            }))
+        );
         setAccountTypeOptions(getOptions(filtered, "accountType"));
         setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, expenses]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, expenses, machineToolsIdToLabel]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -923,6 +992,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         } else if (sortField === 'timestamp') {
             aValue = new Date(aValue);
             bValue = new Date(bValue);
+        } else if (sortField === 'machineTools') {
+            aValue = String(getMachineToolsItemIdDisplay(a.machineTools) || '').toLowerCase();
+            bValue = String(getMachineToolsItemIdDisplay(b.machineTools) || '').toLowerCase();
         } else {
             aValue = String(aValue || '').toLowerCase();
             bValue = String(bValue || '').toLowerCase();
@@ -1158,7 +1230,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             expense.comments,
             expense.category,
             expense.accountType,
-            expense.machineTools,
+            getMachineToolsItemIdDisplay(expense.machineTools),
             expense.eno,
             expense.billCopy || ""
         ]);
@@ -1196,7 +1268,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 exp.comments,
                 exp.category,
                 exp.accountType,
-                exp.machineTools,
+                getMachineToolsItemIdDisplay(exp.machineTools),
                 exp.eno
             ]),
             styles: {
@@ -1389,7 +1461,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     {selectedMachineTools && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Tools: </span>
-                                            <span className="font-bold">{selectedMachineTools}</span>
+                                            <span className="font-bold">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
                                             <button onClick={() => setSelectedMachineTools('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                                         </span>
                                     )}
@@ -1551,7 +1623,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 <Select
                                                     className="w-full"
                                                     options={machineToolsOptions}
-                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === selectedMachineTools) : null}
+                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
                                                     placeholder="Machine..."
                                                     menuPlacement="bottom"
@@ -1584,7 +1656,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
                                             <td className=" text-sm text-left ">{expense.accountType}</td>
-                                            <td className=" text-sm text-left ">{expense.machineTools}</td>
+                                            <td className=" text-sm text-left ">{getMachineToolsItemIdDisplay(expense.machineTools)}</td>
                                             <td className=" text-sm text-left ">{expense.source}</td>
                                             <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
                                             <td className=" text-sm text-left ">{expense.enteredBy || 'Sivaprakasm'}</td>
@@ -2137,7 +2209,12 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                 </div>
                             </div>
                         )}
-                        <AuditModal show={showModal} onClose={() => setShowModal(false)} audits={audits} />
+                        <AuditModal
+                            show={showModal}
+                            onClose={() => setShowModal(false)}
+                            audits={audits}
+                            resolveMachineToolsDisplay={getMachineToolsItemIdDisplay}
+                        />
                     </div>
                 </div>
             </div>
@@ -2168,7 +2245,7 @@ const formatDate = (dateString) => {
     hours = hours ? String(hours).padStart(2, '0') : '12';
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 };
-const AuditModal = ({ show, onClose, audits }) => {
+const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay }) => {
     if (!show) return null;
     const fields = [
         { key: "Date", label: "Date" },
@@ -2246,6 +2323,9 @@ const AuditModal = ({ show, onClose, audits }) => {
                                             if (key.toLowerCase().includes("date")) {
                                                 value = value ? new Date(value).toLocaleDateString("en-GB") : "-";
                                             }
+                                            if (key === "MachineTools" && resolveMachineToolsDisplay && value != null && value !== "") {
+                                                value = resolveMachineToolsDisplay(value);
+                                            }
                                             return (
                                                 <td key={key} style={{ width: columnWidths[i] }} className="border text-sm text-center">
                                                     {value ?? "-"}
@@ -2262,19 +2342,26 @@ const AuditModal = ({ show, onClose, audits }) => {
                                         </td>
                                         {fields.map(({ key }, i) => {
                                             const oldVal = audit[`old${key}`];
-                                            let value = audit[`new${key}`];
+                                            const rawNewVal = audit[`new${key}`];
+                                            let value = rawNewVal;
                                             if (key.toLowerCase().includes("amount")) {
                                                 value = value && !isNaN(value) ? Number(value).toLocaleString("en-IN") : "-";
                                             }
                                             if (key.toLowerCase().includes("date")) {
                                                 value = value ? new Date(value).toLocaleDateString("en-GB") : "-";
                                             }
-                                            const changed = oldVal !== value;
+                                            let displayValue = value;
+                                            if (key === "MachineTools" && resolveMachineToolsDisplay && rawNewVal != null && rawNewVal !== "") {
+                                                displayValue = resolveMachineToolsDisplay(rawNewVal);
+                                            }
+                                            const changed = key === "MachineTools"
+                                                ? String(oldVal ?? "") !== String(rawNewVal ?? "")
+                                                : oldVal !== value;
                                             return (
                                                 <td key={key} style={{ width: columnWidths[i] }}
                                                     className={`border text-sm text-center ${changed ? "bg-[#BF9853] text-black font-bold" : ""}`}
                                                 >
-                                                    {value ?? "-"}
+                                                    {displayValue ?? "-"}
                                                 </td>
                                             );
                                         })}

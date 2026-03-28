@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Select from 'react-select';
 import Attach from '../Images/Attachfile.svg';
 import axios from "axios";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
+
+const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
+
 const Form = ({ username, userRoles = [] }) => {
     const resolveActiveBranchId = () => {
         try {
@@ -41,9 +44,11 @@ const Form = ({ username, userRoles = [] }) => {
     const [selectedSite, setSelectedSite] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedMachineTools, setSelectedMachine] = useState(null);
+    const [selectedToolsItemName, setSelectedToolsItemName] = useState(null);
     const [siteOptions, setSiteOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
+    const [toolsItemNameOptions, setToolsItemNameOptions] = useState([]);
     const [accountTypeOptions, setAccountTypeOptions] = useState([]);
     const [showMachineTools, setShowMachineTools] = useState(false);
     const fileInputRef = useRef(null);
@@ -217,9 +222,9 @@ const Form = ({ username, userRoles = [] }) => {
         fetchCategories();
     }, []);
     useEffect(() => {
-        const fetchMachinTools = async () => {
+        const fetchToolsItemIds = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/machine_tools/getAll", {
+                const response = await fetch(`${TOOLS_API_BASE}/api/tools_item_id/getAll`, {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -230,17 +235,74 @@ const Form = ({ username, userRoles = [] }) => {
                     throw new Error("Network response was not ok: " + response.statusText);
                 }
                 const data = await response.json();
-                const formattedData = data.map(item => ({
-                    value: item.machineTool,
-                    label: item.machineTool,
-                }));
+                const list = Array.isArray(data) ? data : [];
+                const formattedData = list
+                    .map((item) => {
+                        const rowId = item.id;
+                        const itemIdStr = item.item_id ?? item.itemId ?? "";
+                        const itemNameIdStr = item.item_name_id ?? item.itemNameId ?? "";
+                        const label =
+                            itemIdStr ||
+                            (rowId != null ? String(rowId) : "");
+                        return {
+                            value: rowId != null ? String(rowId) : itemIdStr,
+                            label,
+                            id: rowId,
+                            item_id: itemIdStr,
+                            item_name_id: itemNameIdStr,
+                        };
+                    })
+                    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
                 setMachineToolsOptions(formattedData);
             } catch (error) {
-                console.error("Fetch error: ", error);
+                console.error("Fetch error (tools_item_id): ", error);
             }
         };
-        fetchMachinTools();
+        fetchToolsItemIds();
     }, []);
+    useEffect(() => {
+        const fetchToolsItemNames = async () => {
+            try {
+                const response = await fetch(`${TOOLS_API_BASE}/api/tools_item_name/getAll`, {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                const formattedData = list
+                    .map((item) => ({
+                        value: String(item.id),
+                        label: item.item_name || "-",
+                        id: item.id,
+                    }))
+                    .sort((a, b) =>
+                        a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+                    );
+                setToolsItemNameOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error (tools_item_name): ", error);
+            }
+        };
+        fetchToolsItemNames();
+    }, []);
+    const filteredMachineToolOptions = useMemo(() => {
+        if (selectedToolsItemName?.id == null) {
+            return [];
+        }
+        const nameId = String(selectedToolsItemName.id);
+        return machineToolsOptions.filter(
+            (opt) => String(opt.item_name_id ?? "").trim() === nameId
+        );
+    }, [machineToolsOptions, selectedToolsItemName]);
+    useEffect(() => {
+        setSelectedMachine(null);
+    }, [selectedToolsItemName]);
     // Fetch advance portal data (for right-side advance history table)
     useEffect(() => {
         const fetchAdvanceData = async () => {
@@ -710,6 +772,7 @@ const Form = ({ username, userRoles = [] }) => {
         } else {
             setShowMachineTools(false);
             setSelectedMachine(null);
+            setSelectedToolsItemName(null);
         }
     };
     const fetchLatestEno = async () => {
@@ -860,6 +923,16 @@ const Form = ({ username, userRoles = [] }) => {
             alert('PDF file is required for this type.');
             return false;
         }
+        if (selectedCategory?.label === 'Machine Repair') {
+            if (!selectedToolsItemName) {
+                alert('Please select an item name for Machine Repair.');
+                return false;
+            }
+            if (!selectedMachineTools) {
+                alert('Please select a machine tool for Machine Repair.');
+                return false;
+            }
+        }
         return true;
     };
     const handleFormSubmit = async (e) => {
@@ -974,7 +1047,7 @@ const Form = ({ username, userRoles = [] }) => {
                 amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseInt(amount)) : parseInt(amount),
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
-                machineTools: selectedMachineTools ? selectedMachineTools.label : '',
+                machineTools: selectedMachineTools?.id != null ? selectedMachineTools.id : null,
                 billCopyUrl: pdfUrl || '',
                 utilityType: utilityType || '',
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
@@ -1136,6 +1209,7 @@ const Form = ({ username, userRoles = [] }) => {
         setSelectedSite(null);
         setSelectedCategory(null);
         setSelectedMachine(null);
+        setSelectedToolsItemName(null);
         setSelectedType("");
         setPaymentMode('');
         setSelectedEbNumber(null);
@@ -1224,7 +1298,7 @@ const Form = ({ username, userRoles = [] }) => {
                 source: "Expenses Entry",
                 category: selectedCategory ? selectedCategory.label : '',
                 comments: comments,
-                machineTools: selectedMachineTools ? selectedMachineTools.label : '',
+                machineTools: selectedMachineTools?.id != null ? selectedMachineTools.id : null,
                 billCopyUrl: pdfUrl || '',
                 paymentMode: paymentModalData.paymentMode,
                 utilityType: utilityType || '',
@@ -1420,7 +1494,7 @@ const Form = ({ username, userRoles = [] }) => {
         const formatted = today.toISOString().split('T')[0];
         setDate(formatted);
     }, []);
-    
+
     return (
         <div className='bg-[#FAF6ED] min-h-screen'>
             <style jsx>{`
@@ -1571,19 +1645,82 @@ const Form = ({ username, userRoles = [] }) => {
                                     </div>
                                 ) : showMachineTools ? (
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-2 block">Machine Tool</label>
+                                        <label className="text-md font-semibold mb-2 block">Item Name</label>
                                         <Select
-                                            options={machineToolsOptions}
-                                            value={selectedMachineTools}
-                                            onChange={setSelectedMachine}
+                                            options={toolsItemNameOptions}
+                                            value={selectedToolsItemName}
+                                            onChange={setSelectedToolsItemName}
                                             styles={customStyles}
                                             isClearable
-                                            placeholder="Select a machine tool..."
+                                            placeholder="Select item name..."
                                             className="custom-select rounded-lg w-[290px] h-[45px]"
                                         />
                                     </div>
                                 ) : null}
                             </div>
+                            {showMachineTools &&
+                                !(selectedAccountType === 'Claim' ||
+                                    selectedAccountType === 'Utility Bills' ||
+                                    selectedAccountType === 'Weekly Payment') && (
+                                    <div className='flex gap-10 mb-3'>
+                                        <div className='w-[290px] min-w-[290px] shrink-0' aria-hidden="true" />
+                                        <div className='text-left'>
+                                            <label className="text-md font-semibold mb-2 block">Machine Tool</label>
+                                            <Select
+                                                options={filteredMachineToolOptions}
+                                                value={selectedMachineTools}
+                                                onChange={setSelectedMachine}
+                                                styles={customStyles}
+                                                isClearable
+                                                placeholder={
+                                                    !selectedToolsItemName
+                                                        ? 'Select item name first...'
+                                                        : filteredMachineToolOptions.length === 0
+                                                          ? 'No tools for this item'
+                                                          : 'Select a machine tool...'
+                                                }
+                                                className="custom-select rounded-lg w-[290px] h-[45px]"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            {showMachineTools &&
+                                (selectedAccountType === 'Claim' ||
+                                    selectedAccountType === 'Utility Bills' ||
+                                    selectedAccountType === 'Weekly Payment') && (
+                                    <div className='flex gap-10 mb-3'>
+                                        <div className='text-left'>
+                                            <label className="text-md font-semibold mb-2 block">Item Name</label>
+                                            <Select
+                                                options={toolsItemNameOptions}
+                                                value={selectedToolsItemName}
+                                                onChange={setSelectedToolsItemName}
+                                                styles={customStyles}
+                                                isClearable
+                                                placeholder="Select item name..."
+                                                className="custom-select rounded-lg w-[290px] h-[45px]"
+                                            />
+                                        </div>
+                                        <div className='text-left'>
+                                            <label className="text-md font-semibold mb-2 block">Machine Tool</label>
+                                            <Select
+                                                options={filteredMachineToolOptions}
+                                                value={selectedMachineTools}
+                                                onChange={setSelectedMachine}
+                                                styles={customStyles}
+                                                isClearable
+                                                placeholder={
+                                                    !selectedToolsItemName
+                                                        ? 'Select item name first...'
+                                                        : filteredMachineToolOptions.length === 0
+                                                          ? 'No tools for this item'
+                                                          : 'Select a machine tool...'
+                                                }
+                                                className="custom-select rounded-lg w-[290px] h-[45px]"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             {selectedAccountType === 'Utility Bills' && (
                                 <>
                                     <div className='flex gap-10 mb-3'>

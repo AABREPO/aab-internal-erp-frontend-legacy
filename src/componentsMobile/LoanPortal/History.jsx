@@ -317,17 +317,11 @@ const History = () => {
     return result;
   })();
 
-  const getTypeBadgeClass = (type) => {
-    switch (type) {
-      case 'Loan':
-        return 'bg-[#FFF3E0] text-[#E4572E]';
-      case 'Refund':
-        return 'bg-[#FFF3E0] text-[#E4572E]';
-      case 'Transfer':
-        return 'bg-[#FFF3E0] text-black';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
+  const getPaymentModeBadgeClass = (mode) => {
+    if (!mode || mode === '') return 'bg-gray-100 text-gray-600';
+    const m = String(mode).toLowerCase();
+    if (m === 'cash') return 'bg-[#E7F4FD] text-[#336EA8]';
+    return 'bg-[#FFEFFF] text-[#815182]';
   };
 
   const combinedAssociateOptions = [
@@ -536,8 +530,8 @@ const History = () => {
                           {item.ref}
                         </span>
                         <span
-                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getTypeBadgeClass(
-                            item.type
+                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getPaymentModeBadgeClass(
+                            item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')
                           )}`}
                         >
                           {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}

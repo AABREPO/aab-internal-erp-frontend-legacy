@@ -706,8 +706,8 @@ const Summary = () => {
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Date and Category Section */}
-      <div className=" pt-[10px] mb-[8px]">
-        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
+      <div className=" pt-[8px] mb-[8px]">
+        <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[10px]">
           <button className="text-[12px] font-semibold text-black leading-normal">#Week</button>
           <button
             onClick={exportSummaryPDF}

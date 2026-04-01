@@ -7,8 +7,34 @@ import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
 import Filter from '../Images/Filter.png'
 import Search from '../Images/Search.png'
-const History = () => {
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
+
+const History = ({ user } = {}) => {
   const [rfqs, setRfqs] = useState([]);
+
+  // Resolve module permissions from user's roles (used to block Edit/Delete on History cards).
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'RFQ';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canEdit = modulePermissions.includes('Edit');
+  const canDelete = modulePermissions.includes('Delete');
+
   // Cache for fast "get by id" lookups during clone (prevents repeated network calls)
   const quickFetchCacheRef = useRef(new Map());
   // Initialize searchQuery from localStorage if available
@@ -375,6 +401,10 @@ const History = () => {
     };
   }, [allVendors, allProjects, allEmployees, allSupportStaff, searchQuery, filters, loadPurchaseOrders]);
   const handleEdit = async (rfq) => {
+    if (!canEdit) {
+      alert("You don't have permission to edit.");
+      return;
+    }
     // Fetch the specific RFQ quickly (ensures rfqTable/items are present immediately)
     let payload = rfq;
     try {
@@ -973,10 +1003,19 @@ const History = () => {
     setCloneExpandedPoId(null);
   };
   const handleDelete = (poId) => {
+    if (!canDelete) {
+      alert("You don't have permission to delete.");
+      return;
+    }
     setPoToDelete(poId);
     setShowDeleteConfirm(true);
   };
   const confirmDelete = async () => {
+    if (!canDelete) {
+      setShowDeleteConfirm(false);
+      setPoToDelete(null);
+      return;
+    }
     if (poToDelete) {
       try {
         // Find the PO to get its order ID
@@ -2002,7 +2041,10 @@ const History = () => {
                         handleEdit(po);
                         setExpandedPoId(null); // Close after edit
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
+                      disabled={!canEdit}
+                      className={`action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm ${
+                        !canEdit ? 'opacity-50 cursor-not-allowed hover:bg-[#007233]' : ''
+                      }`}
                       title="Edit"
                     >
                       <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -2013,7 +2055,10 @@ const History = () => {
                         handleDelete(po.id);
                         setExpandedPoId(null); // Close after delete
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm"
+                      disabled={!canDelete}
+                      className={`action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm ${
+                        !canDelete ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
+                      }`}
                       title="Delete"
                     >
                       <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import Search from '../Images/Search.png';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 // Helper function to highlight matching text (highlights all matching terms)
 const highlightText = (text, searchQuery) => {
@@ -192,6 +193,20 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
             onRefreshData();
         }
     }, [isOpen, onRefreshData]);
+
+    // Resolve module permissions for inventory save actions.
+    const [inventoryModulePermissions, setInventoryModulePermissions] = useState([]);
+    useEffect(() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem('user') || '{}');
+            fetchUserModulePermissions(stored?.userRoles || [], 'Inventory')
+                .then(setInventoryModulePermissions)
+                .catch(() => setInventoryModulePermissions([]));
+        } catch {
+            setInventoryModulePermissions([]);
+        }
+    }, []);
+    const canCreateInventory = inventoryModulePermissions.includes('Create');
 
     // Fetch project names when modal opens with isFromUpdate
     useEffect(() => {
@@ -1767,6 +1782,10 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
 
                                 if (!stockingLocationId) {
                                     alert('Stocking Location is required');
+                                    return;
+                                }
+                                if (!canCreateInventory) {
+                                    alert("You don't have permission to save inventory.");
                                     return;
                                 }
 

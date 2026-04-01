@@ -6,11 +6,26 @@ import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
 import Filter from '../Images/Filter.png'
 import Search from '../Images/Search.png'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const NonPOHistory = ({ onTabChange }) => {
   const [nonPORecords, setNonPORecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      fetchUserModulePermissions(stored?.userRoles || [], 'Inventory')
+        .then(setModulePermissions)
+        .catch(() => setModulePermissions([]));
+    } catch {
+      setModulePermissions([]);
+    }
+  }, []);
+  const canCreate = modulePermissions.includes('Create');
   const [searchQuery, setSearchQuery] = useState('');
   const [vendorData, setVendorData] = useState([]);
   const [siteData, setSiteData] = useState([]);
@@ -523,6 +538,10 @@ const NonPOHistory = ({ onTabChange }) => {
   // Handler for adding new category
   const handleAddNewCategory = async (newCategory) => {
     if (!newCategory || !newCategory.trim()) {
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create categories.");
       return;
     }
     try {

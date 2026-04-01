@@ -6,6 +6,7 @@ import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Close from '../Images/close.png';
 import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
@@ -54,6 +55,28 @@ const ServiceHistory = ({ user, onTabChange }) => {
   const [brandsMap, setBrandsMap] = useState({});
   const [itemIdsMap, setItemIdsMap] = useState({});
   const [machineNumbersMap, setMachineNumbersMap] = useState({});
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
 
   // Image viewer state
   const [showImageViewer, setShowImageViewer] = useState(false);
@@ -172,6 +195,10 @@ const ServiceHistory = ({ user, onTabChange }) => {
   const saveMachineStatus = async (itemIdsId, machineNumberId, machineStatus) => {
     if (!itemIdsId || !machineNumberId || !machineStatus) {
       console.error('Missing required fields for saving machine status');
+      return false;
+    }
+    if (!canCreate) {
+      console.warn('Skipping tools-machine-status/save - user lacks Create permission');
       return false;
     }
     try {

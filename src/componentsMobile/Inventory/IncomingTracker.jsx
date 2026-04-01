@@ -7,6 +7,7 @@ import Close from '../Images/close.png'
 import Edit from '../Images/edit1.png';
 import Search from '../Images/Search.png'
 import { getIncomingTrackerPrefetchCache } from './incomingTrackerPrefetch';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const IncomingTracker = ({ user, onTabChange }) => {
   // Prevent whole-page scroll; keep only inner containers scrollable
@@ -22,6 +23,28 @@ const IncomingTracker = ({ user, onTabChange }) => {
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, []);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Inventory';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
 
   const [activeStatus, setActiveStatus] = useState('live'); // 'live', 'closed', or 'history'
   const [incomingRecords, setIncomingRecords] = useState([]);
@@ -603,23 +626,27 @@ const IncomingTracker = ({ user, onTabChange }) => {
         const closedBy = (user && user.username) || '';
         const timestamp = new Date().toISOString();
 
-        try {
-          await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              purchase_no: purchaseNo || '',
-              vendor_id: vendorId || 0,
-              closed_by: closedBy,
-              timestamp: timestamp
-            })
-          });
-        } catch (error) {
-          console.error('Error saving closed PO record:', error);
-          // Don't fail the whole operation if this fails
+        if (canCreate) {
+          try {
+            await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                purchase_no: purchaseNo || '',
+                vendor_id: vendorId || 0,
+                closed_by: closedBy,
+                timestamp: timestamp
+              })
+            });
+          } catch (error) {
+            console.error('Error saving closed PO record:', error);
+            // Don't fail the whole operation if this fails
+          }
+        } else {
+          console.warn('Skipping closed_po_records/save - user lacks Create permission');
         }
         // Refresh the incoming records
         const fetchIncomingRecords = async () => {
@@ -1686,23 +1713,27 @@ const IncomingTracker = ({ user, onTabChange }) => {
                   await Promise.all(closePromises);
                   // Save to ClosedPORecords (only once per purchase_no)
                   if (purchaseNo) {
-                    try {
-                      await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: {
-                          'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                          purchase_no: purchaseNo,
-                          vendor_id: vendorId,
-                          closed_by: closedBy,
-                          timestamp: timestamp
-                        })
-                      });
-                    } catch (error) {
-                      console.error('Error saving closed PO record:', error);
-                      // Don't fail the whole operation if this fails
+                    if (canCreate) {
+                      try {
+                        await fetch('https://backendaab.in/aabuildersDash/api/closed_po_records/save', {
+                          method: 'POST',
+                          credentials: 'include',
+                          headers: {
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({
+                            purchase_no: purchaseNo,
+                            vendor_id: vendorId,
+                            closed_by: closedBy,
+                            timestamp: timestamp
+                          })
+                        });
+                      } catch (error) {
+                        console.error('Error saving closed PO record:', error);
+                        // Don't fail the whole operation if this fails
+                      }
+                    } else {
+                      console.warn('Skipping closed_po_records/save - user lacks Create permission');
                     }
                   }
                   // Refresh data once after all closes

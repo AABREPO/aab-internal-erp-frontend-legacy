@@ -6,6 +6,7 @@ import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Close from '../Images/close.png';
 import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 const AddInput = ({ user }) => {
   const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
   const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
@@ -35,6 +36,28 @@ const AddInput = ({ user }) => {
   const [fileUrl, setFileUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   // Store full data objects with IDs
   const [toolsBrandFullData, setToolsBrandFullData] = useState([]); // Full brand objects with id and tools_brand
   const [toolsItemIdFullData, setToolsItemIdFullData] = useState([]); // Full item ID objects with id and item_id
@@ -424,6 +447,11 @@ const AddInput = ({ user }) => {
   const handleConfirmCreateItemId = async () => {
     const pendingValue = String(pendingItemIdToCreate || '').trim().replace(/\s+/g, ' ');
     if (!pendingValue) {
+      closeCreateConfirmModal();
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create tools tracker data.");
       closeCreateConfirmModal();
       return;
     }
@@ -1257,6 +1285,10 @@ const AddInput = ({ user }) => {
     requestCreateItemIdConfirmation(newItemId, 'main');
   };
   const handleAddSheetSave = async () => {
+    if (!canCreate) {
+      alert("You don't have permission to create tools tracker data.");
+      return;
+    }
     const itemName = (addSheetForm.itemName || selectedItemName || '').trim();
     if (!itemName) {
       alert('Item Name is required.');

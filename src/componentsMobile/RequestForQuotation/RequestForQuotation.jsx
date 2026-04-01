@@ -21,6 +21,7 @@ import SearchItemsModal from './SearchItemsModal';
 import Summary from './Summary';
 import editIcon from '../Images/edit.png';
 import SearchBlack from '../Images/search black.png';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 // Module-level cache that persists across component remounts
 const siteEngineersCache = { data: null };
@@ -36,6 +37,28 @@ const RequestForQuotation = ({ user, onLogout }) => {
   });
   const [showAddItems, setShowAddItems] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'RFQ';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -1367,6 +1390,10 @@ const RequestForQuotation = ({ user, onLogout }) => {
     if (!newVendor || !newVendor.trim()) {
       return;
     }
+    if (!canCreate) {
+      alert("You don't have permission to create Vendors.");
+      return;
+    }
     try {
       // Create vendor data with only vendorName (other fields will be null/empty)
       const vendorData = {
@@ -2041,6 +2068,11 @@ const RequestForQuotation = ({ user, onLogout }) => {
       };
       const isEditingExistingPo = isEditMode && poData.originalId;
       const baseUrl = "https://backendaab.in/aabuildersDash/api/rfq";
+      // `/save` is only used for creating new RFQ; block it if user lacks `Create`.
+      if (!isEditingExistingPo && !canCreate) {
+        alert("You don't have permission to create a new RFQ.");
+        return;
+      }
       const url = isEditingExistingPo
         ? `${baseUrl}/edit_with_history/${poData.originalId}?changedBy=${encodeURIComponent(username)}`
         : `${baseUrl}/save`;
@@ -2625,6 +2657,9 @@ const RequestForQuotation = ({ user, onLogout }) => {
     if (page === 'request-for-quotation') {
       setCurrentPage('request-for-quotation');
       navigate('/rfq');
+    } else if (page === 'billing') {
+      setCurrentPage('billing');
+      navigate('/tracker/pendingbill');
     } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
@@ -2664,7 +2699,7 @@ const RequestForQuotation = ({ user, onLogout }) => {
       {/* Content Area */}
       <div className="mt-[96px] h-[calc(100vh-96px-80px)] overflow-hidden">
         {/* History Tab Content */}
-        {activeTab === 'history' && <History />}
+        {activeTab === 'history' && <History user={user} />}
         {/* Input Data Tab Content */}
         {activeTab === 'input' && <InputData />}
         {/* Summary Tab Content */}
@@ -2699,8 +2734,10 @@ const RequestForQuotation = ({ user, onLogout }) => {
                     <button
                       type="button"
                       onClick={generatePO}
-                      disabled={isGenerating || isGeneratePrecheckRunning}
-                      className={`text-[12px] font-semibold leading-normal ${(isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
+                      disabled={!canCreate || isGenerating || isGeneratePrecheckRunning}
+                      className={`text-[12px] font-semibold leading-normal ${
+                        (!canCreate || isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'
+                      }`}
                     >
                       {(isGenerating || isGeneratePrecheckRunning) ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update RFQ' : 'Generate RFQ')}
                     </button>

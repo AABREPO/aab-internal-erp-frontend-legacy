@@ -9,6 +9,7 @@ import SearchItemsModal from '../PurchaseOrder/SearchItemsModal';
 import editIcon from '../Images/edit.png';
 import jsPDF from 'jspdf';
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 const Incoming = ({ user }) => {
   // Prevent whole-page scroll; keep only inner lists scrollable
   useEffect(() => {
@@ -23,6 +24,28 @@ const Incoming = ({ user }) => {
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, []);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Inventory';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   // Helper functions for date
   const getTodayDate = () => {
     const today = new Date();
@@ -1406,6 +1429,11 @@ const Incoming = ({ user }) => {
 
       // Check if this is an update or new record
       const isUpdate = isEditMode && incomingData.inventoryId;
+      // `/save` is used for creating new inventory records; block it if user lacks `Create`.
+      if (!isUpdate && !canCreate) {
+        alert("You don't have permission to create new Inventory entries.");
+        return;
+      }
 
       let payload = {
         vendor_id: incomingData.vendorId,

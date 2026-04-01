@@ -4,6 +4,7 @@ import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import UploadFile from '../Images/Upload Small.svg';
 import Pen from '../Images/Pen.svg';
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 // ISO 8601 week helpers (same as AdvanceReport.js)
 const getISOWeekNumber = (date) => {
@@ -61,7 +62,7 @@ const PREDEFINED_SITE_OPTIONS = [
   { value: 'Bill Payment Tracker', label: 'Bill Payment Tracker', id: 12, sNo: '12' },
 ];
 
-const History = ({ onVendorClick }) => {
+const History = ({ onVendorClick, user } = {}) => {
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem('selectedBranchId');
@@ -83,6 +84,29 @@ const History = ({ onVendorClick }) => {
   };
 
   const [advanceData, setAdvanceData] = useState([]);
+
+  // Resolve module permissions from user's roles (used to block History "upload/update" actions).
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Advance Portal';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canEdit = modulePermissions.includes('Edit');
+
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([...PREDEFINED_SITE_OPTIONS]);
@@ -405,11 +429,20 @@ const History = ({ onVendorClick }) => {
   const minSwipeDistance = 50;
 
   const handleUploadClick = (item) => {
+    if (!canEdit) {
+      alert("You don't have permission to edit.");
+      return;
+    }
     setItemToUploadFor(item);
     setShowUploadConfirmModal(true);
   };
 
   const handleUploadConfirm = () => {
+    if (!canEdit) {
+      setShowUploadConfirmModal(false);
+      setItemToUploadFor(null);
+      return;
+    }
     if (!itemToUploadFor) return;
     setShowUploadConfirmModal(false);
     setUploadingForId(itemToUploadFor.id);
@@ -426,6 +459,11 @@ const History = ({ onVendorClick }) => {
     const file = e.target?.files?.[0];
     e.target.value = '';
     if (!file || !uploadingForId) {
+      setUploadingForId(null);
+      return;
+    }
+    if (!canEdit) {
+      alert("You don't have permission to edit.");
       setUploadingForId(null);
       return;
     }

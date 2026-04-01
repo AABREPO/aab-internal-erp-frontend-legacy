@@ -6,6 +6,7 @@ import Filter from '../Images/Filter.png';
 import Close from '../Images/close.png';
 import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
@@ -20,6 +21,29 @@ const History = ({ user, onTabChange }) => {
   const [historyType, setHistoryType] = useState('entry'); // 'entry' | 'service' | 'relocate' | 'log'
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Resolve module permissions from user's roles (used to block Edit/Delete on History cards).
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canEdit = modulePermissions.includes('Edit');
+  const canDelete = modulePermissions.includes('Delete');
   const [fullEntriesData, setFullEntriesData] = useState([]); // Store full entries before flattening
   const [projectsMap, setProjectsMap] = useState({});
   const [vendorsMap, setVendorsMap] = useState({});
@@ -717,6 +741,10 @@ const History = ({ user, onTabChange }) => {
   };
   // Handle edit (for update)
   const handleEdit = async (entry) => {
+    if (!canEdit) {
+      alert("You don't have permission to edit.");
+      return;
+    }
     try {
       // Get the entry ID
       const entryId = entry.entryId || entry.id;
@@ -1673,13 +1701,27 @@ const History = ({ user, onTabChange }) => {
                         e.stopPropagation();
                         handleEdit(entry);
                       }}
-                      className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm"
+                      disabled={!canEdit}
+                      className={`action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-1.5 hover:bg-[#22a882] transition-colors shadow-sm ${
+                        !canEdit ? 'opacity-50 cursor-not-allowed hover:bg-[#007233]' : ''
+                      }`}
                       title="Edit"
                     >
                       <img src={EditIcon} alt="Edit" className="w-[18px] h-[18px]" />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); setExpandedEntryId(null); }}
-                      className="action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!canDelete) {
+                          alert("You don't have permission to delete.");
+                          return;
+                        }
+                        setExpandedEntryId(null);
+                      }}
+                      disabled={!canDelete}
+                      className={`action-button w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-1.5 hover:bg-[#cc4d26] transition-colors shadow-sm ${
+                        !canDelete ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
+                      }`}
                       title="Delete"
                     >
                       <img src={DeleteIcon} alt="Delete" className="w-[18px] h-[18px]" />

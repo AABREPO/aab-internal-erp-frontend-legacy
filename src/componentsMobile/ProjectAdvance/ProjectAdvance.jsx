@@ -38,6 +38,9 @@ const ProjectAdvance = ({ user, onLogout }) => {
     if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
+    } else if (page === 'billing') {
+      setCurrentPage('billing');
+      navigate('/tracker/pendingbill');
     } else if (page === 'inventory') {
       setCurrentPage('inventory');
       navigate('/inventory');
@@ -80,6 +83,7 @@ const ProjectAdvance = ({ user, onLogout }) => {
         {activeTab === 'history' && (
           <div className="flex-1 min-h-0 overflow-hidden">
             <History
+              user={user}
               onVendorClick={(data) => {
                 setInitialFromHistory(data);
                 setActiveTab('advanceform');

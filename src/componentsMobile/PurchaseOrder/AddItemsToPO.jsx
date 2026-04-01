@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import CloseIcon from '../Images/Close F.svg';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType, onRefreshCategory }) => {
   const [formData, setFormData] = useState({
@@ -50,6 +51,21 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
 
   // Track previous initialData to prevent unnecessary form resets
   const previousInitialDataRef = useRef(null);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      fetchUserModulePermissions(stored?.userRoles || [], 'Purchase Order')
+        .then(setModulePermissions)
+        .catch(() => setModulePermissions([]));
+    } catch {
+      setModulePermissions([]);
+    }
+  }, []);
+
+  const canCreate = modulePermissions.includes('Create');
 
   // Fetch PO item names from API
   useEffect(() => {
@@ -439,6 +455,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     if (!newCategory || !newCategory.trim()) {
       return;
     }
+    if (!canCreate) {
+      alert("You don't have permission to create categories.");
+      return;
+    }
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
         method: 'POST',
@@ -534,6 +554,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       groupName: '',
       otherPOEntityList: [], // Always empty when saving new item name
     };
+    if (!canCreate) {
+      alert("You don't have permission to create item names.");
+      return;
+    }
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/save', {
         method: 'POST',
@@ -567,6 +591,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       model: model,
       category: categoryId,
     };
+    if (!canCreate) {
+      alert("You don't have permission to create models.");
+      return;
+    }
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/save', {
         method: 'POST',
@@ -600,6 +628,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       brand,
       category: categoryId
     };
+    if (!canCreate) {
+      alert("You don't have permission to create brands.");
+      return;
+    }
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/save', {
         method: 'POST',
@@ -633,6 +665,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
       typeColor,
       category: categoryId
     };
+    if (!canCreate) {
+      alert("You don't have permission to create types.");
+      return;
+    }
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/save', {
         method: 'POST',

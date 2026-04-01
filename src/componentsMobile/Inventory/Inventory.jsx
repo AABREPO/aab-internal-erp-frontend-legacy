@@ -111,7 +111,7 @@ const Inventory = ({ user, onLogout }) => {
       case 'net-stock':
         return <NetStock />;
       case 'history':
-        return <History onTabChange={handleTabChange} />
+        return <History user={user} onTabChange={handleTabChange} />
       case 'add-input':
         return <AddInput />;
       case 'incoming-tracker':

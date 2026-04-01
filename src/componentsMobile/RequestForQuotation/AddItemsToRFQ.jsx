@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import SearchableDropdown from './SearchableDropdown';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCategory = '', onCategoryChange, onRefreshItemName, onRefreshModel, onRefreshBrand, onRefreshType }) => {
   const [formData, setFormData] = useState({
@@ -26,6 +27,21 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
 
   // State for PO type from API
   const [poType, setPoType] = useState([]);
+
+  // Resolve module permissions (Create/Edit/Delete) for RFQ create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      fetchUserModulePermissions(stored?.userRoles || [], 'RFQ')
+        .then(setModulePermissions)
+        .catch(() => setModulePermissions([]));
+    } catch {
+      setModulePermissions([]);
+    }
+  }, []);
+
+  const canCreate = modulePermissions.includes('Create');
 
   // State for categories (with IDs) from API
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -401,6 +417,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     if (!newCategory || !newCategory.trim()) {
       return;
     }
+    if (!canCreate) {
+      alert("You don't have permission to create categories.");
+      return;
+    }
     try {
       const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/save', {
         method: 'POST',
@@ -485,6 +505,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
   };
   // API handlers for saving new items (same as InputData.jsx)
   const handleSubmitItemName = async (itemName, selectedCategory) => {
+    if (!canCreate) {
+      alert("You don't have permission to create item names.");
+      return;
+    }
     const categoryToUse = selectedCategory || formData.category || '';
     const payload = {
       itemName: itemName,
@@ -516,6 +540,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     }
   };
   const handleSubmitModel = async (model, selectedCategory) => {
+    if (!canCreate) {
+      alert("You don't have permission to create models.");
+      return;
+    }
     const categoryToUse = selectedCategory || formData.category || '';
     const categoryOption = categoryOptions.find(cat =>
       cat.label === categoryToUse || cat.value === categoryToUse
@@ -549,6 +577,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     }
   };
   const handleSubmitBrand = async (brand, selectedCategory) => {
+    if (!canCreate) {
+      alert("You don't have permission to create brands.");
+      return;
+    }
     const categoryToUse = selectedCategory || formData.category || '';
     const categoryOption = categoryOptions.find(cat =>
       cat.label === categoryToUse || cat.value === categoryToUse
@@ -582,6 +614,10 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
     }
   };
   const handleSubmitType = async (typeColor, selectedCategory) => {
+    if (!canCreate) {
+      alert("You don't have permission to create types.");
+      return;
+    }
     const categoryToUse = selectedCategory || formData.category || '';
     const categoryOption = categoryOptions.find(cat =>
       cat.label === categoryToUse || cat.value === categoryToUse

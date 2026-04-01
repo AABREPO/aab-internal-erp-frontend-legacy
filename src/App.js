@@ -66,6 +66,7 @@ function AppContent({ user, handleLogout }) {
     location.pathname.startsWith('/purchaseorder') ||
     location.pathname.startsWith('/inventory') ||
     location.pathname.startsWith('/toolsTracker') ||
+    location.pathname.startsWith('/tracker') ||
     location.pathname.startsWith('/portal') ||
     location.pathname.startsWith('/loan') ||
     location.pathname.startsWith('/rfq');

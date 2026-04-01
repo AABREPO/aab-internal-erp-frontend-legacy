@@ -3,8 +3,18 @@ import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Attach from '../Images/Attachfile.svg';
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], initialFromHistory = null, onConsumedInitialFromHistory }) => {
+  // Resolve module permissions (Create/Edit/Delete) for mobile actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    fetchUserModulePermissions(userRoles, 'Advance Portal')
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [userRoles]);
+  const canCreate = modulePermissions.includes('Create');
+
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -622,6 +632,11 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
   // Submit advance data
   const submitAdvanceData = async () => {
     setIsSubmitting(true);
+    if (!canCreate) {
+      alert("You don't have permission to create new Advance entries.");
+      setIsSubmitting(false);
+      return;
+    }
     try {
       let fileUrl = '';
       if (selectedAdvanceFile && selectedType === 'Bill Settlement') {

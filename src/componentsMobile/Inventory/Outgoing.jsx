@@ -13,6 +13,7 @@ import DP from '../Images/DP.png';
 import CloseIcon from '../Images/Close F.svg'
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const Outgoing = ({ user }) => {
   // Prevent whole-page scroll; keep only inner lists scrollable
@@ -28,6 +29,28 @@ const Outgoing = ({ user }) => {
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, []);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Inventory';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   // Helper functions for date
   const getTodayDate = () => {
     const today = new Date();
@@ -1269,6 +1292,10 @@ const Outgoing = ({ user }) => {
         payload.eno = eno;
       }
       // Determine API endpoint and method
+      if (!isUpdate && !canCreate) {
+        alert("You don't have permission to create Inventory entries.");
+        return;
+      }
       const apiUrl = isUpdate
         ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${editingInventoryId}?changedBy=${encodeURIComponent(username)}`
         : 'https://backendaab.in/aabuildersDash/api/inventory/save';

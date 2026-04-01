@@ -4,8 +4,26 @@ import 'react-toastify/dist/ReactToastify.css';
 import Attach from '../Images/Attachfile.svg';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const LoanForm = () => {
+  // Resolve module permissions (Create/Edit/Delete) for mobile actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const stored = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('user') || '{}');
+      } catch {
+        return {};
+      }
+    })();
+    fetchUserModulePermissions(stored?.userRoles || [], 'Loan Portal')
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, []);
+
+  const canCreate = modulePermissions.includes('Create');
+
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -324,6 +342,14 @@ const LoanForm = () => {
     setIsSubmitting(true);
 
     try {
+      if (!canCreate) {
+        toast.error("You don't have permission to create new Loan entries.", {
+          position: "top-center",
+          autoClose: 3000,
+          theme: "colored"
+        });
+        return;
+      }
       const formData = new FormData();
       formData.append('type', selectedLoanType);
       formData.append('date', dateValue);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
 const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
@@ -36,6 +37,28 @@ const ToolsHistory = ({ user }) => {
   const [showMachineNumberPopup, setShowMachineNumberPopup] = useState(false);
   const [showEditSheet, setShowEditSheet] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Resolve module permissions for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileUrl, setFileUrl] = useState('');
@@ -1223,6 +1246,11 @@ const ToolsHistory = ({ user }) => {
   const handleConfirmCreate = async () => {
     const pendingValue = String(pendingCreateValue || '').trim().replace(/\s+/g, ' ');
     if (!pendingValue) {
+      closeCreateConfirmModal();
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create tools tracker data.");
       closeCreateConfirmModal();
       return;
     }

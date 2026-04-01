@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SelectVendorModal from './SelectVendorModal';
 import Search from '../Images/Search.png';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 // Helper function to highlight matching text (highlights all matching terms)
 const highlightText = (text, searchQuery) => {
@@ -307,6 +308,34 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
     const [showSplitTypeModal, setShowSplitTypeModal] = useState(false);
     const [splitTypeRowIndex, setSplitTypeRowIndex] = useState(null);
     const [stockRefreshTick, setStockRefreshTick] = useState(0);
+
+    // Resolve module permissions for split/saving actions.
+    const [poModulePermissions, setPoModulePermissions] = useState([]);
+    const [inventoryModulePermissions, setInventoryModulePermissions] = useState([]);
+    useEffect(() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem('user') || '{}');
+            const roles = stored?.userRoles || [];
+            Promise.all([
+                fetchUserModulePermissions(roles, 'Purchase Order'),
+                fetchUserModulePermissions(roles, 'Inventory')
+            ])
+                .then(([poPerms, invPerms]) => {
+                    setPoModulePermissions(poPerms);
+                    setInventoryModulePermissions(invPerms);
+                })
+                .catch(() => {
+                    setPoModulePermissions([]);
+                    setInventoryModulePermissions([]);
+                });
+        } catch {
+            setPoModulePermissions([]);
+            setInventoryModulePermissions([]);
+        }
+    }, []);
+
+    const canCreatePoType = poModulePermissions.includes('Create');
+    const canCreateInventory = inventoryModulePermissions.includes('Create');
     // Store all selected items with their full details (persists across searches)
     const [selectedItemsMap, setSelectedItemsMap] = useState({}); // Key: itemKey, Value: { item, quantity }
     // Refresh data when modal opens
@@ -1627,6 +1656,10 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
     const handleCreateSplitType = async (newType) => {
         const trimmedType = (newType || '').trim();
         if (!trimmedType) return;
+        if (!canCreatePoType) {
+            alert("You don't have permission to create PO types.");
+            return;
+        }
         // Match AddItemsToPO.jsx behavior: it sends `category` as the *category name* (not id),
         // because `categoryOptions` there use `value/label` = category string.
         const categoryName =
@@ -1670,6 +1703,10 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
     };
     const handleSubmitSplit = async () => {
         if (!selectedSplitItem) return;
+        if (!canCreateInventory) {
+            alert("You don't have permission to create inventory records.");
+            return;
+        }
         if (!stockingLocationId) {
             alert('Stocking Location is required');
             return;

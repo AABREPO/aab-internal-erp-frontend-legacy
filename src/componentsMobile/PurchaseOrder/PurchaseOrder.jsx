@@ -22,6 +22,7 @@ import Summary from './Summary';
 import editIcon from '../Images/edit.png';
 import SearchBlack from '../Images/search black.png';
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 // Module-level cache that persists across component remounts
 const siteEngineersCache = { data: null };
@@ -37,6 +38,28 @@ const PurchaseOrder = ({ user, onLogout }) => {
   });
   const [showAddItems, setShowAddItems] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Purchase Order';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -134,6 +157,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   useEffect(() => {
     expandedItemIdRef.current = expandedItemId;
   }, [expandedItemId]);
+  // This screen uses internal scroll (items list). Prevent any overall page/body scroll.
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow;
     const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -2228,6 +2252,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
         })
       };
       const isEditingExistingPo = isEditMode && poData.originalId;
+      // `/save` is only used for creating new PO; block it if user lacks `Create`.
+      if (!isEditingExistingPo && !canCreate) {
+        alert("You don't have permission to create a new Purchase Order.");
+        return;
+      }
       const baseUrl = "https://backendaab.in/aabuildersDash/api/purchase_orders";
       const url = isEditingExistingPo
         ? `${baseUrl}/edit_with_history/${poData.originalId}?changedBy=${encodeURIComponent(username)}`
@@ -2803,6 +2832,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
     if (page === 'request-for-quotation') {
       setCurrentPage('request-for-quotation');
       navigate('/rfq');
+    } else if (page === 'billing') {
+      setCurrentPage('billing');
+      navigate('/tracker/pendingbill');
     } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
@@ -2837,14 +2869,14 @@ const PurchaseOrder = ({ user, onLogout }) => {
       {/* Content Area */}
       <div className="mt-[96px] h-[calc(100vh-96px-80px)] overflow-hidden">
         {/* History Tab Content */}
-        {activeTab === 'history' && <History />}
+        {activeTab === 'history' && <History user={user} />}
         {/* Input Data Tab Content */}
         {activeTab === 'input' && <InputData />}
         {/* Summary Tab Content */}
         {activeTab === 'summary' && <Summary />}
         {/* Create PO Tab Content */}
         {activeTab === 'create' && (
-          <div className="flex flex-col h-full bg-white overflow-hidden">
+          <div className="flex flex-col h-full bg-white">
             {/* PO Number and Date Row - Only show date when not in empty state */}
             <div className="sticky top-0 bg-white z-10 flex-shrink-0">
               <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
@@ -2887,8 +2919,10 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     <button
                       type="button"
                       onClick={generatePO}
-                      disabled={isGenerating || isGeneratePrecheckRunning}
-                      className={`text-[12px] font-semibold leading-normal ${(isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'}`}
+                      disabled={!canCreate || isGenerating || isGeneratePrecheckRunning}
+                      className={`text-[12px] font-semibold leading-normal ${
+                        (!canCreate || isGenerating || isGeneratePrecheckRunning) ? 'text-gray-400 cursor-not-allowed' : 'text-black'
+                      }`}
                     >
                       {(isGenerating || isGeneratePrecheckRunning) ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
                     </button>
@@ -2930,11 +2964,11 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 </div>
               </div>
             </div>
-            {/* Input Fields - Show dropdowns BEFORE clicking + button (when !hasOpenedAdd) for edit/clone mode */}
-            {/* For edit/clone mode: show dropdowns before clicking + */}
-            {/* For regular flow: show dropdowns before clicking + (when selecting fields) */}
-            {(!hasOpenedAdd && isEditMode) || ((!showAddItems && !hasOpenedAdd) && !isEditMode) || (items.length > 0 && hasOpenedAdd && (!poData.vendorName || !poData.projectName || !poData.projectIncharge)) ? (
-              <div className="flex-shrink-0 space-y-[6px]">
+              {/* Input Fields - Show dropdowns BEFORE clicking + button (when !hasOpenedAdd) for edit/clone mode */}
+              {/* For edit/clone mode: show dropdowns before clicking + */}
+              {/* For regular flow: show dropdowns before clicking + (when selecting fields) */}
+              {(!hasOpenedAdd && isEditMode) || ((!showAddItems && !hasOpenedAdd) && !isEditMode) || (items.length > 0 && hasOpenedAdd && (!poData.vendorName || !poData.projectName || !poData.projectIncharge)) ? (
+                <div className="flex-shrink-0 space-y-[6px]">
                 {/* Vendor Name Field */}
                 <div className=" relative">
                   <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
@@ -3050,7 +3084,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   </div>
                 </div>
               </div>
-            ) : null}
+              ) : null}
             {/* Summary details card - Show AFTER clicking + button (when hasOpenedAdd is true) for edit/clone mode */}
             {/* For regular flow: show summary card AFTER clicking + button */}
             {/* These two views are mutually exclusive - never show both at the same time */}
@@ -3114,7 +3148,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     {/* Items List - Scrollable */}
                     {items.length > 0 && (
                       <div className="flex-1 overflow-y-auto no-scrollbar pb-[40px]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                        <div className="space-y-2 ">
+                        <div className="space-y-2">
                           {items.map((item) => {
                             // Use item.id as-is (can be string or number) for consistent swipe state lookup
                             if (!item || !item.id) return null;

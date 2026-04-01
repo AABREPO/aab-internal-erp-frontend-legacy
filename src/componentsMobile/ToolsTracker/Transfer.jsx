@@ -12,6 +12,7 @@ import Swap1 from '../Images/Down1.svg'
 import CloseIcon from '../Images/Close F.svg'
 import DropdownIcon from '../Images/Dropdown F.svg'
 import Search from '../Images/Search.png'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 const Transfer = ({ user }) => {
   const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
   const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
@@ -32,6 +33,28 @@ const Transfer = ({ user }) => {
   const [selectedCurrentLocation, setSelectedCurrentLocation] = useState(null);
   const [selectedRelocateLocation, setSelectedRelocateLocation] = useState(null);
   const [relocateItemDetails, setRelocateItemDetails] = useState(null);
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   const [vendorOptions, setVendorOptions] = useState([]);
   const [items, setItems] = useState([]);
   const [fromOptions, setFromOptions] = useState([]);
@@ -2241,6 +2264,10 @@ const Transfer = ({ user }) => {
   };
   const handleUpdateTransfer = async () => {
     if (!editEntryId || !originalEditData) return;
+    if (!canCreate) {
+      alert("You don't have permission to save Tools Tracker changes.");
+      return;
+    }
     if (!selectedFrom || !selectedIncharge) {
       alert('Please fill in all required fields (From and Project Incharge)');
       return;
@@ -2390,6 +2417,10 @@ const Transfer = ({ user }) => {
     }
   };
   const handleSaveTransfer = async () => {
+    if (!canCreate) {
+      alert("You don't have permission to save Tools Tracker transfers.");
+      return;
+    }
     if (entryServiceMode === 'Relocate') {
       if (!selectedRelocateItemId || !selectedCurrentLocation || !selectedRelocateLocation) {
         alert('Please fill in all required fields (Item ID, Current Location, and Relocate Location)');
@@ -3878,6 +3909,10 @@ const Transfer = ({ user }) => {
     if (!newItemName || !newItemName.trim()) {
       return;
     }
+    if (!canCreate) {
+      alert("You don't have permission to create Tools Tracker master data.");
+      return;
+    }
     const trimmedName = newItemName.trim();
     if (itemNameOptions.some(name => name.toLowerCase() === trimmedName.toLowerCase())) {
       handleFieldChange('itemName', trimmedName);
@@ -3944,6 +3979,10 @@ const Transfer = ({ user }) => {
     if (!newBrand || !newBrand.trim()) {
       return;
     }
+    if (!canCreate) {
+      alert("You don't have permission to create Tools Tracker master data.");
+      return;
+    }
     const trimmedBrand = newBrand.trim();
     if (brandOptions.some(b => b.toLowerCase() === trimmedBrand.toLowerCase())) {
       handleFieldChange('brand', trimmedBrand);
@@ -4006,6 +4045,10 @@ const Transfer = ({ user }) => {
   };
   const handleAddNewItemId = async (newItemId) => {
     if (!newItemId || !newItemId.trim()) {
+      return;
+    }
+    if (!canCreate) {
+      alert("You don't have permission to create Tools Tracker master data.");
       return;
     }
     const trimmedItemId = newItemId.trim();
@@ -4090,7 +4133,7 @@ const Transfer = ({ user }) => {
               <>
                 <button
                   onClick={handleUpdateTransfer}
-                  disabled={isSaving || !areFieldsFilled || items.length === 0}
+                  disabled={!canCreate || isSaving || !areFieldsFilled || items.length === 0}
                   className="text-[12px] font-semibold leading-normal text-black"
                 >
                   {isSaving ? 'Updating...' : 'Update'}
@@ -4106,8 +4149,12 @@ const Transfer = ({ user }) => {
               <>
                 <button
                   onClick={() => setShowConfirmModal(true)}
-                  disabled={isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)}
-                  className={`flex items-center gap-[4px] text-[12px] font-medium ${isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0) ? 'text-gray-400' : 'text-black'} ${(cloneModeActive || ((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled))) ? '' : 'invisible'}`}
+                  disabled={!canCreate || isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)}
+                  className={`flex items-center gap-[4px] text-[12px] font-medium ${
+                    !canCreate || isSaving || !areFieldsFilled || (entryServiceMode !== 'Relocate' && items.length === 0)
+                      ? 'text-gray-400'
+                      : 'text-black'
+                  } ${(cloneModeActive || ((items.length > 0 && areFieldsFilled) || (entryServiceMode === 'Relocate' && areFieldsFilled))) ? '' : 'invisible'}`}
                 >
                   {isSaving ? (
                     <span className="text-gray-500">...</span>
@@ -6138,7 +6185,9 @@ const Transfer = ({ user }) => {
               >
                 Cancel
               </button>
-              <button onClick={() => { setShowConfirmModal(false); handleSaveTransfer(); }} disabled={isSaving}
+              <button
+                onClick={() => { setShowConfirmModal(false); handleSaveTransfer(); }}
+                disabled={!canCreate || isSaving}
                 className="flex-1 h-[44px] bg-black rounded-[8px] text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors disabled:bg-gray-400"
               >
                 {isSaving ? 'Saving...' : 'Confirm'}

@@ -857,7 +857,7 @@ const Table = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         // Check if payment mode requires bank details
-        if (["GPay", "PhonePe", "Net Banking", "Cheque","Gpay"].includes(rentFormData.paymentMode)) {
+        if (["GPay", "PhonePe", "Net Banking", "Cheque", "Gpay"].includes(rentFormData.paymentMode)) {
             // Show payment modal if not already shown
             if (!showPaymentModal) {
                 setPaymentModalData({
@@ -1069,9 +1069,9 @@ const Table = () => {
                         >
                             Export pdf
                         </span>
-                        <span
-                            className='text-[#007233] font-semibold hover:underline cursor-pointer text-sm sm:text-base'
-                            onClick={handleExportExcel} >
+                        <span className='text-[#007233] font-semibold hover:underline cursor-pointer text-sm sm:text-base'
+                            onClick={handleExportExcel}
+                        >
                             Export XL
                         </span>
                         <span className='text-[#BF9853] font-semibold hover:underline text-sm sm:text-base'>Print</span>
@@ -1596,8 +1596,8 @@ const Table = () => {
                                                     onClick={() => handleEditClick(rent)}
                                                     disabled={rent.formType === 'Shop Closure' || rent.formType === 'Refund'}
                                                     className={`rounded-full transition duration-200 ml-2 mr-3 ${rent.formType === 'Shop Closure' || rent.formType === 'Refund'
-                                                            ? 'opacity-50 cursor-not-allowed'
-                                                            : ''
+                                                        ? 'opacity-50 cursor-not-allowed'
+                                                        : ''
                                                         }`}
                                                     title={rent.formType === 'Shop Closure' || rent.formType === 'Refund'
                                                         ? 'Cannot edit Shop Closure or Refund forms'
@@ -1607,8 +1607,8 @@ const Table = () => {
                                                         src={edit}
                                                         alt="Edit"
                                                         className={`w-4 h-6 transition duration-200 ${rent.formType === 'Shop Closure' || rent.formType === 'Refund'
-                                                                ? ''
-                                                                : ''
+                                                            ? ''
+                                                            : ''
                                                             }`}
                                                     />
                                                 </button>
@@ -1777,7 +1777,7 @@ const Table = () => {
                                                 const newPaymentMode = selectedOption?.value || '';
                                                 setRentFormData({ ...rentFormData, paymentMode: newPaymentMode });
                                                 // Check if payment mode requires bank details
-                                                if (["GPay", "PhonePe", "Net Banking", "Cheque","Gpay"].includes(newPaymentMode)) {
+                                                if (["GPay", "PhonePe", "Net Banking", "Cheque", "Gpay"].includes(newPaymentMode)) {
                                                     setPaymentModalData({
                                                         date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
                                                         amount: rentFormData.amount || "",

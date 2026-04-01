@@ -34,7 +34,13 @@ const InventoryHeading = ({ username, userRoles = [] }) => {
 
     if (isMobile) {
         const storedUser = localStorage.getItem('user');
-        const user = storedUser ? JSON.parse(storedUser) : { username, userRoles};
+        const storedUserParsed = storedUser ? JSON.parse(storedUser) : {};
+        const user = {
+            ...storedUserParsed,
+            username,
+            // Prefer roles provided from `App.js` props; fall back to localStorage if missing.
+            userRoles: Array.isArray(userRoles) && userRoles.length > 0 ? userRoles : (storedUserParsed?.userRoles ?? []),
+        };
         return (
             <div style={{textAlign: 'left'}}>
                 <MobileInventory user={user} onLogout={() => {}}/>;

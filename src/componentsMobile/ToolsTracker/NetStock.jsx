@@ -8,6 +8,7 @@ import Search from '../Images/Search.png';
 import CloseIcon from '../Images/Close F.svg';
 import Filter from '../Images/Filter.png';
 import { getToolsNetStockPrefetchCache } from './netStockPrefetch';
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
 const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
 const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
@@ -43,6 +44,28 @@ const NetStock = ({ user }) => {
   const [vendorsMap, setVendorsMap] = useState({});
   const [employeesMap, setEmployeesMap] = useState({});
   const [loading, setLoading] = useState(true);
+
+  // Resolve module permissions for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    const moduleName = 'Tools Tracker';
+    const resolvedUserRoles =
+      user?.userRoles ||
+      (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          return stored?.userRoles || [];
+        } catch {
+          return [];
+        }
+      })();
+
+    fetchUserModulePermissions(resolvedUserRoles, moduleName)
+      .then(setModulePermissions)
+      .catch(() => setModulePermissions([]));
+  }, [user?.userRoles]);
+
+  const canCreate = modulePermissions.includes('Create');
   const [itemNameOptions, setItemNameOptions] = useState([]);
   const [itemIdOptions, setItemIdOptions] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
@@ -1439,6 +1462,11 @@ const NetStock = ({ user }) => {
 
     if (quantityDifference === 0) {
       alert('New count is the same as old count');
+      return;
+    }
+
+    if (!canCreate) {
+      alert("You don't have permission to update stock.");
       return;
     }
 

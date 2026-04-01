@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import PendingBill from './PendingBill';
 import BillDatabase from './BillDatabase';
 import BillStatement from './BillStatement';
+import MobileBillPaymentsTracker from '../../componentsMobile/BillPaymentsTracker/BillPaymentsTracker';
 
-const BillPaymentsTrackerHeading = ({ username, userRoles = [] }) => {
+const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activePaintTab');
         if (savedTab === 'billdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
@@ -60,4 +61,32 @@ const BillPaymentsTrackerHeading = ({ username, userRoles = [] }) => {
         </div>
     )
 }
+
+const BillPaymentsTrackerHeading = ({ username, userRoles = [], onLogout }) => {
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    if (isMobile) {
+        const storedUserParsed = (() => {
+            try {
+                return JSON.parse(localStorage.getItem('user') || '{}');
+            } catch {
+                return {};
+            }
+        })();
+        const user = {
+            ...storedUserParsed,
+            username,
+            userRoles: Array.isArray(userRoles) && userRoles.length > 0 ? userRoles : (storedUserParsed?.userRoles ?? []),
+        };
+        return <MobileBillPaymentsTracker user={user} onLogout={onLogout} />;
+    }
+
+    return <BillPaymentsTrackerHeadingDesktop username={username} userRoles={userRoles} />;
+};
+
 export default BillPaymentsTrackerHeading

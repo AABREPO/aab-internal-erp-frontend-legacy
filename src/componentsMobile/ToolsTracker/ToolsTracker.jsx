@@ -63,6 +63,9 @@ const ToolsTracker = ({ user, onLogout }) => {
     if (page === 'request-for-quotation') {
       setCurrentPage('request-for-quotation');
       navigate('/rfq');
+    } else if (page === 'billing') {
+      setCurrentPage('billing');
+      navigate('/tracker/pendingbill');
     } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');

@@ -8,9 +8,25 @@ import { to } from 'mathjs';
 import Filter from '../Images/Filter.png'
 import Close from '../Images/close.png'
 import CloseIcon from '../Images/Close F.svg'
+import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 const EditStock = () => {
   const [activeSubTab, setActiveSubTab] = useState('transfer'); // 'transfer', 'update', 'history'
+
+  // Resolve module permissions (Create/Edit/Delete) for mobile create actions.
+  const [modulePermissions, setModulePermissions] = useState([]);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      fetchUserModulePermissions(stored?.userRoles || [], 'Inventory')
+        .then(setModulePermissions)
+        .catch(() => setModulePermissions([]));
+    } catch {
+      setModulePermissions([]);
+    }
+  }, []);
+  const canCreate = modulePermissions.includes('Create');
+
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [fromLocation, setFromLocation] = useState('Stock Room A');
@@ -783,6 +799,10 @@ const EditStock = () => {
   // Handle move stock submit (modal edit for a single item)
   const handleMoveStockSubmit = async () => {
     if (!selectedItemForEdit) return;
+    if (!canCreate) {
+      alert("You don't have permission to update stock.");
+      return;
+    }
     // Decide which stocking location id to use: if Update tab is active, use the selected Update location
     const updateSelectedOption = stockRoomOptions.find(loc => (loc.value || loc.label) === updateSelectedLocation);
     const updateStockingLocationId = updateSelectedOption?.id || null;
@@ -855,6 +875,10 @@ const EditStock = () => {
   const [transferLoading, setTransferLoading] = useState(false);
   // Handle transfer (Move Stock) submit for Transfer tab
   const handleTransferSubmit = async () => {
+    if (!canCreate) {
+      alert("You don't have permission to save stock transfers.");
+      return;
+    }
     // Basic validation
     if (!fromLocation || !toLocation) {
       alert('Please select both From and To locations.');

@@ -230,10 +230,17 @@ const MobileBillPaymentsTracker = ({ user, onLogout }) => {
 				/>
 				<Header title="Bill Payments Tracker" user={user} onLogout={onLogout} onMenuClick={handleMenuClick} />
 				<MobileTabs activeTab={activeTab} onTabChange={setActiveTab} />
-				<div className="pt-[94px] pb-[88px] px-[10px]">
-					{activeTab === 'pendingbill' && <PendingBillMobile username={user?.username} userRoles={user?.userRoles || []} />}
-					{activeTab === 'billdatabase' && <DatabaseMobile username={user?.username} userRoles={user?.userRoles || []} />}
-					{activeTab === 'billstatement' && <StatementMobile username={user?.username} userRoles={user?.userRoles || []} />}
+				<div className="pt-[87px] pb-[88px]">
+					{/* Keep tabs mounted so data/state doesn't reload on tab switch */}
+					<div style={{ display: activeTab === 'pendingbill' ? 'block' : 'none' }}>
+						<PendingBillMobile username={user?.username} userRoles={user?.userRoles || []} />
+					</div>
+					<div style={{ display: activeTab === 'billdatabase' ? 'block' : 'none' }}>
+						<DatabaseMobile username={user?.username} userRoles={user?.userRoles || []} />
+					</div>
+					<div style={{ display: activeTab === 'billstatement' ? 'block' : 'none' }}>
+						<StatementMobile username={user?.username} userRoles={user?.userRoles || []} />
+					</div>
 				</div>
 				<BottomNav activeTab="home" />
 			</div>

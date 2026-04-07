@@ -5,6 +5,7 @@ import AdvanceDatabase from './AdvanceDatabase';
 import AdvanceReport from './AdvanceReport';
 import AdvanceSummary from './AdvanceSummary';
 import MobileProjectAdvance from '../../componentsMobile/ProjectAdvance/ProjectAdvance';
+import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
 
 // Payment Mode options
 const paymentModeOptions = [
@@ -18,13 +19,11 @@ const paymentModeOptions = [
 
 const AdvanceHeading = ({ username, userRoles = [] }) => {
 
-    const [isMobile, setIsMobile] = useState(() => {
-        return window.innerWidth <= 768;
-    });
+    const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
 
     useEffect(() => {
         const handleResize = () => {
-            setIsMobile(window.innerWidth <= 768);
+            setIsMobile(isMobileViewportWidth());
         };
         window.addEventListener('resize', handleResize);
         return () => {

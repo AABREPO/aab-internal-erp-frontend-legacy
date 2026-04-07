@@ -340,6 +340,20 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 		return null;
 	};
 
+	// Fallback: derive a "last" PO from the current bill's persisted verifications
+	// when history-based lookup is unavailable. Mirrors getLastBillNumberForVendor's
+	// rule of skipping 'NO_PO' entries.
+	const getLastNonNoPoFromCurrent = (bill) => {
+		const verifications = bill?.billVerifications || bill?.bill_verifications || [];
+		if (!Array.isArray(verifications) || verifications.length === 0) return null;
+		for (let i = verifications.length - 1; i >= 0; i -= 1) {
+			const billNumber = verifications[i]?.bill_number ?? verifications[i]?.billNumber ?? '';
+			const s = String(billNumber || '').trim();
+			if (s && s !== 'NO_PO') return s;
+		}
+		return null;
+	};
+
 	const formatDdMmYyyyFromDate = (d) => {
 		if (!d || isNaN(d.getTime())) return '';
 		const day = String(d.getDate()).padStart(2, '0');
@@ -2583,27 +2597,132 @@ useEffect(() => {
 							</div>
 							{/* Previously entered rows */}
 							{billEntryDetailsRows.length > 0 && (
-								<div className="rounded-[12px] border border-[#E5E7EB] bg-white p-[12px]">
-									<div className="grid grid-cols-2 gap-[12px]">
-										<div>
-											<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
-										</div>
-										<div>
-											<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
-										</div>
-									</div>
-									<div className="mt-[6px] space-y-[10px]">
-										{billEntryDetailsRows.map((r, i) => (
-											<div key={i} className="grid grid-cols-2 gap-[12px]">
-												<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-													<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
+								<div className="mt-[2px] space-y-[10px]">
+									{billEntryDetailsRows.map((r, i) => {
+											const entryRowId = `entry-${i}`;
+											const ACTIONS_WIDTH = 56;
+											const isSwiped = String(swipedRowId ?? '') === String(entryRowId ?? '');
+											const isActiveTouch = touchStartX != null && String(touchRowId ?? '') === String(entryRowId ?? '');
+											const deltaX = (isActiveTouch && touchCurrentX != null) ? (touchCurrentX - touchStartX) : 0;
+
+											const swipeOffset = (() => {
+												if (isSwiped) {
+													if (isActiveTouch && deltaX > 0) return Math.min(0, -ACTIONS_WIDTH + deltaX);
+													return -ACTIONS_WIDTH;
+												}
+												if (isActiveTouch && deltaX < 0) return Math.max(-ACTIONS_WIDTH, deltaX);
+												return 0;
+											})();
+
+											const showSwipeActions = isSwiped || (isActiveTouch && touchIsSwiping && swipeOffset < -20);
+
+											return (
+												<div
+													key={entryRowId}
+													className="relative overflow-hidden"
+													onMouseDown={(e) => {
+														// Only left-click / primary button
+														if (e.button !== 0) return;
+														e.preventDefault();
+														setTouchRowId(entryRowId);
+														setTouchStartX(e.clientX);
+														setTouchCurrentX(e.clientX);
+														setTouchIsSwiping(false);
+													}}
+													onTouchStart={(e) => {
+														if (!e.touches?.[0]) return;
+														setTouchRowId(entryRowId);
+														setTouchStartX(e.touches[0].clientX);
+														setTouchCurrentX(e.touches[0].clientX);
+														setTouchIsSwiping(false);
+													}}
+													onTouchMove={(e) => {
+														if (touchStartX == null || !e.touches?.[0]) return;
+														const x = e.touches[0].clientX;
+														const dx = x - touchStartX;
+														// allow swipe left to open, and swipe right to close when already expanded
+														if (dx < 0 || (isSwiped && dx > 0)) {
+															if (e.preventDefault) e.preventDefault();
+															setTouchCurrentX(x);
+															setTouchIsSwiping(true);
+														}
+													}}
+													onTouchEnd={() => {
+														const minSwipeDistance = 50;
+														const dx = (touchCurrentX != null && touchStartX != null) ? (touchCurrentX - touchStartX) : 0;
+														if (Math.abs(dx) >= minSwipeDistance) {
+															if (dx < 0) setSwipedRowId(entryRowId);
+															else setSwipedRowId(null);
+														}
+														setTouchRowId(null);
+														setTouchStartX(null);
+														setTouchCurrentX(null);
+														setTouchIsSwiping(false);
+													}}
+												>
+													{/* Actions behind row */}
+													<div
+														className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
+														style={{
+															width: `${ACTIONS_WIDTH}px`,
+															opacity: showSwipeActions ? 1 : 0,
+															transition: 'opacity 0.2s ease-out',
+															pointerEvents: showSwipeActions ? 'auto' : 'none'
+														}}
+													>
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																setBillEntryForm({
+																	enteredBy: r.enteredBy || username || '',
+																	date: r.date || ''
+																});
+																setShowBillEntrySheet(true);
+																setSwipedRowId(null);
+																setTouchRowId(null);
+																setTouchStartX(null);
+																setTouchCurrentX(null);
+																setTouchIsSwiping(false);
+															}}
+															className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
+															title="Edit"
+															aria-label="Edit"
+														>
+															<img src={Edit1} alt="Edit" className="w-[18px] h-[18px]" />
+														</button>
+													</div>
+
+													{/* Sliding row */}
+													<div
+														style={{
+															transform: `translateX(${swipeOffset}px)`,
+															touchAction: 'pan-y',
+															userSelect: 'none',
+															WebkitUserSelect: 'none',
+															willChange: 'transform',
+															transition: isActiveTouch ? 'none' : 'transform 0.3s ease-out'
+														}}
+														className="rounded-[10px] border border-[#E5E7EB] bg-white px-[12px] py-[10px]"
+													>
+														<div className="grid grid-cols-2 gap-[12px]">
+															<div>
+																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
+																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																	<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
+																</div>
+															</div>
+															<div>
+																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
+																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																	<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
+																</div>
+															</div>
+														</div>
+													</div>
 												</div>
-												<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-													<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
-												</div>
-											</div>
-										))}
-									</div>
+											);
+										})}
 								</div>
 							)}
 
@@ -2896,32 +3015,151 @@ useEffect(() => {
 									const txn = p?.transaction_number || p?.transactionNumber || '';
 									const chequeNo = p?.cheque_no || p?.chequeNo || '';
 									const date = p?.date || p?.payment_date || '';
+									const paidRowId = `paid-${i}`;
+									const ACTIONS_WIDTH = 56;
+									const isSwiped = String(swipedRowId ?? '') === String(paidRowId ?? '');
+									const isActiveTouch = touchStartX != null && String(touchRowId ?? '') === String(paidRowId ?? '');
+									const deltaX = (isActiveTouch && touchCurrentX != null) ? (touchCurrentX - touchStartX) : 0;
+
+									const swipeOffset = (() => {
+										if (isSwiped) {
+											if (isActiveTouch && deltaX > 0) return Math.min(0, -ACTIONS_WIDTH + deltaX);
+											return -ACTIONS_WIDTH;
+										}
+										if (isActiveTouch && deltaX < 0) return Math.max(-ACTIONS_WIDTH, deltaX);
+										return 0;
+									})();
+
+									const showSwipeActions = isSwiped || (isActiveTouch && touchIsSwiping && swipeOffset < -20);
+
+									const isoDate = (() => {
+										try {
+											if (!date) return '';
+											return new Date(date).toISOString().split('T')[0];
+										} catch {
+											return '';
+										}
+									})();
+
 									return (
-										<div key={i} className="rounded-[14px] bg-[#FAFAFA] border border-[#EFEFEF] px-[14px] py-[12px] flex items-start justify-between gap-[10px]">
-											<div className="min-w-0 text-left">
-												<p className="text-[12px] font-semibold text-black truncate">{acc ? `A/C - ${acc}` : 'A/C - -'}</p>
-												<p className="text-[12px] text-black mt-[2px] truncate">
-													{chequeNo ? `CHQ-${chequeNo}` : (txn || '')}
-												</p>
-												<p className="text-[10px] text-[#666666] mt-[4px]">{date ? new Date(date).toLocaleString('en-GB') : ''}</p>
-											</div>
-											<div className="flex-shrink-0 flex flex-col items-end">
-												<span className="inline-flex px-[10px] py-[3px] rounded-full text-[10px] font-semibold bg-[#F3E8FF] text-[#7C3AED]">
-													{mode || 'Mode'}
-												</span>
+										<div
+											key={i}
+											className="relative overflow-hidden"
+											onMouseDown={(e) => {
+												if (e.button !== 0) return;
+												e.preventDefault();
+												setTouchRowId(paidRowId);
+												setTouchStartX(e.clientX);
+												setTouchCurrentX(e.clientX);
+												setTouchIsSwiping(false);
+											}}
+											onTouchStart={(e) => {
+												if (!e.touches?.[0]) return;
+												setTouchRowId(paidRowId);
+												setTouchStartX(e.touches[0].clientX);
+												setTouchCurrentX(e.touches[0].clientX);
+												setTouchIsSwiping(false);
+											}}
+											onTouchMove={(e) => {
+												if (touchStartX == null || !e.touches?.[0]) return;
+												const x = e.touches[0].clientX;
+												const dx = x - touchStartX;
+												if (dx < 0 || (isSwiped && dx > 0)) {
+													if (e.preventDefault) e.preventDefault();
+													setTouchCurrentX(x);
+													setTouchIsSwiping(true);
+												}
+											}}
+											onTouchEnd={() => {
+												const minSwipeDistance = 50;
+												const dx = (touchCurrentX != null && touchStartX != null) ? (touchCurrentX - touchStartX) : 0;
+												if (Math.abs(dx) >= minSwipeDistance) {
+													if (dx < 0) setSwipedRowId(paidRowId);
+													else setSwipedRowId(null);
+												}
+												setTouchRowId(null);
+												setTouchStartX(null);
+												setTouchCurrentX(null);
+												setTouchIsSwiping(false);
+											}}
+										>
+											{/* Actions behind row */}
+											<div
+												className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
+												style={{
+													width: `${ACTIONS_WIDTH}px`,
+													opacity: showSwipeActions ? 1 : 0,
+													transition: 'opacity 0.2s ease-out',
+													pointerEvents: showSwipeActions ? 'auto' : 'none'
+												}}
+											>
 												<button
 													type="button"
-													onClick={() => {
-														const url = String(billUrlForAmount || '').trim();
-														if (!url) return;
-														window.open(url, '_blank', 'noopener,noreferrer');
+													onClick={(e) => {
+														e.stopPropagation();
+														setPaymentForm({
+															date: isoDate || '',
+															amount: String(amount || ''),
+															mode: mode || '',
+															transactionNumber: txn || '',
+															accountNumber: acc || '',
+															chequeNo: chequeNo || '',
+															chequeDate: isoDate || '',
+															file: null
+														});
+														setShowPaymentSheet(true);
+														setSwipedRowId(null);
+														setTouchRowId(null);
+														setTouchStartX(null);
+														setTouchCurrentX(null);
+														setTouchIsSwiping(false);
 													}}
-													disabled={!String(billUrlForAmount || '').trim()}
-													className={`mt-[6px] text-[13px] font-semibold ${String(billUrlForAmount || '').trim() ? 'text-green-700 underline underline-offset-2' : 'text-green-700'}`}
-													title={String(billUrlForAmount || '').trim() ? 'Open bill copy' : 'No bill copy'}
+													className="action-button w-[56px] h-full bg-[#007233] rounded-[10px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
+													title="Edit"
+													aria-label="Edit"
 												>
-													{formatIndianCurrency(amount)}
+													<img src={Edit1} alt="Edit" className="w-[18px] h-[18px]" />
 												</button>
+											</div>
+
+											{/* Sliding card */}
+											<div
+												style={{
+													transform: `translateX(${swipeOffset}px)`,
+													touchAction: 'pan-y',
+													userSelect: 'none',
+													WebkitUserSelect: 'none',
+													willChange: 'transform',
+													transition: isActiveTouch ? 'none' : 'transform 0.3s ease-out'
+												}}
+											>
+												<div className="rounded-[14px] bg-[#FAFAFA] border border-[#EFEFEF] px-[14px] py-[12px] flex items-start justify-between gap-[10px]">
+													<div className="min-w-0 text-left">
+														<p className="text-[12px] font-semibold text-black truncate">{acc ? `A/C - ${acc}` : 'A/C - -'}</p>
+														<p className="text-[12px] text-black mt-[2px] truncate">
+															{chequeNo ? `CHQ-${chequeNo}` : (txn || '')}
+														</p>
+														<p className="text-[10px] text-[#666666] mt-[4px]">{date ? new Date(date).toLocaleString('en-GB') : ''}</p>
+													</div>
+													<div className="flex-shrink-0 flex flex-col items-end">
+														<span className="inline-flex px-[10px] py-[3px] rounded-full text-[10px] font-semibold bg-[#F3E8FF] text-[#7C3AED]">
+															{mode || 'Mode'}
+														</span>
+														<button
+															type="button"
+															onClick={() => {
+																const url = String(billUrlForAmount || '').trim();
+																if (!url) return;
+																window.open(url, '_blank', 'noopener,noreferrer');
+															}}
+															disabled={!String(billUrlForAmount || '').trim()}
+															className={`mt-[6px] text-[13px] font-semibold ${String(billUrlForAmount || '').trim() ? 'text-green-700 underline underline-offset-2' : 'text-green-700'}`}
+															title={String(billUrlForAmount || '').trim() ? 'Open bill copy' : 'No bill copy'}
+														>
+															{formatIndianCurrency(amount)}
+														</button>
+													</div>
+												</div>
 											</div>
 										</div>
 									);
@@ -3773,7 +4011,7 @@ useEffect(() => {
 							<div className="text-right flex-shrink-0">
 								<p className="text-[11px] font-semibold text-black leading-tight">
 									Last PO:{' '}
-									{lastPoNumber != null ? String(lastPoNumber) : ''}
+									{lastPoNumber != null ? String(lastPoNumber) : (getLastNonNoPoFromCurrent(selectedVerifyBill) || '')}
 								</p>
 								<p className="text-[10px] font-medium text-[#777777] leading-tight mt-[2px]">
 									{(() => {
@@ -4016,7 +4254,7 @@ useEffect(() => {
 
 						{/* Bottom actions (pinned) */}
 						<div className=" pb-[16px] flex-shrink-0 bg-white">
-							<div className=" grid grid-cols-2 gap-[10px]">
+							<div className={` grid ${isEditMode ? 'grid-cols-2' : 'grid-cols-1'} gap-[10px]`}>
 								<button
 									type="button"
 									onClick={checkPO}
@@ -4025,13 +4263,15 @@ useEffect(() => {
 								>
 									{checkingPO ? 'Checking...' : 'Check PO'}
 								</button>
-								<button
-									type="button"
-									onClick={makeDuplicate}
-									className="h-[40px] rounded-[10px] border border-[#D1D5DB] bg-white text-[13px] font-semibold text-black"
-								>
-									{isDuplicateMode ? 'Duplicate Mode' : 'Make Duplicate'}
-								</button>
+								{isEditMode && (
+									<button
+										type="button"
+										onClick={makeDuplicate}
+										className="h-[40px] rounded-[10px] border border-[#D1D5DB] bg-white text-[13px] font-semibold text-black"
+									>
+										{isDuplicateMode ? 'Duplicate Mode' : 'No Po Mode'}
+									</button>
+								)}
 							</div>
 
 							{isAdminUser() && (selectedVerifyBill?.send_request || selectedVerifyBill?.sendRequest) && !(selectedVerifyBill?.request_approved || selectedVerifyBill?.requestApproved) && (

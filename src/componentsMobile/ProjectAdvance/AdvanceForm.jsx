@@ -1,18 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Attach from '../Images/Attachfile.svg';
 import CloseIcon from '../Images/Close F.svg'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
+import {
+  fetchAdvancePortalListForMobile,
+  fetchMaxEntryNoFromBranch,
+  computeAdvanceTotalsFromGetAll,
+} from './advancePortalApi';
 
-const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], initialFromHistory = null, onConsumedInitialFromHistory }) => {
-  // Resolve module permissions (Create/Edit/Delete) for mobile actions.
+/** Keeps dropdown mapping/render cheap on huge vendor/site lists. */
+const MAX_SELECT_OPTIONS = 500;
+
+const AdvanceForm = ({
+  username = '',
+  userRoles = [],
+  paymentModeOptions = [],
+  initialFromHistory = null,
+  onConsumedInitialFromHistory,
+  isAdvanceTabActive = true,
+}) => {
+  // Resolve module permissions — defer until Advance tab is active (avoid work when tab is hidden).
   const [modulePermissions, setModulePermissions] = useState([]);
-  useEffect(() => {
-    fetchUserModulePermissions(userRoles, 'Advance Portal')
-      .then(setModulePermissions)
-      .catch(() => setModulePermissions([]));
-  }, [userRoles]);
   const canCreate = modulePermissions.includes('Create');
 
   const resolveActiveBranchId = () => {
@@ -27,13 +37,13 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     }
   };
   const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
-  const withBranchUrl = (baseUrl) => {
+  const withBranchUrl = useCallback((baseUrl) => {
     const url = new URL(baseUrl);
     if (activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== "") {
       url.searchParams.set("branchId", String(activeBranchId));
     }
     return url.toString();
-  };
+  }, [activeBranchId]);
   useEffect(() => {
     const syncBranch = () => {
       const nextBranchId = resolveActiveBranchId();
@@ -103,6 +113,175 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
 
+  /** First visit or branch change → reload advance list; same tab revisit → light refresh only. */
+  const advanceStaggerBranchKeyRef = useRef(null);
+
+  /** Vendor/contractor/site/category JSON can be huge — parsing blocks the main thread. Load only when user opens a picker. */
+  const masterDropdownsLoadedRef = useRef(false);
+  const masterDropdownsInFlightRef = useRef(null);
+  const accountDetailsLoadedRef = useRef(false);
+  const accountDetailsInFlightRef = useRef(null);
+
+  useEffect(() => {
+    masterDropdownsLoadedRef.current = false;
+    accountDetailsLoadedRef.current = false;
+  }, [activeBranchId]);
+
+  useEffect(() => {
+    if (!isAdvanceTabActive) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      fetchUserModulePermissions(userRoles, 'Advance Portal')
+        .then((p) => {
+          if (!cancelled) setModulePermissions(p);
+        })
+        .catch(() => {
+          if (!cancelled) setModulePermissions([]);
+        });
+    }, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [isAdvanceTabActive, userRoles]);
+
+  const ensureMasterDropdownsLoaded = useCallback(async () => {
+    if (masterDropdownsLoadedRef.current) return;
+    if (masterDropdownsInFlightRef.current) {
+      await masterDropdownsInFlightRef.current;
+      return;
+    }
+    const run = (async () => {
+      try {
+        const vRes = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!vRes.ok) throw new Error('vendor_Names');
+        const vData = await vRes.json();
+        const vSliced = Array.isArray(vData) ? vData.slice(0, MAX_SELECT_OPTIONS) : [];
+        setVendorOptions(
+          vSliced.map((item) => ({
+            value: item.vendorName,
+            label: item.vendorName,
+            id: item.id,
+            type: 'Vendor',
+          }))
+        );
+        await new Promise((r) => setTimeout(r, 0));
+
+        const cRes = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!cRes.ok) throw new Error('contractor_Names');
+        const cData = await cRes.json();
+        const cSliced = Array.isArray(cData) ? cData.slice(0, MAX_SELECT_OPTIONS) : [];
+        setContractorOptions(
+          cSliced.map((item) => ({
+            value: item.contractorName,
+            label: item.contractorName,
+            id: item.id,
+            type: 'Contractor',
+          }))
+        );
+        await new Promise((r) => setTimeout(r, 0));
+
+        const predefinedSiteOptions = [
+          { value: 'Mason Advance', label: 'Mason Advance', id: 1, sNo: '1' },
+          { value: 'Material Advance', label: 'Material Advance', id: 2, sNo: '2' },
+          { value: 'Weekly Advance', label: 'Weekly Advance', id: 3, sNo: '3' },
+          { value: 'Excess Advance', label: 'Excess Advance', id: 4, sNo: '4' },
+          { value: 'Material Rent', label: 'Material Rent', id: 5, sNo: '5' },
+          { value: 'Subhash Kumar - Kunnur', label: 'Subhash Kumar - Kunnur', id: 6, sNo: '6' },
+          { value: 'Summary Bill', label: 'Summary Bill', id: 7, sNo: '7' },
+          { value: 'Daily Wage', label: 'Daily Wage', id: 8, sNo: '8' },
+          { value: 'Rent Management Portal', label: 'Rent Management Portal', id: 9, sNo: '9' },
+          { value: 'Multi-Project Batch', label: 'Multi-Project Batch', id: 10, sNo: '10' },
+          { value: 'Loan Portal', label: 'Loan Portal', id: 11, sNo: '11' },
+          { value: 'Bill Payment Tracker', label: 'Bill Payment Tracker', id: 12, sNo: '12' },
+        ];
+        try {
+          const sRes = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll', {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (!sRes.ok) throw new Error('project_Names');
+          const sData = await sRes.json();
+          const sSliced = Array.isArray(sData) ? sData.slice(0, MAX_SELECT_OPTIONS) : [];
+          const formatted = sSliced.map((item) => ({
+            value: item.siteName,
+            label: item.siteName,
+            id: item.id,
+            sNo: item.siteNo,
+          }));
+          setSiteOptions([...predefinedSiteOptions, ...formatted]);
+        } catch {
+          setSiteOptions(predefinedSiteOptions);
+        }
+        await new Promise((r) => setTimeout(r, 0));
+
+        const catRes = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!catRes.ok) throw new Error('categories');
+        const catData = await catRes.json();
+        const catSliced = Array.isArray(catData) ? catData.slice(0, MAX_SELECT_OPTIONS) : [];
+        setCategoryOptions(
+          catSliced.map((item) => ({
+            id: item.id,
+            value: item.category,
+            label: item.category,
+          }))
+        );
+        masterDropdownsLoadedRef.current = true;
+      } catch (error) {
+        console.error('Master dropdown load error:', error);
+      }
+    })();
+    masterDropdownsInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      masterDropdownsInFlightRef.current = null;
+    }
+  }, []);
+
+  const ensureAccountDetailsLoaded = useCallback(async () => {
+    if (accountDetailsLoadedRef.current) return;
+    if (accountDetailsInFlightRef.current) {
+      await accountDetailsInFlightRef.current;
+      return;
+    }
+    const run = (async () => {
+      try {
+        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error('account-details');
+        const data = await response.json();
+        const sliced = Array.isArray(data) ? data.slice(0, MAX_SELECT_OPTIONS) : [];
+        setAccountDetails(sliced);
+        accountDetailsLoadedRef.current = true;
+      } catch (error) {
+        console.error('Error fetching account details:', error);
+      }
+    })();
+    accountDetailsInFlightRef.current = run;
+    try {
+      await run;
+    } finally {
+      accountDetailsInFlightRef.current = null;
+    }
+  }, []);
+
   // Format date helper
   const getTodayDate = () => {
     const today = new Date();
@@ -163,152 +342,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     if (description) sessionStorage.setItem('description', JSON.stringify(description));
   }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, advanceAmount, transferSiteId, paymentMode, description]);
 
-  // Fetch vendors
-  useEffect(() => {
-    const fetchVendorNames = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Network response was not ok: " + response.statusText);
-        }
-        const data = await response.json();
-        const formattedData = data.map(item => ({
-          value: item.vendorName,
-          label: item.vendorName,
-          id: item.id,
-          type: "Vendor",
-        }));
-        setVendorOptions(formattedData);
-      } catch (error) {
-        console.error("Fetch error: ", error);
-      }
-    };
-    fetchVendorNames();
-  }, []);
-
-  // Fetch contractors
-  useEffect(() => {
-    const fetchContractorNames = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Network response was not ok: " + response.statusText);
-        }
-        const data = await response.json();
-        const formattedData = data.map(item => ({
-          value: item.contractorName,
-          label: item.contractorName,
-          id: item.id,
-          type: "Contractor",
-        }));
-        setContractorOptions(formattedData);
-      } catch (error) {
-        console.error("Fetch error: ", error);
-      }
-    };
-    fetchContractorNames();
-  }, []);
-
-  // Fetch sites
-  useEffect(() => {
-    const fetchSites = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Network response was not ok: " + response.statusText);
-        }
-        const data = await response.json();
-        const formattedData = data.map(item => ({
-          value: item.siteName,
-          label: item.siteName,
-          id: item.id,
-          sNo: item.siteNo
-        }));
-        const predefinedSiteOptions = [
-          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
-          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
-          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
-          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
-          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
-          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
-          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
-          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
-          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
-          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
-          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
-          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
-        ];
-        const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
-        setSiteOptions(combinedSiteOptions);
-      } catch (error) {
-        console.error("Fetch error: ", error);
-        const predefinedSiteOptions = [
-          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
-          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
-          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
-          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
-          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
-          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
-          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
-          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
-          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
-          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
-          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
-          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
-        ];
-        setSiteOptions(predefinedSiteOptions);
-      }
-    };
-    fetchSites();
-  }, []);
-
-  // Fetch categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-        if (!response.ok) {
-          throw new Error("Network response was not ok: " + response.statusText);
-        }
-        const data = await response.json();
-        const formattedData = data.map(item => ({
-          id: item.id,
-          value: item.category,
-          label: item.category,
-        }));
-        setCategoryOptions(formattedData);
-      } catch (error) {
-        console.error("Fetch error: ", error);
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  // Fetch latest ENo
+  // Latest expense E.No — only needed for Bill Settlement → expenses_form/save (get_form is huge; do not load on tab open)
   const fetchLatestEno = async () => {
     try {
       const response = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
@@ -316,10 +350,15 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
         throw new Error('Failed to fetch ENo');
       }
       const data = await response.json();
-      if (data.length > 0) {
-        const sortedData = data.sort((a, b) => b.eno - a.eno);
-        const lastEno = sortedData[0].eno;
-        setEno(lastEno + 1);
+      await new Promise((r) => setTimeout(r, 0));
+      if (Array.isArray(data) && data.length > 0) {
+        let m = 0;
+        for (let i = 0; i < data.length; i++) {
+          const n = Number(data[i]?.eno ?? 0);
+          if (n > m) m = n;
+          if (i > 0 && i % 2000 === 0) await new Promise((r) => setTimeout(r, 0));
+        }
+        setEno(m + 1);
       } else {
         setEno(54173);
       }
@@ -327,48 +366,41 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
       console.error('Error fetching latest ENo:', error);
     }
   };
-  useEffect(() => {
-    fetchLatestEno();
-  }, []);
 
-  // Fetch account details for Payment Details bottom sheet
   useEffect(() => {
-    const fetchAccountDetails = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" }
-        });
-        if (!response.ok) throw new Error("Network response was not ok: " + response.statusText);
-        const data = await response.json();
-        setAccountDetails(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching account details:", error);
-      }
-    };
-    fetchAccountDetails();
-  }, []);
+    if (selectedType !== 'Bill Settlement') return;
+    if (eno != null) return;
+    const t = setTimeout(() => {
+      fetchLatestEno();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [selectedType, eno]);
 
-  // Fetch advance data (use branch URL so list matches History and filter works)
+  // Fetch advance data — paged / getLast150 only (not getAll)
   const fetchAdvanceData = async () => {
     try {
-      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      const data = await response.json();
-      setAdvanceData(data);
-      const maxEntryNo = data.length > 0 ? Math.max(...data.map(item => item.entry_no || 0)) : 0;
+      const rows = await fetchAdvancePortalListForMobile(withBranchUrl);
+      setAdvanceData(rows);
+      const maxEntryNo = await fetchMaxEntryNoFromBranch(withBranchUrl);
       setEntryNo(maxEntryNo + 1);
     } catch (error) {
       console.error('Error fetching advance portal data:', error);
     }
   };
 
+  // Advance tab: only load paged advance rows (small JSON). Vendor/project/category lists load on first picker open.
   useEffect(() => {
-    fetchAdvanceData();
-  }, []);
+    if (!isAdvanceTabActive) return;
+    advanceStaggerBranchKeyRef.current = String(activeBranchId ?? 'null');
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) fetchAdvanceData();
+    }, 120);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [isAdvanceTabActive, activeBranchId]);
 
   // Apply initialFromHistory when user navigated from History – only set selection; use existing advanceData load
   useEffect(() => {
@@ -379,126 +411,50 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     onConsumedInitialFromHistory();
   }, [initialFromHistory, onConsumedInitialFromHistory]);
 
-  // Derive overall advance from advanceData when we have both (avoids extra fetch when opening from History)
+  // Vendor overall + project advance: match desktop AdvancePortal.js (full getAll), not paged advanceData.
+  const refreshTotalsFromServer = useCallback(async () => {
+    if (!selectedOption) {
+      setOverallAdvance(0);
+      setProjectAdvance('');
+      return;
+    }
+    try {
+      const { overall, projectAmount } = await computeAdvanceTotalsFromGetAll(
+        withBranchUrl,
+        selectedOption,
+        selectedSite || null
+      );
+      setOverallAdvance(overall);
+      if (projectAmount !== null) {
+        setProjectAdvance(projectAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+      } else {
+        setProjectAdvance('');
+      }
+    } catch (error) {
+      console.error('Error fetching advance totals:', error);
+      setOverallAdvance(0);
+      setProjectAdvance('');
+    }
+  }, [withBranchUrl, selectedOption, selectedSite]);
+
   useEffect(() => {
-    if (!selectedOption || !advanceData.length) return;
-    const vid = Number(selectedOption.id);
-    const total = advanceData
-      .filter(item =>
-        selectedOption.type === 'Vendor'
-          ? Number(item.vendor_id) === vid
-          : Number(item.contractor_id) === vid
-      )
-      .reduce((sum, curr) => {
-        const amount = parseFloat(curr.amount) || 0;
-        const billAmount = parseFloat(curr.bill_amount) || 0;
-        const refundAmount = parseFloat(curr.refund_amount) || 0;
-        return sum + amount - billAmount - refundAmount;
-      }, 0);
-    setOverallAdvance(total);
-  }, [advanceData, selectedOption]);
+    void refreshTotalsFromServer();
+  }, [refreshTotalsFromServer]);
 
   // Combine vendor and contractor options
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
 
-  // Handle contractor/vendor change (use advanceData when already loaded to avoid extra fetch)
+  // Handle contractor/vendor change — totals refresh via refreshTotalsFromServer (getAll parity with desktop).
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     if (selected) {
       localStorage.setItem("advanceContractorVendor", JSON.stringify(selected));
     } else {
       localStorage.removeItem("advanceContractorVendor");
-      setOverallAdvance(0);
-      return;
-    }
-    if (advanceData.length > 0) {
-      const vid = Number(selected.id);
-      const total = advanceData
-        .filter(item =>
-          selected.type === 'Vendor'
-            ? Number(item.vendor_id) === vid
-            : Number(item.contractor_id) === vid
-        )
-        .reduce((sum, curr) => {
-          const amount = parseFloat(curr.amount) || 0;
-          const billAmount = parseFloat(curr.bill_amount) || 0;
-          const refundAmount = parseFloat(curr.refund_amount) || 0;
-          return sum + amount - billAmount - refundAmount;
-        }, 0);
-      setOverallAdvance(total);
-      return;
-    }
-    try {
-      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
-      if (!response.ok) throw new Error('Failed to fetch data');
-      const data = await response.json();
-      const vid = Number(selected.id);
-      const total = data
-        .filter(item =>
-          selected.type === 'Vendor'
-            ? Number(item.vendor_id) === vid
-            : Number(item.contractor_id) === vid
-        )
-        .reduce((sum, curr) => {
-          const amount = parseFloat(curr.amount) || 0;
-          const billAmount = parseFloat(curr.bill_amount) || 0;
-          const refundAmount = parseFloat(curr.refund_amount) || 0;
-          return sum + amount - billAmount - refundAmount;
-        }, 0);
-      setOverallAdvance(total);
-    } catch (error) {
-      console.error('Error fetching or processing advance data:', error);
-      setOverallAdvance(0);
     }
   };
-
-  // Calculate project advance (use existingData when provided to avoid extra fetch)
-  const calculateProjectAdvance = async (vendorOrContractor, project, existingData) => {
-    if (!vendorOrContractor || !project) {
-      setProjectAdvance('');
-      return;
-    }
-    const run = (data) => {
-      const isVendor = vendorOrContractor.type === 'Vendor';
-      const vid = Number(vendorOrContractor.id);
-      const pid = Number(project.id);
-      const relevantData = data.filter(
-        item =>
-          (isVendor ? Number(item.vendor_id) === vid : Number(item.contractor_id) === vid) &&
-          Number(item.project_id) === pid
-      );
-      const total = relevantData.reduce((sum, entry) => {
-        const amount = parseFloat(entry.amount) || 0;
-        const billAmount = parseFloat(entry.bill_amount) || 0;
-        const refundAmount = parseFloat(entry.refund_amount) || 0;
-        return sum + amount - billAmount - refundAmount;
-      }, 0);
-      setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
-    };
-    if (existingData && existingData.length > 0) {
-      run(existingData);
-      return;
-    }
-    try {
-      const response = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
-      if (!response.ok) throw new Error('Failed to fetch advance portal data');
-      const data = await response.json();
-      run(data);
-    } catch (error) {
-      console.error('Error calculating project advance:', error);
-      setProjectAdvance('');
-    }
-  };
-
-  useEffect(() => {
-    if (selectedOption && selectedSite) {
-      calculateProjectAdvance(selectedOption, selectedSite, advanceData);
-    } else {
-      setProjectAdvance('');
-    }
-  }, [selectedOption, selectedSite, advanceData]);
 
   // Format with commas
   const formatWithCommas = (value) => {
@@ -668,10 +624,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
           return;
         }
       }
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/advance_portal/getAll');
-      if (!res.ok) throw new Error('Failed to fetch entry numbers');
-      const allData = await res.json();
-      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
+      const maxEntryNo = await fetchMaxEntryNoFromBranch(withBranchUrl);
       const nextEntryNo = maxEntryNo + 1;
       const createPayload = (overrides = {}) => ({
         type: selectedType,
@@ -844,9 +797,8 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
         fileInputRef.current.value = '';
       }
       setEntryNo(nextEntryNo);
-      fetchAdvanceData();
-      if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite, advanceData);
+      await fetchAdvanceData();
+      await refreshTotalsFromServer();
     } catch (error) {
       console.error('Error submitting data:', error);
       alert('Failed to save data!');
@@ -862,8 +814,9 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     return ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(paymentMode);
   };
 
-  const proceedWithPayAdvance = () => {
+  const proceedWithPayAdvance = async () => {
     if (requiresPaymentDetailsSheet()) {
+      await ensureAccountDetailsLoaded();
       setPaymentModalData({
         date: dateValue,
         amount: advanceAmount.toString().replace(/,/g, '') || '',
@@ -905,7 +858,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
       setCheckingDuplicate(false);
     }
 
-    proceedWithPayAdvance();
+    void proceedWithPayAdvance();
   };
 
   const handleDuplicateIgnore = () => {
@@ -913,7 +866,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
     setDuplicateMatchedExpenses([]);
     if (pendingActionAfterIgnore === 'payAdvance') {
       setPendingActionAfterIgnore(null);
-      proceedWithPayAdvance();
+      void proceedWithPayAdvance();
     } else if (pendingActionAfterIgnore === 'paymentDetailsSubmit') {
       setPendingActionAfterIgnore(null);
       handlePaymentDetailsSubmit(true);
@@ -986,10 +939,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
         const uploadResult = await uploadResponse.json();
         fileUrl = uploadResult.url;
       }
-      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
-      if (!res.ok) throw new Error('Failed to fetch entry numbers');
-      const allData = await res.json();
-      const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
+      const maxEntryNo = await fetchMaxEntryNoFromBranch(withBranchUrl);
       const nextEntryNo = maxEntryNo + 1;
       const advancePayload = {
         type: selectedType,
@@ -1097,9 +1047,8 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
       setEntryNo(nextEntryNo);
       setShowPaymentDetailsBottomSheet(false);
       setPaymentModalData({ date: '', amount: '', paymentMode: '', chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
-      fetchAdvanceData();
-      if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite, advanceData);
+      await fetchAdvanceData();
+      await refreshTotalsFromServer();
     } catch (error) {
       console.error('Error submitting payment details:', error);
       alert(error?.message || 'Failed to save data!');
@@ -1184,7 +1133,7 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
 
   return (
     <div
-      className=" flex flex-col flex-1 min-h-0 overflow-hidden"
+      className="flex flex-col flex-1 min-h-0 overflow-hidden w-full"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       {/* Form section - no scroll */}
@@ -1225,7 +1174,12 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
             </p>
             <div className="relative">
               <div
-                onClick={() => setShowContractorVendorModal(true)}
+                onClick={() => {
+                  void (async () => {
+                    await ensureMasterDropdownsLoaded();
+                    setShowContractorVendorModal(true);
+                  })();
+                }}
                 className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
@@ -1263,7 +1217,12 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
             </p>
             <div className="relative">
               <div
-                onClick={() => setShowProjectModal(true)}
+                onClick={() => {
+                  void (async () => {
+                    await ensureMasterDropdownsLoaded();
+                    setShowProjectModal(true);
+                  })();
+                }}
                 className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                 style={{
                   boxSizing: 'border-box',
@@ -1327,7 +1286,12 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
               </p>
               <div className="relative">
                 <div
-                  onClick={() => setShowCategoryModal(true)}
+                  onClick={() => {
+                    void (async () => {
+                      await ensureMasterDropdownsLoaded();
+                      setShowCategoryModal(true);
+                    })();
+                  }}
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
@@ -1367,7 +1331,12 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                 </p>
                 <div className="relative">
                   <div
-                    onClick={() => setShowTransferSiteModal(true)}
+                    onClick={() => {
+                      void (async () => {
+                        await ensureMasterDropdownsLoaded();
+                        setShowTransferSiteModal(true);
+                      })();
+                    }}
                     className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{
                       boxSizing: 'border-box',
@@ -1565,8 +1534,8 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
           }
           return (
             <div
-              className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: 'none' }}
+              className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
             >
               {filteredEntries.map((entry, index) => {
                 const {
@@ -1783,9 +1752,6 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
           const selected = siteOptions.find(opt => opt.label === value);
           if (selected) {
             setSelectedSite(selected);
-            if (selectedOption) {
-              calculateProjectAdvance(selectedOption, selected, advanceData);
-            }
           }
           setShowProjectModal(false);
         }}
@@ -1964,7 +1930,12 @@ const AdvanceForm = ({ username = '', userRoles = [], paymentModeOptions = [], i
                 </p>
                 <div className="relative">
                   <div
-                    onClick={() => setShowAccountSelectModal(true)}
+                    onClick={() => {
+                      void (async () => {
+                        await ensureAccountDetailsLoaded();
+                        setShowAccountSelectModal(true);
+                      })();
+                    }}
                     className="relative w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ color: paymentModalData.accountNumber ? '#000' : '#9E9E9E' }}
                   >

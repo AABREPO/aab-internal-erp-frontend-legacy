@@ -21,9 +21,19 @@ const ProjectAdvance = ({ user, onLogout }) => {
     return savedTab || 'advanceform';
   });
 
+  // Avoid re-mounting heavy tab components (they fetch big datasets).
+  // Once a tab is opened once, keep it mounted and only hide/show.
+  const [loadedTabs, setLoadedTabs] = useState(() => ({
+    [activeTab]: true,
+  }));
+
   // Save activeTab to localStorage when it changes
   React.useEffect(() => {
     localStorage.setItem('projectAdvanceActiveTab', activeTab);
+  }, [activeTab]);
+
+  React.useEffect(() => {
+    setLoadedTabs((prev) => (prev[activeTab] ? prev : { ...prev, [activeTab]: true }));
   }, [activeTab]);
 
   const handleMenuClick = () => {
@@ -49,10 +59,10 @@ const ProjectAdvance = ({ user, onLogout }) => {
       navigate('/toolsTracker');
     } else if (page === 'project-advance') {
       setCurrentPage('project-advance');
-      navigate('/portal');
+      navigate('/portal/advancePortal');
     }else if (page === 'loan-portal') {
       setCurrentPage('loan-portal');
-      navigate('/loan');
+      navigate('/loan/loanportal');
     }
   };
 
@@ -70,18 +80,34 @@ const ProjectAdvance = ({ user, onLogout }) => {
       <Header user={user} onLogout={onLogout} onMenuClick={handleMenuClick} />
       {/* Tabs - Fixed */}
       <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
-      {/* Content Area - fixed height so only inner content (e.g. cards) scrolls, not the page */}
-      <div className="pt-[84px] flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 85px)' }}>
-        {/* Advance Form Tab Content */}
-        {activeTab === 'advanceform' && (
-          <AdvanceForm
-            initialFromHistory={initialFromHistory}
-            onConsumedInitialFromHistory={() => setInitialFromHistory(null)}
-          />
+      {/* Main column: 100vh with pt for fixed chrome + pb for fixed BottomNav */}
+      <div
+        className="pt-[84px] box-border flex flex-col min-h-0 overflow-hidden"
+        style={{
+          height: '100vh',
+          paddingBottom: 'calc(60px + 9px + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
+        {/* Advance Form Tab Content — flex parent so AdvanceForm flex-1 / list scroll works */}
+        {loadedTabs.advanceform && (
+          <div
+            className="flex flex-col min-h-0 flex-1"
+            style={{ display: activeTab === 'advanceform' ? 'flex' : 'none' }}
+          >
+            <AdvanceForm
+              isAdvanceTabActive={activeTab === 'advanceform'}
+              initialFromHistory={initialFromHistory}
+              onConsumedInitialFromHistory={() => setInitialFromHistory(null)}
+            />
+          </div>
         )}
+
         {/* History Tab Content */}
-        {activeTab === 'history' && (
-          <div className="flex-1 min-h-0 overflow-hidden">
+        {loadedTabs.history && (
+          <div
+            className="flex-1 min-h-0 overflow-hidden"
+            style={{ display: activeTab === 'history' ? 'block' : 'none' }}
+          >
             <History
               user={user}
               onVendorClick={(data) => {
@@ -91,10 +117,26 @@ const ProjectAdvance = ({ user, onLogout }) => {
             />
           </div>
         )}
+
         {/* Report Tab Content */}
-        {activeTab === 'report' && <div className="flex-1 min-h-0 overflow-hidden"><Report /></div>}
+        {loadedTabs.report && (
+          <div
+            className="flex-1 min-h-0 overflow-hidden"
+            style={{ display: activeTab === 'report' ? 'block' : 'none' }}
+          >
+            <Report />
+          </div>
+        )}
+
         {/* Summary Tab Content */}
-        {activeTab === 'summary' && <div className="flex-1 min-h-0 overflow-hidden"><Summary /></div>}
+        {loadedTabs.summary && (
+          <div
+            className="flex-1 min-h-0 overflow-hidden"
+            style={{ display: activeTab === 'summary' ? 'block' : 'none' }}
+          >
+            <Summary />
+          </div>
+        )}
       </div>
       {/* Bottom Navigation */}
       <BottomNav activeTab="home" />

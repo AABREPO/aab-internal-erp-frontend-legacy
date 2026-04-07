@@ -1218,7 +1218,6 @@ const AddItemsToPO = ({ isOpen, onClose, onAdd, initialData = {}, selectedCatego
         selectedValue={formData.category || selectedCategory}
         options={categoryOptionsStrings}
         fieldName="Category"
-        onAddNew={handleAddNewCategory}
       />
       <SelectVendorModal
         isOpen={showItemNameModal}

@@ -1257,23 +1257,90 @@ const DatabaseMobile = () => {
 						))}
 						<div className="px-[14px] pt-[10px] pb-[10px] flex flex-col" style={{ minHeight: 'calc(100vh - 86px)' }}>
 							{billEntryDetailsRows.length > 0 && (
-								<div className="rounded-[12px] border border-[#E5E7EB] bg-white p-[12px]">
-									<div className="grid grid-cols-2 gap-[12px]">
-										<div><p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p></div>
-										<div><p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p></div>
-									</div>
-									<div className="mt-[6px] space-y-[10px]">
-										{billEntryDetailsRows.map((r, i) => (
-											<div key={i} className="grid grid-cols-2 gap-[12px]">
-												<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-													<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
+								<div className="mt-[6px] space-y-[10px]">
+									{billEntryDetailsRows.map((r, i) => {
+											const entryRowId = `entry-${i}`;
+											const ENTRY_ACTION_SLIDE = 56;
+											const swipeState = swipeStates[entryRowId];
+											const deltaX = swipeState ? (swipeState.currentX - swipeState.startX) : 0;
+											const swipeOffset =
+												swipeState && swipeState.isSwiping
+													? Math.max(-ENTRY_ACTION_SLIDE, Math.min(0, deltaX))
+													: expandedRowId === entryRowId
+														? -ENTRY_ACTION_SLIDE
+														: 0;
+
+											const showSwipeActions =
+												expandedRowId === entryRowId || (swipeState && swipeState.isSwiping && swipeOffset < -20);
+
+											return (
+												<div
+													key={entryRowId}
+													className="relative overflow-hidden"
+													onTouchStart={(e) => handleTouchStart(e, entryRowId)}
+													onTouchMove={(e) => handleTouchMove(e, entryRowId)}
+													onTouchEnd={() => handleTouchEnd(entryRowId)}
+													onMouseDown={(e) => handleMouseDown(e, entryRowId)}
+													style={{
+														userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+														WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+													}}
+												>
+													{/* Actions behind row */}
+													<div
+														className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
+														style={{
+															width: `${ENTRY_ACTION_SLIDE}px`,
+															opacity: showSwipeActions ? 1 : 0,
+															transition: 'opacity 0.2s ease-out',
+															pointerEvents: showSwipeActions ? 'auto' : 'none'
+														}}
+													>
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																openEditSheet(detailRow);
+																setExpandedRowId(null);
+															}}
+															className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
+															title="Edit"
+															aria-label="Edit"
+														>
+															<img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+														</button>
+													</div>
+
+													{/* Sliding row */}
+													<div
+														style={{
+															transform: `translateX(${swipeOffset}px)`,
+															touchAction: 'pan-y',
+															userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+															WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+															willChange: 'transform',
+															transition: swipeState && swipeState.isSwiping ? 'none' : 'transform 0.3s ease-out'
+														}}
+														className="rounded-[10px] border border-[#E5E7EB] bg-white px-[12px] py-[10px]"
+													>
+														<div className="grid grid-cols-2 gap-[12px]">
+															<div>
+																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
+																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																	<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
+																</div>
+															</div>
+															<div>
+																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
+																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																	<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
+																</div>
+															</div>
+														</div>
+													</div>
 												</div>
-												<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-													<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
-												</div>
-											</div>
-										))}
-									</div>
+											);
+										})}
 								</div>
 							)}
 

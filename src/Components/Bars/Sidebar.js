@@ -284,7 +284,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Vendor Payments Tracker</li></p>
             </Link>
-            <Link to={hasAccessToModel('Advance Portal') ? 'portal/advancePortal' : '#'}
+            <Link to={hasAccessToModel('Advance Portal') ? '/portal/advancePortal' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Advance Portal' ? 'text-red-500' : ''}`}
               onClick={(e) => {
                 if (!hasAccessToModel('Advance Portal')) {
@@ -297,7 +297,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
               }}>
               <p className="text-sm cursor-pointer"><li>Advance Portal</li></p>
             </Link>
-            <Link to={hasAccessToModel('Loan Portal') ? 'loan/loanportal' : '#'}
+            <Link to={hasAccessToModel('Loan Portal') ? '/loan/loanportal' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Loan Portal' ? 'text-red-500' : ''}`}
               onClick={(e) => {
                 if (!hasAccessToModel('Loan Portal')) {

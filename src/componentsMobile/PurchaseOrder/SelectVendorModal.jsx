@@ -6,8 +6,10 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingNewValue, setPendingNewValue] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const selectedOptionRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const optionRefs = useRef([]);
   const [favorites, setFavorites] = useState(() => {
     // Load favorites from localStorage based on field name
     const storageKey = `favorite${fieldName}s`;
@@ -21,6 +23,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
       setSearchQuery('');
       setShowConfirmModal(false);
       setPendingNewValue('');
+      setHighlightedIndex(-1);
     }
   }, [isOpen]);
 
@@ -90,15 +93,74 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
     return normalizedOpt === normalizedQuery;
   });
 
-  // Default behavior: favorites first, then alphabetically.
+  // Default behavior: when searching, prefix matches come first.
+  // Otherwise keep favorites first, then alphabetical order.
   // Opt-in preserveOrder keeps the incoming options order (used by PO modal list).
   const sortedOptions = preserveOrder ? filteredOptions : [...filteredOptions].sort((a, b) => {
+    const aNormalized = normalizeSearchText(a);
+    const bNormalized = normalizeSearchText(b);
+    const hasQuery = normalizedQuery.length > 0;
+
+    if (hasQuery) {
+      const aStartsWithQuery = aNormalized.startsWith(normalizedQuery);
+      const bStartsWithQuery = bNormalized.startsWith(normalizedQuery);
+
+      if (aStartsWithQuery && !bStartsWithQuery) return -1;
+      if (!aStartsWithQuery && bStartsWithQuery) return 1;
+    }
+
     const aIsFavorite = favorites.includes(a);
     const bIsFavorite = favorites.includes(b);
     if (aIsFavorite && !bIsFavorite) return -1;
     if (!aIsFavorite && bIsFavorite) return 1;
     return a.localeCompare(b);
   });
+
+  useEffect(() => {
+    optionRefs.current = [];
+  }, [sortedOptions]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (sortedOptions.length === 0) {
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    setHighlightedIndex(prev => {
+      if (prev >= 0 && prev < sortedOptions.length) {
+        return prev;
+      }
+
+      const selectedIndex = sortedOptions.findIndex(option => option === selectedValue);
+      return selectedIndex >= 0 ? selectedIndex : 0;
+    });
+  }, [isOpen, sortedOptions, selectedValue]);
+
+  useEffect(() => {
+    if (highlightedIndex < 0) return;
+
+    const highlightedOption = optionRefs.current[highlightedIndex];
+    const container = scrollContainerRef.current;
+
+    if (highlightedOption && container) {
+      requestAnimationFrame(() => {
+        const containerRect = container.getBoundingClientRect();
+        const optionRect = highlightedOption.getBoundingClientRect();
+        const optionTop = optionRect.top - containerRect.top + container.scrollTop;
+        const optionBottom = optionTop + optionRect.height;
+        const visibleTop = container.scrollTop;
+        const visibleBottom = visibleTop + container.clientHeight;
+
+        if (optionTop < visibleTop) {
+          container.scrollTop = optionTop;
+        } else if (optionBottom > visibleBottom) {
+          container.scrollTop = optionBottom - container.clientHeight;
+        }
+      });
+    }
+  }, [highlightedIndex]);
 
   if (!isOpen) return null;
 
@@ -166,6 +228,37 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
     setPendingNewValue('');
   };
 
+  const handleInputKeyDown = (e) => {
+    e.stopPropagation();
+
+    if (showConfirmModal) {
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (sortedOptions.length > 0) {
+        setHighlightedIndex(prev => (prev < sortedOptions.length - 1 ? prev + 1 : 0));
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (sortedOptions.length > 0) {
+        setHighlightedIndex(prev => (prev > 0 ? prev - 1 : sortedOptions.length - 1));
+      }
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      if (highlightedIndex >= 0 && highlightedIndex < sortedOptions.length) {
+        e.preventDefault();
+        handleSelect(sortedOptions[highlightedIndex]);
+      }
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-50 z-[10000] flex items-center justify-center p-[16px]"
@@ -205,7 +298,7 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
                 setSearchQuery(e.target.value);
               }}
               onKeyDown={(e) => {
-                e.stopPropagation();
+                handleInputKeyDown(e);
               }}
               onKeyUp={(e) => {
                 e.stopPropagation();
@@ -267,7 +360,12 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
                   return (
                     <button
                       key={index}
-                      ref={isSelected ? selectedOptionRef : null}
+                      ref={(element) => {
+                        optionRefs.current[index] = element;
+                        if (isSelected) {
+                          selectedOptionRef.current = element;
+                        }
+                      }}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -277,8 +375,9 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
                         e.stopPropagation();
                         handleSelect(option);
                       }}
+                      onMouseEnter={() => setHighlightedIndex(index)}
                       className={`w-full px-[10px] flex items-center justify-between transition-colors flex-shrink-0 ${
-                        isSelected ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                        isSelected ? 'bg-[#FFF9E6]' : highlightedIndex === index ? 'bg-[#F5F5F5]' : 'hover:bg-[#F5F5F5]'
                       }`}
                       style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
                     >
@@ -374,4 +473,3 @@ const SelectVendorModal = ({ isOpen, onClose, onSelect, selectedValue, options =
 };
 
 export default SelectVendorModal;
-

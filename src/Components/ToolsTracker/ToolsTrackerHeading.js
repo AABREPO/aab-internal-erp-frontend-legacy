@@ -8,14 +8,13 @@ import ToolTrackerNetStock from './ToolsTrackerNetStock';
 import ToolTrackerToolHistory from './ToolsTrackerToolsHistory';
 import ToolTrackerServiceHistory from './ToolsTrackerServiceHistory';
 import MobileToolsTracker from "../../componentsMobile/ToolsTracker/ToolsTracker";
+import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
 
 const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
-  const [isMobile, setIsMobile] = useState(() => {
-    return window.innerWidth <= 768;
-  });
+  const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
+      setIsMobile(isMobileViewportWidth());
     };
     window.addEventListener('resize', handleResize);
     return () => {

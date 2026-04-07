@@ -127,7 +127,8 @@ const Summary = () => {
 
   const loadAdvanceData = useCallback(async () => {
     try {
-      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      // Mobile: avoid fetching the full dataset (can crash the browser on large payloads).
+      const res = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getLast150'));
       if (!res.ok) throw new Error('Failed to fetch advance data');
       const data = await res.json();
       setAdvanceData(data);

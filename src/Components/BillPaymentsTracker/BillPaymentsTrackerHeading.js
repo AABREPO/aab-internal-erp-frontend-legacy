@@ -3,6 +3,7 @@ import PendingBill from './PendingBill';
 import BillDatabase from './BillDatabase';
 import BillStatement from './BillStatement';
 import MobileBillPaymentsTracker from '../../componentsMobile/BillPaymentsTracker/BillPaymentsTracker';
+import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
 
 const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
@@ -63,9 +64,9 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
 }
 
 const BillPaymentsTrackerHeading = ({ username, userRoles = [], onLogout }) => {
-    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+    const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
     useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        const handleResize = () => setIsMobile(isMobileViewportWidth());
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);

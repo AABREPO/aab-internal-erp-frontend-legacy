@@ -6,6 +6,7 @@ import LoanPortal from './LoanPortal';
 import LoanReport from './LoanReport';
 import LoanSummary from './LoanSummary';
 import MobileLoanPortal from '../../componentsMobile/LoanPortal/LoanPortal';
+import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
 
 // Payment Mode options
 const paymentModeOptions = [
@@ -18,13 +19,11 @@ const paymentModeOptions = [
 ];
 
 const LoanPoratlHeading = ({ username, userRoles = [] }) => {
-    const [isMobile, setIsMobile] = useState(() => {
-        return window.innerWidth <= 768;
-    });
+    const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
 
     useEffect(() => {
         const handleResize = () => {
-            setIsMobile(window.innerWidth <= 768);
+            setIsMobile(isMobileViewportWidth());
         };
         window.addEventListener('resize', handleResize);
         return () => {

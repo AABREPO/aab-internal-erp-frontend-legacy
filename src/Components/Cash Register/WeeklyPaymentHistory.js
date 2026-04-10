@@ -542,20 +542,35 @@ const History = ({ username, userRoles = [] }) => {
                 .replace(/\s/g, "-");
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
-            formData.append("file", selectedFileForPopup);
-            formData.append("file_name", finalName);
+
+            const uploadFormData = new FormData();
+
+            // ✅ CHANGE 1: "files" instead of "file"
+            uploadFormData.append("files", selectedFileForPopup);
+
+            // ✅ CHANGE 2: required folder
+            uploadFormData.append("folder", "FileUpload / Cash_Register");
+
+            // ✅ CHANGE 3: filename param
+            uploadFormData.append("fileName", finalName);
+
             const uploadResponse = await fetch(
-                "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                "https://backendaab.in/aabuildersDash/api/files/upload",
                 {
                     method: "POST",
-                    body: formData,
+                    body: uploadFormData,
                 }
             );
+
             if (!uploadResponse.ok) {
                 throw new Error("File upload failed");
             }
+
             const uploadResult = await uploadResponse.json();
-            const pdfUrl = uploadResult.url;
+
+            // ✅ CHANGE 4: new response format
+            const pdfUrl = uploadResult.urls[0];
+
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
@@ -1300,7 +1315,7 @@ const History = ({ username, userRoles = [] }) => {
         }
         return response.json();
     };
-    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId, purposeId = 0 , description = ""}) => {
+    const createLoanPortalEntry = async ({ date, amount, vendorId, contractorId, employeeId, projectId, purposeId = 0, description = "" }) => {
         const payload = {
             type: "Loan",
             date,

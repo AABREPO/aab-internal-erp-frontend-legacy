@@ -5,6 +5,9 @@ import Delete from '../Images/delete.png';
 import BackIcon from '../Images/BAck Icon.svg';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import Star from '../Images/Star.svg'
+import Search from '../Images/Search.png'
+import Close from '../Images/close.png'
 
 const Chip = ({ label, tone = 'neutral', onClick }) => {
 	const toneStyles =
@@ -12,7 +15,7 @@ const Chip = ({ label, tone = 'neutral', onClick }) => {
 			? { bg: '#E2F9E1', text: '#1E8E3E', border: '#E2F9E1' }
 			: tone === 'warn'
 				? { bg: '#FFD39E', text: '#111827', border: '#FFD39E' }
-					: { bg: '#FAF6ED', text: '#111827', border: '#D1D5DB' };
+				: { bg: '#FAF6ED', text: '#111827', border: '#D1D5DB' };
 
 	if (typeof onClick === 'function') {
 		return (
@@ -114,6 +117,10 @@ const DatabaseMobile = () => {
 	const [showBankDetailsModal, setShowBankDetailsModal] = useState(false);
 	const [selectedVendorAccountDetails, setSelectedVendorAccountDetails] = useState(null);
 	const [loadingVendorBankDetails, setLoadingVendorBankDetails] = useState(false);
+	const [showDatabaseVendorPopup, setShowDatabaseVendorPopup] = useState(false);
+	const [selectedVendor, setSelectedVendor] = useState("");
+	const [selectedVendorId, setSelectedVendorId] = useState(null);
+	const [search, setSearch] = useState("");
 	useEffect(() => {
 		let isMounted = true;
 		const load = async () => {
@@ -176,6 +183,11 @@ const DatabaseMobile = () => {
 		loadVendors();
 		return () => { isMounted = false; };
 	}, []);
+
+	const vendorList = Object.entries(vendorMap || {}).map(([id, name]) => ({
+		id,
+		name
+	}));
 
 	const getVendorNameById = (vendorId) => {
 		if (!vendorId && vendorId !== 0) return '-';
@@ -488,7 +500,7 @@ const DatabaseMobile = () => {
 
 	const renderTopBar = (title, onBack, rightNode = null) => (
 		<div className="">
-			<div className="flex items-start justify-between gap-[10px]">
+			<div className="flex items-start justify-between gap-[10px] border-b-[2px] border-[#E0E0E0] pb-[10px]">
 				<div className="flex items-center gap-[10px]">
 					<button type="button" onClick={onBack} className="w-[28px] h-[28px] flex items-center justify-center" aria-label="Back">
 						<img src={BackIcon} alt="Back" className="w-[18px] h-[18px]" />
@@ -1025,37 +1037,59 @@ const DatabaseMobile = () => {
 		<div className="w-full h-[calc(100vh-96px-80px)] overflow-hidden flex flex-col">
 			<div className="flex-shrink-0">
 				<div className=" pt-[8px] pb-[8px] border-b border-[#E5E7EB] flex items-center justify-between">
-				<p className="text-[12px] font-semibold text-[#111827]"></p>
-				<p className="text-[12px] font-semibold text-[#111827]">Vendor</p>
-			</div>
-			<div className=" mt-[8px]">
-				<div className="w-full h-[36px] rounded-[24px] bg-white border border-[#E5E7EB] flex items-center px-[12px]">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-						<circle cx="11" cy="11" r="7" stroke="#9CA3AF" strokeWidth="1.5" />
-						<path d="M20 20L17 17" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" />
-					</svg>
-					<input
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-						placeholder="Search"
-						className="ml-[8px] flex-1 outline-none text-[12px] font-semibold text-[#111827] placeholder-[#9CA3AF]"
-						style={{ background: 'transparent' }}
-					/>
+					<p className="text-[12px] font-semibold text-[#111827]"></p>
+					<div className="flex items-center gap-2">
+						<p
+							className="text-[12px] font-semibold text-[#111827] cursor-pointer"
+							onClick={() => setShowDatabaseVendorPopup(true)}
+						>
+							{selectedVendor || "Vendor"}
+						</p>
+
+						{selectedVendor && (
+							<span
+								onClick={(e) => {
+									e.stopPropagation();
+									setSelectedVendor("");
+									setSelectedVendorId(null);
+								}}
+								className="cursor-pointer"
+							>
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+									<path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" />
+								</svg>
+							</span>
+						)}
+					</div>
 				</div>
-			</div>
-			{/* Filter Row (match PendingBill.jsx) */}
-			<div className="flex justify-between items-center gap-[4px] px-0 mt-[6px] flex-shrink-0">
-				<div className="flex items-center gap-[4px] min-w-0">
-					<button
-						type="button"
-						onClick={() => setShowFilterSheet(true)}
-						className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0"
-					>
-						<img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
-						<span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
-					</button>
+				<div className=" mt-[8px]">
+					<div className="w-full h-[36px] rounded-[24px] bg-white border border-[#E5E7EB] flex items-center px-[12px]">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+							<circle cx="11" cy="11" r="7" stroke="#9CA3AF" strokeWidth="1.5" />
+							<path d="M20 20L17 17" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" />
+						</svg>
+						<input
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							placeholder="Search"
+							className="ml-[8px] flex-1 outline-none text-[12px] font-semibold text-[#111827] placeholder-[#9CA3AF]"
+							style={{ background: 'transparent' }}
+						/>
+					</div>
 				</div>
-			</div>
+				{/* Filter Row (match PendingBill.jsx) */}
+				<div className="flex justify-between items-center gap-[4px] px-0 mt-[6px] flex-shrink-0">
+					<div className="flex items-center gap-[4px] min-w-0">
+						<button
+							type="button"
+							onClick={() => setShowFilterSheet(true)}
+							className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0"
+						>
+							<img src={Filter} alt="Filter" className="w-[13px] h-[11px]" />
+							<span className="text-[12px] font-medium text-black flex-shrink-0">Filter</span>
+						</button>
+					</div>
+				</div>
 			</div>
 			<div className="flex-1 overflow-y-auto no-scrollbar scrollbar-none  pb-[10px]">
 				<div className="flex flex-col">
@@ -1200,7 +1234,7 @@ const DatabaseMobile = () => {
 				<div className="fixed inset-0 z-[999] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
 					<div className="w-full max-w-[360px] mx-auto min-h-screen bg-white">
 						{renderTopBar(getVendorBillsTitle(detailRow), () => setActiveFullScreen(null))}
-						<div className="px-[14px] pt-[10px] pb-[10px]">
+						<div className=" pt-[10px] pb-[10px]">
 							<div className="rounded-[10px] border border-[#E5E7EB] p-[10px]">
 								{(() => {
 									const noOfBills = Number(detailRow?.no_of_bills ?? detailRow?.noOfBills ?? 0) || 0;
@@ -1220,22 +1254,22 @@ const DatabaseMobile = () => {
 											{/* Match PendingBill.jsx: show all slots (no pagination), grid scrolls if needed */}
 											<div className="overflow-y-auto no-scrollbar scrollbar-none" style={{ maxHeight: 'calc(100vh - 160px)' }}>
 												<div className="grid grid-cols-4 gap-[10px]">
-												{slots.map((n, i) => {
-													const hasValue = String(n || '').trim() !== '';
-													return (
-														<div
-															key={`${i}`}
-															className="h-[34px] rounded-[4px] border flex items-center justify-center text-[12px] font-semibold"
-															style={{
-																borderColor: hasValue ? '#22C55E' : '#D1D5DB',
-																background: hasValue ? '#E2F9E1' : '#FFFFFF',
-																color: '#111827'
-															}}
-														>
-															{hasValue ? n : ''}
-														</div>
-													);
-												})}
+													{slots.map((n, i) => {
+														const hasValue = String(n || '').trim() !== '';
+														return (
+															<div
+																key={`${i}`}
+																className="h-[34px] rounded-[4px] border flex items-center justify-center text-[12px] font-semibold"
+																style={{
+																	borderColor: hasValue ? '#22C55E' : '#D1D5DB',
+																	background: hasValue ? '#E2F9E1' : '#FFFFFF',
+																	color: '#111827'
+																}}
+															>
+																{hasValue ? n : ''}
+															</div>
+														);
+													})}
 												</div>
 											</div>
 										</>
@@ -1255,92 +1289,92 @@ const DatabaseMobile = () => {
 								Download
 							</button>
 						))}
-						<div className="px-[14px] pt-[10px] pb-[10px] flex flex-col" style={{ minHeight: 'calc(100vh - 86px)' }}>
+						<div className="pt-[4px] pb-[10px] flex flex-col" style={{ minHeight: 'calc(100vh - 86px)' }}>
 							{billEntryDetailsRows.length > 0 && (
 								<div className="mt-[6px] space-y-[10px]">
 									{billEntryDetailsRows.map((r, i) => {
-											const entryRowId = `entry-${i}`;
-											const ENTRY_ACTION_SLIDE = 56;
-											const swipeState = swipeStates[entryRowId];
-											const deltaX = swipeState ? (swipeState.currentX - swipeState.startX) : 0;
-											const swipeOffset =
-												swipeState && swipeState.isSwiping
-													? Math.max(-ENTRY_ACTION_SLIDE, Math.min(0, deltaX))
-													: expandedRowId === entryRowId
-														? -ENTRY_ACTION_SLIDE
-														: 0;
+										const entryRowId = `entry-${i}`;
+										const ENTRY_ACTION_SLIDE = 56;
+										const swipeState = swipeStates[entryRowId];
+										const deltaX = swipeState ? (swipeState.currentX - swipeState.startX) : 0;
+										const swipeOffset =
+											swipeState && swipeState.isSwiping
+												? Math.max(-ENTRY_ACTION_SLIDE, Math.min(0, deltaX))
+												: expandedRowId === entryRowId
+													? -ENTRY_ACTION_SLIDE
+													: 0;
 
-											const showSwipeActions =
-												expandedRowId === entryRowId || (swipeState && swipeState.isSwiping && swipeOffset < -20);
+										const showSwipeActions =
+											expandedRowId === entryRowId || (swipeState && swipeState.isSwiping && swipeOffset < -20);
 
-											return (
+										return (
+											<div
+												key={entryRowId}
+												className="relative overflow-hidden"
+												onTouchStart={(e) => handleTouchStart(e, entryRowId)}
+												onTouchMove={(e) => handleTouchMove(e, entryRowId)}
+												onTouchEnd={() => handleTouchEnd(entryRowId)}
+												onMouseDown={(e) => handleMouseDown(e, entryRowId)}
+												style={{
+													userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+													WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+												}}
+											>
+												{/* Actions behind row */}
 												<div
-													key={entryRowId}
-													className="relative overflow-hidden"
-													onTouchStart={(e) => handleTouchStart(e, entryRowId)}
-													onTouchMove={(e) => handleTouchMove(e, entryRowId)}
-													onTouchEnd={() => handleTouchEnd(entryRowId)}
-													onMouseDown={(e) => handleMouseDown(e, entryRowId)}
+													className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
 													style={{
-														userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-														WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto'
+														width: `${ENTRY_ACTION_SLIDE}px`,
+														opacity: showSwipeActions ? 1 : 0,
+														transition: 'opacity 0.2s ease-out',
+														pointerEvents: showSwipeActions ? 'auto' : 'none'
 													}}
 												>
-													{/* Actions behind row */}
-													<div
-														className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
-														style={{
-															width: `${ENTRY_ACTION_SLIDE}px`,
-															opacity: showSwipeActions ? 1 : 0,
-															transition: 'opacity 0.2s ease-out',
-															pointerEvents: showSwipeActions ? 'auto' : 'none'
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															openEditSheet(detailRow);
+															setExpandedRowId(null);
 														}}
+														className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
+														title="Edit"
+														aria-label="Edit"
 													>
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																openEditSheet(detailRow);
-																setExpandedRowId(null);
-															}}
-															className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
-															title="Edit"
-															aria-label="Edit"
-														>
-															<img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
-														</button>
-													</div>
+														<img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+													</button>
+												</div>
 
-													{/* Sliding row */}
-													<div
-														style={{
-															transform: `translateX(${swipeOffset}px)`,
-															touchAction: 'pan-y',
-															userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-															WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
-															willChange: 'transform',
-															transition: swipeState && swipeState.isSwiping ? 'none' : 'transform 0.3s ease-out'
-														}}
-														className="rounded-[10px] border border-[#E5E7EB] bg-white px-[12px] py-[10px]"
-													>
-														<div className="grid grid-cols-2 gap-[12px]">
-															<div>
-																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
-																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-																	<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
-																</div>
+												{/* Sliding row */}
+												<div
+													style={{
+														transform: `translateX(${swipeOffset}px)`,
+														touchAction: 'pan-y',
+														userSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+														WebkitUserSelect: (swipeState && swipeState.isSwiping) ? 'none' : 'auto',
+														willChange: 'transform',
+														transition: swipeState && swipeState.isSwiping ? 'none' : 'transform 0.3s ease-out'
+													}}
+													className="rounded-[10px] border border-[#E5E7EB] bg-white px-[12px] py-[10px]"
+												>
+													<div className="grid grid-cols-2 gap-[12px]">
+														<div>
+															<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
+															<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
 															</div>
-															<div>
-																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
-																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-																	<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
-																</div>
+														</div>
+														<div>
+															<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
+															<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
 															</div>
 														</div>
 													</div>
 												</div>
-											);
-										})}
+											</div>
+										);
+									})}
 								</div>
 							)}
 
@@ -1384,7 +1418,7 @@ const DatabaseMobile = () => {
 				<div className="fixed inset-0 z-[999] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
 					<div className="w-full max-w-[360px] mx-auto min-h-screen bg-white">
 						{renderTopBar(getVendorBillsTitle(detailRow), () => setActiveFullScreen(null))}
-						<div className="px-[14px] pt-[10px] pb-[10px] flex flex-col" style={{ minHeight: 'calc(100vh - 86px)' }}>
+						<div className=" pt-[10px] pb-[10px] flex flex-col" style={{ minHeight: 'calc(100vh - 86px)' }}>
 							<div
 								className="flex items-center justify-between"
 								role="button"
@@ -1633,7 +1667,7 @@ const DatabaseMobile = () => {
 							</div>
 						</div>
 					</div>
-			</div>
+				</div>
 			)}
 
 			{/* Filter Bottom Sheet */}
@@ -1647,7 +1681,7 @@ const DatabaseMobile = () => {
 						className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] relative z-[1202] overflow-hidden flex flex-col"
 						onClick={(e) => e.stopPropagation()}
 					>
-						<div className="flex-shrink-0 flex items-center justify-between px-[16px] pt-[14px] pb-[10px] border-b border-[#E5E7EB]">
+						<div className="flex-shrink-0 flex items-center justify-between px-[16px] pt-[14px] pb-[10px]">
 							<p className="text-[14px] font-semibold text-black">Filters</p>
 							<button type="button" onClick={() => setShowFilterSheet(false)} className="text-[#E4572E] text-[18px] font-bold leading-none" aria-label="Close">
 								×
@@ -1677,7 +1711,7 @@ const DatabaseMobile = () => {
 							</div>
 						</div>
 
-						<div className="flex-shrink-0 px-[16px] pb-[16px] pt-[10px] border-t border-[#E5E7EB] grid grid-cols-2 gap-[12px]">
+						<div className="flex-shrink-0 px-[16px] pb-[26px] pt-[10px] border-t border-[#E5E7EB] grid grid-cols-2 gap-[12px]">
 							<button
 								type="button"
 								onClick={() => {
@@ -1699,6 +1733,77 @@ const DatabaseMobile = () => {
 					</div>
 				</div>
 			)}
+			{showDatabaseVendorPopup && (
+	<div
+		className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center"
+		onClick={() => setShowDatabaseVendorPopup(false)}
+	>
+		<div
+			className="bg-white w-[92%] max-w-[360px] h-[80vh] rounded-[20px] p-4 flex flex-col"
+			onClick={(e) => e.stopPropagation()}
+		>
+			{/* Header */}
+			<div className="flex justify-between items-center mb-2">
+				<h2 className="text-[16px] font-semibold">Select Vendor</h2>
+				<span
+					className="cursor-pointer"
+					onClick={() => setShowDatabaseVendorPopup(false)}
+				>
+					<img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+				</span>
+			</div>
+
+			{/* Search */}
+			<div className="mb-3 relative">
+				<img
+					src={Search}
+					alt="search"
+					className="absolute left-3 top-1/2 transform -translate-y-1/2 w-[12px] h-[12px] opacity-60"
+				/>
+
+				<input
+					type="text"
+					placeholder="Search"
+					className="w-full pl-[30px] pr-3 py-2 border rounded-[10px] text-[13px] outline-none"
+					value={search}
+					onChange={(e) => setSearch(e.target.value)}
+				/>
+			</div>
+
+			{/* Vendor List */}
+			<div className="rounded-[12px] shadow-sm overflow-y-auto no-scrollbar scrollbar-none flex-1">
+				{vendorList.length > 0 ? (
+					vendorList
+						.filter(v =>
+							v.name.toLowerCase().includes(search.toLowerCase())
+						)
+						.map((vendor) => (
+							<div
+								key={vendor.id}
+								className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer hover:bg-gray-100"
+								onClick={() => {
+									setSelectedVendor(vendor.name);
+									setSelectedVendorId(vendor.id);
+									setShowDatabaseVendorPopup(false);
+
+									fetchSelectedVendorAccountDetails(vendor.id);
+								}}
+							>
+								<img src={Star} alt="Star" className="w-[16px] h-[16px]" />
+								<span className="text-[14px] text-gray-800">
+									{vendor.name}
+								</span>
+							</div>
+						))
+				) : (
+					<p className="text-sm text-gray-400 text-center py-4">
+						No vendors found
+					</p>
+				)}
+			</div>
+		</div>
+	</div>
+)}
 		</div>
 	);
 };

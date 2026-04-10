@@ -195,15 +195,16 @@ const Tenant = () => {
     let confirmedAgreementUrl = "";
     const filename = `${selectedPropertyName}_${selectedDoorNo}_${selectedTenantName}`;
     const formData = new FormData();
-    formData.append("file", selectedAgreementFile);
-    formData.append("file_name", filename);
-    const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/agreement/googleUploader/uploadToGoogleDrive", {
+    formData.append("files", selectedAgreementFile);
+    formData.append("fileName", filename);
+    formData.append("folderName", "FileUpload / Rental_Agreements");
+    const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
       method: "POST",
       body: formData,
     });
     if (!uploadResponse.ok) throw new Error("PDF upload failed");
     const uploadResult = await uploadResponse.json();
-    confirmedAgreementUrl = uploadResult.url;
+    confirmedAgreementUrl = uploadResult.urls[0] || '';
     try {
       const res = await fetch(`https://backendaab.in/aabuildersDash/api/agreements/updateConfirmedUrl/${selectedId}`, {
         method: "PUT",

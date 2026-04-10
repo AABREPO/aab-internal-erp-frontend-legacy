@@ -597,9 +597,10 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             .replace(/\s/g, "-");
           const employeeName = dataToSubmit.empName?.label || '';
           const finalName = `${timestamp} ${employeeName}`;
-          formData.append('file', selectedFile);
-          formData.append('file_name', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          formData.append('files', selectedFile);
+          formData.append('fileName', finalName);
+          formData.append('folderName', 'FileUpload / Staff_Advances');
+          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -607,7 +608,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
             throw new Error('File upload failed');
           }
           const uploadResult = await uploadResponse.json();
-          fileUrl = uploadResult.url;
+          fileUrl = uploadResult.urls[0] || '';
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');

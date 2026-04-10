@@ -7,6 +7,9 @@ import autoTable from 'jspdf-autotable';
 import Edit1 from '../Images/edit1.png'
 import Edit from '../Images/edit.png'
 import BackArrow from '../Images/BAck Icon.svg'
+import Star from '../Images/Star.svg'
+import Search from '../Images/Search.png'
+import Close from '../Images/close.png'
 
 const Chip = ({ label, tone = 'neutral', onClick, disabled = false }) => {
 	const toneStyles =
@@ -14,7 +17,7 @@ const Chip = ({ label, tone = 'neutral', onClick, disabled = false }) => {
 			? { bg: '#E2F9E1', text: '#4CAF50', border: '#E2F9E1' }
 			: tone === 'warn'
 				? { bg: '#FFD39E', text: '#111827', border: '#FFD39E' }
-					: { bg: '#FAF6ED', text: '#111827', border: '#D1D5DB' };
+				: { bg: '#FAF6ED', text: '#111827', border: '#D1D5DB' };
 
 	if (typeof onClick === 'function') {
 		return (
@@ -200,6 +203,19 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 	const [discount, setDiscount] = useState(0);
 	const [discountSubmitted, setDiscountSubmitted] = useState(false);
 	const [uploadingOverallPdf, setUploadingOverallPdf] = useState(false);
+	const [showVendorPopup, setShowVendorPopup] = useState(false);
+	const [selectedVendor, setSelectedVendor] = useState("");
+	const [showDatePicker, setShowDatePicker] = useState(false);
+	const [selectedDate, setSelectedDate] = useState("");
+	const vendorList = Object.entries(vendorMap || {}).map(([id, name]) => ({
+		id,
+		name
+	}));
+	const [search, setSearch] = useState("");
+
+	const filteredVendors = vendorList.filter(v =>
+		v.name.toLowerCase().includes(search.toLowerCase())
+	);
 	const overallPdfInputRef = useRef(null);
 
 	const paymentModeOptions = useMemo(() => ([
@@ -459,19 +475,19 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 		return 'Verify';
 	};
 
-// Match desktop gating rules:
-// - Entry allowed only after ALL bills verified
-// - Payment allowed only after Entry completed
-const isAllBillsVerified = (item) => {
-	const verifications = item?.billVerifications || item?.bill_verifications || [];
-	if (!Array.isArray(verifications) || verifications.length === 0) return false;
-	return verifications.every(v => v?.is_verified === true || v?.status === 'VERIFIED');
-};
+	// Match desktop gating rules:
+	// - Entry allowed only after ALL bills verified
+	// - Payment allowed only after Entry completed
+	const isAllBillsVerified = (item) => {
+		const verifications = item?.billVerifications || item?.bill_verifications || [];
+		if (!Array.isArray(verifications) || verifications.length === 0) return false;
+		return verifications.every(v => v?.is_verified === true || v?.status === 'VERIFIED');
+	};
 
-const isEntryCompleted = (item) => {
-	const entryStatus = item?.entry_status || item?.entryStatus || 'Entry';
-	return entryStatus === 'Entered' || entryStatus === '✓ Entered';
-};
+	const isEntryCompleted = (item) => {
+		const entryStatus = item?.entry_status || item?.entryStatus || 'Entry';
+		return entryStatus === 'Entered' || entryStatus === '✓ Entered';
+	};
 
 	const openVerifyModal = (bill) => {
 		setSelectedVerifyBill(bill || null);
@@ -710,7 +726,7 @@ const isEntryCompleted = (item) => {
 		}
 	};
 
-const reloadTrackers = async () => {
+	const reloadTrackers = async () => {
 		try {
 			const res = await fetchWithBranch('https://backendaab.in/aabuildersDash/api/vendor-payments/trackers/pending', {
 				method: 'GET',
@@ -1905,7 +1921,7 @@ const reloadTrackers = async () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-useEffect(() => {
+	useEffect(() => {
 		// Purchase orders are branch-scoped; clear cache on branch change to avoid wrong "Last PO"/Check PO results.
 		setPurchaseOrdersAll([]);
 		setPurchaseOrders([]);
@@ -1944,7 +1960,10 @@ useEffect(() => {
 				// ignore
 			}
 		};
-
+		const vendorList = Object.entries(vendorMap || {}).map(([id, name]) => ({
+			id,
+			name
+		}));
 		const fetchTrackerData = async () => {
 			setLoading(true);
 			setError(null);
@@ -2599,130 +2618,130 @@ useEffect(() => {
 							{billEntryDetailsRows.length > 0 && (
 								<div className="mt-[2px] space-y-[10px]">
 									{billEntryDetailsRows.map((r, i) => {
-											const entryRowId = `entry-${i}`;
-											const ACTIONS_WIDTH = 56;
-											const isSwiped = String(swipedRowId ?? '') === String(entryRowId ?? '');
-											const isActiveTouch = touchStartX != null && String(touchRowId ?? '') === String(entryRowId ?? '');
-											const deltaX = (isActiveTouch && touchCurrentX != null) ? (touchCurrentX - touchStartX) : 0;
+										const entryRowId = `entry-${i}`;
+										const ACTIONS_WIDTH = 56;
+										const isSwiped = String(swipedRowId ?? '') === String(entryRowId ?? '');
+										const isActiveTouch = touchStartX != null && String(touchRowId ?? '') === String(entryRowId ?? '');
+										const deltaX = (isActiveTouch && touchCurrentX != null) ? (touchCurrentX - touchStartX) : 0;
 
-											const swipeOffset = (() => {
-												if (isSwiped) {
-													if (isActiveTouch && deltaX > 0) return Math.min(0, -ACTIONS_WIDTH + deltaX);
-													return -ACTIONS_WIDTH;
-												}
-												if (isActiveTouch && deltaX < 0) return Math.max(-ACTIONS_WIDTH, deltaX);
-												return 0;
-											})();
+										const swipeOffset = (() => {
+											if (isSwiped) {
+												if (isActiveTouch && deltaX > 0) return Math.min(0, -ACTIONS_WIDTH + deltaX);
+												return -ACTIONS_WIDTH;
+											}
+											if (isActiveTouch && deltaX < 0) return Math.max(-ACTIONS_WIDTH, deltaX);
+											return 0;
+										})();
 
-											const showSwipeActions = isSwiped || (isActiveTouch && touchIsSwiping && swipeOffset < -20);
+										const showSwipeActions = isSwiped || (isActiveTouch && touchIsSwiping && swipeOffset < -20);
 
-											return (
+										return (
+											<div
+												key={entryRowId}
+												className="relative overflow-hidden"
+												onMouseDown={(e) => {
+													// Only left-click / primary button
+													if (e.button !== 0) return;
+													e.preventDefault();
+													setTouchRowId(entryRowId);
+													setTouchStartX(e.clientX);
+													setTouchCurrentX(e.clientX);
+													setTouchIsSwiping(false);
+												}}
+												onTouchStart={(e) => {
+													if (!e.touches?.[0]) return;
+													setTouchRowId(entryRowId);
+													setTouchStartX(e.touches[0].clientX);
+													setTouchCurrentX(e.touches[0].clientX);
+													setTouchIsSwiping(false);
+												}}
+												onTouchMove={(e) => {
+													if (touchStartX == null || !e.touches?.[0]) return;
+													const x = e.touches[0].clientX;
+													const dx = x - touchStartX;
+													// allow swipe left to open, and swipe right to close when already expanded
+													if (dx < 0 || (isSwiped && dx > 0)) {
+														if (e.preventDefault) e.preventDefault();
+														setTouchCurrentX(x);
+														setTouchIsSwiping(true);
+													}
+												}}
+												onTouchEnd={() => {
+													const minSwipeDistance = 50;
+													const dx = (touchCurrentX != null && touchStartX != null) ? (touchCurrentX - touchStartX) : 0;
+													if (Math.abs(dx) >= minSwipeDistance) {
+														if (dx < 0) setSwipedRowId(entryRowId);
+														else setSwipedRowId(null);
+													}
+													setTouchRowId(null);
+													setTouchStartX(null);
+													setTouchCurrentX(null);
+													setTouchIsSwiping(false);
+												}}
+											>
+												{/* Actions behind row */}
 												<div
-													key={entryRowId}
-													className="relative overflow-hidden"
-													onMouseDown={(e) => {
-														// Only left-click / primary button
-														if (e.button !== 0) return;
-														e.preventDefault();
-														setTouchRowId(entryRowId);
-														setTouchStartX(e.clientX);
-														setTouchCurrentX(e.clientX);
-														setTouchIsSwiping(false);
-													}}
-													onTouchStart={(e) => {
-														if (!e.touches?.[0]) return;
-														setTouchRowId(entryRowId);
-														setTouchStartX(e.touches[0].clientX);
-														setTouchCurrentX(e.touches[0].clientX);
-														setTouchIsSwiping(false);
-													}}
-													onTouchMove={(e) => {
-														if (touchStartX == null || !e.touches?.[0]) return;
-														const x = e.touches[0].clientX;
-														const dx = x - touchStartX;
-														// allow swipe left to open, and swipe right to close when already expanded
-														if (dx < 0 || (isSwiped && dx > 0)) {
-															if (e.preventDefault) e.preventDefault();
-															setTouchCurrentX(x);
-															setTouchIsSwiping(true);
-														}
-													}}
-													onTouchEnd={() => {
-														const minSwipeDistance = 50;
-														const dx = (touchCurrentX != null && touchStartX != null) ? (touchCurrentX - touchStartX) : 0;
-														if (Math.abs(dx) >= minSwipeDistance) {
-															if (dx < 0) setSwipedRowId(entryRowId);
-															else setSwipedRowId(null);
-														}
-														setTouchRowId(null);
-														setTouchStartX(null);
-														setTouchCurrentX(null);
-														setTouchIsSwiping(false);
+													className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
+													style={{
+														width: `${ACTIONS_WIDTH}px`,
+														opacity: showSwipeActions ? 1 : 0,
+														transition: 'opacity 0.2s ease-out',
+														pointerEvents: showSwipeActions ? 'auto' : 'none'
 													}}
 												>
-													{/* Actions behind row */}
-													<div
-														className="absolute right-0 top-0 h-full flex items-center justify-end z-0"
-														style={{
-															width: `${ACTIONS_WIDTH}px`,
-															opacity: showSwipeActions ? 1 : 0,
-															transition: 'opacity 0.2s ease-out',
-															pointerEvents: showSwipeActions ? 'auto' : 'none'
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															setBillEntryForm({
+																enteredBy: r.enteredBy || username || '',
+																date: r.date || ''
+															});
+															setShowBillEntrySheet(true);
+															setSwipedRowId(null);
+															setTouchRowId(null);
+															setTouchStartX(null);
+															setTouchCurrentX(null);
+															setTouchIsSwiping(false);
 														}}
+														className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
+														title="Edit"
+														aria-label="Edit"
 													>
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																setBillEntryForm({
-																	enteredBy: r.enteredBy || username || '',
-																	date: r.date || ''
-																});
-																setShowBillEntrySheet(true);
-																setSwipedRowId(null);
-																setTouchRowId(null);
-																setTouchStartX(null);
-																setTouchCurrentX(null);
-																setTouchIsSwiping(false);
-															}}
-															className="action-button w-[48px] h-full bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm"
-															title="Edit"
-															aria-label="Edit"
-														>
-															<img src={Edit1} alt="Edit" className="w-[18px] h-[18px]" />
-														</button>
-													</div>
+														<img src={Edit1} alt="Edit" className="w-[18px] h-[18px]" />
+													</button>
+												</div>
 
-													{/* Sliding row */}
-													<div
-														style={{
-															transform: `translateX(${swipeOffset}px)`,
-															touchAction: 'pan-y',
-															userSelect: 'none',
-															WebkitUserSelect: 'none',
-															willChange: 'transform',
-															transition: isActiveTouch ? 'none' : 'transform 0.3s ease-out'
-														}}
-														className="rounded-[10px] border border-[#E5E7EB] bg-white px-[12px] py-[10px]"
-													>
-														<div className="grid grid-cols-2 gap-[12px]">
-															<div>
-																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
-																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-																	<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
-																</div>
+												{/* Sliding row */}
+												<div
+													style={{
+														transform: `translateX(${swipeOffset}px)`,
+														touchAction: 'pan-y',
+														userSelect: 'none',
+														WebkitUserSelect: 'none',
+														willChange: 'transform',
+														transition: isActiveTouch ? 'none' : 'transform 0.3s ease-out'
+													}}
+													className="rounded-[10px] border border-[#E5E7EB] bg-white px-[12px] py-[10px]"
+												>
+													<div className="grid grid-cols-2 gap-[12px]">
+														<div>
+															<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Entered By</p>
+															<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																<p className="text-[12px] font-medium text-[#111827] truncate">{r.enteredBy || '-'}</p>
 															</div>
-															<div>
-																<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
-																<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
-																	<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
-																</div>
+														</div>
+														<div>
+															<p className="text-[12px] font-semibold text-[#111827] mb-[6px]">Date</p>
+															<div className="h-[36px] rounded-[6px] bg-[#F3F4F6] border border-[#E5E7EB] px-[10px] flex items-center">
+																<p className="text-[12px] font-medium text-[#111827] truncate">{formatEntryDateDdMmYyyy(r.date) || '-'}</p>
 															</div>
 														</div>
 													</div>
 												</div>
-											);
-										})}
+											</div>
+										);
+									})}
 								</div>
 							)}
 
@@ -3279,7 +3298,7 @@ useEffect(() => {
 								onClick={closePaymentSheet}
 							/>
 							<div className="relative w-full bg-white rounded-t-[18px] pt-[14px] pb-[16px]">
-									<style>{`
+								<style>{`
 										/* Hide number input spinner arrows for Payment Details amount */
 										.bpt-payment-amount-input::-webkit-outer-spin-button,
 										.bpt-payment-amount-input::-webkit-inner-spin-button {
@@ -3674,16 +3693,52 @@ useEffect(() => {
 
 			{/* Date / Vendor row */}
 			<div className="flex items-center justify-between border-b border-[#E0E0E0] pt-[8px] pb-[8px]">
-				<p className="text-[12px] font-semibold text-[#111827]">Date</p>
-				<p className="text-[12px] font-semibold text-[#111827]">Vendor</p>
+				<p
+					className="text-[12px] font-semibold text-[#111827] cursor-pointer"
+					onClick={() => setShowDatePicker(true)}
+				>
+					{selectedDate || "Date"}
+				</p>
+				<div className="flex items-center gap-2">
+					<p
+						className="text-[12px] font-semibold text-[#111827] cursor-pointer"
+						onClick={() => setShowVendorPopup(true)}
+					>
+						{selectedVendor || "Vendor"}
+					</p>
+
+					{/* ✅ SVG Clear Button */}
+					{selectedVendor && (
+						<span
+							className="cursor-pointer flex items-center"
+							onClick={(e) => {
+								e.stopPropagation(); // prevent popup open
+								setSelectedVendor("");
+							}}
+						>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 12 12"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									d="M9 3L3 9M3 3L9 9"
+									stroke="#848484"
+									strokeWidth="1.5"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+							</svg>
+						</span>
+					)}
+				</div>
 			</div>
 			{/* Search */}
 			<div className=" mt-[8px]">
 				<div className="w-full h-[36px] rounded-[24px] bg-white border border-[#E5E7EB] flex items-center px-[12px]">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-						<circle cx="11" cy="11" r="7" stroke="#9CA3AF" strokeWidth="1.5" />
-						<path d="M20 20L17 17" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" />
-					</svg>
+					<img src={Search} alt="Search" className="w-[12px] h-[12px]" />
 					<input
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
@@ -3718,17 +3773,17 @@ useEffect(() => {
 						className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] relative z-[1202] overflow-hidden flex flex-col"
 						onClick={(e) => e.stopPropagation()}
 					>
-						<div className="flex-shrink-0 flex items-center justify-between px-[16px] pt-[14px] pb-[10px] border-b border-[#E5E7EB]">
-							<p className="text-[14px] font-semibold text-black">Filters</p>
+						<div className="flex-shrink-0 flex items-center justify-between px-[16px] pt-[14px] pb-[10px]">
+							<p className="text-[14px] font-bold text-black">Filters</p>
 							<button type="button" onClick={() => setShowFilterSheet(false)} className="text-[#E4572E] text-[18px] font-bold leading-none" aria-label="Close">
-								×
+								<img src={Close} alt="Close" className="w-[11px] h-[11px]" />
 							</button>
 						</div>
 
 						<div className="flex-1 overflow-y-auto px-[16px] py-[12px]">
 							<div className="grid grid-cols-2 gap-[12px]">
 								<div>
-									<p className="text-[12px] font-semibold text-black mb-[6px]">From Date</p>
+									<p className="text-[12px] font-semibold text-black mb-[2px]">From Date</p>
 									<input
 										type="date"
 										value={filterFromDate}
@@ -3737,7 +3792,7 @@ useEffect(() => {
 									/>
 								</div>
 								<div>
-									<p className="text-[12px] font-semibold text-black mb-[6px]">To Date</p>
+									<p className="text-[12px] font-semibold text-black mb-[2px]">To Date</p>
 									<input
 										type="date"
 										value={filterToDate}
@@ -3748,7 +3803,7 @@ useEffect(() => {
 							</div>
 
 							<div className="mt-[12px]">
-								<p className="text-[12px] font-semibold text-black mb-[6px]">Payment Status</p>
+								<p className="text-[12px] font-semibold text-black mb-[2px]">Payment Status</p>
 								<select
 									value={filterPaymentStatus}
 									onChange={(e) => setFilterPaymentStatus(e.target.value)}
@@ -3762,7 +3817,7 @@ useEffect(() => {
 							</div>
 						</div>
 
-						<div className="flex-shrink-0 px-[16px] pb-[16px] pt-[10px] border-t border-[#E5E7EB] grid grid-cols-2 gap-[12px]">
+						<div className="flex-shrink-0 px-[16px] pb-[26px] pt-[10px] grid grid-cols-2 gap-[12px]">
 							<button
 								type="button"
 								onClick={() => {
@@ -4175,7 +4230,7 @@ useEffect(() => {
 															className="h-[34px] rounded-[6px] border text-[12px] font-semibold text-center outline-none"
 															style={{ borderColor, background: bgColor }}
 														/>
-                                                        {isAdminUser() && !isDuplicateMode && (
+														{isAdminUser() && !isDuplicateMode && (
 															<label className="flex items-center justify-center gap-[6px] text-[11px] font-medium text-black">
 																<input
 																	type="checkbox"
@@ -4404,7 +4459,9 @@ useEffect(() => {
 								className="w-[28px] h-[28px] flex items-center justify-center"
 								aria-label="Close"
 							>
-								<span className="text-[20px] leading-none font-semibold text-[#E4572E]">×</span>
+								<span className="text-[20px] leading-none font-semibold text-[#E4572E]">
+									<img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+								</span>
 							</button>
 						</div>
 
@@ -4478,7 +4535,7 @@ useEffect(() => {
 										type="number"
 										value={addForm.noOfBills}
 										onChange={(e) => setAddForm((p) => ({ ...p, noOfBills: e.target.value }))}
-									onKeyDown={(e) => { if (e.key === 'Enter') submitNewTracker(); }}
+										onKeyDown={(e) => { if (e.key === 'Enter') submitNewTracker(); }}
 										placeholder="Enter Bill Count"
 										className="w-full h-[38px] rounded-[6px] border border-[#D1D5DB] bg-white px-[12px] text-[12px] font-medium text-[#111827] outline-none"
 									/>
@@ -4489,14 +4546,14 @@ useEffect(() => {
 										type="number"
 										value={addForm.totalAmount}
 										onChange={(e) => setAddForm((p) => ({ ...p, totalAmount: e.target.value }))}
-									onKeyDown={(e) => { if (e.key === 'Enter') submitNewTracker(); }}
+										onKeyDown={(e) => { if (e.key === 'Enter') submitNewTracker(); }}
 										placeholder="Enter Amount"
 										className="w-full h-[38px] rounded-[6px] border border-[#D1D5DB] bg-white px-[12px] text-[12px] font-medium text-[#111827] outline-none"
 									/>
 								</div>
 							</div>
 
-							<div className="mt-[4px] grid grid-cols-2 gap-[12px]">
+							<div className="mt-[4px] grid grid-cols-2 gap-[12px] mb-[10px]">
 								<button
 									type="button"
 									onClick={closeAddSheet}
@@ -4921,7 +4978,76 @@ useEffect(() => {
 					</div>
 				</div>
 			)}
+			{showVendorPopup && (
+				<div
+					className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center"
+					onClick={() => setShowVendorPopup(false)}
+				>
+					<div
+						className="bg-white w-[92%] max-w-[360px] h-[80vh] rounded-[20px] p-4 flex flex-col"
+						onClick={(e) => e.stopPropagation()}
+					>
+						{/* Header */}
+						<div className="flex justify-between items-center mb-2">
+							<h2 className="text-[16px] font-semibold">Select Vendor</h2>
+							<span
+								className=" cursor-pointer"
+								onClick={() => setShowVendorPopup(false)}
+							>
+								<img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+							</span>
+						</div>
 
+						<div className="mb-3 relative">
+							<img
+								src={Search}
+								alt="search"
+								className="absolute left-3 top-1/2 transform -translate-y-1/2 w-[12px] h-[12px] opacity-60"
+							/>
+
+							<input
+								type="text"
+								placeholder="Search"
+								className="w-full pl-[30px] pr-3 py-2 border rounded-[10px] text-[13px] outline-none"
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+							/>
+						</div>
+
+						{/* Vendor List Card */}
+						<div className=" rounded-[12px] shadow-sm overflow-y-auto no-scrollbar scrollbar-none">
+							{vendorList.length > 0 ? (
+								vendorList
+									.filter(v =>
+										v.name.toLowerCase().includes(search.toLowerCase())
+									)
+									.map((vendor) => (
+										<div
+											key={vendor.id}
+											className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer hover:bg-gray-100"
+											onClick={() => {
+												setSelectedVendor(vendor.name);
+												setShowVendorPopup(false);
+											}}
+										>
+											{/* ⭐ Star Icon */}
+											<img src={Star} alt="Star" className="w-[16px] h-[16px]" />
+
+											{/* Vendor Name */}
+											<span className="text-[14px] text-gray-800">
+												{vendor.name}
+											</span>
+										</div>
+									))
+							) : (
+								<p className="text-sm text-gray-400 text-center py-4">
+									No vendors found
+								</p>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
 			{/* Edit received date picker */}
 			<DatePickerModal
 				isOpen={showEditReceivedDatePicker}
@@ -4931,6 +5057,15 @@ useEffect(() => {
 					setShowEditReceivedDatePicker(false);
 				}}
 				initialDate={getEditReceivedDateInitialForModal()}
+			/>
+			<DatePickerModal
+				isOpen={showDatePicker}
+				onClose={() => setShowDatePicker(false)}
+				onConfirm={(formattedDate) => {
+					setSelectedDate(formattedDate);
+					setShowDatePicker(false);
+				}}
+				initialDate={selectedDate}
 			/>
 
 			<div className="bpt-received-date-picker">

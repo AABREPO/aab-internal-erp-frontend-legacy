@@ -1093,14 +1093,16 @@ WITNESSES:
             const propertyDoorNo = doorNos.join("_");
             const filename = `${selectedProperty.value}_${propertyDoorNo}_R${currentRevisionCount}`;
             const formData = new FormData();
-            formData.append("file", pdfBlob);
-            formData.append("file_name", filename);
-            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/agreement/googleUploader/uploadToGoogleDrive", {
+            formData.append("files", pdfBlob);
+            formData.append("fileName", filename);
+            formData.append("folderName", "FileUpload / Rental_Agreements");
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
             if (!uploadResponse.ok) throw new Error("PDF upload failed");
-            const { url: pdfUrl } = await uploadResponse.json();
+            const { urls: pdfUrls } = await uploadResponse.json();
+            const pdfUrl = pdfUrls[0] || '';
             const updatedOwners = owners.map(own => ({
                 ownerName: own.ownerName,
                 fatherName: own.fatherName,

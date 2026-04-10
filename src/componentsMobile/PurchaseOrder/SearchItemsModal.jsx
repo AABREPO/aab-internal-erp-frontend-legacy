@@ -774,6 +774,83 @@ const SearchItemsModal = ({ isOpen, onClose, onAdd, getAvailableItems, existingI
                     }
                 }
             }
+            // For mapped-name flows (PurchaseOrder / Incoming): ALWAYS include mapped combinations
+            // from the nested master (`otherPOEntityList`) along with inventory-derived rows.
+            if (useMappedItemNameDisplay && !isFromUpdate) {
+                const data = getAvailableItems();
+                if (data.useNestedStructure && data.items && Array.isArray(data.items)) {
+                    for (const item of data.items) {
+                        if (results.length >= MAX_RESULTS) break;
+                        const itemName = item.itemName || '';
+                        const category = item.category || '';
+                        const otherPOEntityList = item.otherPOEntityList || [];
+                        const itemNameLower = itemName.toLowerCase();
+                        const categoryLower = category.toLowerCase();
+                        const itemNameMatches = searchTerms.every(term => (
+                            itemNameLower.includes(term) || categoryLower.includes(term)
+                        ));
+                        if (otherPOEntityList.length > 0) {
+                            for (const entity of otherPOEntityList) {
+                                if (results.length >= MAX_RESULTS) break;
+                                const brand = entity.brandName || '';
+                                const model = entity.modelName || '';
+                                const type = entity.typeColor || '';
+                                const brandLower = brand.toLowerCase();
+                                const modelLower = model.toLowerCase();
+                                const typeLower = type.toLowerCase();
+                                const matches = searchTerms.every(term => (
+                                    itemNameLower.includes(term) ||
+                                    categoryLower.includes(term) ||
+                                    brandLower.includes(term) ||
+                                    modelLower.includes(term) ||
+                                    typeLower.includes(term)
+                                ));
+                                if (matches) {
+                                    const itemKey = `${itemName}_${category}_${brand}_${model}_${type}`;
+                                    if (!seenKeys.has(itemKey)) {
+                                        seenKeys.add(itemKey);
+                                        results.push({
+                                            itemName,
+                                            brand,
+                                            model,
+                                            type,
+                                            category,
+                                            defaultQty: entity.defaultQty || '1',
+                                            minimumQty: entity.minimumQty || '1',
+                                            entityId: entity.id,
+                                            itemId: item.id || item.itemId || item._id || null,
+                                            categoryId: item.categoryId || item.category_id || null,
+                                            brandId: entity.brandId || entity.brand_id || null,
+                                            modelId: entity.modelId || entity.model_id || null,
+                                            typeId: entity.typeId || entity.type_id || null,
+                                        });
+                                    }
+                                }
+                            }
+                        } else if (itemNameMatches) {
+                            const itemKey = `${itemName}_${category}__`;
+                            if (!seenKeys.has(itemKey)) {
+                                seenKeys.add(itemKey);
+                                results.push({
+                                    itemName,
+                                    brand: '',
+                                    model: '',
+                                    type: '',
+                                    category,
+                                    defaultQty: '1',
+                                    minimumQty: '1',
+                                    entityId: null,
+                                    itemId: item.id || item.itemId || item._id || null,
+                                    categoryId: item.categoryId || item.category_id || null,
+                                    brandId: null,
+                                    modelId: null,
+                                    typeId: null,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
             // Only mapped-name flows (PO/Incoming) should fallback to getAvailableItems() when
             // inventory search temporarily returns no matches during async refresh.
             // Outgoing must stay inventory-only (previous behavior).

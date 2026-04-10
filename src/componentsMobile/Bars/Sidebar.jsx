@@ -11,6 +11,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
     procurement:
       currentPage === 'request-for-quotation' ||
       currentPage === 'purchase-order' ||
+      currentPage === 'goods-recieved-notes' ||
       currentPage === 'inventory' ||
       currentPage === 'tools-tracker',
     account: currentPage === 'project-advance' || currentPage === 'loan-portal'
@@ -25,6 +26,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       procurement:
         currentPage === 'request-for-quotation' ||
         currentPage === 'purchase-order' ||
+        currentPage === 'goods-recieved-notes' ||
         currentPage === 'inventory' ||
         currentPage === 'tools-tracker',
       account: currentPage === 'project-advance' || currentPage === 'loan-portal'
@@ -131,6 +133,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       subItems: [
         { id: 'request-for-quotation', label: 'RFQ', modelName: 'RFQ' },
         { id: 'purchase-order', label: 'Purchase Order', modelName: 'Purchase Order' },
+        { id: 'goods-recieved-notes', label: 'GRN', modelName: null },
         { id: 'inventory', label: 'Inventory', modelName: 'Inventory' },
         { id: 'tools-tracker', label: 'Tools Tracker', modelName: 'Tools Tracker' }
       ]

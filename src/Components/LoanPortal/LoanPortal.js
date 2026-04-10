@@ -1047,9 +1047,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         }
 
         const advanceResult = await advanceResponse.json();
-        console.log('✅ Advance portal entry created:', advanceResult);
         advancePortalId = advanceResult.id || advanceResult.advancePortalId;
-        console.log('Advance Portal ID to link:', advancePortalId);
       } catch (error) {
         console.error('Error creating advance portal entry:', error);
         toast.error('Failed to create advance portal entry!', {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SearchableDropdown from '../PurchaseOrder/SearchableDropdown';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
@@ -45,6 +45,7 @@ const IncomingTracker = ({ user, onTabChange }) => {
   }, [user?.userRoles]);
 
   const canCreate = modulePermissions.includes('Create');
+  const canEdit = modulePermissions.includes('Edit');
 
   const [activeStatus, setActiveStatus] = useState('live'); // 'live', 'closed', or 'history'
   const [incomingRecords, setIncomingRecords] = useState([]);
@@ -74,8 +75,148 @@ const IncomingTracker = ({ user, onTabChange }) => {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [swipeStates, setSwipeStates] = useState({});
   const [expandedClosedCardId, setExpandedClosedCardId] = useState(null);
-  
-  const minSwipeDistance = 50;
+  /** Sync coordinates on touch (React state updates too late for first touchmove). */
+  const swipeTrackRef = useRef({});
+  const expandedClosedCardIdRef = useRef(null);
+  const trackerCardRefs = useRef({});
+  /** After a horizontal mouse drag on Live cards, block the synthetic click so selection does not toggle. */
+  const suppressLiveCardClickRef = useRef(false);
+  const finalizeIncomingTrackerSwipeRef = useRef(() => {});
+  const pointerSwipeRef = useRef({ activeRecordId: null, pointerId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 });
+
+  /** Left drag past this (px) locks the row open so Edit stays visible & clickable. */
+  const minSwipeOpenPx = 16;
+  /** Right-drag to collapse when row is already open */
+  const minSwipeDistance = 32;
+
+  useEffect(() => {
+    expandedClosedCardIdRef.current = expandedClosedCardId;
+  }, [expandedClosedCardId]);
+
+  const activeStatusRef = useRef(activeStatus);
+  useEffect(() => {
+    activeStatusRef.current = activeStatus;
+  }, [activeStatus]);
+
+  const openEditForRow = (recordId) => {
+    // keep ref in sync immediately (render uses state, but handlers rely on ref)
+    expandedClosedCardIdRef.current = recordId;
+    setExpandedClosedCardId(recordId);
+  };
+
+  const closeEditForRow = (recordId) => {
+    if (expandedClosedCardIdRef.current === recordId) {
+      expandedClosedCardIdRef.current = null;
+    }
+    setExpandedClosedCardId(null);
+  };
+
+  const handlePointerDown = (e, recordId) => {
+    if (!e) return;
+    // Left mouse only for mouse pointers
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    try {
+      e.currentTarget?.setPointerCapture?.(e.pointerId);
+    } catch (_) {
+      // ignore
+    }
+
+    pointerSwipeRef.current = {
+      activeRecordId: recordId,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      currentX: e.clientX,
+      currentY: e.clientY,
+    };
+
+    // Seed swipe state so UI can animate immediately
+    setSwipeStates(prev => ({
+      ...prev,
+      [recordId]: {
+        startX: e.clientX,
+        startY: e.clientY,
+        currentX: e.clientX,
+        currentY: e.clientY,
+        isSwiping: false,
+      }
+    }));
+  };
+
+  const handlePointerMove = (e) => {
+    const ps = pointerSwipeRef.current;
+    if (!ps?.activeRecordId) return;
+    if (ps.pointerId !== e.pointerId) return;
+
+    const recordId = ps.activeRecordId;
+    ps.currentX = e.clientX;
+    ps.currentY = e.clientY;
+
+    const deltaX = ps.currentX - ps.startX;
+    const deltaY = Math.abs(ps.currentY - ps.startY);
+    const absDeltaX = Math.abs(deltaX);
+    const isExpanded = expandedClosedCardIdRef.current === recordId;
+
+    // Only treat as swipe when it is mostly horizontal
+    if (absDeltaX <= deltaY) return;
+
+    // Lock open as soon as user swipes left enough; close only on a clear right swipe when open.
+    if (deltaX < 0 && absDeltaX >= minSwipeOpenPx && !isExpanded) {
+      openEditForRow(recordId);
+    } else if (isExpanded && deltaX > 0 && absDeltaX >= minSwipeDistance) {
+      closeEditForRow(recordId);
+    }
+
+    // Prevent the browser from selecting text / dragging images while swiping
+    if (e.cancelable) e.preventDefault();
+
+    setSwipeStates(prev => ({
+      ...prev,
+      [recordId]: {
+        ...(prev[recordId] || {}),
+        startX: ps.startX,
+        startY: ps.startY,
+        currentX: ps.currentX,
+        currentY: ps.currentY,
+        isSwiping: true,
+      }
+    }));
+  };
+
+  const handlePointerUpOrCancel = (e) => {
+    const ps = pointerSwipeRef.current;
+    if (!ps?.activeRecordId) return;
+    if (ps.pointerId !== e.pointerId) return;
+
+    const recordId = ps.activeRecordId;
+    const deltaX = ps.currentX - ps.startX;
+    const deltaY = Math.abs(ps.currentY - ps.startY);
+    const absDeltaX = Math.abs(deltaX);
+
+    // If it was a real horizontal drag, suppress the click on Live cards
+    if (activeStatusRef.current === 'live' && absDeltaX > 8 && absDeltaX >= deltaY * 0.55) {
+      suppressLiveCardClickRef.current = true;
+    }
+
+    // If user swiped left enough and it isn't open yet, open it (do NOT auto-close on release).
+    if (deltaX < 0 && absDeltaX >= minSwipeOpenPx && expandedClosedCardIdRef.current !== recordId) {
+      openEditForRow(recordId);
+    }
+    // If user swiped right enough while open, close it.
+    if (expandedClosedCardIdRef.current === recordId && deltaX > 0 && absDeltaX >= minSwipeDistance) {
+      closeEditForRow(recordId);
+    }
+
+    pointerSwipeRef.current = { activeRecordId: null, pointerId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 };
+
+    // Clear transient swipe tracking state (keep expandedClosedCardId)
+    setSwipeStates(prev => {
+      const next = { ...prev };
+      delete next[recordId];
+      return next;
+    });
+  };
 
   // Hydrate from prefetched in-memory cache (if available) to avoid waiting on network.
   useEffect(() => {
@@ -107,49 +248,75 @@ const IncomingTracker = ({ user, onTabChange }) => {
   };
   const handleClosedCardSwipeStart = (event, recordId) => {
     const touch = event.touches ? event.touches[0] : { clientX: event.clientX, clientY: event.clientY };
+    const startY = touch.clientY || event.clientY || 0;
+    const g = {
+      startX: touch.clientX,
+      startY,
+      currentX: touch.clientX,
+      currentY: startY,
+      isSwiping: false,
+    };
+    swipeTrackRef.current[recordId] = g;
     setSwipeStates(prev => ({
       ...prev,
-      [recordId]: {
-        startX: touch.clientX,
-        startY: touch.clientY || event.clientY || 0,
-        currentX: touch.clientX,
-        currentY: touch.clientY || event.clientY || 0,
-        isSwiping: false,
-      }
+      [recordId]: { ...g },
     }));
   };
   const handleClosedCardSwipeMove = (event, recordId) => {
-    const state = swipeStates[recordId];
-    if (!state) return;
+    const g = swipeTrackRef.current[recordId];
+    if (!g) return;
     const touch = event.touches ? event.touches[0] : { clientX: event.clientX, clientY: event.clientY };
-    const deltaX = touch.clientX - state.startX;
     const currentY = touch.clientY || event.clientY || 0;
-    const deltaY = Math.abs(currentY - (state.startY || 0));
+    // Always record latest pointer (release uses this for delta; otherwise currentX never moves if drag stays diagonal)
+    g.currentX = touch.clientX;
+    g.currentY = currentY;
+    const deltaX = touch.clientX - g.startX;
+    const deltaY = Math.abs(currentY - (g.startY || 0));
     const absDeltaX = Math.abs(deltaX);
     if (absDeltaX <= deltaY) return;
-    const isExpanded = expandedClosedCardId === recordId;
+    const isExpanded = expandedClosedCardIdRef.current === recordId;
+
+    // On touch: lock open as soon as we cross threshold (mobile UX)
+    if (event.touches && deltaX < 0 && absDeltaX >= minSwipeOpenPx && !isExpanded) {
+      openEditForRow(recordId);
+    }
+
+    // On touch: close only on an intentional right swipe when already open
+    if (event.touches && isExpanded && deltaX > 0 && absDeltaX >= minSwipeDistance) {
+      closeEditForRow(recordId);
+    }
+
     if (deltaX < 0 || (isExpanded && deltaX > 0)) {
       if (event.preventDefault) {
         event.preventDefault();
       }
+      g.isSwiping = true;
       setSwipeStates(prev => ({
         ...prev,
         [recordId]: {
-          ...prev[recordId],
-          currentX: touch.clientX,
-          currentY: currentY,
+          ...g,
+          startX: g.startX,
+          startY: g.startY,
+          currentX: g.currentX,
+          currentY: g.currentY,
           isSwiping: true,
-        }
+        },
       }));
     }
   };
-  const handleClosedCardSwipeEnd = (recordId) => {
-    const state = swipeStates[recordId];
+
+  const finalizeIncomingTrackerSwipe = (recordId) => {
+    const state = swipeTrackRef.current[recordId];
     if (!state) return;
-    const deltaX = state.currentX - state.startX;
-    const deltaY = Math.abs((state.currentY || 0) - (state.startY || 0));
+    const startX = state.startX;
+    const startY = state.startY || 0;
+    const deltaX = state.currentX - startX;
+    const deltaY = Math.abs((state.currentY || 0) - startY);
     const absDeltaX = Math.abs(deltaX);
-    if (absDeltaX <= deltaY) {
+    delete swipeTrackRef.current[recordId];
+
+    // Obvious list scroll only (long vertical, almost no horizontal)
+    if (deltaY > 55 && absDeltaX < 12) {
       setSwipeStates(prev => {
         const newState = { ...prev };
         delete newState[recordId];
@@ -157,22 +324,36 @@ const IncomingTracker = ({ user, onTabChange }) => {
       });
       return;
     }
-    if (absDeltaX >= minSwipeDistance) {
-      if (deltaX < 0) {
-        setExpandedClosedCardId(recordId);
-      } else {
-        setExpandedClosedCardId(null);
-      }
-    } else if (expandedClosedCardId === recordId) {
-      setExpandedClosedCardId(null);
+
+    if (activeStatusRef.current === 'live' && absDeltaX > 8 && absDeltaX >= deltaY * 0.55) {
+      suppressLiveCardClickRef.current = true;
     }
+
+    const isOpen = expandedClosedCardIdRef.current === recordId;
+
+    // Requirement: once opened, it must stay open until user swipes right to close.
+    if (!isOpen && deltaX < 0 && absDeltaX >= minSwipeOpenPx) {
+      openEditForRow(recordId);
+    } else if (isOpen && deltaX > 0 && absDeltaX >= minSwipeDistance) {
+      closeEditForRow(recordId);
+    }
+
     setSwipeStates(prev => {
       const newState = { ...prev };
       delete newState[recordId];
       return newState;
     });
   };
-  const handleEditClosedRecord = (record) => {
+
+  finalizeIncomingTrackerSwipeRef.current = finalizeIncomingTrackerSwipe;
+
+  const handleClosedCardSwipeEnd = (recordId) => {
+    finalizeIncomingTrackerSwipe(recordId);
+  };
+
+  // Pointer events handle both mobile + desktop swipes; no global mouse/touch listeners needed.
+
+  const handleEditIncomingRecord = (record) => {
     const latestEntry = getLatestEntry(record);
     if (!latestEntry) return;
     const inventoryItem = {
@@ -187,13 +368,13 @@ const IncomingTracker = ({ user, onTabChange }) => {
       localStorage.setItem('inventoryActiveTab', 'incoming');
     }
     setExpandedClosedCardId(null);
+    setSelectedLiveCardId(null);
     window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryItem }));
   };
   useEffect(() => {
-    if (activeStatus !== 'closed') {
-      setExpandedClosedCardId(null);
-      setSwipeStates({});
-    }
+    setExpandedClosedCardId(null);
+    setSwipeStates({});
+    swipeTrackRef.current = {};
   }, [activeStatus]);
 
   // Fetch vendor data
@@ -1517,10 +1698,10 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 : (record.totalMergedItems || record.numberOfItems);
 
               if (activeStatus === 'history') {
-                // History tab - simple list format
+                // History tab — tap row for detail only (no swipe edit; edit is Live/Closed cards only)
                 return (
                   <div
-                    key={record.id || record._id || `${record.purchaseNo}_${record.vendorName}_${Math.random()}`}
+                    key={record.id || record._id || `${record.purchaseNo}_${record.vendorName}_${displayDate}`}
                     className="flex items-center justify-between py-[12px] px-[16px] border-b border-gray-200 cursor-pointer hover:bg-gray-50"
                     onClick={() => {
                       setSelectedRecord(record);
@@ -1547,39 +1728,44 @@ const IncomingTracker = ({ user, onTabChange }) => {
                 // Live and Closed tabs - detailed card format
                 const recordId = record.id || record._id || `${record.purchaseNo}_${record.vendorName}`;
                 const isSelected = activeStatus === 'live' && selectedLiveCardId === recordId;
-                const isClosedCard = activeStatus === 'closed';
+                const supportsSwipeEdit = activeStatus === 'closed' || activeStatus === 'live';
                 const isClickable = activeStatus === 'live';
                 const swipeState = swipeStates[recordId];
                 const isExpanded = expandedClosedCardId === recordId;
                 let swipeOffset = 0;
-                if (isClosedCard && swipeState && swipeState.isSwiping) {
+                if (supportsSwipeEdit && swipeState && swipeState.isSwiping) {
                   const deltaX = swipeState.currentX - swipeState.startX;
                   swipeOffset = Math.max(-48, Math.min(0, deltaX));
-                } else if (isClosedCard && isExpanded) {
+                } else if (supportsSwipeEdit && isExpanded) {
                   swipeOffset = -48;
                 }
                 return (
                   <div key={recordId}>
                     <div className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]">
-                      {isClosedCard && (
+                      {supportsSwipeEdit && (
                         <div
-                          className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
+                          className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-20"
                           style={{
                             opacity: isExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20) ? 1 : 0,
                             transform: swipeOffset < 0
                               ? `translateX(${Math.max(0, 48 + swipeOffset)}px)`
                               : 'translateX(48px)',
                             transition: (swipeState && swipeState.isSwiping) ? 'none' : 'opacity 0.2s ease-out, transform 0.3s ease-out',
-                            pointerEvents: isExpanded ? 'auto' : 'none'
+                            pointerEvents:
+                              isExpanded || (swipeState && swipeState.isSwiping && swipeOffset <= -18)
+                                ? 'auto'
+                                : 'none'
                           }}
                         >
                           <button
                             type="button"
-                            className="action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm"
+                            disabled={!canEdit}
+                            className={`action-button w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm ${!canEdit ? 'opacity-50 cursor-not-allowed hover:bg-[#007233]' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEditClosedRecord(record)
+                              if (canEdit) handleEditIncomingRecord(record);
                             }}
+                            onMouseDown={(e) => e.stopPropagation()}
                             title="Edit"
                           >
                             <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
@@ -1587,10 +1773,15 @@ const IncomingTracker = ({ user, onTabChange }) => {
                         </div>
                       )}
                       <div
-                        className={`bg-white rounded-lg px-[12px] py-[12px] relative flex flex-col transition-all duration-300 ease-out ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'border-[#007233]' : 'border-gray-200'}`}
+                        ref={(el) => {
+                          if (!supportsSwipeEdit) return;
+                          if (el) trackerCardRefs.current[recordId] = el;
+                          else delete trackerCardRefs.current[recordId];
+                        }}
+                        className={`bg-white rounded-lg px-[12px] py-[12px] relative z-10 flex flex-col transition-all duration-300 ease-out select-none ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'border-[#007233]' : 'border-gray-200'}`}
                         style={{
                           ...(isSelected ? { borderWidth: '1px', borderColor: '#007233' } : {}),
-                          ...(isClosedCard ? {
+                          ...(supportsSwipeEdit ? {
                             transform: `translateX(${swipeOffset}px)`,
                             transition: (swipeState && swipeState.isSwiping) ? 'none' : 'transform 0.3s ease-out',
                             touchAction: 'pan-y',
@@ -1601,15 +1792,20 @@ const IncomingTracker = ({ user, onTabChange }) => {
                           } : {})
                         }}
                         onClick={isClickable ? () => {
+                          if (suppressLiveCardClickRef.current) {
+                            suppressLiveCardClickRef.current = false;
+                            return;
+                          }
                           if (selectedLiveCardId === recordId) {
                             setSelectedLiveCardId(null);
                           } else {
                             setSelectedLiveCardId(recordId);
                           }
                         } : undefined}
-                        onTouchStart={isClosedCard ? (e) => handleClosedCardSwipeStart(e, recordId) : undefined}
-                        onTouchMove={isClosedCard ? (e) => handleClosedCardSwipeMove(e, recordId) : undefined}
-                        onTouchEnd={isClosedCard ? () => handleClosedCardSwipeEnd(recordId) : undefined}
+                        onPointerDown={supportsSwipeEdit ? (e) => handlePointerDown(e, recordId) : undefined}
+                        onPointerMove={supportsSwipeEdit ? handlePointerMove : undefined}
+                        onPointerUp={supportsSwipeEdit ? handlePointerUpOrCancel : undefined}
+                        onPointerCancel={supportsSwipeEdit ? handlePointerUpOrCancel : undefined}
                       >
                         {/* Green Checkmark Icon - Top Left */}
                         {isSelected && (

@@ -37,7 +37,8 @@ import ToolsTrackerHeading from './Components/ToolsTracker/ToolsTrackerHeading';
 import TestToolsTrackerHeading from './Components/TestToolsTracker/TestToolsTrackerHeading';
 import MobileRFQLogin from './componentsMobile/RequestForQuotation/LoginPage';
 import MobileRFQ from './componentsMobile/RequestForQuotation/RequestForQuotation';
-import { isMobileViewportWidth } from './constants/mobileBreakpoint';
+import GoodsRecievedNotesCreate from './componentsMobile/Goods Recieved Notes/Create';
+import GoodsRecievedNotesVerify from './componentsMobile/Goods Recieved Notes/Verify';
 
 function MainContentWithSidebarMargin({ children }) {
   const { isSidebarVisible } = useSidebar();
@@ -50,10 +51,12 @@ function MainContentWithSidebarMargin({ children }) {
 
 function AppContent({ user, handleLogout }) {
   const location = useLocation();
-  const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth())
+  const [isMobile, setIsMobile] = useState(() => {
+    return window.innerWidth <= 768;
+  })
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(isMobileViewportWidth());
+      setIsMobile(window.innerWidth <= 768);
     };
     window.addEventListener('resize', handleResize);
     return () => {
@@ -68,7 +71,8 @@ function AppContent({ user, handleLogout }) {
     location.pathname.startsWith('/tracker') ||
     location.pathname.startsWith('/portal') ||
     location.pathname.startsWith('/loan') ||
-    location.pathname.startsWith('/rfq');
+    location.pathname.startsWith('/rfq') ||
+    location.pathname.startsWith('/grn');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
 
   return (
@@ -127,15 +131,31 @@ function AppContent({ user, handleLogout }) {
             />
           }
         />
+        <Route
+          path="/grn/create"
+          element={
+            <GoodsRecievedNotesCreate
+              user={user}
+              onLogout={handleLogout}
+            />
+          }
+        />
+        <Route
+          path="/grn/verify"
+          element={
+            <GoodsRecievedNotesVerify
+              user={user}
+              onLogout={handleLogout}
+            />
+          }
+        />
         <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/testpurchaseorder' element={<TestPurchaseOrder />} />
         <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/attendance' element={<Attendancelog username={user.username} />} />
-        <Route path='/portal' element={<Navigate to="/portal/advancePortal" replace />} />
         <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/loan' element={<Navigate to="/loan/loanportal" replace />} />
         <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []} />} />

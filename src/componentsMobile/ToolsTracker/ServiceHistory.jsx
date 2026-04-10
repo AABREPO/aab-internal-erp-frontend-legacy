@@ -77,6 +77,8 @@ const ServiceHistory = ({ user, onTabChange }) => {
   }, [user?.userRoles]);
 
   const canCreate = modulePermissions.includes('Create');
+  const canEdit = modulePermissions.includes('Edit');
+  const canManageMachineStatus = canCreate || canEdit;
 
   // Image viewer state
   const [showImageViewer, setShowImageViewer] = useState(false);
@@ -192,13 +194,29 @@ const ServiceHistory = ({ user, onTabChange }) => {
   };
 
   // Helper function to save/update machine status
+  const resolveMachineNumberId = (entry) => {
+    const directMachineNumberId = entry?.machineNumberId;
+    if (directMachineNumberId != null && String(directMachineNumberId).trim() !== '') {
+      return String(directMachineNumberId).trim();
+    }
+
+    const machineNumberText = String(entry?.machineNumber || '').trim();
+    if (!machineNumberText) return '';
+
+    const matchedMachineNumber = Object.entries(machineNumbersMap).find(([, value]) => {
+      return String(value || '').trim() === machineNumberText;
+    });
+
+    return matchedMachineNumber ? String(matchedMachineNumber[0]).trim() : '';
+  };
+
   const saveMachineStatus = async (itemIdsId, machineNumberId, machineStatus) => {
     if (!itemIdsId || !machineNumberId || !machineStatus) {
       console.error('Missing required fields for saving machine status');
       return false;
     }
-    if (!canCreate) {
-      console.warn('Skipping tools-machine-status/save - user lacks Create permission');
+    if (!canManageMachineStatus) {
+      console.warn('Skipping tools-machine-status/save - user lacks Create/Edit permission');
       return false;
     }
     try {
@@ -746,10 +764,23 @@ const ServiceHistory = ({ user, onTabChange }) => {
       return;
     }
 
+    const resolvedMachineNumberId = resolveMachineNumberId(selectedEntry);
+
+    if (!selectedEntry.itemIdsId || !resolvedMachineNumberId) {
+      console.error('Unable to resolve machine status payload', {
+        itemIdsId: selectedEntry.itemIdsId,
+        machineNumberId: selectedEntry.machineNumberId,
+        machineNumber: selectedEntry.machineNumber
+      });
+      alert('Machine number details are missing for this item, so the status could not be updated.');
+      handleCloseBottomSheet();
+      return;
+    }
+
     // Save machine status to the new API
     const success = await saveMachineStatus(
       selectedEntry.itemIdsId,
-      selectedEntry.machineNumberId,
+      resolvedMachineNumberId,
       selectedStatus
     );
 

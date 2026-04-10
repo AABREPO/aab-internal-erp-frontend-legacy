@@ -982,15 +982,16 @@ const Form = () => {
         let pdfUrl = '';
         if (selectedRentFile) {
             const formData = new FormData();
-            formData.append('pdf', selectedRentFile);
-            formData.append('filename', `${date} `);
-            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/rentForm/googleUploader/uploadToGoogleDrive", {
+            formData.append('files', selectedRentFile);
+            formData.append('fileName', `${date} `);
+            formData.append('folderName', 'FileUpload / Rent_Management');
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
             if (!uploadResponse.ok) throw new Error('File upload failed');
             const uploadResult = await uploadResponse.json();
-            pdfUrl = uploadResult.url;
+            pdfUrl = uploadResult.urls[0] || '';
         }
         const tenantInfo = shopInfoMap[formShopNo];
         const formShopNoId = tenantInfo?.shopNoId || null;

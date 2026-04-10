@@ -17,6 +17,7 @@ const Transfer = ({ user }) => {
   const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
   const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
   const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
+  const FILE_UPLOAD_BASE_URL = 'https://backendaab.in/aabuildersDash/api/files';
   const [entryNo, setEntryNo] = useState(0);
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -182,7 +183,9 @@ const Transfer = ({ user }) => {
   const [cloneModeActive, setCloneModeActive] = useState(false);
   const [editEntryId, setEditEntryId] = useState(null);
   const [originalEditData, setOriginalEditData] = useState(null);
+  const [editLoadVersion, setEditLoadVersion] = useState(0);
   const initialImageCountByItemIdRef = useRef({});
+  const pendingEditPayloadRef = useRef(null);
   const [customAlert, setCustomAlert] = useState({
     isOpen: false,
     message: ''
@@ -204,6 +207,17 @@ const Transfer = ({ user }) => {
         : statusOptions,
     [entryServiceMode, serviceFlowMode, statusOptions]
   );
+  useEffect(() => {
+    const handleEditEntryEvent = (event) => {
+      pendingEditPayloadRef.current = event?.detail || null;
+      setEditLoadVersion((prev) => prev + 1);
+    };
+
+    window.addEventListener('editToolsTrackerEntry', handleEditEntryEvent);
+    return () => {
+      window.removeEventListener('editToolsTrackerEntry', handleEditEntryEvent);
+    };
+  }, []);
   useEffect(() => {
     const fetchSites = async () => {
       try {
@@ -877,22 +891,37 @@ const Transfer = ({ user }) => {
         setCloneModeActive(isCloneMode);
         setIsEditingTransferDetails(isCloneMode);
         if (editEntryId) {
-          const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/get/${editEntryId}`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (!response.ok) {
-            throw new Error('Failed to fetch entry data');
+          let editData = pendingEditPayloadRef.current;
+          if (!editData) {
+            try {
+              const storedEditEntry = localStorage.getItem('editingToolsTrackerEntry');
+              editData = storedEditEntry ? JSON.parse(storedEditEntry) : null;
+            } catch (parseError) {
+              console.error('Error parsing stored edit payload:', parseError);
+            }
           }
-          const editData = await response.json();
+
+          if (!editData) {
+            const response = await fetch(`${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/get/${editEntryId}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+              throw new Error('Failed to fetch entry data');
+            }
+            editData = await response.json();
+          }
+
+          pendingEditPayloadRef.current = null;
           const entryType = editData.tools_entry_type || editData.toolsEntryType || 'entry';
+          const normalizedEntryType = String(entryType).toLowerCase();
           if (isCloneMode) {
             try {
               let endpoint;
-              if (String(entryType).toLowerCase() === 'service') {
+              if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
                 endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getServiceCount`;
-              } else if (String(entryType).toLowerCase() === 'relocate') {
+              } else if (normalizedEntryType === 'relocate') {
                 endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getRelocationCount`;
               } else {
                 endpoint = `${TOOLS_TRACKER_MANAGEMENT_BASE_URL}/getEntryCount`;
@@ -914,12 +943,15 @@ const Transfer = ({ user }) => {
               setDate(normalizedDate);
             }
           }
-          if (entryType === 'service') {
+          if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
             setEntryServiceMode('Service');
-          } else if (entryType === 'relocate' || entryType === 'Relocate') {
+            setServiceFlowMode(normalizedEntryType === 'service_return' ? 'return' : 'sent');
+          } else if (normalizedEntryType === 'relocate') {
             setEntryServiceMode('Relocate');
+            setServiceFlowMode('sent');
           } else {
             setEntryServiceMode('Entry');
+            setServiceFlowMode('sent');
           }
           const resolveCloneFromIdFromApi = async (fallbackFromId) => {
             if (!isCloneMode) return fallbackFromId;
@@ -965,6 +997,10 @@ const Transfer = ({ user }) => {
                 const relocatedHomeLocationId = latestMovement.movementItem?.home_location_id || latestMovement.movementItem?.homeLocationId;
                 return relocatedHomeLocationId ? String(relocatedHomeLocationId) : fallbackFromId;
               }
+              if (isServiceReturnEntryType(latestMovement.movementType)) {
+                const latestToProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+                return latestToProjectId ? String(latestToProjectId) : fallbackFromId;
+              }
               if (isServiceEntryType(latestMovement.movementType)) {
                 const serviceStoreId = latestMovement.entry?.service_store_id || latestMovement.entry?.serviceStoreId;
                 return serviceStoreId ? String(serviceStoreId) : fallbackFromId;
@@ -987,6 +1023,9 @@ const Transfer = ({ user }) => {
                   const base64Data = img.tools_image || img.toolsImage;
                   return `data:image/jpeg;base64,${base64Data}`;
                 }
+                if (img.tools_image_url || img.toolsImageUrl) {
+                  return img.tools_image_url || img.toolsImageUrl;
+                }
                 return null;
               }).filter(Boolean);
               const itemName = toolsItemNameListData.find(i => String(i?.id) === String(item?.item_name_id ?? item?.itemNameId))?.item_name ||
@@ -1007,7 +1046,10 @@ const Transfer = ({ user }) => {
                 quantity: item.quantity || 0,
                 machine_status: isCloneMode ? 'Working' : (item.machine_status || item.machineStatus || 'Working'),
                 description: item.description || '',
-                tools_item_live_images: rawImages.map(img => ({ tools_image: img.tools_image || img.toolsImage })),
+                tools_item_live_images: rawImages.map(img => ({
+                  tools_image: img.tools_image || img.toolsImage,
+                  tools_image_url: img.tools_image_url || img.toolsImageUrl
+                })).filter(img => img.tools_image || img.tools_image_url),
                 localImageUrls: processedImages,
                 itemName: itemName,
                 brand: brand,
@@ -1018,7 +1060,23 @@ const Transfer = ({ user }) => {
               setItems(rawItems);
               return;
             }
+
+            const hasImagesInPayload = rawItems.every(
+              (baseItem) => Array.isArray(baseItem.tools_item_live_images) && baseItem.tools_item_live_images.length > 0
+            );
+            if (hasImagesInPayload) {
+              setItems(rawItems);
+              initialImageCountByItemIdRef.current = {};
+              rawItems.forEach((item) => {
+                initialImageCountByItemIdRef.current[String(item.id)] = (item.tools_item_live_images || []).length;
+              });
+              return;
+            }
+
             const loadedItems = await Promise.all(rawItems.map(async (baseItem) => {
+              if (Array.isArray(baseItem.tools_item_live_images) && baseItem.tools_item_live_images.length > 0) {
+                return baseItem;
+              }
               const itemTableId = baseItem.id;
               if (!itemTableId) return baseItem;
               try {
@@ -1030,14 +1088,12 @@ const Transfer = ({ user }) => {
                 if (!res.ok) return baseItem;
                 const imgList = await res.json();
                 const arr = Array.isArray(imgList) ? imgList : [];
-                const urls = arr.map(img => {
-                  const base64 = img.tools_image ?? img.toolsImage;
-                  const url = img.tools_image_url ?? img.toolsImageUrl;
-                  if (base64) return `data:image/jpeg;base64,${base64}`;
-                  if (url) return url;
-                  return null;
-                }).filter(Boolean);
-                const toolsImages = arr.map(img => ({ tools_image: img.tools_image ?? img.toolsImage })).filter(o => o.tools_image);
+                const urls = arr
+                  .map((img) => img?.tools_image_url ?? img?.toolsImageUrl ?? null)
+                  .filter(Boolean);
+                const toolsImages = arr.map(img => ({
+                  tools_image_url: img.tools_image_url ?? img.toolsImageUrl
+                })).filter(o => o.tools_image_url);
                 return {
                   ...baseItem,
                   localImageUrls: urls,
@@ -1088,16 +1144,29 @@ const Transfer = ({ user }) => {
             } else if (isCloneMode) {
               setSelectedFrom(null);
             }
-            if (entryType === 'service') {
+            if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
               if (isCloneMode) {
                 setSelectedServiceStore(null);
+                if (normalizedEntryType === 'service_return') {
+                  setSelectedTo(null);
+                }
               } else {
                 const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
                 if (serviceStoreOption) {
                   setSelectedServiceStore(serviceStoreOption);
                 }
+                if (normalizedEntryType === 'service_return') {
+                  const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                  if (toOption) {
+                    setSelectedTo(toOption);
+                  } else {
+                    setSelectedTo(null);
+                  }
+                } else {
+                  setSelectedTo(null);
+                }
               }
-            } else if (entryType === 'relocate' || entryType === 'Relocate') {
+            } else if (normalizedEntryType === 'relocate') {
               // For Relocate entries, set Relocate-specific fields
               const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
               if (entryItems.length > 0 && toolsItemIdFullData.length > 0) {
@@ -1181,16 +1250,29 @@ const Transfer = ({ user }) => {
                 } else if (isCloneMode) {
                   setSelectedFrom(null);
                 }
-                if (entryType === 'service') {
+                if (normalizedEntryType === 'service' || normalizedEntryType === 'service_return') {
                   if (isCloneMode) {
                     setSelectedServiceStore(null);
+                    if (normalizedEntryType === 'service_return') {
+                      setSelectedTo(null);
+                    }
                   } else {
                     const serviceStoreOption = serviceStoreOptions.find(opt => String(opt.id) === String(editData.service_store_id || editData.serviceStoreId));
                     if (serviceStoreOption) {
                       setSelectedServiceStore(serviceStoreOption);
                     }
+                    if (normalizedEntryType === 'service_return') {
+                      const toOption = toOptions.find(opt => String(opt.id) === String(editData.to_project_id || editData.toProjectId));
+                      if (toOption) {
+                        setSelectedTo(toOption);
+                      } else {
+                        setSelectedTo(null);
+                      }
+                    } else {
+                      setSelectedTo(null);
+                    }
                   }
-                } else if (entryType === 'relocate' || entryType === 'Relocate') {
+                } else if (normalizedEntryType === 'relocate') {
                   // For Relocate entries, set Relocate-specific fields
                   const entryItems = editData.tools_tracker_item_name_table || editData.toolsTrackerItemNameTable || [];
                   if (entryItems.length > 0 && toolsItemIdFullData.length > 0) {
@@ -1267,6 +1349,7 @@ const Transfer = ({ user }) => {
             setTimeout(() => clearInterval(checkInterval), 5000);
           }
           localStorage.removeItem('editingToolsTrackerEntryId');
+          localStorage.removeItem('editingToolsTrackerEntry');
           localStorage.removeItem('toolsTrackerCloneMode');
           localStorage.removeItem('toolsTrackerCloneItemIdsId');
           localStorage.removeItem('toolsTrackerCloneBrandId');
@@ -1277,6 +1360,7 @@ const Transfer = ({ user }) => {
       } catch (error) {
         console.error('Error loading edit data:', error);
         localStorage.removeItem('editingToolsTrackerEntryId');
+        localStorage.removeItem('editingToolsTrackerEntry');
         localStorage.removeItem('toolsTrackerCloneMode');
         localStorage.removeItem('toolsTrackerCloneItemIdsId');
         localStorage.removeItem('toolsTrackerCloneBrandId');
@@ -1285,7 +1369,7 @@ const Transfer = ({ user }) => {
       }
     };
     loadEditData();
-  }, [fromOptions, toOptions, serviceStoreOptions, inchargeOptions, toolsItemNameListData, toolsBrandFullData, toolsItemIdFullData]);
+  }, [fromOptions, toOptions, serviceStoreOptions, inchargeOptions, toolsItemNameListData, toolsBrandFullData, toolsItemIdFullData, editLoadVersion]);
   const handleAddItem = () => {
     if (areFieldsFilled) {
       setShowAddItemsModal(true);
@@ -1508,56 +1592,115 @@ const Transfer = ({ user }) => {
       }
     }
   };
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64String = reader.result.split(',')[1];
-        resolve(base64String);
-      };
-      reader.onerror = (error) => reject(error);
+  const uploadFilesToBackend = async (files, { folder, fileNamePrefix } = {}) => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    formData.append('folder', folder || 'FileUpload / tools_item_live_images');
+    if (fileNamePrefix) formData.append('fileName', fileNamePrefix);
+
+    const res = await fetch(`${FILE_UPLOAD_BASE_URL}/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
     });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(text || `Upload failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const urls = Array.isArray(data?.urls) ? data.urls : [];
+    return urls;
   };
+
+  const buildUploadFileNamePrefix = ({ itemName, itemId, quantity } = {}) => {
+    const safePart = (value) =>
+      String(value ?? '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 80);
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    // dd-mm-yyyy_hh:mm:ss (12-hour time)
+    const hh12 = (() => {
+      const h = now.getHours() % 12;
+      return h === 0 ? 12 : h;
+    })();
+    const ts =
+      `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_` +
+      `${pad(hh12)}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    const namePart = safePart(itemName) || 'item';
+    const idPart = safePart(itemId) || safePart(quantity) || 'qty';
+    return `${namePart}_${idPart}_${ts}`;
+  };
+
+  const replaceUrlInItemImages = (itemUniqueId, oldUrl, newUrl) => {
+    if (!itemUniqueId) return;
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemUniqueId) return item;
+        const localImageUrls = (item.localImageUrls || []).map((u) => (u === oldUrl ? newUrl : u));
+        const tools_item_live_images = (item.tools_item_live_images || []).map((img) => {
+          const existingUrl = img?.tools_image_url ?? img?.toolsImageUrl ?? '';
+          if (existingUrl && existingUrl === oldUrl) return { ...img, tools_image_url: newUrl, toolsImageUrl: newUrl };
+          return img;
+        });
+        return { ...item, localImageUrls, tools_item_live_images };
+      })
+    );
+  };
+
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setIsUploading(true);
-    for (const file of files) {
+    const fileEntries = files.map((file) => {
       const fileId = Date.now() + Math.random();
       const localPreviewUrl = URL.createObjectURL(file);
-      setUploadFiles(prev => [...prev, {
+      return {
         id: fileId,
-        file: file,
+        file,
         name: file.name,
         size: file.size,
-        progress: 0,
+        progress: 10,
         localUrl: localPreviewUrl,
-        base64Data: null
-      }]);
-      try {
-        const progressInterval = setInterval(() => {
-          setUploadFiles(prev => prev.map(f =>
-            f.id === fileId && f.progress < 90
-              ? { ...f, progress: f.progress + 10 }
-              : f
-          ));
-        }, 100);
-        const base64Data = await fileToBase64(file);
-        clearInterval(progressInterval);
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId
-            ? { ...f, progress: 100, base64Data: base64Data }
-            : f
-        ));
-      } catch (error) {
-        console.error('Error converting file to base64:', error);
-        setUploadFiles(prev => prev.filter(f => f.id !== fileId));
-        alert(`Failed to process ${file.name}. Please try again.`);
-      }
+        uploadedUrl: null
+      };
+    });
+    setUploadFiles((prev) => [...prev, ...fileEntries]);
+
+    try {
+      // one request for the entire selection (backend supports multiple)
+      const urls = await uploadFilesToBackend(files, {
+        folder: 'FileUpload / Tools_Tracker_Images',
+        fileNamePrefix: buildUploadFileNamePrefix({
+          itemName: addItemFormData?.itemName,
+          itemId: addItemFormData?.itemId,
+          quantity: addItemFormData?.quantity
+        })
+      });
+
+      setUploadFiles((prev) =>
+        prev.map((f) => {
+          const idx = fileEntries.findIndex((x) => x.id === f.id);
+          if (idx === -1) return f;
+          const uploadedUrl = urls[idx] || null;
+          return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
+        })
+      );
+    } catch (error) {
+      console.error('Error uploading file(s):', error);
+      // remove the just-added files on failure
+      setUploadFiles((prev) => prev.filter((f) => !fileEntries.some((x) => x.id === f.id)));
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
     }
-    setIsUploading(false);
-    e.target.value = '';
   };
   const normalizeMachineNumberValue = (value) => {
     if (value === null || value === undefined) return '';
@@ -1646,8 +1789,14 @@ const Transfer = ({ user }) => {
   const isServiceEntryType = (entryType) => {
     return entryType === 'service';
   };
+  const isServiceReturnEntryType = (entryType) => {
+    return entryType === 'service_return';
+  };
+  const isServiceMovementEntryType = (entryType) => {
+    return isServiceEntryType(entryType) || isServiceReturnEntryType(entryType);
+  };
   const isMovementEntryType = (entryType) => {
-    return entryType === 'entry' || isRelocateEntryType(entryType) || isServiceEntryType(entryType);
+    return entryType === 'entry' || isRelocateEntryType(entryType) || isServiceMovementEntryType(entryType);
   };
   const getEntrySortTime = (entry) => {
     const rawDate = entry?.created_date_time || entry?.createdDateTime || entry?.timestamp || '';
@@ -1750,6 +1899,19 @@ const Transfer = ({ user }) => {
     const dateTime = date && time ? `${date} • ${time}` : null;
     return { dateTime, inchargeName };
   };
+  const getLatestItemSetMachineStatus = (itemIdsId, brandId, machineNumber, fallbackStatus = 'Working') => {
+    if (!itemIdsId) return String(fallbackStatus || 'Working').trim();
+    const movement = getLatestItemSetMovement(
+      String(itemIdsId),
+      brandId != null && brandId !== '' ? String(brandId) : '',
+      String(machineNumber ?? '').trim()
+    );
+    const movementStatus = movement?.matchingEntryItem?.machine_status ?? movement?.matchingEntryItem?.machineStatus;
+    if (String(movementStatus || '').trim()) {
+      return String(movementStatus).trim();
+    }
+    return String(fallbackStatus || 'Working').trim();
+  };
   // Helper function to get current location of an item (quantity-based: itemNameId + brandId)
   const getItemCurrentLocation = (itemNameId, brandId) => {
     if (!itemNameId) return null;
@@ -1832,6 +1994,13 @@ const Transfer = ({ user }) => {
         return relocatedHomeLocationId && String(relocatedHomeLocationId) === locationIdStr;
       }
 
+      if (isServiceReturnEntryType(latestMovement.entryType)) {
+        const returnedProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+        if (returnedProjectId) {
+          return String(returnedProjectId) === locationIdStr;
+        }
+      }
+
       if (isServiceEntryType(latestMovement.entryType)) {
         const serviceStoreId = latestMovement.entry?.service_store_id || latestMovement.entry?.serviceStoreId;
         return serviceStoreId && String(serviceStoreId) === locationIdStr;
@@ -1885,6 +2054,15 @@ const Transfer = ({ user }) => {
         if (relocatedHomeLocationId) {
           currentLocationId = String(relocatedHomeLocationId);
           locationType = 'home';
+          return { locationId: currentLocationId, locationType };
+        }
+      }
+
+      if (isServiceReturnEntryType(latestMovement.entryType)) {
+        const returnedProjectId = latestMovement.entry?.to_project_id || latestMovement.entry?.toProjectId;
+        if (returnedProjectId) {
+          currentLocationId = String(returnedProjectId);
+          locationType = 'project';
           return { locationId: currentLocationId, locationType };
         }
       }
@@ -2203,13 +2381,11 @@ const Transfer = ({ user }) => {
     }
 
     const uploadedImages = uploadFiles
-      .filter(f => f.base64Data) // Only include files with base64 data
-      .map(f => ({
-        tools_image: f.base64Data // Send as byte array (base64 encoded)
-      }));
+      .filter((f) => f.uploadedUrl)
+      .map((f) => ({ tools_image_url: f.uploadedUrl }));
     const localImageUrls = uploadFiles
-      .filter(f => f.localUrl)
-      .map(f => f.localUrl);
+      .filter((f) => f.uploadedUrl)
+      .map((f) => f.uploadedUrl);
     const newItem = {
       id: Date.now(), // Temporary ID for UI
       timestamp: new Date().toISOString().slice(0, 19), // LocalDateTime format
@@ -2221,7 +2397,7 @@ const Transfer = ({ user }) => {
       quantity: addItemFormData.quantity ? parseInt(addItemFormData.quantity, 10) : 0,
       machine_status: uploadStatus,
       description: uploadDescription,
-      tools_item_live_images: uploadedImages, // For backend (base64 bytes)
+      tools_item_live_images: uploadedImages, // Send URLs only
       localImageUrls: localImageUrls,
       itemName: addItemFormData.itemName,
       brand: addItemFormData.brand,
@@ -2879,36 +3055,51 @@ const Transfer = ({ user }) => {
     if (files.length === 0) return;
     const currentItemId = imageViewerData.itemUniqueId;
     if (!currentItemId) return;
-    for (const file of files) {
-      try {
-        const localPreviewUrl = URL.createObjectURL(file);
-        const base64Data = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const base64String = reader.result.split(',')[1];
-            resolve(base64String);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        setItems(prev => prev.map(item => {
-          if (item.id === currentItemId) {
-            return {
-              ...item,
-              localImageUrls: [...(item.localImageUrls || []), localPreviewUrl],
-              tools_item_live_images: [...(item.tools_item_live_images || []), { tools_image: base64Data }]
-            };
-          }
-          return item;
-        }));
-        setImageViewerData(prev => ({
+    // Optimistic local previews, then replace with uploaded URLs
+    const tempUrls = files.map((file) => URL.createObjectURL(file));
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== currentItemId) return item;
+        const newLocal = [...(item.localImageUrls || []), ...tempUrls];
+        const newImgs = [
+          ...(item.tools_item_live_images || []),
+          ...tempUrls.map((u) => ({ tools_image_url: u }))
+        ];
+        return { ...item, localImageUrls: newLocal, tools_item_live_images: newImgs };
+      })
+    );
+    setImageViewerData((prev) => ({
+      ...prev,
+      images: [...prev.images, ...tempUrls],
+      currentIndex: prev.images.length
+    }));
+
+    try {
+      const urls = await uploadFilesToBackend(files, {
+        folder: 'FileUpload / Tools_Tracker_Images',
+        fileNamePrefix: buildUploadFileNamePrefix({
+          itemName: imageViewerData?.itemName,
+          itemId: imageViewerData?.itemId,
+          quantity: null
+        })
+      });
+      urls.forEach((remoteUrl, idx) => {
+        const temp = tempUrls[idx];
+        if (!remoteUrl || !temp) return;
+        replaceUrlInItemImages(currentItemId, temp, remoteUrl);
+        setImageViewerData((prev) => ({
           ...prev,
-          images: [...prev.images, localPreviewUrl],
-          currentIndex: prev.images.length
+          images: (prev.images || []).map((u) => (u === temp ? remoteUrl : u))
         }));
-      } catch (error) {
-        console.error('Error adding image:', error);
-      }
+        try {
+          URL.revokeObjectURL(temp);
+        } catch {
+          // ignore
+        }
+      });
+    } catch (error) {
+      console.error('Error uploading viewer image(s):', error);
+      alert('Failed to upload image. Please try again.');
     }
     e.target.value = '';
   };
@@ -2951,11 +3142,11 @@ const Transfer = ({ user }) => {
         brandId: item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId ?? null,
         itemIdDbId: itemIdsId,
         machineNumber: resolveMachineNumFromStock(item),
-        quantity: 1
+        quantity: 0
       });
       if (!isValidToAdd) return;
 
-      setSelectedSearchItem({ ...item, quantity: 1 });
+      setSelectedSearchItem({ ...item, quantity: 0 });
       setShowUniversalSearchModal(false);
       setShowSearchConfirmModal(true);
       return;
@@ -3040,29 +3231,42 @@ const Transfer = ({ user }) => {
   };
   const handleSearchFileSelect = (e) => {
     const files = Array.from(e.target.files);
-    files.forEach((file) => {
-      if (file.size > 5 * 1024 * 1024) {
-        alert(`File ${file.name} is too large. Max size is 5MB.`);
-        return;
-      }
-      const newFile = {
-        id: Date.now() + Math.random(),
-        file: file,
-        name: file.name,
-        size: file.size,
-        progress: 100,
-        base64: null
-      };
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64String = reader.result.split(',')[1];
-        setSearchUploadFiles(prev => prev.map(f =>
-          f.id === newFile.id ? { ...f, base64: base64String } : f
-        ));
-      };
-      reader.readAsDataURL(file);
-      setSearchUploadFiles(prev => [...prev, newFile]);
-    });
+    if (!files.length) return;
+    const validFiles = files;
+
+    const fileEntries = validFiles.map((file) => ({
+      id: Date.now() + Math.random(),
+      file,
+      name: file.name,
+      size: file.size,
+      progress: 10,
+      uploadedUrl: null
+    }));
+    setSearchUploadFiles((prev) => [...prev, ...fileEntries]);
+
+    uploadFilesToBackend(validFiles, {
+      folder: 'FileUpload / Tools_Tracker_Images',
+      fileNamePrefix: buildUploadFileNamePrefix({
+        itemName: selectedSearchItem?.item_name || selectedSearchItem?.itemName || '',
+        itemId: selectedSearchItem?.item_id || selectedSearchItem?.itemId || '',
+        quantity: selectedSearchItem?.quantity || selectedSearchItem?.qty || ''
+      })
+    })
+      .then((urls) => {
+        setSearchUploadFiles((prev) =>
+          prev.map((f) => {
+            const idx = fileEntries.findIndex((x) => x.id === f.id);
+            if (idx === -1) return f;
+            const uploadedUrl = urls[idx] || null;
+            return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
+          })
+        );
+      })
+      .catch((error) => {
+        console.error('Error uploading search file(s):', error);
+        setSearchUploadFiles((prev) => prev.filter((f) => !fileEntries.some((x) => x.id === f.id)));
+        alert('Failed to upload image. Please try again.');
+      });
     e.target.value = '';
   };
   const handleDeleteSearchUploadFile = (fileId) => {
@@ -3094,8 +3298,8 @@ const Transfer = ({ user }) => {
       item => String(item?.id) === String(selectedItemIdsId)
     );
     const uploadedImages = searchUploadFiles
-      .filter(f => f.base64)
-      .map(f => ({ tools_image: f.base64 }));
+      .filter((f) => f.uploadedUrl)
+      .map((f) => ({ tools_image_url: f.uploadedUrl }));
 
     const newItem = {
       id: Date.now(),
@@ -3105,15 +3309,14 @@ const Transfer = ({ user }) => {
       brand_id: selectedBrandId ? String(selectedBrandId) : null,
       model: selectedSearchItem?.model || '',
       machine_number: resolvedMachineNumber || '',
-      quantity: selectedSearchItem?.quantity || 1,
+      quantity: selectedItemIdsId ? 0 : (selectedSearchItem?.quantity || 1),
       machine_status: searchUploadStatus,
       description: searchUploadDescription,
       tools_item_live_images: uploadedImages,
       itemName: itemNameObj?.item_name || itemNameObj?.itemName || selectedSearchItem?.item_name || selectedSearchItem?.itemName || 'Unknown',
       brand: brandObj?.tools_brand || brandObj?.toolsBrand || selectedSearchItem?.brand || '',
       itemId: itemIdObj?.item_id || itemIdObj?.itemId || selectedSearchItem?.item_id || selectedSearchItem?.itemId || '',
-      localImageUrls: searchUploadFiles.filter(f => f.base64).map(f => `data:image/jpeg;base64,${f.base64}`),
-      imageBase64List: searchUploadFiles.filter(f => f.base64).map(f => f.base64)
+      localImageUrls: searchUploadFiles.filter((f) => f.uploadedUrl).map((f) => f.uploadedUrl)
     };
     setItems(prev => [...prev, newItem]);
     handleCloseSearchUploadModal();
@@ -3253,9 +3456,11 @@ const Transfer = ({ user }) => {
       const itemName = itemNameObj?.item_name || itemNameObj?.itemName || '';
       const itemIdName = itemIdObj?.item_id || itemIdObj?.itemId || '';
       const brandName = brandObj?.tools_brand || brandObj?.toolsBrand || '';
-      const machineNumber = item?.machine_number ?? item?.machineNumber ?? '';
+      const machineNumber = resolveMachineNumFromStock(item) || (item?.machine_number ?? item?.machineNumber ?? '');
       const modelStr = (item?.model ?? '').trim();
-      const statusStr = (item?.machine_status ?? item?.machineStatus ?? 'Working').trim();
+      const statusStr = itemIdsId
+        ? getLatestItemSetMachineStatus(itemIdsId, brandId, machineNumber, item?.machine_status ?? item?.machineStatus ?? 'Working')
+        : String(item?.machine_status ?? item?.machineStatus ?? 'Working').trim();
       return matchesSearch(itemName, itemIdName, brandName, machineNumber, modelStr, statusStr);
     });
   };
@@ -4219,7 +4424,11 @@ const Transfer = ({ user }) => {
                 </div>
               )}
               <div className="flex items-center">
-                <span className="text-[12px] text-gray-500 w-[100px]">{entryServiceMode === 'Entry' ? 'To' : 'Service Store'}</span>
+                <span className="text-[12px] text-gray-500 w-[100px]">
+                  {entryServiceMode === 'Entry'
+                    ? 'To'
+                    : (serviceFlowMode === 'return' ? 'From' : 'To')}
+                </span>
                 <span className="text-[12px] text-gray-500 mx-2">:</span>
                 <span className="text-[12px] text-gray-700">
                   {entryServiceMode === 'Entry' ? (selectedTo?.label || '-') : (selectedServiceStore?.label || '-')}
@@ -4439,7 +4648,7 @@ const Transfer = ({ user }) => {
             <div className=" relative dropdown-container">
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
-                  {isServiceSwapIconToggled ? 'From' : 'To'}<span className="text-[#E4572E]">*</span>
+                  {(serviceFlowMode === 'return' ? 'From' : 'To')}<span className="text-[#E4572E]">*</span>
                 </p>
                 {serviceFlowMode === 'sent' && (
                   <button onClick={() => {
@@ -5119,6 +5328,8 @@ const Transfer = ({ user }) => {
                                           if (lastImage.tools_image || lastImage.toolsImage) {
                                             const base64Data = lastImage.tools_image || lastImage.toolsImage;
                                             lastImageUrl = `data:image/jpeg;base64,${base64Data}`;
+                                          } else if (lastImage.tools_image_url || lastImage.toolsImageUrl) {
+                                            lastImageUrl = lastImage.tools_image_url || lastImage.toolsImageUrl;
                                           }
                                         }
                                       }
@@ -5926,7 +6137,7 @@ const Transfer = ({ user }) => {
                     <path d="M12 3V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <p className="text-[14px] font-medium text-[#E4572E] mt-[4px]">Click to Upload</p>
-                  <p className="text-[10px] text-gray-400">(Max. File size: 5 MB)</p>
+                  <p className="text-[10px] text-gray-400">Files will be compressed on upload</p>
                 </label>
                 <input
                   id="file-upload-input"
@@ -6281,9 +6492,11 @@ const Transfer = ({ user }) => {
                         ? `${brandName}, ${modelName}`
                         : (brandName || modelName || '');
                       const machineNumber = resolveMachineNumFromStock(item);
-                      const machineStatus = item?.machine_status ?? item?.machineStatus ?? 'Working';
                       const itemIdsId = item?.item_ids_id ?? item?.itemIdsId;
                       const brandIdForEntry = item?.brand_id ?? item?.brandId ?? item?.brand_name_id ?? item?.brandNameId;
+                      const machineStatus = itemIdsId
+                        ? getLatestItemSetMachineStatus(itemIdsId, brandIdForEntry, machineNumber, item?.machine_status ?? item?.machineStatus ?? 'Working')
+                        : (item?.machine_status ?? item?.machineStatus ?? 'Working');
                       const lastEntry = itemIdsId ? getLastEntryDateAndInchargeForItemSet(itemIdsId, brandIdForEntry, machineNumber) : { dateTime: null, inchargeName: null };
                       const inchargeObj = inchargeOptions.find(
                         i => String(i?.id) === String(item?.project_incharge_id ?? item?.projectInchargeId)
@@ -6440,7 +6653,7 @@ const Transfer = ({ user }) => {
                     <path d="M12 3V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <p className="text-[14px] font-medium text-[#E4572E] mt-[4px]">Click to Upload</p>
-                  <p className="text-[10px] text-gray-400">(Max. File size: 5 MB)</p>
+                  <p className="text-[10px] text-gray-400">Files will be compressed on upload</p>
                 </label>
                 <input
                   id="search-file-upload-input"

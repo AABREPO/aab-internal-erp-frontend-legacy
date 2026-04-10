@@ -840,6 +840,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         if (selectedFile) {
             try {
                 const uploadFormData = new FormData();
+
                 const now = new Date();
                 const timestamp = now.toLocaleString("en-GB", {
                     day: "2-digit",
@@ -852,21 +853,36 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 })
                     .replace(",", "")
                     .replace(/\s/g, "-");
-                const finalName = `${timestamp} - ${formData.siteName} - ${formData.vendor || formData.contractor}`;
-                uploadFormData.append('file', selectedFile);
-                uploadFormData.append('file_name', finalName);
-                const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+
+                const finalName = `${timestamp}-${formData.siteName}-${formData.vendor || formData.contractor}`;
+
+                // ✅ CHANGE 1: key must be "files"
+                uploadFormData.append("files", selectedFile);
+
+                // ✅ CHANGE 2: required folder
+                uploadFormData.append("folder", "FileUpload / Expenses_Entry_Files");
+
+                // ✅ CHANGE 3: optional filename
+                uploadFormData.append("fileName", finalName);
+
+                const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                     method: "POST",
                     body: uploadFormData,
                 });
+
                 if (!uploadResponse.ok) {
-                    throw new Error('File upload failed');
+                    throw new Error("File upload failed");
                 }
+
                 const result = await uploadResponse.json();
-                updatedBillCopy = result.url;
+
+                // ✅ CHANGE 4: new response structure
+                updatedBillCopy = result.urls[0];
+
             } catch (error) {
-                console.error('Error uploading file:', error);
-                alert('Failed to upload file. Please try again.');
+                console.error("Error during file upload:", error);
+                alert("Error during file upload. Please try again.");
+                setIsSubmitting(false);
                 return;
             }
         }
@@ -1334,8 +1350,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                             readOnly
                                             className={`w-[200px] h-[45px] cursor-pointer rounded-lg border-2 focus:outline-none p-2 text-lg font-bold text-center transition-all duration-200 ${selectedAccountType === accountType
-                                                    ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md'
-                                                    : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
+                                                ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md'
+                                                : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
                                                 }`}
                                         />
                                     </div>
@@ -1754,8 +1770,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                     return (
                                         <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
                                             className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
-                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
-                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
                                                 }`}
                                         >
                                             {pageNum}

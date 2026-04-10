@@ -740,9 +740,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             .replace(",", "")
             .replace(/\s/g, "-");
           const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
-          formData.append('file', selectedAdvanceFile);
-          formData.append('file_name', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          formData.append('files', selectedAdvanceFile);
+          formData.append('fileName', finalName);
+          formData.append('folderName', 'FileUpload / Advance_Portal');
+          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -750,7 +751,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             throw new Error('File upload failed');
           }
           const uploadResult = await uploadResponse.json();
-          fileUrl = uploadResult.url;
+          fileUrl = uploadResult.urls[0];
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');
@@ -1394,9 +1395,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             .replace(",", "")
             .replace(/\s/g, "-");
           const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
-          formData.append('file', selectedAdvanceFile);
-          formData.append('file_name', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          formData.append('files', selectedAdvanceFile);
+          formData.append('folderName', 'FileUpload / Advance_Portal');
+          formData.append('fileName', finalName);
+          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -1404,7 +1406,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             throw new Error('File upload failed');
           }
           const uploadResult = await uploadResponse.json();
-          fileUrl = uploadResult.url;
+          fileUrl = uploadResult.urls[0];
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');

@@ -1054,9 +1054,10 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             .replace(",", "")
             .replace(/\s/g, "-");
           const finalName = `${timestamp} ${selectedSite?.sNo || ''} ${contractorOrVendor}`;
-          formData.append('file', selectedFile);
-          formData.append('file_name', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          formData.append('files', selectedFile);
+          formData.append('fileName', finalName);
+          formData.append('folderName', 'FileUpload / Advance_Portal');
+          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });

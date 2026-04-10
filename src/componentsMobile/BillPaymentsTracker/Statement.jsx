@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Filter from '../Images/Filter.png';
 import Download from '../Images/Download.svg';
+import Star from '../Images/Star.svg';
+import Search from '../Images/Search.png';
+import Close from '../Images/close.png';
 
 const ModeTag = ({ label }) => (
 	<div className="px-[10px] h-[22px] rounded-full text-[11px] font-semibold flex items-center" style={{ background: '#F5E8FB', color: '#7C3AED' }}>
@@ -83,6 +86,11 @@ const StatementMobile = () => {
 	const [filterToDate, setFilterToDate] = useState(''); // YYYY-MM-DD (tracker/bill arrival date)
 	const [filterPaymentDate, setFilterPaymentDate] = useState(''); // YYYY-MM-DD (payment date)
 	const [filterPaymentMode, setFilterPaymentMode] = useState(''); // '' | mode label
+	const [vendorMap, setVendorMap] = useState({});
+	const [showStatementVendorPopup, setShowStatementVendorPopup] = useState(false);
+	const [selectedVendor, setSelectedVendor] = useState('');
+	const [vendorSearch, setVendorSearch] = useState('');
+	const [showModePopup, setShowModePopup] = useState(false);
 
 	const parseDateAny = (input) => {
 		if (input == null || input === '') return null;
@@ -226,6 +234,50 @@ const StatementMobile = () => {
 		};
 	}, [query, filterFromDate, filterToDate, filterPaymentDate, filterPaymentMode]);
 
+	useEffect(() => {
+		let isMounted = true;
+		const loadVendors = async () => {
+			try {
+				const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
+					method: 'GET',
+					credentials: 'include',
+					headers: { 'Content-Type': 'application/json' }
+				});
+				if (!res.ok) return;
+				const data = await res.json();
+				const map = {};
+				(Array.isArray(data) ? data : []).forEach((v) => {
+					const id = v?.id ?? v?._id;
+					const name = v?.vendorName ?? v?.vendor_name ?? v?.label ?? '';
+					if (id != null && name) {
+						map[id] = name;
+						map[String(id)] = name;
+					}
+				});
+				if (isMounted) setVendorMap(map);
+			} catch {
+				// ignore
+			}
+		};
+		loadVendors();
+		return () => { isMounted = false; };
+	}, []);
+
+	const vendorList = Object.entries(vendorMap || {}).map(([id, name]) => ({
+		id,
+		name
+	}));
+
+	const modeOptions = [
+		'Carry Forward',
+		'Net Banking',
+		'PhonePe',
+		'GPay',
+		'Cheque',
+		'Cash',
+		'NEFT/RTGS'
+	];
+
 	const statementRows = useMemo(() => {
 		const list = Array.isArray(rows) ? rows : [];
 		return list.map((r, idx) => {
@@ -272,8 +324,48 @@ const StatementMobile = () => {
 		<div className="w-full h-[calc(100vh-96px-80px)] overflow-hidden flex flex-col">
 			<div className="flex-shrink-0">
 				<div className="flex items-center justify-between border-b border-[#E0E0E0] pt-[8px] pb-[8px]">
-					<p className="text-[12px] font-semibold text-[#111827]">Vendor</p>
-					<p className="text-[12px] font-semibold text-[#111827]">Mode</p>
+					<div className="flex items-center gap-2">
+						<p
+							className="text-[12px] font-semibold text-[#111827] cursor-pointer"
+							onClick={() => setShowStatementVendorPopup(true)}
+						>
+							{selectedVendor || 'Vendor'}
+						</p>
+						{selectedVendor && (
+							<span
+								onClick={(e) => {
+									e.stopPropagation();
+									setSelectedVendor('');
+								}}
+								className="cursor-pointer"
+							>
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+									<path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" />
+								</svg>
+							</span>
+						)}
+					</div>
+					<div className="flex items-center gap-2">
+						<p
+							className="text-[12px] font-semibold text-[#111827] cursor-pointer"
+							onClick={() => setShowModePopup(true)}
+						>
+							{filterPaymentMode || 'Mode'}
+						</p>
+						{filterPaymentMode && (
+							<span
+								onClick={(e) => {
+									e.stopPropagation();
+									setFilterPaymentMode('');
+								}}
+								className="cursor-pointer"
+							>
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+									<path d="M9 3L3 9M3 3L9 9" stroke="#848484" strokeWidth="1.5" />
+								</svg>
+							</span>
+						)}
+					</div>
 				</div>
 				<div className="mt-[8px]">
 					<div className="w-full h-[36px] rounded-[24px] bg-white border border-[#E5E7EB] flex items-center px-[12px]">
@@ -318,7 +410,7 @@ const StatementMobile = () => {
 						className="bg-white w-full rounded-tl-[16px] rounded-tr-[16px] relative z-[1202] overflow-hidden flex flex-col"
 						onClick={(e) => e.stopPropagation()}
 					>
-						<div className="flex-shrink-0 flex items-center justify-between px-[16px] pt-[14px] pb-[10px] border-b border-[#E5E7EB]">
+						<div className="flex-shrink-0 flex items-center justify-between px-[16px] pt-[14px] pb-[10px]">
 							<p className="text-[14px] font-semibold text-black">Filters</p>
 							<button type="button" onClick={() => setShowFilterSheet(false)} className="text-[#E4572E] text-[18px] font-bold leading-none" aria-label="Close">
 								×
@@ -376,7 +468,7 @@ const StatementMobile = () => {
 							</div>
 						</div>
 
-						<div className="flex-shrink-0 px-[16px] pb-[16px] pt-[10px] border-t border-[#E5E7EB] grid grid-cols-2 gap-[12px]">
+						<div className="flex-shrink-0 px-[16px] pb-[26px] pt-[10px] border-t border-[#E5E7EB] grid grid-cols-2 gap-[12px]">
 							<button
 								type="button"
 								onClick={() => {
@@ -427,6 +519,107 @@ const StatementMobile = () => {
 					))}
 				</div>
 			</div>
+
+			{showStatementVendorPopup && (
+				<div
+					className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center"
+					onClick={() => setShowStatementVendorPopup(false)}
+				>
+					<div
+						className="bg-white w-[92%] max-w-[360px] h-[80vh] rounded-[20px] p-4 flex flex-col"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="flex justify-between items-center mb-2">
+							<h2 className="text-[16px] font-semibold">Select Vendor</h2>
+							<span className="cursor-pointer" onClick={() => setShowStatementVendorPopup(false)}>
+								<img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+							</span>
+						</div>
+
+						<div className="mb-3 relative">
+							<img
+								src={Search}
+								alt="search"
+								className="absolute left-3 top-1/2 transform -translate-y-1/2 w-[12px] h-[12px] opacity-60"
+							/>
+							<input
+								type="text"
+								placeholder="Search"
+								className="w-full pl-[30px] pr-3 py-2 border rounded-[10px] text-[13px] outline-none"
+								value={vendorSearch}
+								onChange={(e) => setVendorSearch(e.target.value)}
+							/>
+						</div>
+
+						<div className="rounded-[12px] shadow-sm overflow-y-auto no-scrollbar scrollbar-none flex-1">
+							{vendorList.length > 0 ? (
+								vendorList
+									.filter(v => v.name.toLowerCase().includes(vendorSearch.toLowerCase()))
+									.map((vendor) => (
+										<div
+											key={vendor.id}
+											className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer hover:bg-gray-100"
+											onClick={() => {
+												setSelectedVendor(vendor.name);
+												setShowStatementVendorPopup(false);
+											}}
+										>
+											<img src={Star} alt="Star" className="w-[16px] h-[16px]" />
+											<span className="text-[14px] text-gray-800">{vendor.name}</span>
+										</div>
+									))
+							) : (
+								<p className="text-sm text-gray-400 text-center py-4">No vendors found</p>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
+
+			{showModePopup && (
+				<div
+					className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center"
+					onClick={() => setShowModePopup(false)}
+				>
+					<div
+						className="bg-white w-[92%] max-w-[360px] h-[80vh] rounded-[20px] p-4 flex flex-col"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="flex justify-between items-center mb-2">
+							<h2 className="text-[16px] font-semibold">Select Mode</h2>
+							<span className="cursor-pointer" onClick={() => setShowModePopup(false)}>
+								<img src={Close} alt="Close" className="w-[11px] h-[11px]" />
+							</span>
+						</div>
+
+						<div className="rounded-[12px] shadow-sm overflow-y-auto no-scrollbar scrollbar-none max-h-[60vh]">
+							<div
+								className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer hover:bg-gray-100"
+								onClick={() => {
+									setFilterPaymentMode('');
+									setShowModePopup(false);
+								}}
+							>
+								<img src={Star} alt="Star" className="w-[16px] h-[16px]" />
+								<span className="text-[14px] text-gray-800">All</span>
+							</div>
+							{modeOptions.map((mode) => (
+								<div
+									key={mode}
+									className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer hover:bg-gray-100"
+									onClick={() => {
+										setFilterPaymentMode(mode);
+										setShowModePopup(false);
+									}}
+								>
+									<img src={Star} alt="Star" className="w-[16px] h-[16px]" />
+									<span className="text-[14px] text-gray-800">{mode}</span>
+								</div>
+							))}
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };

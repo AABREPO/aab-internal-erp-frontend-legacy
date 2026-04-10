@@ -69,6 +69,9 @@ const ToolsTracker = ({ user, onLogout }) => {
     } else if (page === 'purchase-order') {
       setCurrentPage('purchase-order');
       navigate('/purchaseorder');
+    } else if (page === 'goods-recieved-notes') {
+      setCurrentPage('goods-recieved-notes');
+      navigate('/grn/create');
     } else if (page === 'inventory') {
       setCurrentPage('inventory');
       navigate('/inventory');

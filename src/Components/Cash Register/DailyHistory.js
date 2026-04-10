@@ -1696,10 +1696,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 .replace(/\s/g, "-");
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
-            formData.append("file", selectedFileForPopup);
-            formData.append("file_name", finalName);
+            formData.append("files", selectedFileForPopup);
+            formData.append("folderName", "FileUpload / Daily_Cash_Register");
+            formData.append("fileName", finalName);
             const uploadResponse = await fetch(
-                "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                "https://backendaab.in/aabuildersDash/api/files/upload",
                 {
                     method: "POST",
                     body: formData,
@@ -1709,7 +1710,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 throw new Error("File upload failed");
             }
             const uploadResult = await uploadResponse.json();
-            const pdfUrl = uploadResult.url;
+            const pdfUrl = uploadResult.urls[0];
             const payload = {
                 date: currentFileRow.date,
                 labour_id: Number(currentFileRow.labour_id) || null,

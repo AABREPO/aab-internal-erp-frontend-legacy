@@ -995,9 +995,11 @@ const Form = ({ username, userRoles = [] }) => {
                 contractor = selectedOption ? selectedOption.label : '';
             }
             let pdfUrl = '';
+
             if (selectedFile) {
                 try {
                     const formData = new FormData();
+
                     const now = new Date();
                     const timestamp = now.toLocaleString("en-GB", {
                         day: "2-digit",
@@ -1010,21 +1012,35 @@ const Form = ({ username, userRoles = [] }) => {
                     })
                         .replace(",", "")
                         .replace(/\s/g, "-");
-                    const finalName = `${timestamp} ${selectedSite.sNo} ${vendor || contractor}`;
-                    formData.append('file', selectedFile);
-                    formData.append('file_name', finalName);
-                    const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+
+                    const finalName = `${timestamp}_${selectedSite.sNo}_${vendor || contractor}`;
+
+                    // ✅ IMPORTANT: key must be "files" (plural)
+                    formData.append("files", selectedFile);
+
+                    // ✅ required
+                    formData.append("folder", "FileUpload / Expenses_Entry_Files");
+
+                    // ✅ optional (your backend uses this as prefix)
+                    formData.append("fileName", finalName);
+
+                    const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                         method: "POST",
                         body: formData,
                     });
+
                     if (!uploadResponse.ok) {
-                        throw new Error('File upload failed');
+                        throw new Error("File upload failed");
                     }
-                    const uploadResult = await uploadResponse.json();
-                    pdfUrl = uploadResult.url;
+
+                    const result = await uploadResponse.json();
+
+                    // ✅ backend returns { urls: [] }
+                    pdfUrl = result.urls[0];
+
                 } catch (error) {
-                    console.error('Error during file upload:', error);
-                    alert('Error during file upload. Please try again.');
+                    console.error("Error during file upload:", error);
+                    alert("Error during file upload. Please try again.");
                     setIsSubmitting(false);
                     return;
                 }
@@ -1241,9 +1257,11 @@ const Form = ({ username, userRoles = [] }) => {
         setIsSubmitting(true);
         try {
             let pdfUrl = '';
+
             if (selectedFile) {
                 try {
                     const formData = new FormData();
+
                     const now = new Date();
                     const timestamp = now.toLocaleString("en-GB", {
                         day: "2-digit",
@@ -1256,21 +1274,35 @@ const Form = ({ username, userRoles = [] }) => {
                     })
                         .replace(",", "")
                         .replace(/\s/g, "-");
+
                     const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
-                    formData.append('file', selectedFile);
-                    formData.append('file_name', finalName);
-                    const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+
+                    // ✅ IMPORTANT: key must be "files" (plural)
+                    formData.append("files", selectedFile);
+
+                    // ✅ required
+                    formData.append("folder", "FileUpload / Expenses_Entry_Files");
+
+                    // ✅ optional (your backend uses this as prefix)
+                    formData.append("fileName", finalName);
+
+                    const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                         method: "POST",
                         body: formData,
                     });
+
                     if (!uploadResponse.ok) {
-                        throw new Error('File upload failed');
+                        throw new Error("File upload failed");
                     }
-                    const uploadResult = await uploadResponse.json();
-                    pdfUrl = uploadResult.url;
+
+                    const result = await uploadResponse.json();
+
+                    // ✅ backend returns { urls: [] }
+                    pdfUrl = result.urls[0];
+
                 } catch (error) {
-                    console.error('Error during file upload:', error);
-                    alert('Error during file upload. Please try again.');
+                    console.error("Error during file upload:", error);
+                    alert("Error during file upload. Please try again.");
                     setIsSubmitting(false);
                     return;
                 }
@@ -1678,8 +1710,8 @@ const Form = ({ username, userRoles = [] }) => {
                                                     !selectedToolsItemName
                                                         ? 'Select item name first...'
                                                         : filteredMachineToolOptions.length === 0
-                                                          ? 'No tools for this item'
-                                                          : 'Select a machine tool...'
+                                                            ? 'No tools for this item'
+                                                            : 'Select a machine tool...'
                                                 }
                                                 className="custom-select rounded-lg w-[290px] h-[45px]"
                                             />
@@ -1715,8 +1747,8 @@ const Form = ({ username, userRoles = [] }) => {
                                                     !selectedToolsItemName
                                                         ? 'Select item name first...'
                                                         : filteredMachineToolOptions.length === 0
-                                                          ? 'No tools for this item'
-                                                          : 'Select a machine tool...'
+                                                            ? 'No tools for this item'
+                                                            : 'Select a machine tool...'
                                                 }
                                                 className="custom-select rounded-lg w-[290px] h-[45px]"
                                             />

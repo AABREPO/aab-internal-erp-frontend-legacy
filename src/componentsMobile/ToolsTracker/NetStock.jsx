@@ -854,6 +854,7 @@ const NetStock = ({ user }) => {
           itemId: '-',
           location: summary.homeLabel,
           currentLocation: '-',
+          currentLocationId: '',
           brand,
           model: (firstStock.model || '').trim() || '-',
           machineNumber: '-',
@@ -865,7 +866,7 @@ const NetStock = ({ user }) => {
           homeLocationId: firstStock.home_location_id || firstStock.homeLocationId,
           stockRecordIds,
           isQuantityLocationCard: true,
-          isEditableQuantityCard: false
+          isEditableQuantityCard: true
         });
       } else {
         parts.forEach((p) => {
@@ -876,6 +877,7 @@ const NetStock = ({ user }) => {
             itemId: '-',
             location: summary.homeLabel,
             currentLocation: p.name,
+            currentLocationId: p.locationId,
             brand,
             model: (firstStock.model || '').trim() || '-',
             machineNumber: '-',
@@ -887,7 +889,7 @@ const NetStock = ({ user }) => {
             homeLocationId: firstStock.home_location_id || firstStock.homeLocationId,
             stockRecordIds,
             isQuantityLocationCard: true,
-            isEditableQuantityCard: false
+            isEditableQuantityCard: true
           });
         });
       }
@@ -1479,13 +1481,14 @@ const NetStock = ({ user }) => {
         return;
       }
 
-      // For each stock record, update the quantity
-      // We'll create a new stock management entry with the difference
+      const targetLocationId = selectedItemForEdit.currentLocationId || selectedItemForEdit.homeLocationId || '';
+
+      // Save the quantity difference against the location shown on the edited card.
       const stockManagementPayload = {
         item_name_id: String(selectedItemForEdit.itemNameId || ''),
         brand_name_id: selectedItemForEdit.brandId ? String(selectedItemForEdit.brandId) : '',
         item_ids_id: '', // No itemId for quantity-only items
-        home_location_id: selectedItemForEdit.homeLocationId ? String(selectedItemForEdit.homeLocationId) : '',
+        home_location_id: targetLocationId ? String(targetLocationId) : '',
         quantity: String(quantityDifference), // Send the difference
         tool_status: 'Available'
       };
@@ -1698,8 +1701,7 @@ const NetStock = ({ user }) => {
                     const itemId = item.id || index;
                     const swipeState = swipeStates[itemId];
                     const isExpanded = expandedItemId === itemId;
-                    // Allow editing only for the legacy single-card quantity rows.
-                    // For quantity split-by-location cards, editing would be ambiguous.
+                    // Quantity-only rows are editable, including split-by-location cards.
                     const canEdit =
                       !item.hasItemId &&
                       item.quantity !== 0 &&
@@ -2164,4 +2166,3 @@ const NetStock = ({ user }) => {
 };
 
 export default NetStock;
-

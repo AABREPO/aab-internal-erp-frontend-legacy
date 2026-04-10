@@ -35,31 +35,31 @@ function cleanUrl(url) {
 function getISOWeekNumber(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
-    
+
     // Get Thursday of the week containing the date
     // Monday = 1, Tuesday = 2, ..., Sunday = 0 (convert to 7)
     const dayOfWeek = d.getDay() || 7; // Convert Sunday (0) to 7
     const thursday = new Date(d);
     thursday.setDate(d.getDate() + 4 - dayOfWeek); // Thursday is 4 days after Monday
     thursday.setHours(0, 0, 0, 0);
-    
+
     // Use the year that Thursday falls in (ISO 8601 rule)
     const weekYear = thursday.getFullYear();
-    
+
     // Get January 1st of that year
     const jan1 = new Date(weekYear, 0, 1);
     jan1.setHours(0, 0, 0, 0);
-    
+
     // Get the Thursday of week 1 (first Thursday of the year)
     const jan1DayOfWeek = jan1.getDay() || 7;
     const firstThursday = new Date(jan1);
     firstThursday.setDate(jan1.getDate() + 4 - jan1DayOfWeek);
     firstThursday.setHours(0, 0, 0, 0);
-    
+
     // Calculate week number: difference in days divided by 7, plus 1
     const daysDiff = Math.floor((thursday - firstThursday) / 86400000);
     const weekNo = Math.floor(daysDiff / 7) + 1;
-    
+
     return weekNo;
 }
 
@@ -579,22 +579,35 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 .replace(/\s/g, "-");
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
-            formData.append("file", selectedFileForPopup);
-            formData.append("file_name", finalName);
+
+            const uploadFormData = new FormData();
+
+            // ✅ CHANGE 1: "files" instead of "file"
+            uploadFormData.append("files", selectedFileForPopup);
+
+            // ✅ CHANGE 2: required folder
+            uploadFormData.append("folder", "FileUpload / Cash_Register");
+
+            // ✅ CHANGE 3: filename param
+            uploadFormData.append("fileName", finalName);
+
             const uploadResponse = await fetch(
-                "https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive",
+                "https://backendaab.in/aabuildersDash/api/files/upload",
                 {
                     method: "POST",
-                    body: formData,
+                    body: uploadFormData,
                 }
             );
+
             if (!uploadResponse.ok) {
                 throw new Error("File upload failed");
             }
+
             const uploadResult = await uploadResponse.json();
-            console.log("Upload result:", uploadResult);
-            const pdfUrl = uploadResult.url;
-            console.log("File uploaded successfully. URL:", pdfUrl);
+
+            // ✅ CHANGE 4: new response format
+            const pdfUrl = uploadResult.urls[0];
+
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
@@ -1112,7 +1125,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     (Array.isArray(expensesData) && expensesData.length > 0) ||
                     (Array.isArray(paymentsData) && paymentsData.length > 0);
                 // Check if any expense or payment has status === true
-                const hasStatusTrue = 
+                const hasStatusTrue =
                     expensesData.some(expense => expense.status === true) ||
                     paymentsData.some(payment => payment.status === true);
                 setPreviousWeekHasData(hasPreviousWeekData);
@@ -1141,7 +1154,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         if (operationalWeekNumber) {
             checkPreviousWeekStatus();
         }
-    }, [operationalWeekNumber, checkPreviousWeekStatus]); 
+    }, [operationalWeekNumber, checkPreviousWeekStatus]);
     // Fetch expenses and payments whenever actual current week is available
     useEffect(() => {
         if (operationalWeekNumber) {
@@ -1866,7 +1879,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             const currentDate = new Date();
             const nextWeekDate = new Date(currentDate);
             nextWeekDate.setDate(currentDate.getDate() + 7);
-            const nextWeekNumber = getISOWeekNumber(nextWeekDate);            
+            const nextWeekNumber = getISOWeekNumber(nextWeekDate);
             const url = new URL("https://backendaab.in/aabuildersDash/api/payments-received/account-closure");
             url.searchParams.append("closureType", type);
             url.searchParams.append("carryForward", carryForwardParam);
@@ -4915,7 +4928,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                             )}
                         </div>
                         <div className="flex justify-end mt-4">
-                            <button onClick={() => {setShowPaymentDetailsPopup(false); setSelectedPaymentDetails([]);}}
+                            <button onClick={() => { setShowPaymentDetailsPopup(false); setSelectedPaymentDetails([]); }}
                                 className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
                             >
                                 Close
@@ -5035,7 +5048,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                             throw new Error('Failed to fetch ENo');
                                         }
                                         const enoData = await enoResponse.json();
-                                        const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;                                        
+                                        const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
                                         const expensesFormData = {
                                             accountType: "Claim",
                                             eno: nextEno,

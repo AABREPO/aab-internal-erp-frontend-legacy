@@ -986,6 +986,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         if (selectedFile) {
             try {
                 const uploadFormData = new FormData();
+
                 const now = new Date();
                 const timestamp = now.toLocaleString("en-GB", {
                     day: "2-digit",
@@ -998,21 +999,36 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 })
                     .replace(",", "")
                     .replace(/\s/g, "-");
-                const finalName = `${timestamp} - ${formData.siteName} - ${formData.vendor || formData.contractor} `;
-                uploadFormData.append('file', selectedFile);
-                uploadFormData.append('file_name', finalName);
-                const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+
+                const finalName = `${timestamp}-${formData.siteName}-${formData.vendor || formData.contractor}`;
+
+                // ✅ CHANGE 1: key must be "files"
+                uploadFormData.append("files", selectedFile);
+
+                // ✅ CHANGE 2: required folder
+                uploadFormData.append("folder", "FileUpload / Expenses_Entry_Files");
+
+                // ✅ CHANGE 3: optional filename
+                uploadFormData.append("fileName", finalName);
+
+                const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                     method: "POST",
                     body: uploadFormData,
                 });
+
                 if (!uploadResponse.ok) {
-                    throw new Error('File upload failed');
+                    throw new Error("File upload failed");
                 }
+
                 const result = await uploadResponse.json();
-                updatedBillCopy = result.url;
+
+                // ✅ CHANGE 4: new response structure
+                updatedBillCopy = result.urls[0];
+
             } catch (error) {
-                console.error('Error uploading file:', error);
-                alert('Failed to upload file. Please try again.');
+                console.error("Error during file upload:", error);
+                alert("Error during file upload. Please try again.");
+                setIsSubmitting(false);
                 return;
             }
         }

@@ -212,6 +212,8 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 		name
 	}));
 	const [search, setSearch] = useState("");
+	const [showDiscountSheet, setShowDiscountSheet] = useState(false);
+	const [discountInputValue, setDiscountInputValue] = useState('');
 
 	const filteredVendors = vendorList.filter(v =>
 		v.name.toLowerCase().includes(search.toLowerCase())
@@ -1319,15 +1321,16 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 				hour12: true
 			}).replace(",", "").replace(/\s/g, "-");
 			const fileName = `${timestamp} ${vendorName} - summary bill.pdf`;
-			formData.append('file', file);
+			formData.append('files', file);
+			formData.append('folderName', 'FileUpload / Bill_Payments_Tracker ');
 			formData.append('file_name', fileName);
-			const uploadRes = await window.fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+			const uploadRes = await window.fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
 				method: "POST",
 				body: formData
 			});
 			if (!uploadRes.ok) throw new Error('File upload failed');
 			const uploadResult = await uploadRes.json().catch(() => ({}));
-			const pdfUrl = uploadResult?.url || '';
+			const pdfUrl = uploadResult.urls[0] || '';
 			if (!pdfUrl) throw new Error('Upload did not return a URL');
 
 			// Update tracker overall pdf url (desktop behavior)
@@ -1458,15 +1461,16 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 					.replace(/\s/g, "-");
 				const vendorName = getVendorNameById(selectedVerifyBill?.vendor_id ?? selectedVerifyBill?.vendorId) || 'Payment';
 				const finalName = `${timestamp} ${vendorName} ${paymentForm.mode}`;
-				formData.append('file', paymentForm.file);
+				formData.append('files', paymentForm.file);
+				formData.append('folderName', 'FileUpload / Bill_Payments_Tracker ');
 				formData.append('file_name', finalName);
-				const uploadRes = await window.fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+				const uploadRes = await window.fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
 					method: "POST",
 					body: formData
 				});
 				if (!uploadRes.ok) throw new Error('File upload failed');
 				const uploadResult = await uploadRes.json().catch(() => ({}));
-				billUrl = uploadResult?.url || '';
+				billUrl = uploadResult?.urls?.[0] || '';
 			}
 
 			const actualAmount = Number(selectedVerifyBill?.total_amount ?? selectedVerifyBill?.totalAmount ?? 0) || 0;
@@ -1635,7 +1639,6 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 			} catch {
 				// ignore
 			}
-
 			// Refresh trackers + keep current bank view in sync (no full reload)
 			try {
 				const updated = await reloadTrackers();
@@ -2755,7 +2758,7 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 
 							<div className="flex-1" />
 
-							<div className="mt-auto rounded-[14px] border border-[#E5E7EB] bg-white p-[14px]">
+							<div className="mt-auto rounded-[14px] border border-[#E5E7EB] bg-white p-[14px] mb-[20px]">
 								<p className="text-[14px] font-semibold text-black mb-[10px]">Expense Matching Details</p>
 								<div className="flex items-center justify-between py-[6px]">
 									<p className="text-[12px] text-[#666666]">Bills in Expenses</p>
@@ -3199,7 +3202,7 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 
 							<div className="flex-1" />
 
-							<div className="mt-auto rounded-[14px] border border-[#E5E7EB] bg-white p-[14px]">
+							<div className="mt-auto rounded-[14px] border border-[#E5E7EB] bg-white p-[14px] mb-[20px]">
 								<div className="flex items-center justify-between mb-[8px]">
 									<p className="text-[14px] font-semibold text-black">Summary Details</p>
 									<div className="flex items-center gap-[10px]">
@@ -3264,20 +3267,27 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 									<p className="text-[12px] font-semibold text-black">{formatIndianCurrency(bankSummaryDetails?.totalPayable ?? 0)}</p>
 								</div>
 								<div className="flex items-center justify-between py-[6px]">
-									<p className="text-[12px] underline text-[#C58B2A]">Discount</p>
-									<input
-										type="text"
-										value={discount === 0 ? '' : String(discount).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-										onChange={(e) => {
+									<button
+										type="button"
+										onClick={() => {
 											if (discountSubmitted) return;
-											const raw = String(e.target.value || '').replace(/,/g, '').replace(/\D/g, '');
-											setDiscount(Number(raw) || 0);
+											setDiscountInputValue(discount ? String(discount) : '');
+											setShowDiscountSheet(true);
 										}}
+										className="text-[12px] underline text-[#C58B2A]"
 										disabled={discountSubmitted}
-										placeholder="0"
-										className={`w-[90px] h-[28px] px-[10px] text-right text-[12px] font-semibold rounded-[6px] border border-[#E5E7EB] outline-none ${discountSubmitted ? 'bg-[#F3F4F6] text-[#6B7280] cursor-not-allowed' : 'bg-white text-[#C58B2A]'}`}
-										title={discountSubmitted ? 'Discount already applied in previous payment' : 'Enter discount amount'}
-									/>
+									>
+										Discount
+									</button>
+
+									<div
+										className={`w-[90px] h-[28px] px-[10px] flex items-center justify-end text-right text-[12px] font-semibold rounded-[6px]
+			${discountSubmitted ? 'bg-[#F3F4F6] text-[#6B7280]' : 'bg-white text-[#C58B2A]'}`}
+									>
+										{discount
+											? String(discount).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+											: '0'}
+									</div>
 								</div>
 								<div className="h-[1px] bg-[#E5E7EB] my-[8px]" />
 								<div className="flex items-center justify-between py-[6px]">
@@ -3297,7 +3307,7 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 								aria-label="Close"
 								onClick={closePaymentSheet}
 							/>
-							<div className="relative w-full bg-white rounded-t-[18px] pt-[14px] pb-[16px]">
+							<div className="relative w-full bg-white rounded-t-[18px] px-[16px] pt-[14px] pb-[16px]">
 								<style>{`
 										/* Hide number input spinner arrows for Payment Details amount */
 										.bpt-payment-amount-input::-webkit-outer-spin-button,
@@ -5044,6 +5054,68 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 									No vendors found
 								</p>
 							)}
+						</div>
+					</div>
+				</div>
+			)}
+			{showDiscountSheet && (
+				<div className="fixed inset-0 z-[1308] flex items-end justify-center">
+					<button
+						type="button"
+						className="absolute inset-0 bg-black/40"
+						onClick={() => setShowDiscountSheet(false)}
+					/>
+
+					<div className="relative w-full bg-white rounded-t-[18px] pt-[16px] pb-[20px] px-[16px]">
+						<div className="flex items-center justify-between">
+							<p className="text-[16px] font-semibold text-black">Enter Discount</p>
+
+							<button
+								type="button"
+								onClick={() => setShowDiscountSheet(false)}
+								className="text-[20px] font-semibold text-[#E4572E]"
+							>
+								×
+							</button>
+						</div>
+
+						<div className="mt-[16px]">
+							<p className="text-[12px] font-semibold text-black mb-[6px]">
+								Discount Amount
+							</p>
+
+							<input
+								type="number"
+								value={discountInputValue}
+								onChange={(e) =>
+									setDiscountInputValue(
+										String(e.target.value || '').replace(/\D/g, '')
+									)
+								}
+								placeholder="Enter Discount"
+								className="w-full h-[42px] border border-[#D1D5DB] rounded-[8px] px-[12px] text-[13px] font-medium outline-none"
+							/>
+						</div>
+
+						<div className="mt-[18px] grid grid-cols-2 gap-[12px]">
+							<button
+								type="button"
+								onClick={() => setShowDiscountSheet(false)}
+								className="h-[44px] rounded-[10px] border border-[#D1D5DB] bg-white text-[14px] font-semibold text-black"
+							>
+								Cancel
+							</button>
+
+							<button
+								type="button"
+								onClick={() => {
+									setDiscount(Number(discountInputValue) || 0);
+									setShowDiscountSheet(false);
+								}}
+								className="h-[44px] rounded-[10px] bg-black text-white text-[14px] font-semibold"
+							>
+								Save
+							</button>
 						</div>
 					</div>
 				</div>

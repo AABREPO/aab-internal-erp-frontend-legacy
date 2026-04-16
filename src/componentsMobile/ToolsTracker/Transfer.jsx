@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import EditIcon from '../Images/edit1.png';
@@ -141,6 +142,26 @@ const Transfer = ({ user }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const pendingUploadCountRef = useRef(0);
+  const pendingUploadResolversRef = useRef([]);
+  const beginPendingFileUpload = useCallback(() => {
+    pendingUploadCountRef.current += 1;
+  }, []);
+  const endPendingFileUpload = useCallback(() => {
+    pendingUploadCountRef.current = Math.max(0, pendingUploadCountRef.current - 1);
+    if (pendingUploadCountRef.current === 0) {
+      const resolvers = pendingUploadResolversRef.current.splice(0);
+      resolvers.forEach((r) => r());
+    }
+  }, []);
+  const waitForPendingFileUploads = useCallback(() => {
+    if (pendingUploadCountRef.current === 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      pendingUploadResolversRef.current.push(resolve);
+    });
+  }, []);
   const [uploadStatus, setUploadStatus] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [statusOptions] = useState(['Working', 'Not Working', 'Under Repair', 'Machine Dead']);
@@ -161,6 +182,7 @@ const Transfer = ({ user }) => {
   const [pendingSearchItem, setPendingSearchItem] = useState(null);
   const [pendingSearchQty, setPendingSearchQty] = useState('');
   const [searchUploadFiles, setSearchUploadFiles] = useState([]);
+  const [isSearchUploading, setIsSearchUploading] = useState(false);
   const [searchUploadStatus, setSearchUploadStatus] = useState('');
   const [searchUploadDescription, setSearchUploadDescription] = useState('');
   const [showSearchStatusDropdown, setShowSearchStatusDropdown] = useState(false);
@@ -1592,26 +1614,34 @@ const Transfer = ({ user }) => {
       }
     }
   };
+  // Begins pending upload before fetch; caller MUST call endPendingFileUpload() after applying returned URLs to state
+  // (otherwise waitForPendingFileUploads() resolves before React has server URLs in items — save would send blob: URLs).
   const uploadFilesToBackend = async (files, { folder, fileNamePrefix } = {}) => {
-    const formData = new FormData();
-    files.forEach((f) => formData.append('files', f));
-    formData.append('folder', folder || 'FileUpload / tools_item_live_images');
-    if (fileNamePrefix) formData.append('fileName', fileNamePrefix);
+    beginPendingFileUpload();
+    try {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('files', f));
+      formData.append('folder', folder || 'FileUpload / tools_item_live_images');
+      if (fileNamePrefix) formData.append('fileName', fileNamePrefix);
 
-    const res = await fetch(`${FILE_UPLOAD_BASE_URL}/upload`, {
-      method: 'POST',
-      credentials: 'include',
-      body: formData
-    });
+      const res = await fetch(`${FILE_UPLOAD_BASE_URL}/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(text || `Upload failed: ${res.status} ${res.statusText}`);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Upload failed: ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      const urls = Array.isArray(data?.urls) ? data.urls : [];
+      return urls;
+    } catch (error) {
+      endPendingFileUpload();
+      throw error;
     }
-
-    const data = await res.json();
-    const urls = Array.isArray(data?.urls) ? data.urls : [];
-    return urls;
   };
 
   const buildUploadFileNamePrefix = ({ itemName, itemId, quantity } = {}) => {
@@ -1684,14 +1714,17 @@ const Transfer = ({ user }) => {
         })
       });
 
-      setUploadFiles((prev) =>
-        prev.map((f) => {
-          const idx = fileEntries.findIndex((x) => x.id === f.id);
-          if (idx === -1) return f;
-          const uploadedUrl = urls[idx] || null;
-          return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
-        })
-      );
+      flushSync(() => {
+        setUploadFiles((prev) =>
+          prev.map((f) => {
+            const idx = fileEntries.findIndex((x) => x.id === f.id);
+            if (idx === -1) return f;
+            const uploadedUrl = urls[idx] || null;
+            return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
+          })
+        );
+      });
+      endPendingFileUpload();
     } catch (error) {
       console.error('Error uploading file(s):', error);
       // remove the just-added files on failure
@@ -2337,7 +2370,8 @@ const Transfer = ({ user }) => {
     return { isValid: true };
   };
 
-  const handleConfirmUpload = () => {
+  const handleConfirmUpload = async () => {
+    await waitForPendingFileUploads();
     if (!uploadStatus) {
       alert('Please select the machine status before confirming.');
       return;
@@ -2466,6 +2500,7 @@ const Transfer = ({ user }) => {
     }
     setIsSaving(true);
     try {
+      await waitForPendingFileUploads();
       const statusItemsForApi = [];
       const updatedItemRows = [];
       for (const item of items) {
@@ -2740,6 +2775,7 @@ const Transfer = ({ user }) => {
 
     setIsSaving(true);
     try {
+      await waitForPendingFileUploads();
       let payload;
       const statusItemsForApi = [];
 
@@ -3086,17 +3122,20 @@ const Transfer = ({ user }) => {
       urls.forEach((remoteUrl, idx) => {
         const temp = tempUrls[idx];
         if (!remoteUrl || !temp) return;
-        replaceUrlInItemImages(currentItemId, temp, remoteUrl);
-        setImageViewerData((prev) => ({
-          ...prev,
-          images: (prev.images || []).map((u) => (u === temp ? remoteUrl : u))
-        }));
+        flushSync(() => {
+          replaceUrlInItemImages(currentItemId, temp, remoteUrl);
+          setImageViewerData((prev) => ({
+            ...prev,
+            images: (prev.images || []).map((u) => (u === temp ? remoteUrl : u))
+          }));
+        });
         try {
           URL.revokeObjectURL(temp);
         } catch {
           // ignore
         }
       });
+      endPendingFileUpload();
     } catch (error) {
       console.error('Error uploading viewer image(s):', error);
       alert('Failed to upload image. Please try again.');
@@ -3229,7 +3268,7 @@ const Transfer = ({ user }) => {
     setSearchUploadStatus('');
     setSearchUploadDescription('');
   };
-  const handleSearchFileSelect = (e) => {
+  const handleSearchFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     const validFiles = files;
@@ -3244,15 +3283,17 @@ const Transfer = ({ user }) => {
     }));
     setSearchUploadFiles((prev) => [...prev, ...fileEntries]);
 
-    uploadFilesToBackend(validFiles, {
-      folder: 'FileUpload / Tools_Tracker_Images',
-      fileNamePrefix: buildUploadFileNamePrefix({
-        itemName: selectedSearchItem?.item_name || selectedSearchItem?.itemName || '',
-        itemId: selectedSearchItem?.item_id || selectedSearchItem?.itemId || '',
-        quantity: selectedSearchItem?.quantity || selectedSearchItem?.qty || ''
-      })
-    })
-      .then((urls) => {
+    setIsSearchUploading(true);
+    try {
+      const urls = await uploadFilesToBackend(validFiles, {
+        folder: 'FileUpload / Tools_Tracker_Images',
+        fileNamePrefix: buildUploadFileNamePrefix({
+          itemName: selectedSearchItem?.item_name || selectedSearchItem?.itemName || '',
+          itemId: selectedSearchItem?.item_id || selectedSearchItem?.itemId || '',
+          quantity: selectedSearchItem?.quantity || selectedSearchItem?.qty || ''
+        })
+      });
+      flushSync(() => {
         setSearchUploadFiles((prev) =>
           prev.map((f) => {
             const idx = fileEntries.findIndex((x) => x.id === f.id);
@@ -3261,13 +3302,16 @@ const Transfer = ({ user }) => {
             return { ...f, progress: uploadedUrl ? 100 : 0, uploadedUrl };
           })
         );
-      })
-      .catch((error) => {
-        console.error('Error uploading search file(s):', error);
-        setSearchUploadFiles((prev) => prev.filter((f) => !fileEntries.some((x) => x.id === f.id)));
-        alert('Failed to upload image. Please try again.');
       });
-    e.target.value = '';
+      endPendingFileUpload();
+    } catch (error) {
+      console.error('Error uploading search file(s):', error);
+      setSearchUploadFiles((prev) => prev.filter((f) => !fileEntries.some((x) => x.id === f.id)));
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsSearchUploading(false);
+      e.target.value = '';
+    }
   };
   const handleDeleteSearchUploadFile = (fileId) => {
     setSearchUploadFiles(prev => prev.filter(f => f.id !== fileId));
@@ -6740,13 +6784,20 @@ const Transfer = ({ user }) => {
             <div className="px-[24px] pb-[24px] flex-shrink-0 relative z-0">
               <button
                 onClick={handleConfirmSearchUpload}
-                disabled={!searchUploadStatus || (entryServiceMode === 'Service' && searchUploadFiles.length === 0)}
-                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${!searchUploadStatus || (entryServiceMode === 'Service' && searchUploadFiles.length === 0)
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-black'
-                  }`}
+                disabled={
+                  isSearchUploading ||
+                  !searchUploadStatus ||
+                  (entryServiceMode === 'Service' && searchUploadFiles.length === 0)
+                }
+                className={`w-full h-[48px] rounded-lg text-[16px] font-bold text-white ${
+                  isSearchUploading ||
+                  !searchUploadStatus ||
+                  (entryServiceMode === 'Service' && searchUploadFiles.length === 0)
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-black'
+                }`}
               >
-                Confirm
+                {isSearchUploading ? 'Uploading...' : 'Confirm'}
               </button>
             </div>
           </div>

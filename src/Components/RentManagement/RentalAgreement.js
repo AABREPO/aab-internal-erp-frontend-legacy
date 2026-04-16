@@ -1094,8 +1094,8 @@ WITNESSES:
             const filename = `${selectedProperty.value}_${propertyDoorNo}_R${currentRevisionCount}`;
             const formData = new FormData();
             formData.append("files", pdfBlob);
-            formData.append("fileName", filename);
-            formData.append("folderName", "FileUpload / Rental_Agreements");
+            formData.append("folder", "FileUpload / Rental_Agreements");
+            formData.append("fileName", filename);            
             const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,

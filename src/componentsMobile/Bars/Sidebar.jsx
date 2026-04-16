@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import logo from '../Images/AABBlack.png'
 import { prefetchIncomingTrackerData } from '../Inventory/incomingTrackerPrefetch';
 import { prefetchInventoryNetStockData } from '../Inventory/inventoryNetStockPrefetch';
 import { prefetchToolsNetStockData } from '../ToolsTracker/netStockPrefetch';
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) => {
+  const navigate = useNavigate();
   const [expandedItems, setExpandedItems] = useState({
     billing: currentPage === 'billing',
     procurement:
@@ -14,7 +16,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       currentPage === 'goods-recieved-notes' ||
       currentPage === 'inventory' ||
       currentPage === 'tools-tracker',
-    account: currentPage === 'project-advance' || currentPage === 'loan-portal'
+    account: currentPage === 'project-advance' || currentPage === 'loan-portal',
+    'master-data': currentPage === 'master-data'
   });
   const [roleModels, setRoleModels] = useState([]);
   const buildTime = process.env.REACT_APP_BUILD_TIME;
@@ -29,7 +32,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
         currentPage === 'goods-recieved-notes' ||
         currentPage === 'inventory' ||
         currentPage === 'tools-tracker',
-      account: currentPage === 'project-advance' || currentPage === 'loan-portal'
+      account: currentPage === 'project-advance' || currentPage === 'loan-portal',
+      'master-data': currentPage === 'master-data'
     });
   }, [currentPage]);
 
@@ -75,6 +79,11 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
         alert("No permissions for this page");
         return;
       }
+      if (page === 'master-data') {
+        navigate('/master-data');
+        onClose();
+        return;
+      }
       if (page === 'inventory') {
         try {
           const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -106,6 +115,10 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
 
   const handleBillingClick = () => {
     toggleExpand('billing');
+  };
+
+  const handleMasterDataClick = () => {
+    toggleExpand('master-data');
   };
 
   const menuItems = [
@@ -141,7 +154,12 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
     { id: 'design-tools', label: 'Design Tools', icon: 'tools' },
     { id: 'hrm', label: 'HRM', icon: 'person' },
     { id: 'utility-hub', label: 'Utility Hub', icon: 'utility' },
-    { id: 'master-data', label: 'Master Data', icon: 'gear' }
+    {
+      id: 'master-data',
+      label: 'Master Data',
+      icon: 'gear',
+      subItems: [{ id: 'master-data', label: 'Master Data', modelName: null }]
+    }
   ];
 
   const getIcon = (iconType) => {
@@ -250,7 +268,9 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
                             ? handleAccountClick
                             : item.id === 'billing'
                               ? handleBillingClick
-                              : undefined
+                              : item.id === 'master-data'
+                                ? handleMasterDataClick
+                                : undefined
                       }
                     >
                       <div className="flex items-center gap-[12px]">
@@ -307,7 +327,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
             </p>
           </div>
         </div>
-      </div>
+      </div >
     </>
   );
 };

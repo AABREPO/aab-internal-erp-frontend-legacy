@@ -41,6 +41,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
 
     // Additional state for popups (copied from PendingBill)
     const [poNumbers, setPoNumbers] = useState([])
+    const [extraPoNumbers, setExtraPoNumbers] = useState([])
     const [vendorId, setVendorId] = useState(null)
     const [entryFormData, setEntryFormData] = useState({
         enteredBy: null,
@@ -74,14 +75,21 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const [serialNumber, setSerialNumber] = useState(1)
     const [purchaseOrders, setPurchaseOrders] = useState([])
     const [validationResults, setValidationResults] = useState({})
+    const [extraValidationResults, setExtraValidationResults] = useState({})
     const [checkingPO, setCheckingPO] = useState(false)
     const [isEditMode, setIsEditMode] = useState(false)
     const [verifiedBills, setVerifiedBills] = useState({})
+    const [extraVerifiedBills, setExtraVerifiedBills] = useState({})
     const [noPoSelections, setNoPoSelections] = useState({})
+    const [extraNoPoSelections, setExtraNoPoSelections] = useState({})
     const [checkedBills, setCheckedBills] = useState({})
+    const [extraCheckedBills, setExtraCheckedBills] = useState({})
     const [hasBeenSubmitted, setHasBeenSubmitted] = useState(false)
     const [originalData, setOriginalData] = useState(null)
     const [editModeStartData, setEditModeStartData] = useState(null)
+    const [isDuplicateMode, setIsDuplicateMode] = useState(false)
+    const [duplicateSelections, setDuplicateSelections] = useState({})
+    const [extraDuplicateSelections, setExtraDuplicateSelections] = useState({})
     const [billEntryDates, setBillEntryDates] = useState({})
     const [formData, setFormData] = useState({
         billArrivalDate: '',
@@ -114,6 +122,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         billArrivalDate: '',
         vendorId: null,
         noOfBills: '',
+        extraBills: '0',
         totalAmount: ''
     })
     const [editLoading, setEditLoading] = useState(false)
@@ -172,6 +181,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const handleVerifyClick = (item) => {
         setSelectedBill(item)
         const numberOfBills = item.noOfBills || item.no_of_bills || 1
+        const extraBills = item.extraBills || item.extra_bills || 0
         if (item.billVerifications && item.billVerifications.length > 0) {
             const existingBillNumbers = item.billVerifications.map(verification =>
                 verification.bill_number === 'NO_PO' ? '' : (verification.bill_number || '')
@@ -180,16 +190,39 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 existingBillNumbers.push('')
             }
             setPoNumbers(existingBillNumbers.slice(0, numberOfBills))
+            if (extraBills > 0) {
+                const extraBillNumbers = existingBillNumbers.slice(numberOfBills, numberOfBills + extraBills)
+                while (extraBillNumbers.length < extraBills) {
+                    extraBillNumbers.push('')
+                }
+                setExtraPoNumbers(extraBillNumbers)
+            } else {
+                setExtraPoNumbers([])
+            }
             const initialVerified = {}
             const initialNoPo = {}
+            const initialExtraVerified = {}
+            const initialExtraNoPo = {}
+            const initialDuplicate = {}
+            const initialExtraDuplicate = {}
             item.billVerifications.forEach((verification, index) => {
                 if (index < numberOfBills) {
                     initialVerified[index] = verification.is_verified || false
                     initialNoPo[index] = verification.bill_number === 'NO_PO'
+                    initialDuplicate[index] = verification.is_duplicate || false
+                } else if (index < numberOfBills + extraBills) {
+                    const extraIndex = index - numberOfBills
+                    initialExtraVerified[extraIndex] = verification.is_verified || false
+                    initialExtraNoPo[extraIndex] = verification.bill_number === 'NO_PO'
+                    initialExtraDuplicate[extraIndex] = verification.is_duplicate || false
                 }
             })
             setVerifiedBills(initialVerified)
             setNoPoSelections(initialNoPo)
+            setExtraVerifiedBills(initialExtraVerified)
+            setExtraNoPoSelections(initialExtraNoPo)
+            setDuplicateSelections(initialDuplicate)
+            setExtraDuplicateSelections(initialExtraDuplicate)
             const initialChecked = {}
             item.billVerifications.forEach((verification, index) => {
                 if (index < numberOfBills) {
@@ -197,23 +230,45 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 }
             })
             setCheckedBills(initialChecked)
+            const initialExtraChecked = {}
+            item.billVerifications.forEach((verification, index) => {
+                if (index >= numberOfBills && index < numberOfBills + extraBills) {
+                    const extraIndex = index - numberOfBills
+                    initialExtraChecked[extraIndex] = verification.is_verified || false
+                }
+            })
+            setExtraCheckedBills(initialExtraChecked)
             setHasBeenSubmitted(true)
             setOriginalData({
                 poNumbers: existingBillNumbers.slice(0, numberOfBills),
+                extraPoNumbers: extraBills > 0 ? existingBillNumbers.slice(numberOfBills, numberOfBills + extraBills) : [],
                 noPoSelections: initialNoPo,
-                verifiedBills: initialVerified
+                extraNoPoSelections: initialExtraNoPo,
+                verifiedBills: initialVerified,
+                extraVerifiedBills: initialExtraVerified,
+                duplicateSelections: initialDuplicate,
+                extraDuplicateSelections: initialExtraDuplicate
             })
         } else {
             setPoNumbers(new Array(numberOfBills).fill(''))
             setVerifiedBills({})
             setNoPoSelections({})
             setCheckedBills({})
+            setExtraPoNumbers(extraBills > 0 ? new Array(extraBills).fill('') : [])
+            setExtraVerifiedBills({})
+            setExtraNoPoSelections({})
+            setExtraCheckedBills({})
+            setDuplicateSelections({})
+            setExtraDuplicateSelections({})
             setHasBeenSubmitted(false)
             setOriginalData(null)
         }
         setIsEditMode(false)
+        setIsDuplicateMode(false)
         setValidationResults({})
+        setExtraValidationResults({})
         setCheckedBills({}) // Reset checked bills state for new verification
+        setExtraCheckedBills({})
         setShowModal(true)
     }
 
@@ -843,20 +898,47 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         setShowModal(false)
         setSelectedBill(null)
         setPoNumbers([])
+        setExtraPoNumbers([])
         setValidationResults({})
+        setExtraValidationResults({})
         setIsEditMode(false)
         setVerifiedBills({})
+        setExtraVerifiedBills({})
         setNoPoSelections({})
+        setExtraNoPoSelections({})
         setCheckedBills({})
+        setExtraCheckedBills({})
         setOriginalData(null)
         setHasBeenSubmitted(false)
+        setIsDuplicateMode(false)
+        setDuplicateSelections({})
+        setExtraDuplicateSelections({})
+    }
+
+    const handleDuplicateChange = (index, checked) => {
+        setDuplicateSelections(prev => ({ ...prev, [index]: checked }))
+        if (checked) {
+            setNoPoSelections(prev => ({ ...prev, [index]: false }))
+        }
+    }
+
+    const handleExtraDuplicateChange = (index, checked) => {
+        setExtraDuplicateSelections(prev => ({ ...prev, [index]: checked }))
+        if (checked) {
+            setExtraNoPoSelections(prev => ({ ...prev, [index]: false }))
+        }
+    }
+
+    const toggleDuplicateMode = () => {
+        setIsDuplicateMode((prev) => !prev)
+        // When leaving duplicate mode, keep selections but UI will show No PO checkboxes
     }
     const handlePoNumberChange = (index, value) => {
         const numericValue = value.replace(/[^0-9]/g, '')
         const newPoNumbers = [...poNumbers]
         newPoNumbers[index] = numericValue
         setPoNumbers(newPoNumbers)
-        if (numericValue && isAdminUser()) {
+        if (numericValue) {
             setNoPoSelections(prev => ({ ...prev, [index]: false }))
         }
         setCheckedBills(prev => {
@@ -872,11 +954,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     }
 
     const handleNoPoChange = (index, checked) => {
-        if (!isAdminUser()) {
-            return
-        }
         setNoPoSelections(prev => ({ ...prev, [index]: checked }))
         if (checked) {
+            setDuplicateSelections(prev => ({ ...prev, [index]: false }))
             const newPoNumbers = [...poNumbers]
             newPoNumbers[index] = ''
             setPoNumbers(newPoNumbers)
@@ -892,11 +972,51 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             })
         }
     }
+
+    const handleExtraPoNumberChange = (index, value) => {
+        const numericValue = value.replace(/[^0-9]/g, '')
+        const newPoNumbers = [...extraPoNumbers]
+        newPoNumbers[index] = numericValue
+        setExtraPoNumbers(newPoNumbers)
+        if (numericValue) {
+            setExtraNoPoSelections(prev => ({ ...prev, [index]: false }))
+        }
+        setExtraCheckedBills(prev => {
+            const next = { ...prev }
+            delete next[index]
+            return next
+        })
+        setExtraValidationResults(prev => {
+            const next = { ...prev }
+            delete next[index]
+            return next
+        })
+    }
+
+    const handleExtraNoPoChange = (index, checked) => {
+        setExtraNoPoSelections(prev => ({ ...prev, [index]: checked }))
+        if (checked) {
+            setExtraDuplicateSelections(prev => ({ ...prev, [index]: false }))
+            const newPoNumbers = [...extraPoNumbers]
+            newPoNumbers[index] = ''
+            setExtraPoNumbers(newPoNumbers)
+            setExtraCheckedBills(prev => {
+                const next = { ...prev }
+                delete next[index]
+                return next
+            })
+            setExtraValidationResults(prev => {
+                const next = { ...prev }
+                delete next[index]
+                return next
+            })
+        }
+    }
     const renderInputFields = () => {
         const fields = []
         const noOfBills = selectedBill?.noOfBills || selectedBill?.no_of_bills || 0
+        const extraBills = selectedBill?.extraBills || selectedBill?.extra_bills || 0
         const hasExistingBills = selectedBill?.billVerifications && selectedBill.billVerifications.length > 0
-        const vendorIdForSelected = selectedBill?.vendorId || selectedBill?.vendor_id || null
         for (let i = 0; i < noOfBills; i++) {
             const validation = validationResults[i]
             const hasValidation = validation !== undefined
@@ -923,9 +1043,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             } else if (persistedVerification) {
                 const persistedBillNumber = persistedVerification.bill_number || persistedVerification.billNumber || ''
                 const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
+                const persistedIsDuplicate = persistedVerification.is_duplicate === true
                 if (persistedIsVerified) {
-                    borderClass = 'border-green-500'
-                    tooltipText = 'Matched'
+                    if (persistedIsDuplicate) {
+                        borderClass = 'border-purple-500'
+                        tooltipText = 'Duplicate & Verified'
+                    } else {
+                        borderClass = 'border-green-500'
+                        tooltipText = 'Matched'
+                    }
                 } else {
                     borderClass = 'border-red-500'
                     tooltipText = 'Not Matched'
@@ -945,20 +1071,18 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                     className={`w-20 h-8 px-2 py-1 rounded text-sm text-center ${bgClass} focus:outline-none focus:bg-white transition-colors duration-200 placeholder-gray-400 border ${borderClass}`}
                                     disabled={isNoPo}
                                 />
-                                {isAdminUser() && (
-                                    <div className="flex items-center gap-1">
-                                        <input
-                                            type="checkbox"
-                                            id={`no-po-${i}`}
-                                            checked={isNoPo}
-                                            onChange={(e) => handleNoPoChange(i, e.target.checked)}
-                                            className="w-3 h-3"
-                                        />
-                                        <label htmlFor={`no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
-                                            No PO
-                                        </label>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="checkbox"
+                                        id={`no-po-${i}`}
+                                        checked={isNoPo}
+                                        onChange={(e) => handleNoPoChange(i, e.target.checked)}
+                                        className="w-3 h-3"
+                                    />
+                                    <label htmlFor={`no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                        No PO
+                                    </label>
+                                </div>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-1">
@@ -977,6 +1101,86 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )
+        }
+        if (extraBills > 0) {
+            for (let i = 0; i < extraBills; i++) {
+                const validation = extraValidationResults[i]
+                const hasValidation = validation !== undefined
+                const isValid = validation?.matched
+                const poNumber = extraPoNumbers[i] || ''
+                const isNoPo = extraNoPoSelections[i] || false
+                let borderClass = 'border-gray-600'
+                let bgClass = isEditMode ? 'bg-white' : 'bg-[#F2F2F2]'
+                let tooltipText = null
+                const persistedVerificationIndex = noOfBills + i
+                const persistedVerification = selectedBill?.billVerifications && selectedBill.billVerifications[persistedVerificationIndex]
+                if (hasValidation) {
+                    const validationMessage = validation.message
+                    if (isValid) {
+                        borderClass = 'border-green-600'
+                        tooltipText = 'Matched'
+                    } else if (validationMessage === 'Already Entered') {
+                        borderClass = 'border-orange-600'
+                        tooltipText = 'Already Entered'
+                    } else {
+                        borderClass = 'border-red-600'
+                        tooltipText = 'Not Matched'
+                    }
+                } else if (persistedVerification) {
+                    const persistedIsVerified = persistedVerification.is_verified === true || persistedVerification.status === 'VERIFIED'
+                    if (persistedIsVerified) {
+                        borderClass = 'border-green-600'
+                        tooltipText = 'Matched'
+                    } else {
+                        borderClass = 'border-red-600'
+                        tooltipText = 'Not Matched'
+                    }
+                }
+                const showInput = isEditMode || !hasExistingBills
+                fields.push(
+                    <div key={`extra-${i}`} className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white border-2 border-white">
+                        <div className="relative group">
+                            {showInput ? (
+                                <div className="flex flex-col gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        value={poNumber}
+                                        onChange={(e) => handleExtraPoNumberChange(i, e.target.value)}
+                                        placeholder="Enter PO"
+                                        className={`w-20 h-8 px-2 py-1 rounded text-sm text-center ${bgClass} focus:outline-none focus:bg-white transition-colors duration-200 placeholder-gray-400 border ${borderClass}`}
+                                        disabled={isNoPo}
+                                    />
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="checkbox"
+                                            id={`extra-no-po-${i}`}
+                                            checked={isNoPo}
+                                            onChange={(e) => handleExtraNoPoChange(i, e.target.checked)}
+                                            className="w-3 h-3"
+                                        />
+                                        <label htmlFor={`extra-no-po-${i}`} className="text-xs text-gray-600 cursor-pointer">
+                                            No PO
+                                        </label>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-20 h-8 px-2 py-1 rounded text-sm text-center bg-gray-50 border ${borderClass} flex items-center justify-center`}>
+                                        <span className={isNoPo ? 'text-gray-500' : 'text-gray-700'}>
+                                            {isNoPo ? 'No PO' : (poNumber || '-')}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {(tooltipText) && (
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                    {tooltipText}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
         }
         return fields
     }
@@ -1474,9 +1678,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             const finalName = payment
                 ? `${timestamp} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
                 : processedFile.name;
-            formData.append('file', processedFile);
-            formData.append('file_name', finalName);
-            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+            formData.append('files', processedFile);
+            formData.append('folder', 'FileUpload/Bill_Payments_Tracker');
+            formData.append('fileName', finalName);
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
@@ -1484,7 +1689,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 throw new Error('File upload failed');
             }
             const uploadResult = await uploadResponse.json();
-            const billUrl = uploadResult.url;
+            const billUrl = uploadResult.urls[0] || '';
             // Update the payment with bill_url using the update API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/update/${paymentId}`, {
                 method: "PUT",
@@ -1550,9 +1755,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
             const displayVendorName = vendorName !== '-' ? vendorName : 'Overall Payment';
             const fileName = `${timestamp} ${displayVendorName} - summary bill.pdf`;
-            formData.append('file', processedFile);
-            formData.append('file_name', fileName);
-            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+            formData.append('files', processedFile);
+            formData.append('folder', 'FileUpload/Bill_Payments_Tracker');
+            formData.append('fileName', fileName);
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
@@ -1560,7 +1766,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 throw new Error('File upload failed');
             }
             const uploadResult = await uploadResponse.json();
-            const pdfUrl = uploadResult.url;
+            const pdfUrl = uploadResult.urls[0] || '';
             // Update the overall payment PDF URL via API
             const billId = selectedPaymentBill.id; // This is the tracker ID
             const response = await fetch(
@@ -1738,9 +1944,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         const formData = new FormData();
                         const vendorName = getVendorNameById(selectedPaymentBill?.vendor_id);
                         const finalName = `${timestamp} ${vendorName !== '-' ? vendorName : 'Payment'} ${entry.mode}`;
-                        formData.append('file', processedFile);
-                        formData.append('file_name', finalName);
-                        const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+                        formData.append('files', processedFile);
+                        formData.append('folder', 'FileUpload/Bill_Payments_Tracker');
+                        formData.append('fileName', finalName);
+                        const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                             method: "POST",
                             body: formData,
                         });
@@ -1748,7 +1955,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                             throw new Error('File upload failed');
                         }
                         const uploadResult = await uploadResponse.json();
-                        billUrl = uploadResult.url;
+                        billUrl = uploadResult.urls[0] || '';
                     } catch (error) {
                         console.error('Error during file upload:', error);
                         alert('Error during file upload. Please try again.');
@@ -2463,6 +2670,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             billArrivalDate: item.bill_arrival_date ? new Date(item.bill_arrival_date).toISOString().split('T')[0] : '',
             vendorId: vendorOption || null,
             noOfBills: item.no_of_bills || item.noOfBills || '',
+            extraBills: item.extra_bills || item.extraBills || '0',
             totalAmount: item.total_amount || ''
         }
         setEditFormData(formData)
@@ -2484,18 +2692,25 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 bill_arrival_date: editFormData.billArrivalDate || (selectedEditItem.bill_arrival_date ?
                     new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''),
                 vendor_id: editFormData.vendorId?.id || selectedEditItem.vendor_id,
-                no_of_bills: parseInt(editFormData.noOfBills) || selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0,
+                no_of_bills: editFormData.noOfBills !== '' && editFormData.noOfBills !== null && editFormData.noOfBills !== undefined
+                    ? parseInt(editFormData.noOfBills)
+                    : (selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0),
+                extra_bills: editFormData.extraBills !== '' && editFormData.extraBills !== null && editFormData.extraBills !== undefined
+                    ? parseInt(editFormData.extraBills)
+                    : (selectedEditItem.extra_bills || selectedEditItem.extraBills || 0),
                 total_amount: parseFloat(editFormData.totalAmount) || selectedEditItem.total_amount || 0
             }
             const originalDate = selectedEditItem.bill_arrival_date ?
                 new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''
             const originalVendorId = selectedEditItem.vendor_id
             const originalNoOfBills = selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0
+            const originalExtraBills = selectedEditItem.extra_bills || selectedEditItem.extraBills || 0
             const originalTotalAmount = selectedEditItem.total_amount || 0
             const hasChanges = (
                 payload.bill_arrival_date !== originalDate ||
                 payload.vendor_id !== originalVendorId ||
                 payload.no_of_bills !== parseInt(originalNoOfBills) ||
+                payload.extra_bills !== parseInt(originalExtraBills) ||
                 payload.total_amount !== parseFloat(originalTotalAmount)
             )
             if (!hasChanges) {
@@ -2520,6 +2735,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     billArrivalDate: '',
                     vendorId: null,
                     noOfBills: '',
+                    extraBills: '0',
                     totalAmount: ''
                 })
                 window.location.reload()
@@ -2539,6 +2755,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             billArrivalDate: '',
             vendorId: null,
             noOfBills: '',
+            extraBills: '0',
             totalAmount: ''
         })
     }
@@ -2880,7 +3097,13 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                             {getVendorNameById(item.vendor_id)}
                                         </td>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100">
-                                            {item.no_of_bills || item.noOfBills || '-'}
+                                            {(() => {
+                                                const no = item.no_of_bills ?? item.noOfBills ?? null
+                                                const extra = item.extra_bills ?? item.extraBills ?? 0
+                                                if (no == null) return '-'
+                                                const extraNum = Number(extra) || 0
+                                                return extraNum > 0 ? `${no} & ${extraNum}` : String(no)
+                                            })()}
                                         </td>
                                         <td className="px-2 py-3 text-right pr-10 text-sm font-semibold border-b border-gray-100">
                                             {item.total_amount ? `₹${parseInt(item.total_amount).toLocaleString()}` : '-'}
@@ -2991,7 +3214,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                             )
                                         ) : (
                                             <>
-                                                Enter PO numbers or select "No PO" (Max: {selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})
+                                                {isDuplicateMode
+                                                    ? `Enter PO numbers or mark as "Duplicate" (Max: ${selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})`
+                                                    : `Enter PO numbers or select "No PO" (Max: ${selectedBill?.noOfBills || selectedBill?.no_of_bills || 0})`}
                                                 {isSendRequestDisabled() && !hasUnverifiedBillNumbers() && (
                                                     <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
                                                         Enter bill numbers to enable Send Request
@@ -3062,6 +3287,15 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                     Edit
                                                 </button>
                                             ) : null}
+                                            <button
+                                                className={`px-4 py-2 rounded font-medium transition-colors duration-200 ${isDuplicateMode
+                                                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                                    : 'bg-white text-purple-600 border border-purple-600 hover:bg-purple-50'
+                                                    }`}
+                                                onClick={toggleDuplicateMode}
+                                            >
+                                                {isDuplicateMode ? 'Duplicate Mode' : 'Duplicate'}
+                                            </button>
                                         </>
                                     )}
                                     {selectedBill?.send_request && !isAdminUser() && (
@@ -4204,19 +4438,34 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                         }}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Number of Bills *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={editFormData.noOfBills}
-                                        onChange={(e) => handleEditInputChange('noOfBills', e.target.value)}
-                                        className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none focus:border-[#BF9853] focus:border-opacity-60"
-                                        placeholder="Enter number of bills"
-                                        required
-                                    />
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Number of Bills *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={editFormData.noOfBills}
+                                            onChange={(e) => handleEditInputChange('noOfBills', e.target.value)}
+                                            className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none focus:border-[#BF9853] focus:border-opacity-60"
+                                            placeholder="Enter number of bills"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Extra Bills (PO)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={editFormData.extraBills}
+                                            onChange={(e) => handleEditInputChange('extraBills', e.target.value)}
+                                            className="w-full h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-30 rounded-lg text-sm focus:outline-none focus:border-[#BF9853] focus:border-opacity-60"
+                                            placeholder="Enter extra bills (default: 0)"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">

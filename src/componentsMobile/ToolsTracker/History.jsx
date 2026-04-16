@@ -766,14 +766,20 @@ const History = ({ user, onTabChange }) => {
       const asString = String(input).trim();
       let d = new Date(asString);
 
-      // Handle common DD-MM-YYYY / DD/MM/YYYY formats (which `new Date()` often fails to parse)
-      if (isNaN(d.getTime())) {
-        const m = asString.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-        if (m) {
-          const day = parseInt(m[1], 10);
-          const month = parseInt(m[2], 10) - 1;
-          const year = parseInt(m[3], 10);
-          d = new Date(year, month, day);
+      // Force-parse numeric dates with / or - separators.
+      // Backend is sending MM/DD/YYYY (or MM-DD-YYYY). We always DISPLAY as DD/MM/YYYY.
+      // If the first part is > 12, treat as DD/MM/YYYY; otherwise treat as MM/DD/YYYY.
+      const parts = asString.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (parts) {
+        const a = parseInt(parts[1], 10);
+        const b = parseInt(parts[2], 10);
+        const year = parseInt(parts[3], 10);
+        const isLikelyDMY = a > 12; // 13/04/2026 -> DMY
+        const day = isLikelyDMY ? a : b;
+        const month = (isLikelyDMY ? b : a) - 1;
+        const forced = new Date(year, month, day);
+        if (!isNaN(forced.getTime())) {
+          d = forced;
         }
       }
 
@@ -795,6 +801,13 @@ const History = ({ user, onTabChange }) => {
     } catch {
       return String(input);
     }
+  };
+
+  const formatBackendDateOrRelative = (backendDate) => {
+    if (!backendDate) return '';
+    const label = formatRelativeDateLabel(backendDate);
+    if (label === 'Today' || label === 'Yesterday') return label;
+    return String(backendDate);
   };
   const resolveMachineNumberText = (entry) => {
     if (entry.machineNumber && String(entry.machineNumber).trim()) {
@@ -1434,8 +1447,7 @@ const History = ({ user, onTabChange }) => {
           <p className="text-[12px] text-black font-semibold">Category</p>
           <div className="flex items-center gap-[4px] flex-shrink-0">
             <button
-              type="button"
-              onClick={() => setShowFilterItemIdModal(true)}
+              type="button" onClick={() => setShowFilterItemIdModal(true)}
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent text-right"
             >
               {filterItemId ? filterItemId : 'Item ID'}
@@ -1651,7 +1663,8 @@ const History = ({ user, onTabChange }) => {
               // Get entry date from original entry
               const originalEntry = fullEntriesData.find(e => String(e.id) === String(entry.entryId));
               const entryDate = originalEntry?.date || '';
-              const formattedDate = entryDate ? formatRelativeDateLabel(entryDate) : '';
+              // Show Today/Yesterday for current/previous date; otherwise show backend date string as-is.
+              const formattedDate = formatBackendDateOrRelative(entryDate);
               const formattedCreatedDateTime = createdDateTime ? dateTime : '';
               let dateTimeDisplay = dateTime || `${date} • ${time}`;
               if (historyType === 'log') {
@@ -1714,10 +1727,7 @@ const History = ({ user, onTabChange }) => {
                       }}
                     >
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleClone(entry);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); handleClone(entry); }}
                         className="action-button w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                         title="Clone"
                       >
@@ -1744,8 +1754,7 @@ const History = ({ user, onTabChange }) => {
                   >
                     <div className="flex items-start justify-between mb-[2px]">
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <p
-                          className={`text-[12px] font-semibold leading-snug truncate ${editedFields.has('itemName') ? 'text-[#2563eb] font-bold' : 'text-black'}`}
+                        <p className={`text-[12px] font-semibold leading-snug truncate ${editedFields.has('itemName') ? 'text-[#2563eb] font-bold' : 'text-black'}`}
                           title={editedFields.has('itemName') ? tooltip('itemName') : undefined}
                         >
                           #{entry.eno}, {itemName}
@@ -1775,15 +1784,13 @@ const History = ({ user, onTabChange }) => {
                       </div>
                     </div>
                     <div className="flex items-start justify-between mb-[2px]">
-                      <p
-                        className={`text-[11px] leading-snug font-semibold truncate flex-1 min-w-0 ${editedFields.has('fromLocation') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
+                      <p className={`text-[11px] leading-snug font-semibold truncate flex-1 min-w-0 ${editedFields.has('fromLocation') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
                         title={editedFields.has('fromLocation') ? tooltip('fromLocation') : undefined}
                       >
                         From - {fromLocation}
                       </p>
                       {machineNumberText ? (
-                        <p
-                          className={`text-[11px] leading-snug flex-shrink-0 ml-2 truncate max-w-[40%] ${editedFields.has('machineNumber') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
+                        <p className={`text-[11px] leading-snug flex-shrink-0 ml-2 truncate max-w-[40%] ${editedFields.has('machineNumber') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
                           title={editedFields.has('machineNumber') ? tooltip('machineNumber') : undefined}
                         >
                           {machineNumberText}
@@ -1791,8 +1798,7 @@ const History = ({ user, onTabChange }) => {
                       ) : null}
                     </div>
                     <div className="flex items-start justify-between mb-[2px]">
-                      <p
-                        className={`text-[11px] leading-snug font-semibold truncate flex-1 min-w-0 ${editedFields.has('toLocation') ? 'text-[#2563eb] font-semibold' : 'text-[#BF9853]'}`}
+                      <p className={`text-[11px] leading-snug font-semibold truncate flex-1 min-w-0 ${editedFields.has('toLocation') ? 'text-[#2563eb] font-semibold' : 'text-[#BF9853]'}`}
                         title={editedFields.has('toLocation') ? tooltip('toLocation') : undefined}
                       >
                         To - {toLocation}
@@ -1805,8 +1811,7 @@ const History = ({ user, onTabChange }) => {
                                 'bg-[#9E9E9E]'
                             }`}
                         ></span>
-                        <p
-                          className={`text-[11px] font-medium leading-snug ${entry.machineStatus === 'Working' ? 'text-[#4CAF50]' :
+                        <p className={`text-[11px] font-medium leading-snug ${entry.machineStatus === 'Working' ? 'text-[#4CAF50]' :
                             entry.machineStatus === 'Not Working' ? 'text-[#F44336]' :
                               entry.machineStatus === 'Under Repair' ? 'text-[#FF9800]' :
                                 'text-[#9E9E9E]'
@@ -1821,8 +1826,7 @@ const History = ({ user, onTabChange }) => {
                         <span className={`font-bold ${editedFields.has('date') ? 'text-[#2563eb]' : 'text-black'}`}>{formattedDate || date}</span>
                         {formattedCreatedDateTime && <span className={`font-semibold ${editedFields.has('date') ? 'text-[#2563eb]' : 'text-[#9E9E9E]'}`}> • {formattedCreatedDateTime}</span>}
                       </p>
-                      <p
-                        className={`text-[12px] font-medium leading-snug flex-shrink-0 ml-2 ${editedFields.has('incharge') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
+                      <p className={`text-[12px] font-medium leading-snug flex-shrink-0 ml-2 ${editedFields.has('incharge') ? 'text-[#2563eb] font-semibold' : 'text-black'}`}
                         title={editedFields.has('incharge') ? tooltip('incharge') : undefined}
                       >
                         {inchargeName}

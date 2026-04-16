@@ -961,8 +961,8 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           const contractorOrVendor = selectedOption ? selectedOption.label : '';
           const finalName = `${timestamp} ${selectedSite?.sNo || ''} ${contractorOrVendor}`;
           formData.append('files', selectedFile);
-          formData.append('fileName', finalName);
-          formData.append('folderName', 'FileUpload / Advance_Portal');
+          formData.append('folder', 'FileUpload / Advance_Portal');
+          formData.append('fileName', finalName);          
           const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,

@@ -39,6 +39,7 @@ import MobileRFQLogin from './componentsMobile/RequestForQuotation/LoginPage';
 import MobileRFQ from './componentsMobile/RequestForQuotation/RequestForQuotation';
 import GoodsRecievedNotesCreate from './componentsMobile/Goods Recieved Notes/Create';
 import GoodsRecievedNotesVerify from './componentsMobile/Goods Recieved Notes/Verify';
+import MobileMasterData from './componentsMobile/MasterData/MasterData';
 
 function MainContentWithSidebarMargin({ children }) {
   const { isSidebarVisible } = useSidebar();
@@ -72,7 +73,8 @@ function AppContent({ user, handleLogout }) {
     location.pathname.startsWith('/portal') ||
     location.pathname.startsWith('/loan') ||
     location.pathname.startsWith('/rfq') ||
-    location.pathname.startsWith('/grn');
+    location.pathname.startsWith('/grn') ||
+    location.pathname.startsWith('/master-data');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
 
   return (
@@ -158,7 +160,16 @@ function AppContent({ user, handleLogout }) {
         <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/master-data' element={<MasterData username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route
+          path='/master-data'
+          element={
+            isMobile ? (
+              <MobileMasterData user={user} onLogout={handleLogout} />
+            ) : (
+              <MasterData username={user.username} userRoles={user?.userRoles || []} />
+            )
+          }
+        />
         <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path="/utility/*" element={<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />} />
         <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />

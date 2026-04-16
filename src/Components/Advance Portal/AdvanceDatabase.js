@@ -1054,9 +1054,9 @@ const AdvanceDatabase = ({ username, userRoles = [] }) => {
             .replace(",", "")
             .replace(/\s/g, "-");
           const finalName = `${timestamp} ${selectedSite?.sNo || ''} ${contractorOrVendor}`;
-          formData.append('files', selectedFile);
+          formData.append('files', selectedFile);          
+          formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);
-          formData.append('folderName', 'FileUpload / Advance_Portal');
           const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,

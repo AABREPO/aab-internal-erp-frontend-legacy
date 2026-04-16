@@ -1697,7 +1697,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             const formData = new FormData();
             const finalName = `${timestamp}-${siteNo}-${name}`;
             formData.append("files", selectedFileForPopup);
-            formData.append("folderName", "FileUpload / Daily_Cash_Register");
+            formData.append("folder", "FileUpload / Daily_Cash_Register");
             formData.append("fileName", finalName);
             const uploadResponse = await fetch(
                 "https://backendaab.in/aabuildersDash/api/files/upload",

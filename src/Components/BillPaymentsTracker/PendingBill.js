@@ -3081,9 +3081,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const finalName = payment
                 ? `${timestamp} ${vendorName !== '-' ? vendorName : 'Payment'} ${payment.vendor_bill_payment_mode || ''}`
                 : processedFile.name;
-            formData.append('file', processedFile);
-            formData.append('file_name', finalName);
-            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+            formData.append('files', processedFile);
+            formData.append('folder', 'FileUpload / Bill_Payments_Tracker ');
+            formData.append('fileName', finalName);
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
@@ -3092,7 +3093,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 throw new Error('File upload failed');
             }
             const uploadResult = await uploadResponse.json();
-            const billUrl = uploadResult.url;
+            const billUrl = uploadResult.urls[0];
             // Update the payment with bill_url using the update API
             const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/update/${paymentId}`, {
                 method: "PUT",
@@ -3158,9 +3159,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
             const displayVendorName = vendorName !== '-' ? vendorName : 'Overall Payment';
             const fileName = `${timestamp} ${displayVendorName} - summary bill.pdf`;
-            formData.append('file', processedFile);
-            formData.append('file_name', fileName);
-            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+            formData.append('files', processedFile);
+            formData.append('folder', 'FileUpload / Bill_Payments_Tracker ');
+            formData.append('fileName', fileName);
+            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
@@ -3168,7 +3170,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 throw new Error('File upload failed');
             }
             const uploadResult = await uploadResponse.json();
-            const pdfUrl = uploadResult.url;
+            const pdfUrl = uploadResult.urls[0];
             // Update the overall payment PDF URL via API
             const billId = selectedPaymentBill.id; // This is the tracker ID
             const response = await fetch(
@@ -3322,9 +3324,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 .replace(",", "")
                                 .replace(/\s/g, "-");
                             const finalName = `${timestamp} ${selectedPaymentBill.vendor_name || 'Payment'} ${entry.mode}`;
-                            formData.append('file', entry.attachedFile);
-                            formData.append('file_name', finalName);
-                            const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+                            formData.append('files', entry.attachedFile);
+                            formData.append('folder', 'FileUpload / Bill_Payments_Tracker ');
+                            formData.append('fileName', finalName);
+                            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                                 method: "POST",
                                 body: formData,
                             });
@@ -3332,7 +3335,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 throw new Error('File upload failed');
                             }
                             const uploadResult = await uploadResponse.json();
-                            billUrl = uploadResult.url;
+                            billUrl = uploadResult.urls[0];
                         } catch (error) {
                             console.error('Error during file upload:', error);
                             alert('Error during file upload. Please try again.');

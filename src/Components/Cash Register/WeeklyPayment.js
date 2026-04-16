@@ -117,7 +117,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     // Calculate actual current week number using ISO week calculation
     const actualCurrentWeekNumber = getISOWeekNumber(new Date());
     const nextCalendarWeekNumber = getISOWeekNumber(new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)));
-    const operationalWeekNumber = currentWeekHasStatusTrue ? nextCalendarWeekNumber : actualCurrentWeekNumber;
+    // The week we MUST operate on (previous open week wins)
+    const [activeWeekNumber, setActiveWeekNumber] = useState(actualCurrentWeekNumber);
+    const operationalWeekNumber = activeWeekNumber || actualCurrentWeekNumber;
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -1020,6 +1022,51 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setCurrentWeekHasStatusTrue(false);
         }
     }, [actualCurrentWeekNumber, buildBranchUrl]);
+
+    // Decide which week should be shown:
+    // - If previous week has any data but not closed (no status:true), show previous week
+    // - Else show current week, and if current week already closed, show next week
+    const determineActiveWeekNumber = useCallback(async () => {
+        if (!actualCurrentWeekNumber) return;
+        const previousWeekNumber = actualCurrentWeekNumber === 1 ? 52 : actualCurrentWeekNumber - 1;
+        try {
+            const [prevExpensesRes, prevPaymentsRes] = await Promise.all([
+                fetch(buildBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${previousWeekNumber}`)),
+                fetch(buildBranchUrl(`https://backendaab.in/aabuildersDash/api/payments-received/week/${previousWeekNumber}`))
+            ]);
+            const prevExpensesData = prevExpensesRes.ok ? await prevExpensesRes.json() : [];
+            const prevPaymentsData = prevPaymentsRes.ok ? await prevPaymentsRes.json() : [];
+            const hasPreviousWeekData =
+                (Array.isArray(prevExpensesData) && prevExpensesData.length > 0) ||
+                (Array.isArray(prevPaymentsData) && prevPaymentsData.length > 0);
+            const previousClosed =
+                (Array.isArray(prevExpensesData) && prevExpensesData.some((e) => e?.status === true)) ||
+                (Array.isArray(prevPaymentsData) && prevPaymentsData.some((p) => p?.status === true));
+            setPreviousWeekHasData(Boolean(hasPreviousWeekData));
+            setPreviousWeekHasStatusTrue(Boolean(previousClosed));
+
+            if (hasPreviousWeekData && !previousClosed) {
+                // Previous week is open → force showing it and do not advance
+                setActiveWeekNumber(previousWeekNumber);
+                return;
+            }
+
+            const [currExpensesRes, currPaymentsRes] = await Promise.all([
+                fetch(buildBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${actualCurrentWeekNumber}`)),
+                fetch(buildBranchUrl(`https://backendaab.in/aabuildersDash/api/payments-received/week/${actualCurrentWeekNumber}`))
+            ]);
+            const currExpensesData = currExpensesRes.ok ? await currExpensesRes.json() : [];
+            const currPaymentsData = currPaymentsRes.ok ? await currPaymentsRes.json() : [];
+            const currentClosed =
+                (Array.isArray(currExpensesData) && currExpensesData.some((e) => e?.status === true)) ||
+                (Array.isArray(currPaymentsData) && currPaymentsData.some((p) => p?.status === true));
+            setCurrentWeekHasStatusTrue(Boolean(currentClosed));
+            setActiveWeekNumber(currentClosed ? nextCalendarWeekNumber : actualCurrentWeekNumber);
+        } catch (e) {
+            // On errors, fall back to current week
+            setActiveWeekNumber(actualCurrentWeekNumber);
+        }
+    }, [actualCurrentWeekNumber, nextCalendarWeekNumber, buildBranchUrl]);
     const fetchPortalDescriptions = useCallback(async (expensesData) => {
         const projectAdvanceRows = expensesData.filter(row => row.type === "Project Advance" && row.advance_portal_id);
         const fetchedDescriptions = {};
@@ -1140,21 +1187,34 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setPreviousWeekHasStatusTrue(false);
         }
     }, [operationalWeekNumber, buildBranchUrl]);
+    const refreshWeeklyPaymentData = useCallback(async () => {
+        await determineActiveWeekNumber();
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                fetchCurrentWeekNumber();
+                fetchExpenses();
+                fetchPayments();
+                fetchRefundPayments();
+                fetchWeeklyPaymentBills();
+                resolve();
+            }, 0);
+        });
+    }, [
+        determineActiveWeekNumber,
+        fetchCurrentWeekNumber,
+        fetchExpenses,
+        fetchPayments,
+        fetchRefundPayments
+    ]);
     // Initial fetch of current week number
     useEffect(() => {
         fetchCurrentWeekNumber();
     }, [fetchCurrentWeekNumber]);
     useEffect(() => {
         if (actualCurrentWeekNumber) {
-            checkCurrentWeekStatus();
+            determineActiveWeekNumber();
         }
-    }, [actualCurrentWeekNumber, checkCurrentWeekStatus]);
-    // Check previous week status when actualCurrentWeekNumber is available
-    useEffect(() => {
-        if (operationalWeekNumber) {
-            checkPreviousWeekStatus();
-        }
-    }, [operationalWeekNumber, checkPreviousWeekStatus]);
+    }, [actualCurrentWeekNumber, determineActiveWeekNumber]);
     // Fetch expenses and payments whenever actual current week is available
     useEffect(() => {
         if (operationalWeekNumber) {
@@ -1390,17 +1450,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 body: JSON.stringify(expenseForBackend),
             });
             if (!res.ok) throw new Error("Failed to save weekly expense");
-            const saved = await res.json();
-            setExpenses((prev) => {
-                const newExpenses = [saved, ...prev];
-                fetchPortalDescriptions(newExpenses);
-                return newExpenses;
-            });
+            await res.json();
             setShowPurposePopup(false);
             setSelectedPurpose(null);
             setLoanPurposeDescription("");
             setPendingLoanData(null);
-            window.location.reload();
+            await refreshWeeklyPaymentData();
             setNewExpense({
                 date: "",
                 contractor: "",
@@ -1700,13 +1755,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     body: JSON.stringify(expenseForBackend),
                 });
                 if (!saveWeekly.ok) throw new Error("Failed to save weekly expense");
-                const savedWeekly = await saveWeekly.json();
-                setExpenses((prev) => {
-                    const newExpenses = [savedAdvance, savedWeekly, ...prev];
-                    fetchPortalDescriptions(newExpenses);
-                    return newExpenses;
-                });
-                window.location.reload();
+                await saveWeekly.json();
             } else if (newExpense.type === "Staff Advance") {
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
                 if (!res.ok) throw new Error("Failed to fetch staff advance entry numbers");
@@ -1745,13 +1794,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     body: JSON.stringify(expenseForBackend),
                 });
                 if (!saveWeekly.ok) throw new Error("Failed to save weekly expense");
-                const savedWeekly = await saveWeekly.json();
-                setExpenses((prev) => {
-                    const newExpenses = [savedStaffAdvance, savedWeekly, ...prev];
-                    fetchStaffAdvanceDescriptions(newExpenses);
-                    return newExpenses;
-                });
-                window.location.reload();
+                await saveWeekly.json();
             } else {
                 const res = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
                     method: "POST",
@@ -1759,14 +1802,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     body: JSON.stringify(expenseForBackend),
                 });
                 if (!res.ok) throw new Error("Failed to save weekly expense");
-                const saved = await res.json();
-                setExpenses((prev) => {
-                    const newExpenses = [saved, ...prev];
-                    fetchPortalDescriptions(newExpenses);
-                    return newExpenses;
-                });
-                window.location.reload();
+                await res.json();
             }
+            await refreshWeeklyPaymentData();
             setNewExpense({
                 date: "",
                 contractor: "",
@@ -1786,6 +1824,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             setSelectedEmployee(null);
             setSelectedClient(null);
             setSelectedProjectName(null);
+            setIsSubmitting(false);
         } catch (err) {
             setIsSubmitting(false);
             alert("Error saving expense: " + err.message);
@@ -1851,10 +1890,10 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 if (!res.ok) throw new Error("Failed to save payment");
                 return res.json();
             })
-            .then((saved) => {
-                setPayments((prev) => [saved, ...prev]);
+            .then(async () => {
                 setNewPayment({ date: "", amount: "", type: "Weekly" });
-                window.location.reload();
+                await refreshWeeklyPaymentData();
+                setIsSubmitting(false);
             })
             .catch((err) => {
                 setIsSubmitting(false);
@@ -1888,9 +1927,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             url.searchParams.append("currentWeek", operationalWeekNumber);
             url.searchParams.append("branchId", String(activeBranchId));
             const res = await fetch(url.toString(), { method: "POST" });
-            const backendNextWeekNumber = await res.json();
+            await res.json();
             setCurrentWeekNumber(nextWeekNumber);
-            window.location.reload();
+            await refreshWeeklyPaymentData();
             setNewExpense({ date: "", contractor: "", project: "", type: "", amount: "", staff_advance_portal_id: "" });
             setNewPayment({ date: "", amount: "", type: "Weekly" });
         } catch (error) {
@@ -2122,7 +2161,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     return newExpenses;
                 });
             }
-            window.location.reload();
+            await refreshWeeklyPaymentData();
             setEditingRowId(null);
         } catch (error) {
             console.error("❌ Error updating expense:", error);
@@ -2153,11 +2192,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (!response.ok) {
                 throw new Error("Failed to update payment");
             }
-            const updatedPayment = await response.json();
-            window.location.reload();
-            setPayments((prev) =>
-                prev.map((p) => (p.id === row.id ? updatedPayment : p))
-            );
+            await response.json();
+            await refreshWeeklyPaymentData();
             setEditingPaymentId(null);
         } catch (error) {
             console.error("Error updating payment:", error);
@@ -2200,7 +2236,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (response.ok) {
                     alert("Weekly Expenses deleted successfully!!!");
-                    window.location.reload();
+                    await refreshWeeklyPaymentData();
                 } else {
                     console.error("Failed to delete the Weekly Expenses. Status:", response.status);
                     alert("Error deleting the Weekly Expenses. Please try again.");
@@ -2222,7 +2258,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (response.ok) {
                     alert("Weekly Expenses deleted successfully!!!");
-                    window.location.reload();
+                    await refreshWeeklyPaymentData();
                 } else {
                     console.error("Failed to delete the Weekly Expenses. Status:", response.status);
                     alert("Error deleting the Weekly Expenses. Please try again.");
@@ -2556,7 +2592,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             doc.setFontSize(10);
             const shouldShowWeekNumber = previousWeekHasStatusTrue || !previousWeekHasData;
             const displayWeekNumber = shouldShowWeekNumber ? (operationalWeekNumber || "") : "";
-            doc.text(`PS: ${String(displayWeekNumber)}`, 30, 40);
+            doc.text(`PS: ${String(operationalWeekNumber ?? "-")}`, 30, 40);
             doc.setFontSize(9);
             doc.text(String(new Date().toLocaleDateString("en-GB") || ""), 30, 55);
             doc.setFontSize(14);
@@ -3113,7 +3149,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     <div className="flex-[3] min-w-0">
                         <div className="flex justify-between">
                             <h1 className="font-bold text-xl">
-                                PS: {(previousWeekHasStatusTrue || !previousWeekHasData) ? (operationalWeekNumber ?? "-") : "-"}
+                                PS: {operationalWeekNumber ?? "-"}
                             </h1>
                             <h1 className="font-bold text-base">
                                 Expenses: <span style={{ color: "#E4572E" }}>

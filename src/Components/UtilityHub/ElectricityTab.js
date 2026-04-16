@@ -5,10 +5,15 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
+import ExpenseEntryForm from '../ExpensesEntry/Form';
 
 const ElectricityTab = ({ username, userRoles = [] }) => {
+    const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false);
+    const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null);
     const [filters, setFilters] = useState({
         year: new Date().getFullYear().toString(),
+        month: '',
+        paymentStatus: '',
         vendor: '',
         service: '',
         doorNo: '',
@@ -34,6 +39,11 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     });
     const [selectedRowData, setSelectedRowData] = useState(null);
     const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const paymentStatusOptions = [
+        { value: 'Paid', label: 'Paid' },
+        { value: 'Unpaid', label: 'Unpaid' }
+    ];
     useEffect(() => {
         const fetchProjects = async () => {
             try {
@@ -160,6 +170,10 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                     }
                 }
 
+                if (!matchesPaymentFilters(property)) {
+                    return false;
+                }
+
                 return true;
             });
 
@@ -176,7 +190,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         }, []);
 
         setFilteredProjects(filtered);
-    }, [filters, projects, selectedCategory, electricityPayments]);
+    }, [filters, projects, selectedCategory, electricityPayments, frequencyHistory]);
     const handleFilterChange = (filterType, selectedOption) => {
         setFilters(prev => ({
             ...prev,
@@ -355,8 +369,30 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         });
         return unpaidCount;
     };
+    const matchesPaymentFilters = (property) => {
+        const selectedMonth = filters.month;
+        const selectedStatus = filters.paymentStatus;
 
-    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        if (!selectedMonth && !selectedStatus) {
+            return true;
+        }
+
+        const evaluateMonth = (month) => {
+            const paymentData = getPaymentData(property.ebNo, month, property.id);
+            const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+            const isUnpaid = paymentData.amount === '0';
+
+            if (selectedStatus === 'Paid') return isPaid;
+            if (selectedStatus === 'Unpaid') return isUnpaid;
+            return true;
+        };
+
+        if (selectedMonth) {
+            return evaluateMonth(selectedMonth);
+        }
+
+        return monthLabels.some((month) => evaluateMonth(month));
+    };
 
     const buildExportRows = () => {
         const rows = [];
@@ -560,11 +596,64 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             alert('Failed to save frequency history. Please try again.');
         }
     };
+
+    const handleOpenExpenseEntryPopup = ({ ebNo, project, property }) => {
+        const prefillData = {
+            utilityType: 'Electricity',
+            siteName: project?.projectName || project?.siteName || '',
+            projectId: project?.id || project?.projectId || null,
+            propertyId: property?.id || null,
+            utilityIdentifier: { key: 'ebNo', value: ebNo },
+            ebNo
+        };
+        localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefillData));
+        setExpenseEntryPrefill(prefillData);
+        setShowExpenseEntryModal(true);
+    };
     return (
         <div className="bg-[#FAF6ED] rounded-lg shadow-sm">
-            <div className="bg-white rounded-md mb-5 h-[128px] ml-5 mr-5">
+            {showExpenseEntryModal ? (
+                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowExpenseEntryModal(false);
+                                    setExpenseEntryPrefill(null);
+                                    localStorage.removeItem('expenseEntryPrefill');
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-3">
+                            <ExpenseEntryForm
+                                username={username}
+                                userRoles={userRoles}
+                                embedded
+                                onSuccess={async () => {
+                                    setShowExpenseEntryModal(false);
+                                    setExpenseEntryPrefill(null);
+                                    localStorage.removeItem('expenseEntryPrefill');
+                                    try {
+                                        const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
+                                        setElectricityPayments(response.data || []);
+                                    } catch {
+                                        // ignore refresh errors
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
-                    <div className="flex text-left gap-4">
+                    {/* 10 filters -> grid of 5 columns naturally renders them as 2 rows */}
+                    <div className="grid grid-cols-5 gap-4 text-left">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -577,7 +666,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 onChange={(selectedOption) => handleFilterChange('year', selectedOption)}
                                 placeholder="Select Year"
                                 isClearable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -590,7 +684,48 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Vendor"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Month</label>
+                            <Select
+                                options={monthLabels.map(month => ({ value: month, label: month }))}
+                                value={filters.month ? { value: filters.month, label: filters.month } : null}
+                                onChange={(selectedOption) => handleFilterChange('month', selectedOption)}
+                                placeholder="Select Month"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Payment Status</label>
+                            <Select
+                                options={paymentStatusOptions}
+                                value={filters.paymentStatus ? { value: filters.paymentStatus, label: filters.paymentStatus } : null}
+                                onChange={(selectedOption) => handleFilterChange('paymentStatus', selectedOption)}
+                                placeholder="Select Status"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -603,7 +738,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Service No"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -616,7 +756,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Door No"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -629,7 +774,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Shop"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -642,7 +792,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Project"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -655,7 +810,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Project Type"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -668,7 +828,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Tenant"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -733,32 +898,34 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         </div>
                     </div>
                     <div className="border-l-8 border-l-[#BF9853] rounded-lg">
-                        <div className="overflow-y-auto h-[480px]">
-                            <table className="w-full border-collapse ">
+                        <div className="overflow-x-auto">
+                            <div className="overflow-y-auto h-[480px] min-w-max">
+                            <table className="w-full border-collapse table-auto">
                                 <thead className="sticky top-0 z-10">
                                     <tr className="bg-[#FAF6ED]">
-                                        <td className=" px-4 py-2 text-left font-semibold">Sl.No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">PID</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Project Name</td>
-                                        <td className=" px-4 py-2 text-left font-semibold"></td>
-                                        <td className=" px-4 py-2 text-left font-semibold">D.No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Phase</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Service No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Jan</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Feb</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Mar</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Apr</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">May</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">June</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">July</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Aug</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Sep</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Oct</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Nov</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Dec</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Unpaid</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Activity</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Hide</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sl.No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">PID</td>
+                                        <td className="px-4 py-2 text-left font-semibold">Project Name</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap"></td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">D.No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Shop No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Phase</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Service No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Jan</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Feb</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Mar</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Apr</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">May</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">June</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">July</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Aug</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sep</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Oct</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Nov</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Dec</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Unpaid</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Activity</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Hide</td>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -790,7 +957,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-2 py-2">{rowIndex + 1}</td>
                                                             <td className="px-2 py-2">{project.projectId}</td>
-                                                            <td className="px-2 py-2 text-left">{project.projectName}</td>
+                                                            <td className="px-2 py-2 text-left whitespace-normal break-words max-w-[220px]">
+                                                                {project.projectName}
+                                                            </td>
                                                             <td className="px-2 py-2">
                                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${project.projectCategory === 'Client Project'
                                                                     ? 'bg-orange-100 text-orange-800'
@@ -802,13 +971,25 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                 </span>
                                                             </td>
                                                             <td className="px-2 py-2">{property.doorNo || '-'}</td>
+                                                            <td className="px-2 py-2">{property.shopNo || '-'}</td>
                                                             <td className="px-2 py-2">
                                                                 {property.ebNoPhase ? 
                                                                     ` ${property.ebNoPhase.replace('P', '')}` : 
                                                                     '-'
                                                                 }
                                                             </td>
-                                                            <td className="px-2 py-2 text-left">{property.ebNo}</td>
+                                                            <td
+                                                                className="px-2 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                                                onClick={() =>
+                                                                    handleOpenExpenseEntryPopup({
+                                                                        ebNo: property.ebNo,
+                                                                        project,
+                                                                        property
+                                                                    })
+                                                                }
+                                                            >
+                                                                {property.ebNo}
+                                                            </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
                                                                 const paymentData = getPaymentData(property.ebNo, month, property.id);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
@@ -861,8 +1042,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                 })
                                         )
                                     )}
-                                </tbody>
-                            </table>
+                            </tbody>
+                        </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -907,7 +1089,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{rowIndex + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
-                                                            <td className="px-4 py-2">{project.projectName}</td>
+                                                            <td className="px-4 py-2 whitespace-normal break-words max-w-[220px]">
+                                                                {project.projectName}
+                                                            </td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
                                                             <td className="px-4 py-2">
                                                                 {property.ebNoPhase ? 
@@ -915,7 +1099,18 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                     '-'
                                                                 }
                                                             </td>
-                                                            <td className="px-4 py-2">{property.ebNo}</td>
+                                                            <td
+                                                                className="px-4 py-2 text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                                                onClick={() =>
+                                                                    handleOpenExpenseEntryPopup({
+                                                                        ebNo: property.ebNo,
+                                                                        project,
+                                                                        property
+                                                                    })
+                                                                }
+                                                            >
+                                                                {property.ebNo}
+                                                            </td>
                                                             <td className="px-4 py-2">
                                                                 <button
                                                                     onClick={() => toggleProjectHideStatus(project.id, false)}

@@ -76,7 +76,7 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
             case 'advancesummary':
                 return <AdvanceSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
             default:
-                return <AdvancePortal paymentModeOptions={paymentModeOptions} />;
+                return <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
         }
     };
     return (

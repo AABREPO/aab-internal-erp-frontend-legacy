@@ -7,8 +7,9 @@ import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
 
 const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
+const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/api/utility-telecom/getAll';
 
-const Form = ({ username, userRoles = [] }) => {
+const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -69,6 +70,8 @@ const Form = ({ username, userRoles = [] }) => {
     const [selectedEbNumber, setSelectedEbNumber] = useState(null);
     const [selectedMonths, setSelectedMonths] = useState('');
     const [thirdInput, setThirdInput] = useState('');
+    const [validityType, setValidityType] = useState('');
+    const [serviceStartingDate, setServiceStartingDate] = useState('');
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [utilityType, setUtilityType] = useState('');
     const [projectData, setProjectData] = useState(null);
@@ -406,7 +409,15 @@ const Form = ({ username, userRoles = [] }) => {
                     setSelectedAccountType('Utility Bills');
                 }
 
-                setUtilityType('Electricity');
+                const prefillUtilityType =
+                    prefillData.utilityType ||
+                    (prefillData.ebNo ? 'Electricity' : '') ||
+                    (prefillData.propertyTaxNo ? 'Property' : '') ||
+                    (prefillData.waterTaxNo ? 'Water' : '') ||
+                    (prefillData.utilityTypeNumber ? 'Telecom' : '');
+                if (prefillUtilityType) {
+                    setUtilityType(prefillUtilityType);
+                }
 
                 const siteOption = siteOptions.find(opt => opt.label === prefillData.siteName);
                 if (siteOption) {
@@ -415,9 +426,9 @@ const Form = ({ username, userRoles = [] }) => {
 
                 const fetchPreviousEntry = async () => {
                     try {
-                        const response = await axios.get(
-                            "https://backendaab.in/aabuilderDash/expenses_form/utility/electricity"
-                        );
+                        // Only auto-prefill previous entry + TNEB contractor for Electricity.
+                        if (prefillUtilityType !== 'Electricity') return;
+                        const response = await axios.get("https://backendaab.in/aabuilderDash/expenses_form/utility/electricity");
                         const electricityEntries = Array.isArray(response.data) ? response.data : [];
 
                         const previousEntry = electricityEntries
@@ -447,6 +458,9 @@ const Form = ({ username, userRoles = [] }) => {
                             if (previousEntry.utilityValidityDays) {
                                 setThirdInput(previousEntry.utilityValidityDays);
                             }
+                        if (previousEntry.utilityValidityType) {
+                            setValidityType(previousEntry.utilityValidityType);
+                        }
 
                             setTimeout(() => {
                                 if (siteOption && projectData) {
@@ -454,6 +468,7 @@ const Form = ({ username, userRoles = [] }) => {
                             }, 500);
                         }
                         const setTNEBContractor = () => {
+                            if (prefillUtilityType !== 'Electricity') return;
                             if (contractorOptions.length > 0) {
                                 const tnebOption = contractorOptions.find(opt =>
                                     opt.label === 'TNEB' || opt.value === 'TNEB'
@@ -514,11 +529,24 @@ const Form = ({ username, userRoles = [] }) => {
         }
     }, [utilityType, projectData]);
     useEffect(() => {
+        if (utilityType !== 'Telecom') {
+            setServiceStartingDate('');
+        }
+    }, [utilityType]);
+    useEffect(() => {
         const prefillDataStr = localStorage.getItem('expenseEntryPrefill');
         if (prefillDataStr && ebNumberOptions.length > 0) {
             try {
                 const prefillData = JSON.parse(prefillDataStr);
-                const ebOption = ebNumberOptions.find(opt => opt.value === prefillData.ebNo);
+                const targetNumber =
+                    (prefillData.utilityType === 'Telecom' ? prefillData.utilityTypeNumber : null) ||
+                    prefillData.ebNo ||
+                    prefillData.propertyTaxNo ||
+                    prefillData.waterTaxNo ||
+                    prefillData.utilityTypeNumber ||
+                    (prefillData.utilityIdentifier ? prefillData.utilityIdentifier.value : null) ||
+                    null;
+                const ebOption = ebNumberOptions.find(opt => opt.value === targetNumber);
                 if (ebOption) {
                     setSelectedEbNumber(ebOption);
                     setTimeout(() => {
@@ -584,7 +612,43 @@ const Form = ({ username, userRoles = [] }) => {
             return null;
         }
     };
-    const updateEbNumberOptions = (utilityType, projectData) => {
+    const updateEbNumberOptions = async (utilityType, projectData) => {
+        // Telecom numbers come from telecom directory, filtered by project_id
+        if (utilityType === 'Telecom') {
+            const pid =
+                projectData?.id ??
+                projectData?.projectId ??
+                projectData?.project_id ??
+                selectedSite?.id ??
+                null;
+            if (!pid) {
+                setEbNumberOptions([]);
+                return;
+            }
+            try {
+                const res = await axios.get(TELECOM_DIRECTORY_ENDPOINT);
+                const rows = Array.isArray(res.data) ? res.data : [];
+                const serviceNos = rows
+                    .filter(r => String(r?.project_id ?? r?.projectId ?? '') === String(pid))
+                    .map(r => r?.service_number ?? r?.serviceNumber ?? '')
+                    .map(v => String(v || '').trim())
+                    .filter(Boolean);
+                const unique = Array.from(new Set(serviceNos));
+                setEbNumberOptions(
+                    unique.map((no, idx) => ({
+                        value: no,
+                        label: no,
+                        id: idx
+                    }))
+                );
+            } catch (e) {
+                console.error('Failed to fetch telecom service numbers', e);
+                setEbNumberOptions([]);
+            }
+            return;
+        }
+
+        // Other utilities use project property details
         if (!projectData || !projectData.propertyDetails) {
             setEbNumberOptions([]);
             return;
@@ -1070,6 +1134,8 @@ const Form = ({ username, userRoles = [] }) => {
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
                 utilityValidityDays: thirdInput || '',
+                utilityValidityType: validityType || '',
+                serviceStartingDate: serviceStartingDate || '',
                 branchId: activeBranchId,
                 enteredBy: username
             };
@@ -1185,6 +1251,9 @@ const Form = ({ username, userRoles = [] }) => {
             }
             setEno(eno + 1);
             resetForm();
+            if (typeof onSuccess === 'function') {
+                try { await onSuccess(savedExpenseData || null); } catch { }
+            }
         } catch (error) {
             console.error('Error during form submission:', error);
             alert('Error during form submission. Please try again.');
@@ -1232,6 +1301,8 @@ const Form = ({ username, userRoles = [] }) => {
         setSelectedEbNumber(null);
         setSelectedMonths('');
         setThirdInput('');
+        setValidityType('');
+        setServiceStartingDate('');
         setUtilityType('');
         setProjectData(null);
         setEbNumberOptions([]);
@@ -1339,6 +1410,8 @@ const Form = ({ username, userRoles = [] }) => {
                 utilityTypeNumber: selectedEbNumber ? selectedEbNumber.label : '',
                 utilityForTheMonth: selectedMonths || '',
                 utilityValidityDays: thirdInput || '',
+                utilityValidityType: validityType || '',
+                serviceStartingDate: serviceStartingDate || '',
                 branchId: activeBranchId,
                 enteredBy: username
             };
@@ -1469,6 +1542,9 @@ const Form = ({ username, userRoles = [] }) => {
             setEno(eno + 1);
             resetForm();
             setShowPaymentModal(false);
+            if (typeof onSuccess === 'function') {
+                try { await onSuccess(savedExpenseData || null); } catch { }
+            }
         } catch (error) {
             console.error('Error submitting data:', error);
             toast.error('Failed to save data!', {
@@ -1519,7 +1595,8 @@ const Form = ({ username, userRoles = [] }) => {
         { label: 'Utility Type', value: utilityType || '-' },
         { label: 'Utility Number', value: selectedEbNumber?.label || '-' },
         { label: 'Utility Months', value: selectedMonths || '-' },
-        { label: 'Validity / Additional Info', value: thirdInput || '-' },
+        { label: 'Validity', value: thirdInput ? `${thirdInput}${validityType ? ` ${validityType}` : ''}` : '-' },
+        { label: 'Service Start Date', value: formatDateForReview(serviceStartingDate) || '-' },
         { label: 'Comments', value: comments || '-' },
     );
     const isPdfPreview = selectedFile?.type?.toLowerCase().includes('pdf');
@@ -1530,7 +1607,7 @@ const Form = ({ username, userRoles = [] }) => {
     }, []);
 
     return (
-        <div className='bg-[#FAF6ED] min-h-screen'>
+        <div className={embedded ? '' : 'bg-[#FAF6ED] min-h-screen'}>
             <style jsx>{`
                 input:hover, select:hover {
                     border-color: rgba(191, 152, 83, 0.2) !important;
@@ -1540,7 +1617,7 @@ const Form = ({ username, userRoles = [] }) => {
                     outline: none !important;
                 }
             `}</style>
-            <div className="mx-auto p-6 pb-10 bg-white rounded-lg shadow-lg w-full max-w-[1824px]">
+            <div className={`${embedded ? '' : 'mx-auto'} p-6 pb-10 bg-white rounded-lg shadow-lg w-full max-w-[1824px]`}>
                 <form onSubmit={handleFormSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
@@ -1777,7 +1854,7 @@ const Form = ({ username, userRoles = [] }) => {
                                             />
                                         </div>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">Months</label>
+                                            <label className="text-md font-semibold mb-2 block">For The Month Of</label>
                                             <input
                                                 type="month"
                                                 value={selectedMonths}
@@ -1788,15 +1865,41 @@ const Form = ({ username, userRoles = [] }) => {
                                         </div>
                                     </div>
                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
-                                        <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">Additional Input</label>
-                                            <input
-                                                type="text"
-                                                value={thirdInput}
-                                                onChange={(e) => setThirdInput(e.target.value)}
-                                                placeholder="Enter additional information..."
-                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
-                                            />
+                                        <div className="flex gap-4 items-end">
+                                            <div className="text-left">
+                                                <label className="text-md font-semibold mb-2 block">Validity</label>
+                                                <input
+                                                    type="text"
+                                                    value={thirdInput}
+                                                    onChange={(e) => setThirdInput(e.target.value)}
+                                                    placeholder="Enter validity..."
+                                                    className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                                />
+                                            </div>
+                                            <div className="text-left">
+                                                <label className="text-md font-semibold mb-2 block">Validity Type</label>
+                                                <select
+                                                    value={validityType}
+                                                    onChange={(e) => setValidityType(e.target.value)}
+                                                    className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[160px]"
+                                                >
+                                                    <option value="">--- Select ---</option>
+                                                    <option value="Days">Days</option>
+                                                    <option value="Month">Month</option>
+                                                    <option value="Year">Year</option>
+                                                </select>
+                                            </div>
+                                            {utilityType === 'Telecom' && (
+                                                <div className="text-left">
+                                                    <label className="text-md font-semibold mb-2 block">Service Start Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={serviceStartingDate}
+                                                        onChange={(e) => setServiceStartingDate(e.target.value)}
+                                                        className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[185px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </>
@@ -1830,7 +1933,7 @@ const Form = ({ username, userRoles = [] }) => {
                                 {selectedFile && <span className="text-gray-600">{selectedFile.name}</span>}
                             </div>
                             <div className="mt-4 flex">
-                                {userPermissions.includes("Create") && (
+                                {(embedded || userPermissions.includes("Create")) && (
                                     <button
                                         type='submit'
                                         disabled={isSubmitting || checkingDuplicate}
@@ -1842,6 +1945,7 @@ const Form = ({ username, userRoles = [] }) => {
                             </div>
                         </div>
                         {/* Advance history table for selected project and vendor/contractor (same logic as Advance Portal) */}
+                        {embedded ? null : (
                         <div className="hidden lg:flex flex-col items-stretch -ml-[120px]">
                             <div className="flex items-center mb-2">
                                 <div className="flex items-center gap-2">
@@ -1972,6 +2076,7 @@ const Form = ({ username, userRoles = [] }) => {
                                 </div>
                             </div>
                         </div>
+                        )}
                     </div>
                 </form>
             </div>
@@ -2239,7 +2344,7 @@ const Form = ({ username, userRoles = [] }) => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="text-sm font-semibold mb-1 block">Months</label>
+                                                        <label className="text-sm font-semibold mb-1 block">For The Month Of</label>
                                                         <input
                                                             type="month"
                                                             value={selectedMonths}
@@ -2248,14 +2353,41 @@ const Form = ({ username, userRoles = [] }) => {
                                                         />
                                                     </div>
                                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
-                                                        <div>
-                                                            <label className="text-sm font-semibold mb-1 block">Additional Input</label>
-                                                            <input
-                                                                type="text"
-                                                                value={thirdInput}
-                                                                onChange={(e) => setThirdInput(e.target.value)}
-                                                                className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                                                            />
+                                                        <div className={`grid gap-3 ${utilityType === 'Telecom' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                                            <div>
+                                                                <label className="text-sm font-semibold mb-1 block">Validity</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={thirdInput}
+                                                                    onChange={(e) => setThirdInput(e.target.value)}
+                                                                    placeholder="Enter count..."
+                                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-sm font-semibold mb-1 block">Validity Type</label>
+                                                                <select
+                                                                    value={validityType}
+                                                                    onChange={(e) => setValidityType(e.target.value)}
+                                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                                >
+                                                                    <option value="">--- Select ---</option>
+                                                                    <option value="Days">Days</option>
+                                                                    <option value="Month">Month</option>
+                                                                    <option value="Year">Year</option>
+                                                                </select>
+                                                            </div>
+                                                            {utilityType === 'Telecom' && (
+                                                                <div>
+                                                                    <label className="text-sm font-semibold mb-1 block">Service Start Date</label>
+                                                                    <input
+                                                                        type="date"
+                                                                        value={serviceStartingDate}
+                                                                        onChange={(e) => setServiceStartingDate(e.target.value)}
+                                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </>

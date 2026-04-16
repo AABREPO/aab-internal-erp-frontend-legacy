@@ -974,6 +974,18 @@ const Form = () => {
             const v = n % 100;
             return n + (s[(v - 20) % 10] || s[v] || s[0]);
         };
+        const now = new Date();
+        const timestamp = now.toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true
+                    })
+                        .replace(",", "")
+                        .replace(/\s/g, "-");
         const date = `${month} ${getOrdinal(day)} ${year}`;
         const formattedPaidOnDate = convertToDDMMYYYY(paidOnDate);
         const rentFormsRes = await fetch("https://backendaab.in/aabuildersDash/api/rental_forms/getAll");
@@ -983,8 +995,8 @@ const Form = () => {
         if (selectedRentFile) {
             const formData = new FormData();
             formData.append('files', selectedRentFile);
-            formData.append('fileName', `${date} `);
-            formData.append('folderName', 'FileUpload / Rent_Management');
+            formData.append('folder', 'FileUpload / Rent_Management');
+            formData.append('fileName', `${timestamp} `);
             const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,

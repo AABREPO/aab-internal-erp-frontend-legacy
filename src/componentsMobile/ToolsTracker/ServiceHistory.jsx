@@ -1081,7 +1081,7 @@ const ServiceHistory = ({ user, onTabChange }) => {
   };
 
   return (
-    <div className="flex flex-col bg-white min-h-[calc(100vh-90px-80px)]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="flex flex-col bg-white h-[calc(100vh-90px-80px)] overflow-hidden " style={{ fontFamily: "'Manrope', sans-serif" }}>
       <div className="sticky top-0 bg-white z-10 flex-shrink-0">
         {/* Top Header Section */}
         <div className="flex-shrink-0">
@@ -1218,9 +1218,8 @@ const ServiceHistory = ({ user, onTabChange }) => {
           Download
         </button>
       </div>
-
       {/* Service Records List */}
-      <div className="flex-1 overflow-y-auto pb-[16px]">
+      <div className="flex-1 overflow-y-auto pb-[16px] no-scrollbar scrollbar-none">
         {loading ? (
           <div className="flex items-center justify-center py-[32px]">
             <p className="text-[12px] text-gray-500">Loading...</p>
@@ -1245,7 +1244,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                   return false;
                 }
               }
-
               // Filter by Item ID
               if (filterItemId) {
                 const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
@@ -1293,26 +1291,20 @@ const ServiceHistory = ({ user, onTabChange }) => {
               return true;
             }).map((entry) => {
               const { date, time } = formatDateTime(entry.createdDateTime);
-
               // For Service type: check serviceStoreId first (vendors), then toProjectId
               let shopName = getLocationName(entry.serviceStoreId, true);
               if (shopName === '-') {
                 shopName = getLocationName(entry.toProjectId, false);
               }
-
               const inchargeName = employeesMap[entry.projectInchargeId] || employeesMap[String(entry.projectInchargeId)] || '-';
               const itemName = itemNamesMap[entry.itemNameId] || itemNamesMap[String(entry.itemNameId)] || entry.itemNameId || '-';
-
               // Get item ID name (like "AA DM 01") from the map using item_ids_id
               const itemIdName = entry.itemIdsId ? (itemIdsMap[entry.itemIdsId] || itemIdsMap[String(entry.itemIdsId)] || '') : '';
               const canViewImages = Boolean(entry.itemTableId);
               const machineNumberText = resolveMachineNumberText(entry);
-
               // Get status display
               const statusDisplay = getStatusDisplay(entry.machineStatus);
-
               const serviceCost = computeServiceCostForEntry(entry);
-
               // Swipe state and offset calculation
               const entryId = entry.id;
               const swipeState = swipeStates[entryId];
@@ -1324,7 +1316,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                   : isExpanded
                     ? -buttonWidth
                     : 0;
-
               return (
                 <div key={entry.id} className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] h-[100px]">
                   {/* Card */}
@@ -1349,7 +1340,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                         #{entry.eno}, {itemName}
                       </p>
                     </div>
-
                     {/* Row 2: Machine Number | Person Name */}
                     <div className="flex items-start justify-between mb-1">
                       <p className="text-[12px] font-semibold text-black leading-snug truncate flex-1 min-w-0">
@@ -1359,7 +1349,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                         {inchargeName}
                       </p>
                     </div>
-
                     {/* Row 3: Shop Name | Status + Cost */}
                     <div className="flex items-start justify-between mb-1">
                       <p className="text-[11px] font-semibold leading-snug truncate flex-1 min-w-0 text-[#BF9853]">
@@ -1372,7 +1361,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                         <span className="text-[#4CAF50] font-medium">, Rs.{serviceCost}</span>
                       </p>
                     </div>
-
                     {/* Row 4: Date/Time | Item ID (green) */}
                     <div className="flex items-start justify-between">
                       <p className="text-[11px] text-[#848484] leading-snug truncate flex-1 min-w-0">
@@ -1393,7 +1381,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
                       )}
                     </div>
                   </div>
-
                   {/* Action Buttons - Behind the card on the right, revealed on swipe */}
                   <div
                     className="absolute right-0 top-[0px] bottom-0 flex gap-[8px] flex-shrink-0 z-0"
@@ -1438,7 +1425,6 @@ const ServiceHistory = ({ user, onTabChange }) => {
           </div>
         )}
       </div>
-
       {/* Image Viewer Modal - Floating style */}
       {showImageViewer && (
         <div

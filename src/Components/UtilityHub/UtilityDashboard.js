@@ -1,12 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
-import { useNavigate } from 'react-router-dom'
+import ExpenseEntryForm from '../ExpensesEntry/Form'
 
 const UtilityDashboard = () => {
-  const navigate = useNavigate()
+  const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false)
+  const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null)
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}')
+    } catch {
+      return {}
+    }
+  }, [])
+  const username = currentUser?.name || currentUser?.username || currentUser?.userName || ''
+  const userRoles = currentUser?.userRoles || []
   const [electricityData, setElectricityData] = useState([])
   const [frequencyHistory, setFrequencyHistory] = useState([])
   const [projects, setProjects] = useState([])
+  const [allProjectRecords, setAllProjectRecords] = useState([])
   const [loadingElectricity, setLoadingElectricity] = useState(true)
   const [errorElectricity, setErrorElectricity] = useState(null)
   const [propertyTaxData, setPropertyTaxData] = useState([])
@@ -15,19 +26,84 @@ const UtilityDashboard = () => {
   const [waterTaxData, setWaterTaxData] = useState([])
   const [loadingWaterTax, setLoadingWaterTax] = useState(true)
   const [errorWaterTax, setErrorWaterTax] = useState(null)
-  useEffect(() => {
-    const fetchElectricity = async () => {
-      try {
-        const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity')
-        setElectricityData(Array.isArray(res.data) ? res.data : [])
-      } catch (err) {
-        setErrorElectricity('Failed to load electricity data')
-      } finally {
-        setLoadingElectricity(false)
-      }
+
+  const [telecomDirectory, setTelecomDirectory] = useState([])
+  const [telecomExpensePayments, setTelecomExpensePayments] = useState([])
+  const [loadingTelecom, setLoadingTelecom] = useState(true)
+  const [errorTelecom, setErrorTelecom] = useState(null)
+  const [electricityView, setElectricityView] = useState(/** @type {'upcoming' | 'expired'} */ ('upcoming'))
+  const [propertyView, setPropertyView] = useState(/** @type {'upcoming' | 'expired'} */ ('upcoming'))
+  const [waterView, setWaterView] = useState(/** @type {'upcoming' | 'expired'} */ ('upcoming'))
+  const [telecomView, setTelecomView] = useState(/** @type {'upcoming' | 'expired'} */ ('upcoming'))
+
+  const fetchElectricity = useCallback(async () => {
+    setLoadingElectricity(true)
+    setErrorElectricity(null)
+    try {
+      const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity')
+      setElectricityData(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      setErrorElectricity('Failed to load electricity data')
+    } finally {
+      setLoadingElectricity(false)
     }
-    fetchElectricity()
   }, [])
+
+  const fetchPropertyTax = useCallback(async () => {
+    setLoadingPropertyTax(true)
+    setErrorPropertyTax(null)
+    try {
+      const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/property')
+      setPropertyTaxData(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      setErrorPropertyTax('Failed to load property tax data')
+    } finally {
+      setLoadingPropertyTax(false)
+    }
+  }, [])
+
+  const fetchWaterTax = useCallback(async () => {
+    setLoadingWaterTax(true)
+    setErrorWaterTax(null)
+    try {
+      const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/water')
+      setWaterTaxData(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      setErrorWaterTax('Failed to load water tax data')
+    } finally {
+      setLoadingWaterTax(false)
+    }
+  }, [])
+
+  const fetchTelecom = useCallback(async () => {
+    setLoadingTelecom(true)
+    setErrorTelecom(null)
+    try {
+      const [directoryRes, expensesRes] = await Promise.all([
+        axios.get('https://backendaab.in/aabuildersDash/api/utility-telecom/getAll'),
+        axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/telecom').catch((err) => {
+          console.error('Error fetching telecom expense payments:', err)
+          return { data: [] }
+        }),
+      ])
+      setTelecomDirectory(Array.isArray(directoryRes.data) ? directoryRes.data : [])
+      setTelecomExpensePayments(Array.isArray(expensesRes.data) ? expensesRes.data : [])
+    } catch (err) {
+      setErrorTelecom('Failed to load telecom data')
+      setTelecomDirectory([])
+      setTelecomExpensePayments([])
+    } finally {
+      setLoadingTelecom(false)
+    }
+  }, [])
+
+  const refetchUtilityData = useCallback(async () => {
+    await Promise.all([fetchElectricity(), fetchPropertyTax(), fetchWaterTax(), fetchTelecom()])
+  }, [fetchElectricity, fetchPropertyTax, fetchTelecom, fetchWaterTax])
+
+  useEffect(() => {
+    fetchElectricity()
+  }, [fetchElectricity])
   useEffect(() => {
     const fetchFrequencyHistory = async () => {
       try {
@@ -44,6 +120,7 @@ const UtilityDashboard = () => {
     const fetchProjects = async () => {
       try {
         const response = await axios.get('https://backendaab.in/aabuilderDash/api/projects/getAll')
+        setAllProjectRecords(Array.isArray(response.data) ? response.data : [])
         const projectsWithUtilities = response.data.filter(project =>
           Array.isArray(project.propertyDetails) &&
           project.propertyDetails.some(property => {
@@ -63,32 +140,16 @@ const UtilityDashboard = () => {
   }, [])
 
   useEffect(() => {
-    const fetchPropertyTax = async () => {
-      try {
-        const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/property')
-        setPropertyTaxData(Array.isArray(res.data) ? res.data : [])
-      } catch (err) {
-        setErrorPropertyTax('Failed to load property tax data')
-      } finally {
-        setLoadingPropertyTax(false)
-      }
-    }
-    fetchPropertyTax()
-  }, [])
+    fetchTelecom()
+  }, [fetchTelecom])
 
   useEffect(() => {
-    const fetchWaterTax = async () => {
-      try {
-        const res = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/water')
-        setWaterTaxData(Array.isArray(res.data) ? res.data : [])
-      } catch (err) {
-        setErrorWaterTax('Failed to load water tax data')
-      } finally {
-        setLoadingWaterTax(false)
-      }
-    }
+    fetchPropertyTax()
+  }, [fetchPropertyTax])
+
+  useEffect(() => {
     fetchWaterTax()
-  }, [])
+  }, [fetchWaterTax])
 
   const addMonthsClamped = (date, months) => {
     const d = new Date(date.getTime())
@@ -106,11 +167,142 @@ const UtilityDashboard = () => {
     const yyyy = date.getFullYear()
     return `${dd}/${mm}/${yyyy}`
   }
+  const toDateOnly = (value) => new Date(value.getFullYear(), value.getMonth(), value.getDate())
   const daysBetween = (from, to) => {
-    const one = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()
-    const two = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime()
+    const one = toDateOnly(from).getTime()
+    const two = toDateOnly(to).getTime()
     return Math.round((two - one) / (1000 * 60 * 60 * 24))
   }
+
+  const addDays = (date, days) => {
+    const d = new Date(date.getTime())
+    d.setDate(d.getDate() + days)
+    return d
+  }
+
+  const addDurationToDate = (startDate, countRaw, typeRaw) => {
+    const count = countRaw != null && String(countRaw).trim() !== '' ? Number(countRaw) : 0
+    const unit = typeRaw != null ? String(typeRaw).trim().toLowerCase() : ''
+    if (!Number.isFinite(count) || count <= 0) return null
+    if (!startDate || Number.isNaN(startDate.getTime())) return null
+
+    if (unit === 'days' || unit === 'day') return addDays(startDate, count)
+    if (unit === 'month' || unit === 'months') return addMonthsClamped(startDate, count)
+    if (unit === 'year' || unit === 'years') return addMonthsClamped(startDate, count * 12)
+    return null
+  }
+
+  const getProjectNameById = (projectId) => {
+    if (projectId == null) return '-'
+    const idStr = String(projectId)
+    const rec = Array.isArray(allProjectRecords)
+      ? allProjectRecords.find(p => String(p?.id ?? p?.projectId ?? p?.project_id ?? '') === idStr)
+      : null
+    return rec?.projectName ?? rec?.siteName ?? rec?.project ?? '-'
+  }
+
+  const getLatestTelecomExpensePayment = (serviceNumber) => {
+    if (!serviceNumber) return null
+    const s = String(serviceNumber).trim()
+    const payments = Array.isArray(telecomExpensePayments) ? telecomExpensePayments : []
+    const candidates = payments
+      .filter(p => String(p?.utilityTypeNumber || '').trim() === s)
+      .filter(p => p?.date || p?.timestamp)
+      .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))
+    return candidates[0] || null
+  }
+
+  const getTelecomBaseDate = (expenseEntry, dirEntry) => {
+    const baseDateRaw =
+      expenseEntry?.serviceStartingDate ??
+      expenseEntry?.service_starting_date ??
+      expenseEntry?.date ??
+      expenseEntry?.timestamp ??
+      dirEntry?.service_starting_date ??
+      dirEntry?.serviceStartingDate ??
+      dirEntry?.payment_date ??
+      dirEntry?.paymentDate ??
+      null
+    const baseDate = baseDateRaw ? new Date(baseDateRaw) : null
+    return baseDate && !Number.isNaN(baseDate.getTime()) ? baseDate : null
+  }
+
+  const getTelecomExpiryMeta = (dirEntry) => {
+    if (!dirEntry) return null
+    const serviceNumber = dirEntry.service_number ?? dirEntry.serviceNumber ?? dirEntry.service_number ?? null
+    if (!serviceNumber || !String(serviceNumber).trim()) return null
+
+    const latestExpense = getLatestTelecomExpensePayment(serviceNumber)
+    const expenseBaseDate = getTelecomBaseDate(latestExpense, null)
+    const expenseValidityCount = latestExpense?.utilityValidityDays ?? null
+    const expenseValidityType = latestExpense?.utilityValidityType ?? null
+
+    let expiry =
+      expenseBaseDate && expenseValidityCount && expenseValidityType
+        ? addDurationToDate(expenseBaseDate, expenseValidityCount, expenseValidityType)
+        : null
+
+    if (!expiry) {
+      const endDateRaw = dirEntry.service_end_date ?? dirEntry.serviceEndDate ?? null
+      const endDate = endDateRaw ? new Date(endDateRaw) : null
+      expiry = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null
+    }
+
+    if (!expiry) {
+      const fallbackBaseDate = getTelecomBaseDate(null, dirEntry)
+      const validityCount =
+        dirEntry.validity ??
+        dirEntry.utilityValidityDays ??
+        null
+      const validityType =
+        dirEntry.validity_type ??
+        dirEntry.validityType ??
+        dirEntry.utilityValidityType ??
+        null
+      expiry = addDurationToDate(fallbackBaseDate, validityCount, validityType)
+    }
+
+    if (!expiry || Number.isNaN(expiry.getTime())) return null
+
+    return {
+      serviceNumber: String(serviceNumber).trim(),
+      projectId: dirEntry.project_id ?? dirEntry.projectId ?? null,
+      projectName: getProjectNameById(dirEntry.project_id ?? dirEntry.projectId ?? null),
+      vendor: dirEntry.service_provider ?? dirEntry.serviceProvider ?? '-',
+      purpose: dirEntry.purpose ?? '-',
+      expiry,
+    }
+  }
+
+  const upcomingTelecom = useMemo(() => {
+    const today = toDateOnly(new Date())
+    const entries = Array.isArray(telecomDirectory) ? telecomDirectory : []
+    const uniqueItems = Array.from(
+      entries
+        .map(getTelecomExpiryMeta)
+        .filter(Boolean)
+        .reduce((map, meta) => {
+          const key = String(meta.serviceNumber).trim()
+          const existing = map.get(key)
+          if (!existing || toDateOnly(meta.expiry) > toDateOnly(existing.expiry)) {
+            map.set(key, meta)
+          }
+          return map
+        }, new Map()).values()
+    )
+    const items = uniqueItems
+      .map(meta => {
+        const daysLeft = daysBetween(today, meta.expiry)
+        return { ...meta, daysLeft }
+      })
+      .filter(item => {
+        if (telecomView === 'upcoming') return item.daysLeft >= 0 && item.daysLeft <= 15
+        return item.daysLeft < 0 && item.daysLeft >= -30
+      })
+      .sort((a, b) => a.expiry - b.expiry)
+      .slice(0, 6)
+    return items
+  }, [telecomDirectory, telecomExpensePayments, allProjectRecords, telecomView])
   const frequencyConfigs = {
     electricity: {
       frequencyKeys: ['electricityFrequencyNo'],
@@ -240,16 +432,54 @@ const UtilityDashboard = () => {
     return fallbackNextDue()
   }
 
-  const calculateElectricityNextDueDate = (ebNo, propertyId) =>
-    calculateNextDueDate(electricityData, ebNo, propertyId, frequencyConfigs.electricity)
+  const calculateMostRecentDueDate = (payments, identifier, propertyId, config) => {
+    if (!Array.isArray(payments) || payments.length === 0) return null
 
-  const calculatePropertyNextDueDate = (propertyTaxNo, propertyId) =>
-    calculateNextDueDate(propertyTaxData, propertyTaxNo, propertyId, frequencyConfigs.property)
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const currentMonth = currentDate.getMonth() + 1
 
-  const calculateWaterNextDueDate = (waterTaxNo, propertyId) =>
-    calculateNextDueDate(waterTaxData, waterTaxNo, propertyId, frequencyConfigs.water)
+    const latestPayment = payments
+      .filter(payment => payment.utilityTypeNumber === identifier && (payment.date || payment.timestamp))
+      .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))[0]
 
-  const buildUpcomingItems = ({ payments, identifierKey, projectsList, calculateDue }) => {
+    if (!latestPayment) return null
+
+    const lastPaymentDate = new Date(latestPayment.date || latestPayment.timestamp)
+    if (Number.isNaN(lastPaymentDate.getTime())) return null
+
+    const freqDetails = getActiveFrequencyDetails(propertyId, currentYear, currentMonth, config)
+    const stepMonths = freqDetails?.frequency && freqDetails.frequency > 0 ? freqDetails.frequency : 1
+
+    let due = addMonthsClamped(lastPaymentDate, stepMonths)
+    let mostRecentDue = null
+    let safetyCounter = 0
+
+    while (due <= currentDate && safetyCounter < 60) {
+      mostRecentDue = due
+      due = addMonthsClamped(due, stepMonths)
+      safetyCounter += 1
+    }
+
+    return mostRecentDue
+  }
+
+  const calculateElectricityDueDate = (ebNo, propertyId) =>
+    electricityView === 'expired'
+      ? calculateMostRecentDueDate(electricityData, ebNo, propertyId, frequencyConfigs.electricity)
+      : calculateNextDueDate(electricityData, ebNo, propertyId, frequencyConfigs.electricity)
+
+  const calculatePropertyDueDate = (propertyTaxNo, propertyId) =>
+    propertyView === 'expired'
+      ? calculateMostRecentDueDate(propertyTaxData, propertyTaxNo, propertyId, frequencyConfigs.property)
+      : calculateNextDueDate(propertyTaxData, propertyTaxNo, propertyId, frequencyConfigs.property)
+
+  const calculateWaterDueDate = (waterTaxNo, propertyId) =>
+    waterView === 'expired'
+      ? calculateMostRecentDueDate(waterTaxData, waterTaxNo, propertyId, frequencyConfigs.water)
+      : calculateNextDueDate(waterTaxData, waterTaxNo, propertyId, frequencyConfigs.water)
+
+  const buildUpcomingItems = ({ payments, identifierKey, projectsList, calculateDue, view, upcomingLimitDays = 15, expiredLimitDays = 30 }) => {
     if (!Array.isArray(payments) || payments.length === 0 || !projectsList.length) return []
 
     const items = []
@@ -273,6 +503,11 @@ const UtilityDashboard = () => {
           if (!nextDue) return
 
           const daysLeft = daysBetween(today, nextDue)
+          if (view === 'upcoming') {
+            if (daysLeft < 0 || daysLeft > upcomingLimitDays) return
+          } else {
+            if (daysLeft >= 0 || daysLeft < -Math.abs(expiredLimitDays)) return
+          }
           items.push({
             identifier: identifierValue,
             siteName: project.projectName || property.siteName || '-',
@@ -291,27 +526,36 @@ const UtilityDashboard = () => {
       payments: electricityData,
       identifierKey: 'ebNo',
       projectsList: projects,
-      calculateDue: calculateElectricityNextDueDate,
+      calculateDue: calculateElectricityDueDate,
+      view: electricityView,
+      upcomingLimitDays: 30,
+      expiredLimitDays: 30,
     })
-  }, [electricityData, frequencyHistory, projects])
+  }, [electricityData, frequencyHistory, projects, electricityView])
 
   const upcomingPropertyTax = useMemo(() => {
     return buildUpcomingItems({
       payments: propertyTaxData,
       identifierKey: 'propertyTaxNo',
       projectsList: projects,
-      calculateDue: calculatePropertyNextDueDate,
+      calculateDue: calculatePropertyDueDate,
+      view: propertyView,
+      upcomingLimitDays: 15,
+      expiredLimitDays: 30,
     })
-  }, [propertyTaxData, frequencyHistory, projects])
+  }, [propertyTaxData, frequencyHistory, projects, propertyView])
 
   const upcomingWaterTax = useMemo(() => {
     return buildUpcomingItems({
       payments: waterTaxData,
       identifierKey: 'waterTaxNo',
       projectsList: projects,
-      calculateDue: calculateWaterNextDueDate,
+      calculateDue: calculateWaterDueDate,
+      view: waterView,
+      upcomingLimitDays: 15,
+      expiredLimitDays: 30,
     })
-  }, [waterTaxData, frequencyHistory, projects])
+  }, [waterTaxData, frequencyHistory, projects, waterView])
 
   const handleNavigateToExpense = ({ utilityType, identifierKey, identifierValue, projectId, propertyId, siteName }) => {
     const prefillData = {
@@ -334,28 +578,91 @@ const UtilityDashboard = () => {
     if (utilityType === 'Water Tax') {
       prefillData.waterTaxNo = identifierValue
     }
+    if (utilityType === 'Telecom') {
+      prefillData.utilityTypeNumber = identifierValue
+    }
 
     localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefillData))
-    navigate('/expense-entry')
+    setExpenseEntryPrefill(prefillData)
+    setShowExpenseEntryModal(true)
   }
 
   return (
     <div className="p-6 bg-white ml-5 mr-5 rounded">
+      {showExpenseEntryModal ? (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExpenseEntryModal(false)
+                  setExpenseEntryPrefill(null)
+                  localStorage.removeItem('expenseEntryPrefill')
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-3">
+              <ExpenseEntryForm
+                username={username}
+                userRoles={userRoles}
+                embedded
+                onSuccess={async () => {
+                  // close + refetch current utility data without full reload
+                  setShowExpenseEntryModal(false)
+                  setExpenseEntryPrefill(null)
+                  localStorage.removeItem('expenseEntryPrefill')
+                  try { await refetchUtilityData() } catch { /* ignore refresh errors */ }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mb-8 text-left">
         <h2 className="text-xl font-bold mb-6">Upcoming Transactions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <div className="py-2">
-              <h3 className="font-semibold text-[#BF9853] text-base">Electricity</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-[#BF9853] text-base">Electricity</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setElectricityView('expired')}
+                    className="w-7 h-7 flex items-center justify-center border border-[#BF9853] rounded text-xs font-semibold text-[#BF9853] disabled:opacity-40"
+                    disabled={electricityView === 'expired'}
+                    title="Expired (last 30 days)"
+                  >
+                    &lt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setElectricityView('upcoming')}
+                    className="w-7 h-7 flex items-center justify-center border border-[#BF9853] rounded text-xs font-semibold text-[#BF9853] disabled:opacity-40"
+                    disabled={electricityView === 'upcoming'}
+                    title="Upcoming"
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="bg-white rounded-lg shadow-lg border border-[#BF9853]">
-              <div className="p-4 space-y-3">
+              <div
+                className="p-4 space-y-3 max-h-[390px] overflow-y-auto [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {loadingElectricity ? (
                   <div className="text-sm text-gray-500">Loading...</div>
                 ) : errorElectricity ? (
                   <div className="text-sm text-red-500">{errorElectricity}</div>
                 ) : upcomingElectricity.length === 0 ? (
-                  <div className="text-sm text-gray-500">No upcoming bills</div>
+                  <div className="text-sm text-gray-500">{electricityView === 'upcoming' ? 'No upcoming bills' : 'No expired bills'}</div>
                 ) : (
                   upcomingElectricity.map((item) => (
                     <div key={item.identifier} className="flex items-start justify-between py-2 border-b last:border-b-0">
@@ -379,7 +686,7 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.nextDue)}</div>
-                        <div className="text-xs text-[#BF9853] font-medium">{item.daysLeft} Days</div>
+                        <div className={`text-xs font-medium ${electricityView === 'expired' ? 'text-red-500' : 'text-[#BF9853]'}`}>{Math.abs(item.daysLeft)} Days</div>
                       </div>
                     </div>
                   ))
@@ -389,16 +696,41 @@ const UtilityDashboard = () => {
           </div>
           <div>
             <div className="py-2">
-              <h3 className="font-semibold text-pink-300 text-base">Property</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-pink-300 text-base">Property</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPropertyView('expired')}
+                    className="w-7 h-7 flex items-center justify-center border border-pink-300 rounded text-xs font-semibold text-pink-300 disabled:opacity-40"
+                    disabled={propertyView === 'expired'}
+                    title="Expired (last 30 days)"
+                  >
+                    &lt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPropertyView('upcoming')}
+                    className="w-7 h-7 flex items-center justify-center border border-pink-300 rounded text-xs font-semibold text-pink-300 disabled:opacity-40"
+                    disabled={propertyView === 'upcoming'}
+                    title="Upcoming"
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="bg-white rounded-lg shadow-lg border border-pink-300">
-              <div className="p-4 space-y-3">
+              <div
+                className="p-4 space-y-3 max-h-[390px] overflow-y-auto [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {loadingPropertyTax ? (
                   <div className="text-sm text-gray-500">Loading...</div>
                 ) : errorPropertyTax ? (
                   <div className="text-sm text-red-500">{errorPropertyTax}</div>
                 ) : upcomingPropertyTax.length === 0 ? (
-                  <div className="text-sm text-gray-500">No upcoming bills</div>
+                  <div className="text-sm text-gray-500">{propertyView === 'upcoming' ? 'No upcoming bills' : 'No expired bills'}</div>
                 ) : (
                   upcomingPropertyTax.map(item => (
                     <div key={item.identifier} className="flex items-start justify-between py-2 border-b last:border-b-0">
@@ -422,7 +754,7 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.nextDue)}</div>
-                        <div className="text-xs text-pink-300 font-medium">{item.daysLeft} Days</div>
+                        <div className={`text-xs font-medium ${propertyView === 'expired' ? 'text-red-500' : 'text-pink-300'}`}>{Math.abs(item.daysLeft)} Days</div>
                       </div>
                     </div>
                   ))
@@ -432,16 +764,41 @@ const UtilityDashboard = () => {
           </div>
           <div>
             <div className="py-2">
-              <h3 className="font-semibold text-blue-300 text-base">Water</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-blue-300 text-base">Water</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWaterView('expired')}
+                    className="w-7 h-7 flex items-center justify-center border border-blue-300 rounded text-xs font-semibold text-blue-300 disabled:opacity-40"
+                    disabled={waterView === 'expired'}
+                    title="Expired (last 30 days)"
+                  >
+                    &lt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWaterView('upcoming')}
+                    className="w-7 h-7 flex items-center justify-center border border-blue-300 rounded text-xs font-semibold text-blue-300 disabled:opacity-40"
+                    disabled={waterView === 'upcoming'}
+                    title="Upcoming"
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="bg-white rounded-lg shadow-lg border border-blue-300">
-              <div className="p-4 space-y-3">
+              <div
+                className="p-4 space-y-3 max-h-[390px] overflow-y-auto [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {loadingWaterTax ? (
                   <div className="text-sm text-gray-500">Loading...</div>
                 ) : errorWaterTax ? (
                   <div className="text-sm text-red-500">{errorWaterTax}</div>
                 ) : upcomingWaterTax.length === 0 ? (
-                  <div className="text-sm text-gray-500">No upcoming bills</div>
+                  <div className="text-sm text-gray-500">{waterView === 'upcoming' ? 'No upcoming bills' : 'No expired bills'}</div>
                 ) : (
                   upcomingWaterTax.map(item => (
                     <div key={item.identifier} className="flex items-start justify-between py-2 border-b last:border-b-0">
@@ -465,7 +822,7 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.nextDue)}</div>
-                        <div className="text-xs text-blue-300 font-medium">{item.daysLeft} Days</div>
+                        <div className={`text-xs font-medium ${waterView === 'expired' ? 'text-red-500' : 'text-blue-300'}`}>{Math.abs(item.daysLeft)} Days</div>
                       </div>
                     </div>
                   ))
@@ -475,11 +832,70 @@ const UtilityDashboard = () => {
           </div>
           <div>
             <div className="py-2">
-              <h3 className="font-bold text-green-300 text-base">Telecom</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-green-300 text-base">Telecom</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTelecomView('expired')}
+                    className="w-7 h-7 flex items-center justify-center border border-green-300 rounded text-xs font-semibold text-green-300 disabled:opacity-40"
+                    disabled={telecomView === 'expired'}
+                    title="Expired (last 30 days)"
+                  >
+                    &lt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTelecomView('upcoming')}
+                    className="w-7 h-7 flex items-center justify-center border border-green-300 rounded text-xs font-semibold text-green-300 disabled:opacity-40"
+                    disabled={telecomView === 'upcoming'}
+                    title="Upcoming"
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="bg-white rounded-lg shadow-lg border border-green-300">
-              <div className="p-4 space-y-3">
-
+              <div
+                className="p-4 space-y-3 max-h-[390px] overflow-y-auto [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {loadingTelecom ? (
+                  <div className="text-sm text-gray-500">Loading...</div>
+                ) : errorTelecom ? (
+                  <div className="text-sm text-red-500">{errorTelecom}</div>
+                ) : upcomingTelecom.length === 0 ? (
+                  <div className="text-sm text-gray-500">{telecomView === 'upcoming' ? 'No upcoming recharges' : 'No expired recharges'}</div>
+                ) : (
+                  upcomingTelecom.map((item) => (
+                    <div key={item.serviceNumber} className="flex items-start justify-between py-2 border-b last:border-b-0">
+                      <div className="text-left">
+                        <div
+                          className="text-sm font-semibold text-black cursor-pointer hover:text-green-400 hover:underline"
+                          onClick={() => {
+                            handleNavigateToExpense({
+                              utilityType: 'Telecom',
+                              identifierKey: 'utilityTypeNumber',
+                              identifierValue: item.serviceNumber,
+                              projectId: item.projectId,
+                              propertyId: null,
+                              siteName: item.projectName,
+                            })
+                          }}
+                        >
+                          {item.serviceNumber}
+                        </div>
+                        <div className="text-xs text-green-300 font-medium">{item.projectName}</div>
+                        <div className="text-[11px] text-gray-500">{item.vendor} {item.purpose ? `• ${item.purpose}` : ''}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.expiry)}</div>
+                        <div className={`text-xs font-medium ${telecomView === 'expired' ? 'text-red-500' : 'text-green-300'}`}>{Math.abs(item.daysLeft)} Days</div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -546,4 +962,3 @@ const UtilityDashboard = () => {
 }
 
 export default UtilityDashboard
-

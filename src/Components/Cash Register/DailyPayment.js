@@ -637,6 +637,29 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             })
             .catch(console.error);
     }, [currentWeekNumber, withBranchUrl]);
+    const fetchDailyDataForSelectedDate = useCallback(async (dateStr) => {
+        if (!dateStr) return;
+        try {
+            const [dailyRes, refundRes] = await Promise.all([
+                axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${dateStr}`, withBranchParams()),
+                axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${dateStr}`, withBranchParams())
+            ]);
+            setDailyExpenses(dailyRes.data);
+            setRefundPayments(refundRes.data);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            setDailyExpenses([]);
+            setRefundPayments([]);
+        }
+    }, [withBranchParams]);
+    const refreshCashRegisterData = useCallback(async () => {
+        fetchPayments();
+        fetchExpenses();
+        fetchRefundPayments();
+        if (selectedDate) {
+            await fetchDailyDataForSelectedDate(selectedDate);
+        }
+    }, [fetchPayments, fetchExpenses, fetchRefundPayments, selectedDate, fetchDailyDataForSelectedDate]);
     useEffect(() => {
         if (currentWeekNumber) {
             fetchPayments();
@@ -989,7 +1012,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 alert("Please select a labour, employee, vendor, or contractor for the refund.");
                 return;
             }
-            window.location.reload();
+            await refreshCashRegisterData();
             setNewRefundReceived({
                 date: new Date().toISOString().split("T")[0],
                 labour_id: "",
@@ -1065,7 +1088,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setShowPurposePopup(false);
             setSelectedPurpose(null);
             setPendingRefundData(null);
-            window.location.reload();
+            await refreshCashRegisterData();
             setNewRefundReceived({
                 date: new Date().toISOString().split("T")[0],
                 labour_id: "",
@@ -1330,7 +1353,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (response.ok) {
                     alert("Daily Expenses deleted successfully!!!");
-                    window.location.reload();
+                    await refreshCashRegisterData();
                 } else {
                     console.error("Failed to delete the Daily Expenses. Status:", response.status);
                     alert("Error deleting the Daily Expenses. Please try again.");
@@ -1371,7 +1394,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (response.ok) {
                     alert("Refund Received deleted successfully!!!");
-                    window.location.reload();
+                    await refreshCashRegisterData();
                 } else {
                     console.error("Failed to delete the Refund Received. Status:", response.status);
                     alert("Error deleting the Refund Received. Please try again.");
@@ -1494,8 +1517,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     { headers: { "Content-Type": "application/json" } }
                 );
             }
-            await handleDateClick(selectedDate);
-            window.location.reload();
+            await refreshCashRegisterData();
             setNewDailyExpense({
                 labour_id: "",
                 vendor_id: "",
@@ -1563,22 +1585,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     }, []);
     useEffect(() => {
         if (!selectedDate) return;
-        const fetchDataForDate = async () => {
-            try {
-                const [dailyRes, refundRes] = await Promise.all([
-                    axios.get(`https://backendaab.in/aabuildersDash/api/daily-payments/date/${selectedDate}`, withBranchParams()),
-                    axios.get(`https://backendaab.in/aabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams())
-                ]);
-                setDailyExpenses(dailyRes.data);
-                setRefundPayments(refundRes.data);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                setDailyExpenses([]);
-                setRefundPayments([]);
-            }
-        };
-        fetchDataForDate();
-    }, [selectedDate, withBranchParams]);
+        fetchDailyDataForSelectedDate(selectedDate);
+    }, [selectedDate, fetchDailyDataForSelectedDate]);
     const formatDate = (date) =>
         date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     const handleDateClick = async (dateStr) => {

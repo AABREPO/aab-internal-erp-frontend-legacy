@@ -9,6 +9,17 @@ import edit from '../Images/Edit.svg';
 import file from '../Images/file.png';
 
 const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+  const resolveEnteredBy = () => {
+    const propUsername = typeof username === 'string' ? username.trim() : '';
+    if (propUsername) return propUsername;
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return user?.name || user?.username || user?.userName || '';
+    } catch {
+      return '';
+    }
+  };
+  const enteredBy = resolveEnteredBy();
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -711,6 +722,34 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       <span className="text-sm text-gray-800 text-right break-words">{value || '-'}</span>
     </div>
   );
+  const saveAdvancePortalWithLogs = async (payload, context = 'Advance Portal Save') => {
+    const url = withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save');
+    console.groupCollapsed(`[${context}] advance_portal/save`);
+    console.log('Request URL:', url);
+    console.log('Request payload:', payload);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const responseText = await response.text();
+      let responseBody = responseText;
+      try {
+        responseBody = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        // Keep raw text if response is not JSON
+      }
+      console.log('Response status:', response.status, response.statusText);
+      console.log('Response body:', responseBody);
+      console.groupEnd();
+      return { response, data: responseBody };
+    } catch (error) {
+      console.error('Request failed:', error);
+      console.groupEnd();
+      throw error;
+    }
+  };
   const submitAdvanceData = async () => {
     setIsSubmitting(true); // Start loading
     setShowReviewModal(false);
@@ -741,8 +780,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             .replace(/\s/g, "-");
           const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
           formData.append('files', selectedAdvanceFile);
+          formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);
-          formData.append('folderName', 'FileUpload / Advance_Portal');
           const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
@@ -783,7 +822,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         description: description,
         file_url: fileUrl,
         branch_id: activeBranchId,
-        enteredBy: username,
+        enteredBy: enteredBy,
         ...overrides
       });
       if (selectedType === 'Transfer') {
@@ -809,7 +848,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             description: "Transfer from Advance Portal",
             file_url: "",
             branch_id: activeBranchId,
-            enteredBy: username,
+            enteredBy: enteredBy,
           };
           // Save to LoanPortal
           const loanResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
@@ -826,13 +865,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           const advancePayload = createPayload({
             amount: -Math.abs(amountValue),
             loan_portal_id: loanPortalId,
-            enteredBy: username,
+            enteredBy: enteredBy,
           });
-          await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(advancePayload)
-          });
+          const { response: advanceSaveResponse } = await saveAdvancePortalWithLogs(advancePayload, 'Transfer to Loan Portal');
+          if (!advanceSaveResponse.ok) {
+            throw new Error('Failed to save advance portal data');
+          }
         } else if (transferSiteIdInt === 12 && selectedOption?.type === 'Vendor') {
           // Check if transferring to Bill Payment Tracker (id = 12) and it's a vendor
           // First, create vendor carry forward entry in Bill Payment Tracker
@@ -860,13 +898,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           const advancePayload = createPayload({
             amount: -Math.abs(amountValue),
             vendor_carry_forward_id: vendorCarryForwardId,
-            enteredBy: username,
+            enteredBy: enteredBy,
           });
-          await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(advancePayload)
-          });
+          const { response: advanceSaveResponse } = await saveAdvancePortalWithLogs(advancePayload, 'Transfer to Bill Payment Tracker');
+          if (!advanceSaveResponse.ok) {
+            throw new Error('Failed to save advance portal data');
+          }
         } else {
           // Normal transfer logic for other sites
           const firstPayload = createPayload({ amount: -Math.abs(amountValue) });
@@ -875,26 +912,20 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             transfer_site_id: selectedSite?.id || 0,
             amount: Math.abs(amountValue)
           });
-          await Promise.all([
-            fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(firstPayload)
-            }),
-            fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(secondPayload)
-            })
+          const [firstSave, secondSave] = await Promise.all([
+            saveAdvancePortalWithLogs(firstPayload, 'Transfer Source Entry'),
+            saveAdvancePortalWithLogs(secondPayload, 'Transfer Destination Entry')
           ]);
+          if (!firstSave.response.ok || !secondSave.response.ok) {
+            throw new Error('Failed to save advance portal data');
+          }
         }
       } else {
         const payload = createPayload();
-        await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const { response: advanceSaveResponse } = await saveAdvancePortalWithLogs(payload, 'Advance Portal Submit');
+        if (!advanceSaveResponse.ok) {
+          throw new Error('Failed to save advance portal data');
+        }
         // Also save to expenses form if Bill Settlement
         if (selectedType === 'Bill Settlement') {
           let vendor = '';
@@ -922,7 +953,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             billCopyUrl: fileUrl || '',
             source: "Advance Portal",
             branchId: activeBranchId,
-            enteredBy: username,
+            enteredBy: enteredBy,
           };
           const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
             method: "POST",
@@ -1396,7 +1427,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             .replace(/\s/g, "-");
           const finalName = `${timestamp} ${selectedSite.sNo} ${selectedOption.label}`;
           formData.append('files', selectedAdvanceFile);
-          formData.append('folderName', 'FileUpload / Advance_Portal');
+          formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);
           const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
@@ -1440,18 +1471,13 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         description: description,
         file_url: fileUrl,
         branch_id: activeBranchId,
-        enteredBy: username,
+        enteredBy: enteredBy,
       };
       // Save to advance portal
-      const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(advancePayload)
-      });
+      const { response: advanceResponse, data: advanceResult } = await saveAdvancePortalWithLogs(advancePayload, 'Advance Portal Payment Submit');
       if (!advanceResponse.ok) {
         throw new Error('Failed to save advance portal data');
       }
-      const advanceResult = await advanceResponse.json();
       // Save to weekly payment bills only if payment mode is not "Direct"
       let isWeeklyPaymentBillSaved = false;
       if (paymentModalData.paymentMode !== "Direct") {
@@ -1477,7 +1503,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           transaction_number: paymentModalData.transactionNumber || null,
           account_number: paymentModalData.accountNumber || null,
           branch_id: activeBranchId,
-          enteredBy: username,
+          enteredBy: enteredBy,
         };
         // Save to weekly payment bills
         const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save'), {
@@ -1517,7 +1543,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           billCopyUrl: fileUrl || '',
           source: "Advance Portal",
           branchId: activeBranchId,
-          enteredBy: username,
+          enteredBy: enteredBy,
         };
         const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
           method: "POST",
@@ -1526,6 +1552,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           },
           body: JSON.stringify(expensesPayload),
         });
+        console.log('Expenses form response:', expensesResponse);
         if (!expensesResponse.ok) {
           const errorText = await expensesResponse.text();
           throw new Error(`Expenses form submission failed: ${errorText}`);

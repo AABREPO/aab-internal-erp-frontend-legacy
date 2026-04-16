@@ -598,8 +598,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           const employeeName = dataToSubmit.empName?.label || '';
           const finalName = `${timestamp} ${employeeName}`;
           formData.append('files', selectedFile);
-          formData.append('fileName', finalName);
-          formData.append('folderName', 'FileUpload / Staff_Advances');
+          formData.append('folder', 'FileUpload / Staff_Advances');
+          formData.append('fileName', finalName);          
           const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,

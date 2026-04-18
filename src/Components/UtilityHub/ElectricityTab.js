@@ -948,14 +948,16 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredProjects.map((project, projectIndex) =>
-                                            project.propertyDetails
-                                                .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                                                .map((property, propertyIndex) => {
-                                                    const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
-                                                    return (
+                                        filteredProjects
+                                            .flatMap(project =>
+                                                project.propertyDetails
+                                                    .filter(property => property.ebNo && property.ebNo.trim() !== '')
+                                                    .map(property => ({ project, property }))
+                                            )
+                                            .map(({ project, property }, index) => {
+                                                return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-2 py-2">{rowIndex + 1}</td>
+                                                            <td className="px-2 py-2">{index + 1}</td>
                                                             <td className="px-2 py-2">{project.projectId}</td>
                                                             <td className="px-2 py-2 text-left whitespace-normal break-words max-w-[220px]">
                                                                 {project.projectName}
@@ -1040,7 +1042,6 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                         </tr>
                                                     );
                                                 })
-                                        )
                                     )}
                             </tbody>
                         </table>
@@ -1080,14 +1081,16 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {hiddenProjects.map((project, projectIndex) =>
-                                            project.propertyDetails
-                                                .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                                                .map((property, propertyIndex) => {
-                                                    const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
+                                        {hiddenProjects
+                                            .flatMap(project =>
+                                                project.propertyDetails
+                                                    .filter(property => property.ebNo && property.ebNo.trim() !== '')
+                                                    .map(property => ({ project, property }))
+                                            )
+                                            .map(({ project, property }, index) => {
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-4 py-2">{rowIndex + 1}</td>
+                                                            <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2 whitespace-normal break-words max-w-[220px]">
                                                                 {project.projectName}
@@ -1123,8 +1126,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                             </td>
                                                         </tr>
                                                     );
-                                                })
-                                        )}
+                                                })}
                                     </tbody>
                                 </table>
                             </div>

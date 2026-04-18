@@ -82,6 +82,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [vendorContactNumber, setVendorContactNumber] = useState('');
   const [vendorContactEmail, setVendorContactEmail] = useState('');
   const [vendorQrImage, setVendorQrImage] = useState(null);
+  const [vendorCategory, setVendorCategory] = useState('');
   const [vendorNames, setVendorNames] = useState([]);
   const [isVendorEditOpen, setIsVendorEditOpen] = useState(false);
   const [editVendorName, setEditVendorName] = useState('');
@@ -96,6 +97,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editVendorContactEmail, setEditVendorContactEmail] = useState('');
   const [editVendorQrImage, setEditVendorQrImage] = useState(null);
   const [editVendorQrImagePreview, setEditVendorQrImagePreview] = useState(null);
+  const [editVendorCategory, setEditVendorCategory] = useState('');
   const [selectedVendorId, setSelectedVendorId] = useState(null);
   const [vendorBulkUploadFile, setVendorBulkUploadFile] = useState(null);
   const [isVendorBulkUploadOpen, setIsVendorBulkUploadOpen] = useState(false);
@@ -123,6 +125,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [contractorContactEmail, setContractorContactEmail] = useState('');
   const [contractorQrImage, setContractorQrImage] = useState(null);
   const [contractorQrImagePreview, setContractorQrImagePreview] = useState(null);
+  const [contractorCategory, setContractorCategory] = useState('');
   const [contractorNames, setContractorNames] = useState([]);
   const [isContractorEditOpen, setIsContractorEditOpen] = useState(false);
   const [editContractorName, setEditContractorName] = useState('');
@@ -137,6 +140,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [editContractorContactEmail, setEditContractorContactEmail] = useState('');
   const [editContractorQrImage, setEditContractorQrImage] = useState(null);
   const [editContractorQrImagePreview, setEditContractorQrImagePreview] = useState(null);
+  const [editContractorCategory, setEditContractorCategory] = useState('');
   const [selectedContractorId, setSelectedContractorId] = useState(null);
   const [isAccountDetailsOpen, setIsAccountDetailsOpen] = useState(false);
   const [accountDetailsSearch, setAccountDetailsSearch] = useState("");
@@ -405,6 +409,15 @@ const MasterData = ({ username, userRoles = [] }) => {
       reader.readAsDataURL(file);
     }
   };
+
+  const expenseCategoryOptions = useMemo(() => (
+    (expensesCategory || [])
+      .map((item) => {
+        const value = item?.category ?? '';
+        return value ? { value, label: value } : null;
+      })
+      .filter(Boolean)
+  ), [expensesCategory]);
 
   // Function to get reordered table data (selected table first, others after)
   const getReorderedTableData = () => {
@@ -991,7 +1004,8 @@ const MasterData = ({ username, userRoles = [] }) => {
         gpay_number: vendorGpayNumber,
         upi_id: vendorUpiId,
         contact_number: vendorContactNumber,
-        contact_email: vendorContactEmail
+        contact_email: vendorContactEmail,
+        category: vendorCategory
       };
       // Create FormData object
       const formData = new FormData();
@@ -1027,6 +1041,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       setVendorUpiId("");
       setVendorContactNumber("");
       setVendorContactEmail("");
+      setVendorCategory("");
       setVendorQrImageFile(null);
       setVendorQrImagePreview(null);
       closevendorNames();
@@ -1050,7 +1065,8 @@ const MasterData = ({ username, userRoles = [] }) => {
       gpay_number: contractorGpayNumber,
       upi_id: contractorUpiId,
       contact_number: contractorContactNumber,
-      contact_email: contractorContactEmail
+      contact_email: contractorContactEmail,
+      category: contractorCategory
     };
     // Create a blob for the contractor data (like vendor implementation)
     const contractorBlob = new Blob([JSON.stringify(contractorData)], { type: 'application/json' });
@@ -1076,6 +1092,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setContractorUpiId('');
         setContractorContactNumber('');
         setContractorContactEmail('');
+        setContractorCategory('');
         setContractorQrImage(null);
         setContractorQrImagePreview(null);
         closeContractorNames();
@@ -1477,6 +1494,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setEditVendorUpiId(item.upi_id || '');
     setEditVendorContactNumber(item.contact_number || '');
     setEditVendorContactEmail(item.contact_email || '');
+    setEditVendorCategory(item.category || '');
     // Handle QR image from backend byte array
     let qrImagePreview = null;
     if (item.upi_qr_image) {
@@ -1509,6 +1527,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       upiId: item.upi_id || '',
       contactNumber: item.contact_number || '',
       contactEmail: item.contact_email || '',
+      category: item.category || '',
       qrImagePreview: qrImagePreview
     });
     setIsVendorEditOpen(true);
@@ -1525,6 +1544,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setEditContractorUpiId(item.upi_id || '');
     setEditContractorContactNumber(item.contact_number || '');
     setEditContractorContactEmail(item.contact_email || '');
+    setEditContractorCategory(item.category || '');
     // Handle QR image from backend (like vendor implementation)
     let qrImagePreview = null;
     if (item.upi_qr_image) {
@@ -1557,6 +1577,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       upiId: item.upi_id || '',
       contactNumber: item.contact_number || '',
       contactEmail: item.contact_email || '',
+      category: item.category || '',
       qrImagePreview: qrImagePreview
     });
     setIsContractorEditOpen(true);
@@ -1837,6 +1858,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       setEditVendorUpiId(originalVendorData.upiId || '');
       setEditVendorContactNumber(originalVendorData.contactNumber || '');
       setEditVendorContactEmail(originalVendorData.contactEmail || '');
+      setEditVendorCategory(originalVendorData.category || '');
       setEditVendorQrImagePreview(originalVendorData.qrImagePreview || null);
       setEditVendorQrImage(null);
     }
@@ -1855,6 +1877,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       setEditContractorUpiId(originalContractorData.upiId || '');
       setEditContractorContactNumber(originalContractorData.contactNumber || '');
       setEditContractorContactEmail(originalContractorData.contactEmail || '');
+      setEditContractorCategory(originalContractorData.category || '');
       setEditContractorQrImagePreview(originalContractorData.qrImagePreview || null);
       setEditContractorQrImage(null);
     }
@@ -4177,6 +4200,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                             Add QR
                           </button>
                         </div>
+                        <div className="mb-4">
+                          <label className="block text-sm font-semibold mb-1">Category</label>
+                          <Select
+                            value={expenseCategoryOptions.find(opt => opt.value === vendorCategory) ?? null}
+                            onChange={(opt) => setVendorCategory(opt?.value ?? '')}
+                            options={expenseCategoryOptions}
+                            placeholder="Select"
+                            isSearchable
+                            isClearable
+                            className="w-52"
+                          />
+                        </div>
                       </div>
                       <div className="flex space-x-2 justify-end mt-52 ml-5">
                         <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
@@ -4346,6 +4381,18 @@ const MasterData = ({ username, userRoles = [] }) => {
                           >
                             Add QR
                           </button>
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-sm font-semibold mb-1">Category</label>
+                          <Select
+                            value={expenseCategoryOptions.find(opt => opt.value === contractorCategory) ?? null}
+                            onChange={(opt) => setContractorCategory(opt?.value ?? '')}
+                            options={expenseCategoryOptions}
+                            placeholder="Select"
+                            isSearchable
+                            isClearable
+                            className="w-52"
+                          />
                         </div>
                       </div>
                       <div className="flex space-x-2 justify-end mt-52">
@@ -4981,7 +5028,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                         gpay_number: editVendorGpayNumber,
                         upi_id: editVendorUpiId,
                         contact_number: editVendorContactNumber,
-                        contact_email: editVendorContactEmail
+                        contact_email: editVendorContactEmail,
+                        category: editVendorCategory
                       };
                       const vendorBlob = new Blob([JSON.stringify(vendorData)], { type: 'application/json' });
                       formData.append('vendor', vendorBlob);
@@ -5253,6 +5301,19 @@ const MasterData = ({ username, userRoles = [] }) => {
                                 {isVendorEditMode ? 'Disable Edit' : 'Edit Vendor Details'}
                               </button>
                             </div>
+                            <div className="mb-4">
+                              <label className="block text-sm font-semibold mb-1">Category</label>
+                              <Select
+                                value={expenseCategoryOptions.find(opt => opt.value === editVendorCategory) ?? null}
+                                onChange={(opt) => setEditVendorCategory(opt?.value ?? '')}
+                                options={expenseCategoryOptions}
+                                placeholder="Select"
+                                isSearchable
+                                isClearable
+                                className="w-52"
+                                isDisabled={!isVendorEditMode}
+                              />
+                            </div>
                           </div>
                           <div className="flex space-x-2 mt-40">
                             <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
@@ -5350,7 +5411,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                         gpay_number: editContractorGpayNumber,
                         upi_id: editContractorUpiId,
                         contact_number: editContractorContactNumber,
-                        contact_email: editContractorContactEmail
+                        contact_email: editContractorContactEmail,
+                        category: editContractorCategory
                       };
                       const contractorBlob = new Blob([JSON.stringify(contractorData)], { type: 'application/json' });
                       formData.append('contractor', contractorBlob);
@@ -5627,6 +5689,19 @@ const MasterData = ({ username, userRoles = [] }) => {
                               >
                                 {isContractorEditMode ? 'Disable Edit' : 'Edit Contractor Details'}
                               </button>
+                            </div>
+                            <div className="mb-4">
+                              <label className="block text-sm font-semibold mb-1">Category</label>
+                              <Select
+                                value={expenseCategoryOptions.find(opt => opt.value === editContractorCategory) ?? null}
+                                onChange={(opt) => setEditContractorCategory(opt?.value ?? '')}
+                                options={expenseCategoryOptions}
+                                placeholder="Select"
+                                isSearchable
+                                isClearable
+                                className="w-52"
+                                isDisabled={!isContractorEditMode}
+                              />
                             </div>
                           </div>
                           <div className="flex space-x-2 justify-end mt-40">

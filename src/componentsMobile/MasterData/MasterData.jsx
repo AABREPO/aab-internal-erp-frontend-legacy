@@ -20,6 +20,17 @@ const masterDataItems = [
   'Support Associate Name'
 ];
 
+const LABOUR_WAGE_TYPE_OPTIONS = [
+  'Mason',
+  'Carpenter',
+  'Electrician',
+  'Plumber',
+  'Helper',
+  'Painter',
+  'Supervisor',
+  'Other'
+];
+
 const MasterData = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -254,7 +265,7 @@ const MasterData = ({ user, onLogout }) => {
     upiId: ''
   });
   const [isAddLabourViewOpen, setIsAddLabourViewOpen] = useState(false);
-  const [expandedLabourSection, setExpandedLabourSection] = useState('labour-details');
+  const [expandedLabourSection, setExpandedLabourSection] = useState('wage-details');
   const [isLabourQrModalOpen, setIsLabourQrModalOpen] = useState(false);
   const [labourQrPreview, setLabourQrPreview] = useState('');
   const [labourFormMode, setLabourFormMode] = useState('new');
@@ -267,6 +278,7 @@ const MasterData = ({ user, onLogout }) => {
     branch: '',
     labourAddress: '',
     location: '',
+    wageType: '',
     labourSalary: '',
     accountHolderName: '',
     qrCode: '',
@@ -509,7 +521,7 @@ const MasterData = ({ user, onLogout }) => {
       upiId: ''
     });
     setIsAddLabourViewOpen(false);
-    setExpandedLabourSection('labour-details');
+    setExpandedLabourSection('wage-details');
     setIsLabourQrModalOpen(false);
     setLabourQrPreview('');
     setLabourFormMode('new');
@@ -522,6 +534,7 @@ const MasterData = ({ user, onLogout }) => {
       branch: '',
       labourAddress: '',
       location: '',
+      wageType: '',
       labourSalary: '',
       accountHolderName: '',
       qrCode: '',
@@ -704,6 +717,7 @@ const MasterData = ({ user, onLogout }) => {
       branch: valueOr(item?.branch, item?.branch_name),
       labourAddress: valueOr(item?.labourAddress, item?.labour_address, item?.address),
       location: valueOr(item?.location, item?.branchLocation, item?.branch_location),
+      wageType: valueOr(item?.wageType, item?.wage_type, item?.labourWageType, item?.labour_wage_type),
       labourSalary: valueOr(item?.labour_salary, item?.salary),
       accountHolderName: valueOr(item?.accountHolderName, item?.account_holder_name),
       qrCode,
@@ -2507,17 +2521,25 @@ const MasterData = ({ user, onLogout }) => {
             </svg>
             <span>Back</span>
           </button>
-          <button type="button">{labourFormMode === 'edit' ? 'Update' : 'Submit'}</button>
+          <button
+            type="button"
+            className="text-[12px] font-medium text-[#F26B3A]"
+            aria-label={labourFormMode === 'edit' ? 'Update labour' : 'Submit labour'}
+          >
+            Submit
+          </button>
         </div>
 
         <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
           <span />
-          <button type="button">View File</button>
+          <button type="button" className="text-[#2B2B2B]">
+            View File
+          </button>
         </div>
       </div>
 
       <div className="px-[12px] pt-[12px] pb-[18px]">
-        <div className="">
+        <div className="flex flex-col ">
           {renderLabourAccordion(
             'labour-details',
             'Labour Details',
@@ -2609,8 +2631,33 @@ const MasterData = ({ user, onLogout }) => {
             'wage-details',
             'Wage Details',
             <div className="space-y-[10px]">
+              <div className="w-full">
+                <label className="block text-left text-[12px] font-medium text-black">
+                  Wage Type<span className="text-[#E26D47]">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={labourForm.wageType || ''}
+                    onChange={(e) => setLabourForm((s) => ({ ...s, wageType: e.target.value }))}
+                    className="h-[32px] w-full appearance-none rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-[30px] text-[12px] text-black outline-none"
+                  >
+                    <option value="">Select Wage Type</option>
+                    {LABOUR_WAGE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-[10px] top-1/2 -translate-y-1/2 text-[#4B4B4B]">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
               {renderInput({
-                label: 'Wage',
+                label: 'Salary',
+                required: true,
                 placeholder: '',
                 value: labourForm.labourSalary,
                 readOnly: false,
@@ -4025,7 +4072,7 @@ const MasterData = ({ user, onLogout }) => {
               } else if (selectedItem === 'Company Labour') {
                 setLabourFormMode('new');
                 setIsAddLabourViewOpen(true);
-                setExpandedLabourSection('labour-details');
+                setExpandedLabourSection('wage-details');
                 setIsLabourQrModalOpen(false);
                 setLabourQrPreview('');
                 setLabourForm({
@@ -4037,6 +4084,7 @@ const MasterData = ({ user, onLogout }) => {
                   branch: '',
                   labourAddress: '',
                   location: '',
+                  wageType: '',
                   labourSalary: '',
                   accountHolderName: '',
                   qrCode: '',
@@ -4163,7 +4211,7 @@ const MasterData = ({ user, onLogout }) => {
                             setLabourFormMode('edit');
                             setLabourForm(next);
                             setLabourQrPreview(next.qrCode || '');
-                            setExpandedLabourSection('labour-details');
+                            setExpandedLabourSection('wage-details');
                             setIsAddLabourViewOpen(true);
                           }
                         }}

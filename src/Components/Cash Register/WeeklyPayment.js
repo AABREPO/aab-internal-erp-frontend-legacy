@@ -120,6 +120,41 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     // The week we MUST operate on (previous open week wins)
     const [activeWeekNumber, setActiveWeekNumber] = useState(actualCurrentWeekNumber);
     const operationalWeekNumber = activeWeekNumber || actualCurrentWeekNumber;
+    const formatLocalISODate = (date) => {
+        const d = date instanceof Date ? date : new Date(date);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    };
+    const getWeekCacheKey = useCallback((baseKey) => {
+        const branchKey = activeBranchId ?? "all";
+        const todayKey = formatLocalISODate(new Date());
+        return `${baseKey}::${branchKey}::${todayKey}`;
+    }, [activeBranchId]);
+    const readCachedActiveWeek = useCallback(() => {
+        try {
+            const raw = sessionStorage.getItem(getWeekCacheKey("cashRegisterActiveWeek"));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const maxAgeMs = 5 * 60 * 1000; // 5 minutes
+            if (!parsed || !parsed.week || !parsed.ts) return null;
+            if (Date.now() - parsed.ts > maxAgeMs) return null;
+            return Number(parsed.week);
+        } catch {
+            return null;
+        }
+    }, [getWeekCacheKey]);
+    const writeCachedActiveWeek = useCallback((week) => {
+        try {
+            sessionStorage.setItem(
+                getWeekCacheKey("cashRegisterActiveWeek"),
+                JSON.stringify({ week: Number(week), ts: Date.now() })
+            );
+        } catch {
+            // ignore
+        }
+    }, [getWeekCacheKey]);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -1028,6 +1063,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     // - Else show current week, and if current week already closed, show next week
     const determineActiveWeekNumber = useCallback(async () => {
         if (!actualCurrentWeekNumber) return;
+        // Fast path: use cached week immediately if available
+        const cachedWeek = readCachedActiveWeek();
+        if (cachedWeek && Number.isFinite(cachedWeek)) {
+            setActiveWeekNumber(cachedWeek);
+            return;
+        }
         const previousWeekNumber = actualCurrentWeekNumber === 1 ? 52 : actualCurrentWeekNumber - 1;
         try {
             const [prevExpensesRes, prevPaymentsRes] = await Promise.all([
@@ -1048,6 +1089,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             if (hasPreviousWeekData && !previousClosed) {
                 // Previous week is open → force showing it and do not advance
                 setActiveWeekNumber(previousWeekNumber);
+                writeCachedActiveWeek(previousWeekNumber);
                 return;
             }
 
@@ -1061,10 +1103,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 (Array.isArray(currExpensesData) && currExpensesData.some((e) => e?.status === true)) ||
                 (Array.isArray(currPaymentsData) && currPaymentsData.some((p) => p?.status === true));
             setCurrentWeekHasStatusTrue(Boolean(currentClosed));
-            setActiveWeekNumber(currentClosed ? nextCalendarWeekNumber : actualCurrentWeekNumber);
+            const decidedWeek = currentClosed ? nextCalendarWeekNumber : actualCurrentWeekNumber;
+            setActiveWeekNumber(decidedWeek);
+            writeCachedActiveWeek(decidedWeek);
         } catch (e) {
             // On errors, fall back to current week
             setActiveWeekNumber(actualCurrentWeekNumber);
+            writeCachedActiveWeek(actualCurrentWeekNumber);
         }
     }, [actualCurrentWeekNumber, nextCalendarWeekNumber, buildBranchUrl]);
     const fetchPortalDescriptions = useCallback(async (expensesData) => {

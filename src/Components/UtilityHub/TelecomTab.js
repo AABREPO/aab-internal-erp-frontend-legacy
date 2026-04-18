@@ -16,6 +16,8 @@ const SAVE_FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/ap
 const TelecomTab = ({ username, userRoles = [] }) => {
     const [filters, setFilters] = useState({
         year: new Date().getFullYear().toString(),
+        month: '',
+        paymentStatus: '',
         vendor: '',
         service: '',
         doorNo: '',
@@ -43,6 +45,10 @@ const TelecomTab = ({ username, userRoles = [] }) => {
     const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
     const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false);
     const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null);
+    const paymentStatusOptions = [
+        { value: 'Paid', label: 'Paid' },
+        { value: 'Unpaid', label: 'Unpaid' }
+    ];
 
     const openTelecomExpenseEntry = (serviceNumber, project) => {
         const prefillData = {
@@ -102,6 +108,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
                 const groupedProjectsMap = new Map();
                 const vendorSet = new Set();
+                const normalize = (value) => (value ? String(value).trim().toLowerCase() : '');
 
                 telecomEntries
                     .filter(entry => entry && (entry.service_number || entry.serviceNumber))
@@ -121,25 +128,45 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                             projectCategory: projectMeta?.projectCategory ?? entry.project_category ?? entry.category ?? '',
                             propertyDetails: []
                         };
-
                         const propertyId = entry.id ?? `${projectKey}-${existingProject.propertyDetails.length + 1}`;
                         const vendorName = entry.service_provider ?? entry.serviceProvider ?? '';
                         if (vendorName) {
                             vendorSet.add(vendorName);
                         }
-
+                        const projectProperties = Array.isArray(projectMeta?.raw?.propertyDetails)
+                            ? projectMeta.raw.propertyDetails
+                            : [];
+                        const assignedPerson = entry.assigned_person ?? entry.assignedPerson ?? '';
+                        const tenantTarget = normalize(assignedPerson);
+                        const matchedProjectProperty =
+                            (tenantTarget
+                                ? projectProperties.find((prop) => {
+                                    const tenantValue =
+                                        prop?.tenantName ||
+                                        prop?.tenant ||
+                                        prop?.tenantDetails?.tenantName ||
+                                        prop?.tenant_details?.tenantName ||
+                                        '';
+                                    return normalize(tenantValue) === tenantTarget;
+                                })
+                                : null) || projectProperties[0] || null;
                         existingProject.propertyDetails.push({
                             id: propertyId,
                             utilityTelecomId: entry.id ?? propertyId,
-                            doorNo: entry.registered_person ?? entry.registeredPerson ?? '',
-                            shopNo: entry.assigned_person ?? entry.assignedPerson ?? '',
-                            projectType: entry.service_type ?? entry.serviceType ?? '',
+                            // Match ElectricityTab: door/shop come from project propertyDetails
+                            doorNo: matchedProjectProperty?.doorNo ?? '-',
+                            shopNo: matchedProjectProperty?.shopNo ?? matchedProjectProperty?.shop_no ?? '-',
+                            projectType: matchedProjectProperty?.projectType ?? matchedProjectProperty?.project_type ?? (entry.service_type ?? entry.serviceType ?? ''),
                             ebNo: serviceNumber,
-                            tenantName: entry.assigned_person ?? entry.assignedPerson ?? '',
+                            tenantName:
+                                matchedProjectProperty?.tenantName ||
+                                matchedProjectProperty?.tenant ||
+                                matchedProjectProperty?.tenantDetails?.tenantName ||
+                                matchedProjectProperty?.tenant_details?.tenantName ||
+                                (entry.assigned_person ?? entry.assignedPerson ?? ''),
                             vendorName: vendorName,
                             telecomEntry: entry
                         });
-
                         groupedProjectsMap.set(projectKey, existingProject);
                     });
 
@@ -232,6 +259,10 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                     }
                 }
 
+                if (!matchesPaymentFilters(property)) {
+                    return false;
+                }
+
                 return true;
             });
 
@@ -282,6 +313,13 @@ const TelecomTab = ({ username, userRoles = [] }) => {
             ...provided,
             color: '#9CA3AF',
         }),
+        menuPortal: (base) => ({ ...base, zIndex: 100000 }),
+        menu: (base) => ({ ...base, zIndex: 100000 }),
+    };
+
+    const selectPortalProps = {
+        menuPortalTarget: document.body,
+        menuPosition: 'fixed',
     };
 
     const getUniqueValues = (key) => {
@@ -654,6 +692,27 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
     const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+    const matchesPaymentFilters = (property) => {
+        const selectedMonth = filters.month;
+        const selectedStatus = filters.paymentStatus;
+        if (!selectedMonth && !selectedStatus) {
+            return true;
+        }
+        const telecomKey = property?.utilityTelecomId ?? property?.id;
+        const evaluateMonth = (month) => {
+            const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
+            const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+            const isUnpaid = paymentData.amount === '0';
+            if (selectedStatus === 'Paid') return isPaid;
+            if (selectedStatus === 'Unpaid') return isUnpaid;
+            return true;
+        };
+        if (selectedMonth) {
+            return evaluateMonth(selectedMonth);
+        }
+        return monthLabels.some((month) => evaluateMonth(month));
+    };
+
     // Validity is used to hide "0" in covered months (no column).
 
     const buildExportRows = () => {
@@ -937,9 +996,10 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             ) : null}
-            <div className="bg-white rounded-md mb-5 h-[128px] ml-5 mr-5">
+            <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
-                    <div className="flex text-left gap-4">
+                    {/* Match ElectricityTab filter layout */}
+                    <div className="grid grid-cols-5 gap-4 text-left">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -952,7 +1012,37 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 onChange={(selectedOption) => handleFilterChange('year', selectedOption)}
                                 placeholder="Select Year"
                                 isClearable
+                                isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Month</label>
+                            <Select
+                                options={monthLabels.map(month => ({ value: month, label: month }))}
+                                value={filters.month ? { value: filters.month, label: filters.month } : null}
+                                onChange={(selectedOption) => handleFilterChange('month', selectedOption)}
+                                placeholder="Select Month"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                {...selectPortalProps}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Payment Status</label>
+                            <Select
+                                options={paymentStatusOptions}
+                                value={filters.paymentStatus ? { value: filters.paymentStatus, label: filters.paymentStatus } : null}
+                                onChange={(selectedOption) => handleFilterChange('paymentStatus', selectedOption)}
+                                placeholder="Select Status"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -966,6 +1056,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -979,6 +1070,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -992,6 +1084,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -1005,6 +1098,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -1018,6 +1112,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -1031,6 +1126,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -1044,6 +1140,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
+                                {...selectPortalProps}
                                 className="w-full"
                             />
                         </div>
@@ -1109,34 +1206,36 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="border-l-8 border-l-[#BF9853] rounded-lg">
                         <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
-                                    <tr className="bg-[#FAF6ED]">
-                                        <td className=" px-4 py-2 text-left font-semibold">Sl.No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">PID</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Project Name</td>
-                                        <td className=" px-4 py-2 text-left font-semibold"></td>
-                                        <td className=" px-4 py-2 text-left font-semibold">D.No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Service Provider</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Service No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Jan</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Feb</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Mar</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Apr</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">May</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">June</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">July</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Aug</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Sep</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Oct</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Nov</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Dec</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Unpaid</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Activity</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Hide</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            <div className="overflow-y-auto h-[480px] min-w-max">
+                                <table className="w-full border-collapse table-auto">
+                                    <thead className="sticky top-0 z-10">
+                                        <tr className="bg-[#FAF6ED]">
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sl.No</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">PID</td>
+                                            <td className="px-4 py-2 text-left font-semibold">Project Name</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap"></td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">D.No</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Shop No</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Phase</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Service No</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Jan</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Feb</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Mar</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Apr</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">May</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">June</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">July</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Aug</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sep</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Oct</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Nov</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Dec</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Unpaid</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Activity</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Hide</td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                     {loading ? (
                                         <tr>
                                             <td colSpan="22" className="text-center py-4">
@@ -1156,20 +1255,23 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredProjects.map((project, projectIndex) =>
-                                            project.propertyDetails
-                                                .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                                                .map((property, propertyIndex) => {
-                                                    const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
+                                            filteredProjects
+                                                .flatMap(project =>
+                                                    project.propertyDetails
+                                                        .filter(property => property.ebNo && property.ebNo.trim() !== '')
+                                                        .map(property => ({ project, property }))
+                                                )
+                                                .map(({ project, property }, index) => {
                                                     const categoryBadge = property.projectType || project.projectCategory || '-';
-                                                    const vendorBadge = property.vendorName || '-';
                                                     const telecomKey = property.utilityTelecomId ?? property.id;
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-4 py-2">{rowIndex + 1}</td>
-                                                            <td className="px-4 py-2">{project.projectId}</td>
-                                                            <td className="px-4 py-2 text-left">{project.projectName}</td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">{index + 1}</td>
+                                                            <td className="px-2 py-2">{project.projectId}</td>
+                                                            <td className="px-2 py-2 text-left whitespace-normal break-words max-w-[220px]">
+                                                                {project.projectName}
+                                                            </td>
+                                                            <td className="px-2 py-2">
                                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${project.projectCategory === 'Client Project'
                                                                     ? 'bg-orange-100 text-orange-800'
                                                                     : project.projectCategory === 'Own Project'
@@ -1179,24 +1281,14 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                                     {categoryBadge}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2">{property.doorNo || '-'}</td>
-                                                            <td className="px-4 py-2">
-                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${project.projectCategory === 'Client Project'
-                                                                    ? 'bg-orange-100 text-orange-800'
-                                                                    : project.projectCategory === 'Own Project'
-                                                                        ? 'bg-green-100 text-green-800'
-                                                                        : 'bg-gray-100 text-gray-800'
-                                                                    }`}>
-                                                                    {vendorBadge}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-left">
-                                                                <span
-                                                                    className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer"
-                                                                    onClick={() => openTelecomExpenseEntry(property.ebNo, project)}
-                                                                >
-                                                                    {property.ebNo}
-                                                                </span>
+                                                            <td className="px-2 py-2">{property.doorNo || '-'}</td>
+                                                            <td className="px-2 py-2">{property.shopNo || '-'}</td>
+                                                            <td className="px-2 py-2">-</td>
+                                                            <td
+                                                                className="px-2 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                                                onClick={() => openTelecomExpenseEntry(property.ebNo, project)}
+                                                            >
+                                                                {property.ebNo}
                                                             </td>
                                                             {monthLabels.map(month => {
                                                                 const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
@@ -1221,12 +1313,12 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                                     </td>
                                                                 );
                                                             })}
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
                                                                     {getUnpaidCount(property.ebNo, telecomKey, property)}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">
                                                                 <button onClick={() => handleActivityEdit(project, property)}
                                                                     className="rounded-full transition duration-200 hover:scale-110 hover:brightness-110"
                                                                 >
@@ -1237,7 +1329,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                                     />
                                                                 </button>
                                                             </td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 py-2">
                                                                 <button onClick={() => toggleProjectHideStatus(project.id, true)} className="text-red-600 hover:text-red-800 text-sm" >
                                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1248,10 +1340,10 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                         </tr>
                                                     );
                                                 })
-                                        )
-                                    )}
-                                </tbody>
-                            </table>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1286,18 +1378,25 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {hiddenProjects.map((project, projectIndex) =>
-                                            project.propertyDetails
-                                                .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                                                .map((property, propertyIndex) => {
-                                                    const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
+                                        {hiddenProjects
+                                            .flatMap(project =>
+                                                project.propertyDetails
+                                                    .filter(property => property.ebNo && property.ebNo.trim() !== '')
+                                                    .map(property => ({ project, property }))
+                                            )
+                                            .map(({ project, property }, index) => {
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-4 py-2">{rowIndex + 1}</td>
+                                                            <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
-                                                            <td className="px-4 py-2">{property.ebNo}</td>
+                                                            <td
+                                                                className="px-4 py-2 text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                                                onClick={() => openTelecomExpenseEntry(property.ebNo, project)}
+                                                            >
+                                                                {property.ebNo}
+                                                            </td>
                                                             <td className="px-4 py-2">
                                                                 <button
                                                                     onClick={() => toggleProjectHideStatus(project.id, false)}
@@ -1310,8 +1409,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                             </td>
                                                         </tr>
                                                     );
-                                                })
-                                        )}
+                                                })}
                                     </tbody>
                                 </table>
                             </div>

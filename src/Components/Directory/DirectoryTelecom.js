@@ -8,7 +8,7 @@ import filterIcon from '../Images/filter (3).png'
 
 const DirectoryTelecom = () => {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/aabuildersDash';
-
+  const API_BASE_URL1 = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/aabuilderDash';
   const [activeTab, setActiveTab] = useState('clients');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isInputsOpen, setIsInputsOpen] = useState(false);
@@ -44,7 +44,9 @@ const DirectoryTelecom = () => {
   const [networkItems, setNetworkItems] = useState([]);
   const [categoryItems, setCategoryItems] = useState([]);
   const [projectItems, setProjectItems] = useState([]);
+  const [peopleNameOptions, setPeopleNameOptions] = useState([]);
   const [telecomEntries, setTelecomEntries] = useState([]);
+  const [telecomExpensePayments, setTelecomExpensePayments] = useState([]);
   const [telecomLoading, setTelecomLoading] = useState(false);
   const [telecomError, setTelecomError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -148,12 +150,12 @@ const DirectoryTelecom = () => {
       return null;
     }
     let endDate;
-    if (normalizedUnit === 'days') {
+    if (normalizedUnit === 'day' || normalizedUnit === 'days') {
       endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + (numericValidity - 1));
-    } else if (normalizedUnit === 'months') {
+    } else if (normalizedUnit === 'month' || normalizedUnit === 'months') {
       endDate = addMonthsRespectingEndOfMonth(startDate, numericValidity);
-    } else if (normalizedUnit === 'years') {
+    } else if (normalizedUnit === 'year' || normalizedUnit === 'years') {
       endDate = addMonthsRespectingEndOfMonth(startDate, numericValidity * 12);
     } else {
       return null;
@@ -380,6 +382,64 @@ const DirectoryTelecom = () => {
       return true;
     });
   }, [telecomEntries, filters, projectItems]);
+  const latestTelecomPaymentByServiceNo = useMemo(() => {
+    const map = new Map();
+    const list = Array.isArray(telecomExpensePayments) ? telecomExpensePayments : [];
+    const getServiceNo = (p) =>
+      (p?.utilityTypeNumber ??
+        p?.utility_type_number ??
+        p?.utilityTypeNo ??
+        p?.serviceNumber ??
+        p?.service_number ??
+        '').toString().trim();
+    const toYearMonth = (value) => {
+      if (!value) return null;
+      if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value.trim())) return value.trim();
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${yyyy}-${mm}`;
+    };
+    const yearMonthToIndex = (ym) => {
+      if (!ym || typeof ym !== 'string') return null;
+      const [y, m] = ym.split('-').map((x) => parseInt(x, 10));
+      if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+      return y * 12 + (m - 1);
+    };
+    const getSortMeta = (p) => {
+      const ym = toYearMonth(p?.utilityForTheMonth ?? p?.utility_for_the_month ?? p?.date ?? p?.timestamp);
+      const idx = yearMonthToIndex(ym);
+      const timeCandidate =
+        p?.timestamp ??
+        p?.date ??
+        p?.payment_date ??
+        p?.service_starting_date ??
+        p?.serviceStartingDate ??
+        null;
+      const timeMs = timeCandidate ? new Date(timeCandidate).getTime() : NaN;
+      return { idx: idx ?? -1, timeMs: Number.isFinite(timeMs) ? timeMs : -1 };
+    };
+    const isNewer = (a, b) => {
+      const am = getSortMeta(a);
+      const bm = getSortMeta(b);
+      if (am.idx !== bm.idx) return am.idx > bm.idx;
+      return am.timeMs > bm.timeMs;
+    };
+    list.forEach((p) => {
+      const serviceNo = getServiceNo(p);
+      if (!serviceNo) return;
+      const prev = map.get(serviceNo);
+      if (!prev) {
+        map.set(serviceNo, p);
+        return;
+      }
+      if (isNewer(p, prev)) {
+        map.set(serviceNo, p);
+      }
+    });
+    return map;
+  }, [telecomExpensePayments]);
   const filteredTypeItems = useMemo(() => {
     const term = typeSearch.trim().toLowerCase();
     if (!term) return typeItems;
@@ -431,6 +491,14 @@ const DirectoryTelecom = () => {
     () => projectOptions.find(option => option.value === form.project) ?? null,
     [projectOptions, form.project]
   );
+  const selectedRegisteredPersonOption = useMemo(() => {
+    if (!form.registeredPerson) return null;
+    return peopleNameOptions.find(option => option.value === form.registeredPerson) ?? null;
+  }, [peopleNameOptions, form.registeredPerson]);
+  const selectedAssignedPersonOption = useMemo(() => {
+    if (!form.assignedPerson) return null;
+    return peopleNameOptions.find(option => option.value === form.assignedPerson) ?? null;
+  }, [peopleNameOptions, form.assignedPerson]);
   const selectedProjectFilterOption = useMemo(
     () => projectOptions.find(option => option.value === filters.project) ?? null,
     [projectOptions, filters.project]
@@ -588,12 +656,26 @@ const DirectoryTelecom = () => {
       setTelecomLoading(false);
     }
   };
+  const fetchTelecomExpensePayments = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL1}/expenses_form/utility/telecom`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch telecom payments');
+      }
+      const result = await response.json();
+      setTelecomExpensePayments(Array.isArray(result) ? result : []);
+    } catch (error) {
+      console.error(error);
+      setTelecomExpensePayments([]);
+    }
+  };
   useEffect(() => {
     fetchList('type');
     fetchList('network');
     fetchList('category');
     fetchProjectItems();
     fetchTelecomEntries();
+    fetchTelecomExpensePayments();
   }, []);
   useEffect(() => {
     if (!isInputsOpen) return;
@@ -606,6 +688,76 @@ const DirectoryTelecom = () => {
     fetchProjectItems();
     setSaveError('');
   }, [isCreateOpen]);
+  useEffect(() => {
+    // prevent background scroll while modal is open
+    if (!isCreateOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isCreateOpen]);
+  useEffect(() => {
+    if (!isCreateOpen) return;
+    let isCancelled = false;
+
+    const resolveEmployeeName = (emp) =>
+      emp?.employeeName ||
+      emp?.name ||
+      emp?.fullName ||
+      emp?.employee_name ||
+      emp?.employee_name ||
+      '';
+
+    const resolveStaffName = (staff) =>
+      staff?.support_staff_name ||
+      staff?.supportStaffName ||
+      staff?.name ||
+      '';
+
+    const fetchPeopleOptions = async () => {
+      try {
+        const [employeeRes, staffRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/employee_details/basic/getAll`),
+          fetch(`${API_BASE_URL}/api/support_staff/getAll`)
+        ]);
+
+        const [employeeJson, staffJson] = await Promise.all([
+          employeeRes.ok ? employeeRes.json() : Promise.resolve([]),
+          staffRes.ok ? staffRes.json() : Promise.resolve([])
+        ]);
+
+        if (isCancelled) return;
+
+        const employees = Array.isArray(employeeJson) ? employeeJson : [];
+        const staff = Array.isArray(staffJson) ? staffJson : [];
+
+        const employeeNames = employees
+          .map(resolveEmployeeName)
+          .filter((name) => typeof name === 'string' && name.trim() !== '');
+
+        const staffNames = staff
+          .map(resolveStaffName)
+          .filter((name) => typeof name === 'string' && name.trim() !== '');
+
+        const mergedNames = [...new Set([...employeeNames, ...staffNames])]
+          .sort((a, b) => a.localeCompare(b));
+
+        setPeopleNameOptions(mergedNames.map((name) => ({ value: name, label: name })));
+      } catch (error) {
+        // keep dropdowns usable even if API fails
+        if (!isCancelled) {
+          setPeopleNameOptions([]);
+        }
+      }
+    };
+
+    fetchPeopleOptions();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isCreateOpen, API_BASE_URL]);
   useEffect(() => {
     const { serviceStart, serviceEnd } = form;
     if (!serviceStart || !serviceEnd) {
@@ -835,6 +987,9 @@ const DirectoryTelecom = () => {
         borderColor: 'rgba(191, 152, 83, 0.2)',
       }
     }),
+    // ensure dropdown renders above modal overlays
+    menuPortal: (base) => ({ ...base, zIndex: 100000 }),
+    menu: (base) => ({ ...base, zIndex: 100000 }),
   };
   const handleEditItem = (key, item) => {
     setActiveAddPopup(key);
@@ -900,10 +1055,55 @@ const DirectoryTelecom = () => {
   };
   const openCreateModal = (entry = null) => {
     if (entry) {
+      const normalizeValidityUnit = (unit) => {
+        if (!unit) return '';
+        const raw = String(unit).trim().toLowerCase();
+        if (raw === 'day' || raw === 'days') return 'Days';
+        if (raw === 'month' || raw === 'months') return 'Months';
+        if (raw === 'year' || raw === 'years') return 'Years';
+        return '';
+      };
+      const serviceNumberRaw = entry.service_number ?? entry.serviceNumber ?? entry.utilityTypeNumber ?? entry.utility_type_number ?? '';
+      const serviceNumberKey = serviceNumberRaw != null ? String(serviceNumberRaw).trim() : '';
+      const latestPayment = serviceNumberKey ? latestTelecomPaymentByServiceNo.get(serviceNumberKey) : null;
+
       const validityRaw = entry.validity ?? entry.validity_value ?? entry.validityValue ?? '';
       const parsedValidity = Number(validityRaw);
       const amountRaw = entry.amount ?? entry.amount_value ?? entry.amountValue ?? '';
       const projectRaw = entry.project_id ?? entry.projectId ?? entry.project ?? '';
+      const latestValidityValueRaw =
+        latestPayment?.utility_validity_days ??
+        latestPayment?.utilityValidityDays ??
+        latestPayment?.validity ??
+        null;
+      const latestValidityValue = latestValidityValueRaw != null && String(latestValidityValueRaw).trim() !== ''
+        ? Number(latestValidityValueRaw)
+        : null;
+      const latestValidityUnit = normalizeValidityUnit(
+        latestPayment?.utility_validity_type ??
+        latestPayment?.utilityValidityType ??
+        latestPayment?.validity_type ??
+        latestPayment?.validityType ??
+        null
+      );
+      const latestServiceStartCandidate =
+        latestPayment?.service_starting_date ??
+        latestPayment?.serviceStartingDate ??
+        latestPayment?.serviceStarting ??
+        latestPayment?.service_starting ??
+        latestPayment?.date ??
+        latestPayment?.payment_date ??
+        latestPayment?.timestamp ??
+        null;
+      const latestServiceStart = latestPayment ? formatDateForInput(latestServiceStartCandidate) : '';
+      const resolvedValidityValueForEdit =
+        latestPayment && Number.isFinite(latestValidityValue) ? latestValidityValue : (Number.isNaN(parsedValidity) ? 0 : parsedValidity);
+      const resolvedValidityUnitForEdit =
+        latestPayment && latestValidityUnit ? latestValidityUnit : (entry.validity_type ?? entry.validityType ?? '');
+      const computedEndForEdit =
+        latestPayment && latestServiceStart && resolvedValidityValueForEdit && resolvedValidityUnitForEdit
+          ? computeServiceEndDate(latestServiceStart, resolvedValidityValueForEdit, resolvedValidityUnitForEdit)
+          : null;
       setForm({
         type: entry.service_type ?? entry.serviceType ?? '',
         network: entry.service_provider ?? entry.serviceProvider ?? '',
@@ -911,14 +1111,18 @@ const DirectoryTelecom = () => {
         project: projectRaw !== undefined && projectRaw !== null ? String(projectRaw) : '',
         purpose: entry.purpose ?? '',
         amount:
-          amountRaw !== undefined && amountRaw !== null && amountRaw !== ''
-            ? String(amountRaw)
-            : '',
-        paymentDate: formatDateForInput(entry.payment_date ?? entry.paymentDate),
-        serviceStart: formatDateForInput(entry.service_starting_date ?? entry.serviceStartingDate),
-        serviceEnd: formatDateForInput(entry.service_end_date ?? entry.serviceEndDate),
-        validityValue: Number.isNaN(parsedValidity) ? 0 : parsedValidity,
-        validityUnit: entry.validity_type ?? entry.validityType ?? '',
+          (latestPayment?.amount ?? '') !== ''
+            ? String(latestPayment?.amount ?? '')
+            : (amountRaw !== undefined && amountRaw !== null && amountRaw !== ''
+              ? String(amountRaw)
+              : ''),
+        paymentDate: latestPayment ? formatDateForInput(latestPayment?.date ?? latestPayment?.payment_date ?? latestPayment?.timestamp) : formatDateForInput(entry.payment_date ?? entry.paymentDate),
+        serviceStart: latestPayment ? latestServiceStart : formatDateForInput(entry.service_starting_date ?? entry.serviceStartingDate),
+        serviceEnd: latestPayment
+          ? (computedEndForEdit ? formatDateForInput(computedEndForEdit) : '')
+          : formatDateForInput(entry.service_end_date ?? entry.serviceEndDate),
+        validityValue: resolvedValidityValueForEdit,
+        validityUnit: resolvedValidityUnitForEdit,
         registeredPerson: entry.registered_person ?? entry.registeredPerson ?? '',
         assignedPerson: entry.assigned_person ?? entry.assignedPerson ?? ''
       });
@@ -1107,6 +1311,8 @@ const DirectoryTelecom = () => {
                 <th className="p-2">Type</th>
                 <th className="p-2">Number</th>
                 <th className="p-2">Payment Date</th>
+                <th className="p-2">Service Start</th>
+                <th className="p-2">Service End</th>
                 <th className="p-2">Validity</th>
                 <th className="p-2">Amount</th>
                 <th className="p-2">Exp Date</th>
@@ -1199,34 +1405,93 @@ const DirectoryTelecom = () => {
             <tbody>
               {telecomLoading && (
                 <tr>
-                  <td colSpan={13} className="p-4 text-center text-gray-500">Loading telecom entries...</td>
+                  <td colSpan={16} className="p-4 text-center text-gray-500">Loading telecom entries...</td>
                 </tr>
               )}
               {!telecomLoading && telecomError && (
                 <tr>
-                  <td colSpan={13} className="p-4 text-center text-red-600">{telecomError}</td>
+                  <td colSpan={16} className="p-4 text-center text-red-600">{telecomError}</td>
                 </tr>
               )}
               {!telecomLoading && !telecomError && telecomEntries.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="p-4 text-center text-gray-500">No telecom entries found.</td>
+                  <td colSpan={16} className="p-4 text-center text-gray-500">No telecom entries found.</td>
                 </tr>
               )}
               {!telecomLoading && !telecomError && telecomEntries.length > 0 && filteredTelecomEntries.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="p-4 text-center text-gray-500">No telecom entries match the applied filters.</td>
+                  <td colSpan={16} className="p-4 text-center text-gray-500">No telecom entries match the applied filters.</td>
                 </tr>
               )}
               {!telecomLoading && !telecomError && filteredTelecomEntries.map((item, index) => {
+                const serviceNumber = item.service_number ?? item.serviceNumber ?? item.utilityTypeNumber ?? '';
+                const latestPayment = serviceNumber ? latestTelecomPaymentByServiceNo.get(String(serviceNumber).trim()) : null;
+                const paymentDateRaw =
+                  latestPayment?.date ??
+                  latestPayment?.payment_date ??
+                  item.payment_date ??
+                  item.paymentDate ??
+                  null;
+                const amountRaw =
+                  latestPayment?.amount ??
+                  item.amount ??
+                  item.amount_value ??
+                  item.amountValue ??
+                  '';
+                const serviceStartRaw =
+                  latestPayment?.serviceStartingDate ??
+                  latestPayment?.service_starting_date ??
+                  latestPayment?.serviceStarting ??
+                  latestPayment?.service_starting ??
+                  paymentDateRaw ??
+                  item.service_starting_date ??
+                  item.serviceStartingDate ??
+                  item.service_starting ??
+                  item.serviceStart ??
+                  null;
+                const resolvedValidityValue =
+                  latestPayment?.utility_validity_days ??
+                  latestPayment?.utilityValidityDays ??
+                  latestPayment?.validity ??
+                  item.validity ??
+                  item.validity_value ??
+                  item.validityValue ??
+                  '';
+                const resolvedValidityUnit =
+                  latestPayment?.utility_validity_type ??
+                  latestPayment?.utilityValidityType ??
+                  latestPayment?.validity_type ??
+                  latestPayment?.validityType ??
+                  item.validity_type ??
+                  item.validityType ??
+                  '';
+                const explicitServiceEndFromExpense =
+                  latestPayment?.service_end_date ??
+                  latestPayment?.serviceEndDate ??
+                  latestPayment?.service_end ??
+                  latestPayment?.serviceEnd ??
+                  null;
+                const explicitServiceEndFromDirectory =
+                  item.service_end_date ??
+                  item.serviceEndDate ??
+                  item.service_end ??
+                  item.serviceEnd ??
+                  null;
+                // If a new recharge exists (latestPayment), prefer computed end date.
+                // Directory end date may be stale and should not override latest recharge start+validity.
+                const explicitServiceEnd = explicitServiceEndFromExpense || (!latestPayment ? explicitServiceEndFromDirectory : null);
                 const expiry_date = calculateExpiryDate(
-                  item.service_starting_date,
-                  item.validity,
-                  item.validity_type,
-                  item.service_end_date ?? item.serviceEndDate
+                  serviceStartRaw,
+                  resolvedValidityValue,
+                  resolvedValidityUnit,
+                  explicitServiceEnd
                 );
-                const validityLabel = item.validity && item.validity_type
-                  ? `${item.validity} ${item.validity_type}`
-                  : item.validity || '-';
+                const computedServiceEnd = computeServiceEndDate(serviceStartRaw, resolvedValidityValue, resolvedValidityUnit);
+                const serviceEndForDisplay = explicitServiceEnd || computedServiceEnd || null;
+                const validityLabel =
+                  resolvedValidityValue && resolvedValidityUnit
+                    ? `${resolvedValidityValue} ${resolvedValidityUnit}`
+                    : resolvedValidityValue || '-';
                 const projectCategory = getProjectCategory(item.project_id);
                 const providerStyles = getProjectCategoryStyles(projectCategory);
                 return (
@@ -1245,10 +1510,12 @@ const DirectoryTelecom = () => {
                     <td className="p-2">
                       <div className="font-semibold">{item.service_type || '-'}</div>
                     </td>
-                    <td className="p-2">{item.service_number || '-'}</td>
-                    <td className="p-2">{formatDisplayDate(item.payment_date)}</td>
+                    <td className="p-2">{serviceNumber || '-'}</td>
+                    <td className="p-2">{formatDisplayDate(paymentDateRaw)}</td>
+                    <td className="p-2">{formatDisplayDate(serviceStartRaw)}</td>
+                    <td className="p-2">{formatDisplayDate(serviceEndForDisplay)}</td>
                     <td className="p-2">{validityLabel}</td>
-                    <td className="p-2">{formatAmount(item.amount)}</td>
+                    <td className="p-2">{formatAmount(amountRaw)}</td>
                     <td className="p-2">{formatDisplayDate(expiry_date)}</td>
                     <td className="p-2">{calculateRemainingDays(expiry_date)}</td>
                     <td className="p-2">{calculateExpiredAgo(expiry_date)}</td>
@@ -1522,7 +1789,7 @@ const DirectoryTelecom = () => {
         {isCreateOpen && (
           <div className="fixed inset-0 z-30 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={closeCreateModal} />
-            <div className="relative z-40 bg-white rounded-lg shadow-xl w-[860px] max-w-[92vw]">
+            <div className="relative z-40 bg-white rounded-lg shadow-xl w-[860px] max-w-[92vw] max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-4">
                 <h3 className="text-lg font-semibold">{editingEntry ? 'Edit Telecom Details' : 'Telecom Details'}</h3>
                 <button className="text-red-600 text-2xl" onClick={closeCreateModal}>×</button>
@@ -1599,33 +1866,47 @@ const DirectoryTelecom = () => {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Service Start Date</label>
-                  <input type="date" value={form.serviceStart} onChange={(e) => handleFormChange('serviceStart', e.target.value)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none" />
+                  <input type="date" value={form.serviceStart} onChange={(e) => handleFormChange('serviceStart', e.target.value)} disabled={Boolean(editingEntry?.id)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Service End Date</label>
-                  <input type="date" value={form.serviceEnd} onChange={(e) => handleFormChange('serviceEnd', e.target.value)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none" />
+                  <input type="date" value={form.serviceEnd} onChange={(e) => handleFormChange('serviceEnd', e.target.value)} disabled={Boolean(editingEntry?.id)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Registered Person</label>
-                  <select value={form.registeredPerson} onChange={(e) => handleFormChange('registeredPerson', e.target.value)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none appearance-none">
-                    <option value="">Select</option>
-                    <option>Amir H</option>
-                    <option>Jothi S</option>
-                  </select>
+                  <Select
+                    value={selectedRegisteredPersonOption}
+                    onChange={(option) => handleFormChange('registeredPerson', option?.value ?? '')}
+                    options={peopleNameOptions}
+                    styles={customStyles}
+                    placeholder="Select"
+                    isSearchable
+                    isClearable
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
+                    classNamePrefix="telecom-select"
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Assigned Person</label>
-                  <select value={form.assignedPerson} onChange={(e) => handleFormChange('assignedPerson', e.target.value)} className="w-full h-11 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none appearance-none">
-                    <option value="">Select</option>
-                    <option>Amir H</option>
-                    <option>Vinoth G</option>
-                  </select>
+                  <Select
+                    value={selectedAssignedPersonOption}
+                    onChange={(option) => handleFormChange('assignedPerson', option?.value ?? '')}
+                    options={peopleNameOptions}
+                    styles={customStyles}
+                    placeholder="Select"
+                    isSearchable
+                    isClearable
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
+                    classNamePrefix="telecom-select"
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Validity</label>
                   <div className="flex gap-2">
-                    <input type="number" min="0" value={form.validityValue} onChange={(e) => handleFormChange('validityValue', Number(e.target.value))} className="h-11 w-20 border-2 border-[#BF9853] border-opacity-30 rounded-md px-3 focus:outline-none no-spinner" />
-                    <select value={form.validityUnit} onChange={(e) => handleFormChange('validityUnit', e.target.value)} className="h-11 flex-1 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none appearance-none">
+                    <input type="number" min="0" value={form.validityValue} onChange={(e) => handleFormChange('validityValue', Number(e.target.value))} disabled={Boolean(editingEntry?.id)} className="h-11 w-20 border-2 border-[#BF9853] border-opacity-30 rounded-md px-3 focus:outline-none no-spinner disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                    <select value={form.validityUnit} onChange={(e) => handleFormChange('validityUnit', e.target.value)} disabled={Boolean(editingEntry?.id)} className="h-11 flex-1 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 focus:outline-none appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed">
                       <option value="">Select</option>
                       <option value="Days">Days</option>
                       <option value="Months">Months</option>

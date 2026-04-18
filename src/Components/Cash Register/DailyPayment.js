@@ -67,7 +67,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         employee_id: "",
         project_id: "",
         quantity: "",
-        type: "Wage",
+        type: "",
         amount: "",
         extra_amount: ""
     });
@@ -107,6 +107,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const currentWeek = weeks.find((w) => w.number === Number(selectedWeek));
     const [weeklyReceivedTypes, setWeeklyReceivedTypes] = useState([]);
     const [isChangeButtonActive, setIsChangeButtonActive] = useState(false);
+    /** Labour vs Vendor/Contractor/Employee toggle — only for the row currently being edited (independent from new entry). */
+    const [isEditChangeButtonActive, setIsEditChangeButtonActive] = useState(false);
     const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
@@ -191,10 +193,35 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const velocity = useRef({ x: 0, y: 0 });
     const animationFrame = useRef(null);
     const lastMove = useRef({ time: 0, x: 0, y: 0 });
+    /** Do not start drag-to-scroll when interacting with form fields (mouse selection would scroll the table). */
+    const isScrollDragExcludedTarget = (target) => {
+        if (!target || typeof target.closest !== 'function') return false;
+        return Boolean(
+            target.closest(
+                [
+                    'input',
+                    'textarea',
+                    'select',
+                    'button',
+                    'option',
+                    'a[href]',
+                    'label',
+                    '[contenteditable="true"]',
+                    '[role="combobox"]',
+                    '[role="searchbox"]',
+                    '[role="textbox"]',
+                    '[role="listbox"]',
+                    '[role="option"]'
+                ].join(', ')
+            )
+        );
+    };
     // Move laboursList state declaration here, before it's used in sortedDailyExpenses
     const [laboursList, setLaboursList] = useState([]);
     const handleMouseDown = (e) => {
         if (!scrollRef.current) return;
+        if (isScrollDragExcludedTarget(e.target)) return;
+        if (e.button !== 0) return;
         isDragging.current = true;
         start.current = { x: e.clientX, y: e.clientY };
         scroll.current = {
@@ -396,27 +423,24 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         aValue = new Date(a.date);
                         bValue = new Date(b.date);
                         break;
-                    case 'labour_name':
-                        if (isChangeButtonActive) {
-                            const getAValue = () => {
-                                const employee = employeeOptions.find(opt => opt.id === Number(a.employee_id));
-                                const vendor = vendorOptions.find(opt => opt.id === Number(a.vendor_id));
-                                const contractor = contractorOptions.find(opt => opt.id === Number(a.contractor_id));
+                    case 'labour_name': {
+                        const getNameSortValue = (row) => {
+                            const hasNonLabour =
+                                Number(row.vendor_id) > 0 ||
+                                Number(row.contractor_id) > 0 ||
+                                Number(row.employee_id) > 0;
+                            if (hasNonLabour) {
+                                const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                                const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                                const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
                                 return employee?.label || vendor?.label || contractor?.label || "";
-                            };
-                            const getBValue = () => {
-                                const employee = employeeOptions.find(opt => opt.id === Number(b.employee_id));
-                                const vendor = vendorOptions.find(opt => opt.id === Number(b.vendor_id));
-                                const contractor = contractorOptions.find(opt => opt.id === Number(b.contractor_id));
-                                return employee?.label || vendor?.label || contractor?.label || "";
-                            };
-                            aValue = getAValue();
-                            bValue = getBValue();
-                        } else {
-                            aValue = laboursList.find(opt => opt.id === Number(a.labour_id))?.label || "";
-                            bValue = laboursList.find(opt => opt.id === Number(b.labour_id))?.label || "";
-                        }
+                            }
+                            return laboursList.find(opt => opt.id === Number(row.labour_id))?.label || "";
+                        };
+                        aValue = getNameSortValue(a);
+                        bValue = getNameSortValue(b);
                         break;
+                    }
                     case 'project_name':
                         aValue = siteOptions.find(opt => opt.id === Number(a.project_id))?.label || "";
                         bValue = siteOptions.find(opt => opt.id === Number(b.project_id))?.label || "";
@@ -449,7 +473,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             });
         }
         return sortableData;
-    }, [filteredExpenses, sortConfig, laboursList, siteOptions, isChangeButtonActive, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
+    }, [filteredExpenses, sortConfig, laboursList, siteOptions, combinedOptions, employeeOptions, vendorOptions, contractorOptions]);
     // ISO 8601 week number calculation
     // Week belongs to the year that contains the Thursday of that week
     // Week 1 is the week with the year's first Thursday
@@ -483,14 +507,57 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         
         return weekNo;
     };
-
-    const getCurrentWeekNumber = () => {
-        return getISOWeekNumber(new Date());
+    const getWeekCacheKey = useCallback((baseKey) => {
+        const branchKey = activeBranchId ?? "all";
+        // cache should vary by "today" so it naturally refreshes each week/day
+        const todayKey = formatLocalISODate(new Date());
+        return `${baseKey}::${branchKey}::${todayKey}`;
+    }, [activeBranchId]);
+    const readCachedActiveWeek = useCallback(() => {
+        try {
+            const raw = sessionStorage.getItem(getWeekCacheKey("cashRegisterActiveWeek"));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const maxAgeMs = 5 * 60 * 1000; // 5 minutes
+            if (!parsed || !parsed.week || !parsed.ts) return null;
+            if (Date.now() - parsed.ts > maxAgeMs) return null;
+            return Number(parsed.week);
+        } catch {
+            return null;
+        }
+    }, [getWeekCacheKey]);
+    const writeCachedActiveWeek = useCallback((week) => {
+        try {
+            sessionStorage.setItem(
+                getWeekCacheKey("cashRegisterActiveWeek"),
+                JSON.stringify({ week: Number(week), ts: Date.now() })
+            );
+        } catch {
+            // ignore
+        }
+    }, [getWeekCacheKey]);
+    const formatLocalISODate = (date) => {
+        const d = date instanceof Date ? date : new Date(date);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
     };
+    const parseLocalISODate = (value) => {
+        if (!value || typeof value !== "string") return null;
+        const [y, m, d] = value.split("-").map((part) => Number(part));
+        if (!y || !m || !d) return null;
+        return new Date(y, m - 1, d);
+    };
+
+    const actualCurrentWeekNumber = getISOWeekNumber(new Date());
+    const nextCalendarWeekNumber = getISOWeekNumber(new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)));
+    const [activeWeekNumber, setActiveWeekNumber] = useState(actualCurrentWeekNumber);
+    const operationalWeekNumber = activeWeekNumber || actualCurrentWeekNumber;
 
     // Calculate week number from a specific date (not current date)
     const getWeekNumberFromDate = (dateString) => {
-        if (!dateString) return getCurrentWeekNumber();
+        if (!dateString) return operationalWeekNumber;
         const date = new Date(dateString);
         // Handle date strings in DD/MM/YYYY format
         if (dateString.includes('/')) {
@@ -501,7 +568,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
         return getISOWeekNumber(date);
     };
-    const currentWeekNumber = getCurrentWeekNumber();
+    const currentWeekNumber = operationalWeekNumber;
     const startYear = 2000; // Change if needed
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
     const [newRefundReceived, setNewRefundReceived] = useState({
@@ -521,8 +588,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     });
     const [payments, setPayments] = useState([]);
     const [selectedDate, setSelectedDate] = useState(null);
+    const getEditChangeModeFromRow = (row) => {
+        const v = Number(row.vendor_id) || 0;
+        const c = Number(row.contractor_id) || 0;
+        const e = Number(row.employee_id) || 0;
+        return v > 0 || c > 0 || e > 0;
+    };
     const handleEditClick = (row) => {
         setEditingDailyExpenseRowId(row.id);
+        setIsEditChangeButtonActive(getEditChangeModeFromRow(row));
         setEditDailyExpenseData({
             date: row.date,
             labour_id: row.labour_id || "",
@@ -597,19 +671,71 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         // This ensures the input is cleared even if the same file is selected again next time
         e.target.value = '';
     };
-    function getStartAndEndDateOfWeek(weekNumber, year) {
+    function getStartAndEndDateOfISOWeek(weekNumber, year) {
         const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
-        const dayOfWeek = simple.getDay();
-        const ISOWeekStart = new Date(simple);
-        ISOWeekStart.setDate(simple.getDate() - ((dayOfWeek + 7) % 9)); // Monday
-        const ISOWeekEnd = new Date(ISOWeekStart);
-        ISOWeekEnd.setDate(ISOWeekStart.getDate() + 6); // Saturday (not Sunday)
+        let dayOfWeek = simple.getDay();
+        if (dayOfWeek === 0) {
+            dayOfWeek = 7;
+        }
+        const ISOweekStart = new Date(simple);
+        ISOweekStart.setDate(simple.getDate() - dayOfWeek + 1);
+        const ISOweekEnd = new Date(ISOweekStart);
+        ISOweekEnd.setDate(ISOweekStart.getDate() + 6);
+        ISOweekStart.setHours(0, 0, 0, 0);
+        ISOweekEnd.setHours(23, 59, 59, 999);
         return {
             number: weekNumber,
-            start: ISOWeekStart.toISOString().split("T")[0],
-            end: ISOWeekEnd.toISOString().split("T")[0],
+            // use local YYYY-MM-DD (avoid UTC shift that can turn Monday into Sunday)
+            start: formatLocalISODate(ISOweekStart),
+            end: formatLocalISODate(ISOweekEnd),
         };
     }
+    const determineActiveWeekNumber = useCallback(async () => {
+        if (!actualCurrentWeekNumber) return;
+        // Optimistic fast path: use cached week immediately if available
+        const cachedWeek = readCachedActiveWeek();
+        if (cachedWeek && Number.isFinite(cachedWeek)) {
+            setActiveWeekNumber(cachedWeek);
+            return;
+        }
+        const previousWeekNumber = actualCurrentWeekNumber === 1 ? 52 : actualCurrentWeekNumber - 1;
+        try {
+            const [prevExpensesRes, prevPaymentsRes] = await Promise.all([
+                fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${previousWeekNumber}`)),
+                fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/payments-received/week/${previousWeekNumber}`))
+            ]);
+            const prevExpensesData = prevExpensesRes.ok ? await prevExpensesRes.json() : [];
+            const prevPaymentsData = prevPaymentsRes.ok ? await prevPaymentsRes.json() : [];
+            const hasPreviousWeekData =
+                (Array.isArray(prevExpensesData) && prevExpensesData.length > 0) ||
+                (Array.isArray(prevPaymentsData) && prevPaymentsData.length > 0);
+            const previousClosed =
+                (Array.isArray(prevExpensesData) && prevExpensesData.some((e) => e?.status === true)) ||
+                (Array.isArray(prevPaymentsData) && prevPaymentsData.some((p) => p?.status === true));
+
+            if (hasPreviousWeekData && !previousClosed) {
+                setActiveWeekNumber(previousWeekNumber);
+                writeCachedActiveWeek(previousWeekNumber);
+                return;
+            }
+
+            const [currExpensesRes, currPaymentsRes] = await Promise.all([
+                fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${actualCurrentWeekNumber}`)),
+                fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/payments-received/week/${actualCurrentWeekNumber}`))
+            ]);
+            const currExpensesData = currExpensesRes.ok ? await currExpensesRes.json() : [];
+            const currPaymentsData = currPaymentsRes.ok ? await currPaymentsRes.json() : [];
+            const currentClosed =
+                (Array.isArray(currExpensesData) && currExpensesData.some((e) => e?.status === true)) ||
+                (Array.isArray(currPaymentsData) && currPaymentsData.some((p) => p?.status === true));
+
+            setActiveWeekNumber(currentClosed ? nextCalendarWeekNumber : actualCurrentWeekNumber);
+            writeCachedActiveWeek(currentClosed ? nextCalendarWeekNumber : actualCurrentWeekNumber);
+        } catch {
+            setActiveWeekNumber(actualCurrentWeekNumber);
+            writeCachedActiveWeek(actualCurrentWeekNumber);
+        }
+    }, [actualCurrentWeekNumber, nextCalendarWeekNumber, withBranchUrl]);
     const fetchExpenses = useCallback(() => {
         if (!currentWeekNumber) return;
         fetch(withBranchUrl(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${currentWeekNumber}`))
@@ -637,6 +763,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             })
             .catch(console.error);
     }, [currentWeekNumber, withBranchUrl]);
+    useEffect(() => {
+        determineActiveWeekNumber();
+    }, [determineActiveWeekNumber]);
     const fetchDailyDataForSelectedDate = useCallback(async (dateStr) => {
         if (!dateStr) return;
         try {
@@ -744,6 +873,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     label: item.vendorName,
                     id: item.id,
                     type: "Vendor",
+                    category: item.category || "",
                 }));
                 setVendorOptions(formattedData);
             } catch (error) {
@@ -798,6 +928,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     label: item.contractorName,
                     id: item.id,
                     type: "Contractor",
+                    category: item.category || "",
                 }));
                 setContractorOptions(formattedData);
             } catch (error) {
@@ -855,7 +986,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks', withBranchParams());
                 const currentYear = new Date().getFullYear();
                 const enrichedWeeks = response.data.map((weekNumber) =>
-                    getStartAndEndDateOfWeek(weekNumber, currentYear)
+                    getStartAndEndDateOfISOWeek(weekNumber, currentYear)
                 );
                 setWeeks(enrichedWeeks);
             } catch (error) {
@@ -1105,6 +1236,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const handleChangeButtonClick = () => {
         setIsChangeButtonActive(prev => !prev);
     };
+    const handleEditChangeButtonClick = () => {
+        setIsEditChangeButtonActive((prev) => !prev);
+    };
     const handleRefundChangeButtonClick = () => {
         setIsRefundChangeButtonActive(prev => !prev);
     };
@@ -1218,6 +1352,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             }
             if (!isChanged) {
                 setEditingDailyExpenseRowId(null);
+                setIsEditChangeButtonActive(false);
                 return;
             }
             const response = await axios.put(
@@ -1229,6 +1364,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 prev.map((exp) => (exp.id === row.id ? { ...exp, ...payload } : exp))
             );
             setEditingDailyExpenseRowId(null);
+            setIsEditChangeButtonActive(false);
         } catch (error) {
             console.error("Error updating expense:", error);
         }
@@ -1353,6 +1489,10 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 });
                 if (response.ok) {
                     alert("Daily Expenses deleted successfully!!!");
+                    if (String(editingDailyExpenseRowId) === String(id)) {
+                        setEditingDailyExpenseRowId(null);
+                        setIsEditChangeButtonActive(false);
+                    }
                     await refreshCashRegisterData();
                 } else {
                     console.error("Failed to delete the Daily Expenses. Status:", response.status);
@@ -1536,7 +1676,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number);
+            const preferredWeek = Number(currentWeekNumber);
+            const hasPreferred = weeks.some((w) => Number(w.number) === preferredWeek);
+            setSelectedWeek(hasPreferred ? preferredWeek : weeks[weeks.length - 1].number);
         } else {
             setSelectedWeek("");
             setSelectedDate(null);
@@ -1546,43 +1688,42 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setPayments([]);
             setAllRefundAmount([]);
         }
-    }, [weeks]);
-    const getCurrentWeekDays = () => {
-        const today = new Date();
-        const dayOfWeek = today.getDay() || 7;
-        const monday = new Date(today);
-        monday.setDate(today.getDate() - dayOfWeek + 1);
-        const days = [];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(monday);
-            d.setDate(monday.getDate() + i);
-            days.push(d);
+    }, [weeks, currentWeekNumber]);
+    const displayedWeekDays = (() => {
+        if (currentWeek?.start) {
+            const start = parseLocalISODate(currentWeek.start) ?? new Date(currentWeek.start);
+            const days = [];
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(start);
+                day.setDate(start.getDate() + i);
+                days.push(day);
+            }
+            return days;
         }
-        return days;
-    };
-    const days = [];
-    if (currentWeek) {
-        const start = new Date(currentWeek.start);
-        for (let i = 0; i < 7; i++) {
-            const day = new Date(start);
-            day.setDate(start.getDate() + i);
-            days.push(day);
+        if (currentWeekNumber) {
+            const year = new Date().getFullYear();
+            const { start } = getStartAndEndDateOfISOWeek(Number(currentWeekNumber), year);
+            const startDate = parseLocalISODate(start) ?? new Date(start);
+            const days = [];
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(startDate);
+                day.setDate(startDate.getDate() + i);
+                days.push(day);
+            }
+            return days;
         }
-    }
-    const currentWeekDays = getCurrentWeekDays();
+        return [];
+    })();
     useEffect(() => {
-        if (currentWeekDays.length > 0) {
-            const todayStr = new Date().toISOString().split("T")[0];
-            const matchedDay = currentWeekDays.find(
-                (d) => d.toISOString().split("T")[0] === todayStr
-            );
-            const defaultDate = matchedDay
-                ? matchedDay.toISOString().split("T")[0]
-                : currentWeekDays[0].toISOString().split("T")[0];
-            setSelectedDate(defaultDate);
-            setNewDailyExpense((prev) => ({ ...prev, date: defaultDate }));
-        }
-    }, []);
+        if (!displayedWeekDays.length) return;
+        const todayStr = formatLocalISODate(new Date());
+        const hasSelected = Boolean(selectedDate) && displayedWeekDays.some((d) => formatLocalISODate(d) === selectedDate);
+        if (hasSelected) return;
+        const matchedDay = displayedWeekDays.find((d) => formatLocalISODate(d) === todayStr);
+        const defaultDate = formatLocalISODate(matchedDay ?? displayedWeekDays[0]);
+        setSelectedDate(defaultDate);
+        setNewDailyExpense((prev) => ({ ...prev, date: defaultDate }));
+    }, [currentWeekNumber, currentWeek?.start, selectedWeek, displayedWeekDays.length]);
     useEffect(() => {
         if (!selectedDate) return;
         fetchDailyDataForSelectedDate(selectedDate);
@@ -1593,7 +1734,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         setSelectedDate(dateStr);
         setNewDailyExpense((prev) => ({ ...prev, date: dateStr }));
     };
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatLocalISODate(new Date());
     const totalAmount = filteredExpenses
         .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
@@ -2225,11 +2366,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             </h1>
             <div className='mx-auto flex justify-between w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
                 <div>
-                    {days.length > 0 && (
+                    {displayedWeekDays.length > 0 && (
                         <div className='lg:w-[600px]'>
                             <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
-                                {currentWeekDays.map((day, idx) => {
-                                    const dateStr = day.toISOString().split("T")[0];
+                                {displayedWeekDays.map((day, idx) => {
+                                    const dateStr = formatLocalISODate(day);
                                     return (
                                         <div key={idx} className="flex flex-col items-left w-20 mx-auto">
                                             <div className="font-semibold text-[#E4572E]">
@@ -2550,6 +2691,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                             onChange={(selectedOption) => {
                                                                 if (selectedOption) {
                                                                     const { type, id, label, salary } = selectedOption;
+                                                                    const resolvedCategory = selectedOption.category || "";
                                                                     setNewDailyExpense(prev => ({
                                                                         ...prev,
                                                                         labour_id: type === "Labour" ? id : "",
@@ -2557,7 +2699,13 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                         contractor_id: type === "Contractor" ? id : "",
                                                                         employee_id: type === "Employee" ? id : "",
                                                                         labour_name: label,
-                                                                        amount: salary || ""
+                                                                        amount: salary || "",
+                                                                        type:
+                                                                            type === "Labour"
+                                                                                ? "Wage"
+                                                                                : (type === "Vendor" || type === "Contractor") && resolvedCategory
+                                                                                    ? resolvedCategory
+                                                                                    : prev.type
                                                                     }));
                                                                 } else {
                                                                     setNewDailyExpense(prev => ({
@@ -2733,44 +2881,60 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                     <td className="py-2 font-bold text-left">{dailyExpenses.length - index}</td>
                                                     <td className="py-2">
                                                         {editingDailyExpenseRowId === row.id ? (
-                                                            <Select
-                                                                name="labour_id"
-                                                                className="w-[230px]"
-                                                                placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
-                                                                isSearchable
-                                                                isClearable
-                                                                styles={customStyles}
-                                                                options={isChangeButtonActive ? combinedOptions : laboursList}
-                                                                value={
-                                                                    isChangeButtonActive
-                                                                        ? combinedOptions.find(opt =>
-                                                                            (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
-                                                                            (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
-                                                                            (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
-                                                                        ) || null
-                                                                        : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
-                                                                }
-                                                                onChange={(selectedOption) => {
-                                                                    if (selectedOption) {
-                                                                        const { type, id } = selectedOption;
-                                                                        setEditDailyExpenseData(prev => ({
-                                                                            ...prev,
-                                                                            labour_id: type === "Labour" ? id : "",
-                                                                            vendor_id: type === "Vendor" ? id : "",
-                                                                            contractor_id: type === "Contractor" ? id : "",
-                                                                            employee_id: type === "Employee" ? id : "",
-                                                                        }));
-                                                                    } else {
-                                                                        setEditDailyExpenseData(prev => ({
-                                                                            ...prev,
-                                                                            labour_id: "",
-                                                                            vendor_id: "",
-                                                                            contractor_id: "",
-                                                                            employee_id: "",
-                                                                        }));
-                                                                    }
-                                                                }}
-                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                <div>
+                                                                    <Select
+                                                                        name="labour_id"
+                                                                        className="w-[230px]"
+                                                                        placeholder={isEditChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        styles={customStyles}
+                                                                        options={isEditChangeButtonActive ? combinedOptions : laboursList}
+                                                                        value={
+                                                                            isEditChangeButtonActive
+                                                                                ? combinedOptions.find(opt =>
+                                                                                    (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
+                                                                                    (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
+                                                                                    (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
+                                                                                ) || null
+                                                                                : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
+                                                                        }
+                                                                        onChange={(selectedOption) => {
+                                                                            if (selectedOption) {
+                                                                                const { type, id } = selectedOption;
+                                                                                const resolvedCategory = selectedOption.category || "";
+                                                                                setEditDailyExpenseData(prev => ({
+                                                                                    ...prev,
+                                                                                    labour_id: type === "Labour" ? id : "",
+                                                                                    vendor_id: type === "Vendor" ? id : "",
+                                                                                    contractor_id: type === "Contractor" ? id : "",
+                                                                                    employee_id: type === "Employee" ? id : "",
+                                                                                    type:
+                                                                                        type === "Labour"
+                                                                                            ? "Wage"
+                                                                                            : (type === "Vendor" || type === "Contractor") && resolvedCategory
+                                                                                                ? resolvedCategory
+                                                                                                : prev.type
+                                                                                }));
+                                                                            } else {
+                                                                                setEditDailyExpenseData(prev => ({
+                                                                                    ...prev,
+                                                                                    labour_id: "",
+                                                                                    vendor_id: "",
+                                                                                    contractor_id: "",
+                                                                                    employee_id: "",
+                                                                                }));
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <button type="button" onClick={handleEditChangeButtonClick} title="Switch Labour / Vendor–Contractor">
+                                                                        <img src={Change} className={`w-4 h-4 ${isEditChangeButtonActive ? 'opacity-10' : ''}`} alt="" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
                                                         ) : (
                                                             <div className="w-[180px] h-[40px] flex items-center">
                                                                 {(() => {
@@ -2902,8 +3066,8 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                         {editingDailyExpenseRowId === row.id ? (
                                                             <Select
                                                                 name="type"
-                                                                value={(isChangeButtonActive ? expensesCategory : weeklyTypes).find(option =>
-                                                                    (isChangeButtonActive ? option.category : option.type) === editDailyExpenseData.type
+                                                                value={(isEditChangeButtonActive ? expensesCategory : weeklyTypes).find(option =>
+                                                                    (isEditChangeButtonActive ? option.category : option.type) === editDailyExpenseData.type
                                                                 ) ? {
                                                                     value: editDailyExpenseData.type,
                                                                     label: editDailyExpenseData.type
@@ -2914,9 +3078,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                         type: selectedOption ? selectedOption.value : ""
                                                                     }));
                                                                 }}
-                                                                options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => ({
-                                                                    value: isChangeButtonActive ? type.category : type.type,
-                                                                    label: isChangeButtonActive ? type.category : type.type
+                                                                options={(isEditChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => ({
+                                                                    value: isEditChangeButtonActive ? type.category : type.type,
+                                                                    label: isEditChangeButtonActive ? type.category : type.type
                                                                 }))}
                                                                 placeholder="Select"
                                                                 isSearchable={true}

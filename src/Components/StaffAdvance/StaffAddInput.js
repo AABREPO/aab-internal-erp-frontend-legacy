@@ -36,7 +36,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
 
     const fetchStaffTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setStaffTypes(data);
@@ -53,7 +53,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         const confirmed = window.confirm("Are you sure you want to delete all Staff Types?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/purposes/deleteAll", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/purposes/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -74,7 +74,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
 
     const handleStaffTypeDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/purposes/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/purposes/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -94,7 +94,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         e.preventDefault();
         const newStaffType = { purpose: staffType };
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/purposes/save', {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purposes/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     const handleEditStaffTypes = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/purposes/edit/${selectedStaffTypeId}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/purposes/edit/${selectedStaffTypeId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

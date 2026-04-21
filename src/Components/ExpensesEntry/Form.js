@@ -6,10 +6,24 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
 
-const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
-const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/api/utility-telecom/getAll';
+const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
+const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
 
 const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
+    const predefinedSiteOptions = [
+        { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+        { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+        { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+        { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+        { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+        { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+        { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+        { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+        { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+        { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+        { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+    ];
+
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -38,6 +52,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
+    const [vendorOptionsLoaded, setVendorOptionsLoaded] = useState(false);
+    const [contractorOptionsLoaded, setContractorOptionsLoaded] = useState(false);
     const [combinedOptions, setCombinedOptions] = useState([]);
     const [selectedOption, setSelectedOption] = useState(null);
     const [selectedType, setSelectedType] = useState("");
@@ -53,6 +69,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [accountTypeOptions, setAccountTypeOptions] = useState([]);
     const [showMachineTools, setShowMachineTools] = useState(false);
     const fileInputRef = useRef(null);
+    const prevCategoryOptionsLenRef = useRef(0);
+    const billPaymentsPrefillAttemptsRef = useRef(0);
     const [userPermissions, setUserPermissions] = useState([]);
     const moduleName = "Expense Entry";
     const [paymentMode, setPaymentMode] = useState('');
@@ -72,6 +90,11 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [thirdInput, setThirdInput] = useState('');
     const [validityType, setValidityType] = useState('');
     const [serviceStartingDate, setServiceStartingDate] = useState('');
+    const [summaryBillTotal, setSummaryBillTotal] = useState(null);
+    const [summaryBillRemaining, setSummaryBillRemaining] = useState(null);
+    const summaryBillMode = summaryBillTotal != null && Number(summaryBillTotal) > 0;
+    const [splitRemainingLabel, setSplitRemainingLabel] = useState('Summary Bill Remaining');
+    const [allowSplitOverpay, setAllowSplitOverpay] = useState(false);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [utilityType, setUtilityType] = useState('');
     const [projectData, setProjectData] = useState(null);
@@ -81,6 +104,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [advanceData, setAdvanceData] = useState([]);
     const [projectAdvance, setProjectAdvance] = useState('');
     const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    /** When true, Bill Payments was opened from Weekly Cash Register — payment mode is fixed to Cash */
+    const [billPaymentsCashRegisterPrefill, setBillPaymentsCashRegisterPrefill] = useState(false);
+    /** Weekly expense row id — sync uploaded bill PDF to `PUT .../weekly-expenses/:id/bill-copy-url` */
+    const [weeklyExpenseIdForBillCopyUrl, setWeeklyExpenseIdForBillCopyUrl] = useState(null);
     const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
     const [checkingDuplicate, setCheckingDuplicate] = useState(false);
     useEffect(() => {
@@ -99,7 +126,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
-                const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+                const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
                 const allRoles = response.data;
                 const userRoleNames = userRoles.map(r => r.roles);
                 const matchedRoles = allRoles.filter(role =>
@@ -120,7 +147,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -137,7 +164,16 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     label: item.siteName,
                     sNo: item.siteNo
                 }));
-                setSiteOptions(formattedData);
+                const merged = [...predefinedSiteOptions, ...formattedData].filter(Boolean);
+                const seen = new Set();
+                const deduped = [];
+                for (const opt of merged) {
+                    const key = String(opt?.label ?? opt?.value ?? "").trim().toLowerCase();
+                    if (!key || seen.has(key)) continue;
+                    seen.add(key);
+                    deduped.push(opt);
+                }
+                setSiteOptions(deduped);
             } catch (error) {
                 console.error("Fetch error: ", error);
             }
@@ -147,7 +183,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -163,10 +199,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     value: item.vendorName,
                     label: item.vendorName,
                     type: "Vendor",
+                    category: item.category,
                 }));
                 setVendorOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
+            } finally {
+                setVendorOptionsLoaded(true);
             }
         };
         fetchVendorNames();
@@ -174,7 +213,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchContractorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -190,10 +229,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     value: item.contractorName,
                     label: item.contractorName,
                     type: "Contractor",
+                    category: item.category,
                 }));
                 setContractorOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
+            } finally {
+                setContractorOptionsLoaded(true);
             }
         };
         fetchContractorNames();
@@ -201,7 +243,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -224,6 +266,38 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         };
         fetchCategories();
     }, []);
+
+    const findCategoryOptionByVendorField = (raw) => {
+        if (raw == null || raw === '') return null;
+        const s = String(raw).trim();
+        if (!s) return null;
+        return (
+            categoryOptions.find(
+                (o) => String(o.value).trim() === s || String(o.label).trim() === s
+            ) ?? null
+        );
+    };
+
+    const applyResolvedCategoryOption = (categoryOption) => {
+        setSelectedCategory(categoryOption);
+        if (categoryOption && categoryOption.label === 'Machine Repair') {
+            setShowMachineTools(true);
+        } else {
+            setShowMachineTools(false);
+            setSelectedMachine(null);
+            setSelectedToolsItemName(null);
+        }
+    };
+
+    useEffect(() => {
+        const len = categoryOptions.length;
+        const becameAvailable = prevCategoryOptionsLenRef.current === 0 && len > 0;
+        prevCategoryOptionsLenRef.current = len;
+        if (!becameAvailable || !selectedOption?.category) return;
+        const match = findCategoryOptionByVendorField(selectedOption.category);
+        if (match) applyResolvedCategoryOption(match);
+    }, [categoryOptions, selectedOption]);
+
     useEffect(() => {
         const fetchToolsItemIds = async () => {
             try {
@@ -311,7 +385,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         const fetchAdvanceData = async () => {
             try {
                 const response = await fetch(
-                    buildBranchUrl("https://backendaab.in/aabuildersDash/api/advance_portal/getAll"),
+                    buildBranchUrl("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"),
                     {
                         method: "GET",
                         credentials: "include",
@@ -357,7 +431,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchAccountType = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/account_type/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/account_type/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -383,7 +457,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => {
         const fetchAccountDetails = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     setAccountDetails(data);
@@ -399,10 +473,163 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
 
     useEffect(() => {
+        if (selectedAccountType !== 'Bill Payments' && billPaymentsCashRegisterPrefill) {
+            setBillPaymentsCashRegisterPrefill(false);
+        }
+    }, [selectedAccountType, billPaymentsCashRegisterPrefill]);
+
+    useEffect(() => {
         const prefillDataStr = localStorage.getItem('expenseEntryPrefill');
         if (prefillDataStr && siteOptions.length > 0 && accountTypeOptions.length > 0) {
             try {
                 const prefillData = JSON.parse(prefillDataStr);
+
+                if (prefillData.accountType === 'Bill Payments') {
+                    const vid = prefillData.vendorId ?? prefillData.vendor_id;
+                    const cid = prefillData.contractorId ?? prefillData.contractor_id;
+                    const vNameRaw = prefillData.vendorName ?? prefillData.vendor ?? prefillData.vendor_name;
+                    const cNameRaw = prefillData.contractorName ?? prefillData.contractor ?? prefillData.contractor_name;
+                    const rawSummaryTotal = prefillData.summaryBillTotal ?? prefillData.summary_bill_total ?? null;
+                    const fromBillPaymentsTracker = !!(
+                        prefillData.fromBillPaymentsTracker ??
+                        prefillData.from_bill_payments_tracker
+                    );
+                    const hasVendorName = String(vNameRaw ?? "").trim() !== "";
+                    const hasContractorName = String(cNameRaw ?? "").trim() !== "";
+                    const needVendor =
+                        vid != null &&
+                        String(vid).trim() !== '' &&
+                        Number.isFinite(Number(vid)) &&
+                        Number(vid) > 0;
+                    const needContractor =
+                        cid != null &&
+                        String(cid).trim() !== '' &&
+                        Number.isFinite(Number(cid)) &&
+                        Number(cid) > 0;
+                    // Avoid clearing prefill while only one of vendor/contractor lists has arrived (race: contractors often load first).
+                    if (needVendor && !vendorOptionsLoaded) return;
+                    if (needContractor && !contractorOptionsLoaded) return;
+                    // Also wait for options when we plan to match by name (vendor id may be missing/0 in weekly Bill rows).
+                    if (hasVendorName && !vendorOptionsLoaded) return;
+                    if (hasContractorName && !contractorOptionsLoaded) return;
+                    // If options failed to load (temporary network), do not clear prefill yet.
+                    if ((needVendor || hasVendorName) && vendorOptionsLoaded && vendorOptions.length === 0) return;
+                    if ((needContractor || hasContractorName) && contractorOptionsLoaded && contractorOptions.length === 0) return;
+                    if ((needVendor || needContractor || hasVendorName || hasContractorName) && combinedOptions.length === 0) {
+                        return;
+                    }
+                    const billPayOpt = accountTypeOptions.find((opt) => opt.value === 'Bill Payments');
+                    if (billPayOpt) {
+                        setSelectedAccountType('Bill Payments');
+                    }
+                    if (prefillData.siteName) {
+                        const siteOption = siteOptions.find(
+                            (opt) => String(opt.label).trim() === String(prefillData.siteName).trim()
+                        );
+                        if (siteOption) {
+                            setSelectedSite(siteOption);
+                        }
+                    }
+                    if (prefillData.date) {
+                        setDate(prefillData.date);
+                    }
+                    // Summary Bill flow: treat weekly bill amount as "total" and allow splitting into multiple entries.
+                    const summaryTotalNum =
+                        rawSummaryTotal != null && rawSummaryTotal !== "" && Number.isFinite(Number(rawSummaryTotal))
+                            ? Number(rawSummaryTotal)
+                            : null;
+                    if (summaryTotalNum != null && summaryTotalNum > 0) {
+                        setSummaryBillTotal(summaryTotalNum);
+                        setSummaryBillRemaining((prev) => (prev == null ? summaryTotalNum : prev));
+                        setSplitRemainingLabel(fromBillPaymentsTracker ? 'Bill Payment Remaining' : 'Summary Bill Remaining');
+                        setAllowSplitOverpay(fromBillPaymentsTracker);
+                        // Do not prefill the Amount box for Summary Bill; user will enter split amounts.
+                        setAmount("");
+                    } else if (prefillData.amount != null && prefillData.amount !== '') {
+                        setAmount(String(prefillData.amount));
+                    }
+                    let didApplyParty = false;
+                    if (needVendor) {
+                        const v = combinedOptions.find(
+                            (o) => o.type === 'Vendor' && Number(o.id) === Number(vid)
+                        );
+                        if (v) {
+                            setSelectedOption(v);
+                            setSelectedType('Vendor');
+                            const catOpt = findCategoryOptionByVendorField(v.category);
+                            if (catOpt) applyResolvedCategoryOption(catOpt);
+                            didApplyParty = true;
+                        }
+                    } else if (needContractor) {
+                        const c = combinedOptions.find(
+                            (o) => o.type === 'Contractor' && Number(o.id) === Number(cid)
+                        );
+                        if (c) {
+                            setSelectedOption(c);
+                            setSelectedType('Contractor');
+                            const catOpt = findCategoryOptionByVendorField(c.category);
+                            if (catOpt) applyResolvedCategoryOption(catOpt);
+                            didApplyParty = true;
+                        }
+                    } else {
+                        const normalized = (s) => String(s ?? "").trim().toLowerCase();
+                        const vName = normalized(vNameRaw);
+                        const cName = normalized(cNameRaw);
+                        if (vName) {
+                            const v = combinedOptions.find(
+                                (o) => o.type === "Vendor" && normalized(o.label) === vName
+                            );
+                            if (v) {
+                                setSelectedOption(v);
+                                setSelectedType("Vendor");
+                                const catOpt = findCategoryOptionByVendorField(v.category);
+                                if (catOpt) applyResolvedCategoryOption(catOpt);
+                                didApplyParty = true;
+                            }
+                        } else if (cName) {
+                            const c = combinedOptions.find(
+                                (o) => o.type === "Contractor" && normalized(o.label) === cName
+                            );
+                            if (c) {
+                                setSelectedOption(c);
+                                setSelectedType("Contractor");
+                                const catOpt = findCategoryOptionByVendorField(c.category);
+                                if (catOpt) applyResolvedCategoryOption(catOpt);
+                                didApplyParty = true;
+                            }
+                        }
+                    }
+                    if (prefillData.fromWeeklyCashRegister) {
+                        setBillPaymentsCashRegisterPrefill(true);
+                        setPaymentMode('Cash');
+                    }
+                    if (prefillData.weeklyExpenseId != null && prefillData.weeklyExpenseId !== '') {
+                        const wid = Number(prefillData.weeklyExpenseId);
+                        if (Number.isFinite(wid)) {
+                            setWeeklyExpenseIdForBillCopyUrl(wid);
+                        }
+                    }
+                    if (didApplyParty) {
+                        billPaymentsPrefillAttemptsRef.current = 0;
+                        // Keep prefill while Summary Bill is in progress (multiple entries in same popup).
+                        if (!summaryTotalNum) {
+                            localStorage.removeItem('expenseEntryPrefill');
+                        }
+                        return;
+                    }
+                    // If we expected a party (by id or name) but couldn't match yet, keep prefill for a few reruns
+                    // (covers slow option loading / temporary fetch delays).
+                    if (needVendor || needContractor || hasVendorName || hasContractorName) {
+                        billPaymentsPrefillAttemptsRef.current += 1;
+                        const attempts = billPaymentsPrefillAttemptsRef.current;
+                        if (attempts < 8) return;
+                    }
+                    billPaymentsPrefillAttemptsRef.current = 0;
+                    if (!summaryTotalNum) {
+                        localStorage.removeItem('expenseEntryPrefill');
+                    }
+                    return;
+                }
 
                 const utilityBillsOption = accountTypeOptions.find(opt => opt.value === 'Utility Bills');
                 if (utilityBillsOption) {
@@ -428,7 +655,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     try {
                         // Only auto-prefill previous entry + TNEB contractor for Electricity.
                         if (prefillUtilityType !== 'Electricity') return;
-                        const response = await axios.get("https://backendaab.in/aabuilderDash/expenses_form/utility/electricity");
+                        const response = await axios.get("https://backendaab.in/demoAabuilderDash/expenses_form/utility/electricity");
                         const electricityEntries = Array.isArray(response.data) ? response.data : [];
 
                         const previousEntry = electricityEntries
@@ -512,7 +739,15 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 localStorage.removeItem('expenseEntryPrefill');
             }
         }
-    }, [siteOptions, accountTypeOptions, categoryOptions, contractorOptions, combinedOptions]);
+    }, [
+        siteOptions,
+        accountTypeOptions,
+        categoryOptions,
+        contractorOptions,
+        combinedOptions,
+        vendorOptionsLoaded,
+        contractorOptionsLoaded,
+    ]);
     useEffect(() => {
         if (selectedSite && selectedSite.id) {
             fetchProjectData(selectedSite.id);
@@ -598,7 +833,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     };
     const fetchProjectData = async (projectId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuilderDash/api/projects/get/${projectId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/projects/get/${projectId}`);
             if (response.ok) {
                 const data = await response.json();
                 setProjectData(data);
@@ -693,6 +928,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         setSelectedOption(selectedOption);
         if (selectedOption) {
             setSelectedType(selectedOption.type);
+            const match = findCategoryOptionByVendorField(selectedOption.category);
+            if (match) applyResolvedCategoryOption(match);
         } else {
             setSelectedType("");
         }
@@ -830,18 +1067,11 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         return () => URL.revokeObjectURL(objectUrl);
     }, [selectedFile]);
     const handleCategoryChange = (selectedCategory) => {
-        setSelectedCategory(selectedCategory);
-        if (selectedCategory && selectedCategory.label === 'Machine Repair') {
-            setShowMachineTools(true);
-        } else {
-            setShowMachineTools(false);
-            setSelectedMachine(null);
-            setSelectedToolsItemName(null);
-        }
+        applyResolvedCategoryOption(selectedCategory);
     };
     const fetchLatestEno = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
             if (!response.ok) {
                 throw new Error('Failed to fetch ENo');
             }
@@ -913,7 +1143,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         const dateStr = date ? (date.includes('-') ? date.split('T')[0] : toLocalDateStr(date)) : '';
 
         try {
-            const response = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/get_form"));
+            const response = await fetch(buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/get_form"));
             if (!response.ok) return [];
             const allExpenses = await response.json();
 
@@ -966,7 +1196,19 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             alert('Please fill out all required fields.');
             return false;
         }
-        if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills') && !paymentMode) {
+        if (summaryBillMode) {
+            const remaining = Number(summaryBillRemaining ?? summaryBillTotal ?? 0) || 0;
+            const entryAmt = parseFloat(String(amount).replace(/,/g, '')) || 0;
+            if (entryAmt <= 0) {
+                alert('Please enter a valid amount.');
+                return false;
+            }
+            if (!allowSplitOverpay && remaining > 0 && entryAmt - remaining > 0.0001) {
+                alert(`Entered amount exceeds remaining Summary Bill amount (₹${remaining.toLocaleString('en-IN')}).`);
+                return false;
+            }
+        }
+        if ((selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !paymentMode) {
             alert('Please select a payment mode for this account type.');
             return false;
         }
@@ -974,13 +1216,14 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             alert('PDF file is required for Bill Refund.');
             return false;
         }
-        if (selectedAccountType === 'Utility Bills' && !selectedFile) {
-            alert('PDF file is required for Utility Bills.');
+        if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
+            alert('PDF file is required for this account type.');
             return false;
         }
         if (
             selectedAccountType !== 'Daily Wage' &&
             selectedAccountType !== 'Utility Bills' &&
+            selectedAccountType !== 'Bill Payments' &&
             selectedAccountType !== 'Bill Refund' &&
             !selectedFile
         ) {
@@ -1030,9 +1273,21 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         setShowDuplicateModal(false);
         setDuplicateMatchedExpenses([]);
     };
+    const putWeeklyExpenseBillCopyUrl = async (weeklyExpenseId, url) => {
+        if (weeklyExpenseId == null || url == null || String(url).trim() === '') return false;
+        const res = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${weeklyExpenseId}/bill-copy-url`,
+            {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(url),
+            }
+        );
+        return res.ok;
+    };
     const submitExpenseData = async () => {
         if (
-            (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') &&
+            (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') &&
             ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
         ) {
             setPaymentModalData({
@@ -1088,7 +1343,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     // ✅ optional (your backend uses this as prefix)
                     formData.append("fileName", finalName);
 
-                    const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+                    const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
                         method: "POST",
                         body: formData,
                     });
@@ -1139,7 +1394,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 branchId: activeBranchId,
                 enteredBy: username
             };
-            const formResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
+            const formResponse = await fetch(buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1159,7 +1414,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     savedExpenseData = expensesResult;
                 } else {
                     try {
-                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                        const allFormsRes = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
                             if (allForms.length > 0) {
@@ -1194,7 +1449,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             }
             if (expensesId) {
                 try {
-                    const verifyResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                    const verifyResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
                     if (verifyResponse.ok) {
                         const allForms = await verifyResponse.json();
                         const savedForm = allForms.find(f => f.id === expensesId);
@@ -1203,7 +1458,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     console.error('Could not verify saved data:', verifyError);
                 }
             }
-            if (paymentMode === 'Cash' && expensesId) {
+            if (paymentMode === 'Cash' && expensesId && selectedAccountType !== 'Bill Payments') {
                 let vendorId = null;
                 let contractorId = null;
                 if (selectedType === 'Vendor' && selectedOption) {
@@ -1218,7 +1473,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     vendor_id: vendorId,
                     employee_id: null,
                     project_id: projectId,
-                    type: selectedAccountType === 'Claim' ? "Claim" : selectedAccountType === 'Weekly Payment' ? "Weekly Payment" : selectedAccountType === 'Utility Bills' ? (utilityType || "Utility Bills") : "Expense",
+                    type: selectedAccountType === 'Claim' ? "Claim" : selectedAccountType === 'Weekly Payment' ? "Weekly Payment" : selectedAccountType === 'Bill Payments' ? "Bill" : selectedAccountType === 'Utility Bills' ? (utilityType || "Utility Bills") : "Expense",
                     amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseFloat(amount)) : parseFloat(amount),
                     status: true,
                     weekly_number: getCurrentWeekNumber(),
@@ -1233,7 +1488,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     enteredBy: username,
                 };
                 try {
-                    const weeklyExpenseResponse = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/save", {
+                    const weeklyExpenseResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
@@ -1249,7 +1504,39 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     console.error("❌ Error submitting weekly expense:", error);
                 }
             }
+            if (weeklyExpenseIdForBillCopyUrl != null && pdfUrl) {
+                const ok = await putWeeklyExpenseBillCopyUrl(weeklyExpenseIdForBillCopyUrl, pdfUrl);
+                if (!ok) {
+                    toast.warn('Expense saved, but the weekly bill row could not be updated with the file link.');
+                }
+            }
             setEno(eno + 1);
+            if (summaryBillMode) {
+                const entryAmt = parseFloat(String(amount).replace(/,/g, "")) || 0;
+                const prevRemaining = Number(summaryBillRemaining ?? summaryBillTotal ?? 0) || 0;
+                const nextRemainingRaw = prevRemaining - entryAmt;
+                const nextRemaining = Math.max(0, Math.round(nextRemainingRaw * 100) / 100);
+                if (nextRemaining > 0) {
+                    setSummaryBillRemaining(nextRemaining);
+                    // Prepare for next split entry; keep prefills (vendor/contractor/category/etc).
+                    setAmount('');
+                    // Clear only what the user must re-enter for each split.
+                    setSelectedSite(null);
+                    setProjectData(null);
+                    setSelectedEbNumber(null);
+                    setEbNumberOptions([]);
+                    setSelectedFile(null);
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                    }
+                    setShowReviewModal(false);
+                    toast.success(`Saved. Remaining amount: ₹${nextRemaining.toLocaleString('en-IN')}`);
+                    return;
+                }
+                // Completed the full Summary Bill amount.
+                setSummaryBillTotal(null);
+                setSummaryBillRemaining(null);
+            }
             resetForm();
             if (typeof onSuccess === 'function') {
                 try { await onSuccess(savedExpenseData || null); } catch { }
@@ -1298,6 +1585,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         setSelectedToolsItemName(null);
         setSelectedType("");
         setPaymentMode('');
+        setBillPaymentsCashRegisterPrefill(false);
+        setWeeklyExpenseIdForBillCopyUrl(null);
         setSelectedEbNumber(null);
         setSelectedMonths('');
         setThirdInput('');
@@ -1321,8 +1610,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             alert("Please enter cheque number and date.");
             return;
         }
-        if (selectedAccountType === 'Utility Bills' && !selectedFile) {
-            alert('PDF file is required for Utility Bills.');
+        if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
+            alert('PDF file is required for this account type.');
             return;
         }
         setIsSubmitting(true);
@@ -1357,7 +1646,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     // ✅ optional (your backend uses this as prefix)
                     formData.append("fileName", finalName);
 
-                    const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+                    const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
                         method: "POST",
                         body: formData,
                     });
@@ -1415,7 +1704,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 branchId: activeBranchId,
                 enteredBy: username
             };
-            const expensesResponse = await fetch(buildBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
+            const expensesResponse = await fetch(buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1437,7 +1726,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 } else {
                     expensesResult = { message: responseText };
                     try {
-                        const allFormsRes = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                        const allFormsRes = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
                         if (allFormsRes.ok) {
                             const allForms = await allFormsRes.json();
                             if (allForms.length > 0) {
@@ -1481,7 +1770,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             }
             if (expensesId) {
                 try {
-                    const verifyResponse = await fetch("https://backendaab.in/aabuilderDash/expenses_form/get_form");
+                    const verifyResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses_form/get_form");
                     if (verifyResponse.ok) {
                         const allForms = await verifyResponse.json();
                         const savedForm = allForms.find(f => f.id === expensesId);
@@ -1490,55 +1779,69 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     console.error('Could not verify saved data:', verifyError);
                 }
             }
-            const weeklyPaymentBillPayload = {
-                date: paymentModalData.date,
-                created_at: new Date().toISOString(),
-                contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
-                vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
-                employee_id: null,
-                project_id: selectedSite?.id || null,
-                type: selectedAccountType === 'Claim' ? "Claim Payment" : selectedAccountType === 'Weekly Payment' ? "Weekly Payment" : "Utility Payment",
-                bill_payment_mode: paymentModalData.paymentMode,
-                amount: parseFloat(paymentModalData.amount),
-                status: true,
-                weekly_number: "",
-                expenses_entry_id: expensesId,
-                advance_portal_id: null,
-                staff_advance_portal_id: null,
-                claim_payment_id: null,
-                cheque_number: paymentModalData.chequeNo || null,
-                cheque_date: paymentModalData.chequeDate || null,
-                transaction_number: paymentModalData.transactionNumber || null,
-                account_number: paymentModalData.accountNumber || null,
-                branch_id: activeBranchId,
-                enteredBy: username,
-            };
-            const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(weeklyPaymentBillPayload)
-            });
-            let weeklyResult;
-            try {
-                const responseText = await weeklyResponse.text();
-                if (!weeklyResponse.ok) {
-                    throw new Error(`Weekly payment bills submission failed: ${responseText}`);
+            if (selectedAccountType !== 'Bill Payments') {
+                const weeklyPaymentBillPayload = {
+                    date: paymentModalData.date,
+                    created_at: new Date().toISOString(),
+                    contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+                    vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+                    employee_id: null,
+                    project_id: selectedSite?.id || null,
+                    type: selectedAccountType === 'Claim' ? "Claim Payment" : selectedAccountType === 'Weekly Payment' ? "Weekly Payment" : "Utility Payment",
+                    bill_payment_mode: paymentModalData.paymentMode,
+                    amount: parseFloat(paymentModalData.amount),
+                    status: true,
+                    weekly_number: "",
+                    expenses_entry_id: expensesId,
+                    advance_portal_id: null,
+                    staff_advance_portal_id: null,
+                    claim_payment_id: null,
+                    cheque_number: paymentModalData.chequeNo || null,
+                    cheque_date: paymentModalData.chequeDate || null,
+                    transaction_number: paymentModalData.transactionNumber || null,
+                    account_number: paymentModalData.accountNumber || null,
+                    branch_id: activeBranchId,
+                    enteredBy: username,
+                };
+                const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(weeklyPaymentBillPayload)
+                });
+                let weeklyResult;
+                try {
+                    const responseText = await weeklyResponse.text();
+                    if (!weeklyResponse.ok) {
+                        throw new Error(`Weekly payment bills submission failed: ${responseText}`);
+                    }
+                    if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+                        weeklyResult = JSON.parse(responseText);
+                    } else {
+                        throw new Error(`Weekly payment bills API returned non-JSON response: ${responseText}`);
+                    }
+                } catch (parseError) {
+                    console.error('Weekly payment bills response parsing error:', parseError);
+                    throw new Error('Failed to parse weekly payment bills API response');
                 }
-                if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
-                    weeklyResult = JSON.parse(responseText);
-                } else {
-                    throw new Error(`Weekly payment bills API returned non-JSON response: ${responseText}`);
-                }
-            } catch (parseError) {
-                console.error('Weekly payment bills response parsing error:', parseError);
-                throw new Error('Failed to parse weekly payment bills API response');
+                toast.success(`${selectedAccountType} payment saved successfully and added to Weekly Payment Bills!`, {
+                    position: "top-center",
+                    autoClose: 3000,
+                    theme: "colored"
+                });
+            } else {
+                toast.success(`${selectedAccountType} payment saved successfully.`, {
+                    position: "top-center",
+                    autoClose: 3000,
+                    theme: "colored"
+                });
             }
-            toast.success(`${selectedAccountType} payment saved successfully and added to Weekly Payment Bills!`, {
-                position: "top-center",
-                autoClose: 3000,
-                theme: "colored"
-            });
+            if (weeklyExpenseIdForBillCopyUrl != null && pdfUrl) {
+                const ok = await putWeeklyExpenseBillCopyUrl(weeklyExpenseIdForBillCopyUrl, pdfUrl);
+                if (!ok) {
+                    toast.warn('Expense saved, but the weekly bill row could not be updated with the file link.');
+                }
+            }
             setEno(eno + 1);
             resetForm();
             setShowPaymentModal(false);
@@ -1621,6 +1924,19 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 <form onSubmit={handleFormSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
+                            {summaryBillMode && (
+                                <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="text-sm font-semibold text-orange-800">
+                                        {splitRemainingLabel}:&nbsp;
+                                        <span className="text-base font-bold">
+                                            ₹{Number(summaryBillRemaining ?? summaryBillTotal ?? 0).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-orange-700">
+                                        Total:&nbsp;₹{Number(summaryBillTotal ?? 0).toLocaleString('en-IN')}
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex mb-4 items-center gap-4">
                                 <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
                                 <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[182px]"
@@ -1738,21 +2054,31 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                         className="custom-select rounded-lg w-[290px] h-[45px]"
                                     />
                                 </div>
-                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') ? (
+                                {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') ? (
                                     <div className='text-left'>
                                         <label className="text-md font-semibold mb-2 block">Payment Mode <span className="text-red-500">*</span></label>
-                                        <select
-                                            value={paymentMode}
-                                            onChange={(e) => setPaymentMode(e.target.value)}
-                                            className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
-                                        >
-                                            <option value="">Select Payment Mode</option>
-                                            {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
-                                            <option value="GPay">GPay</option>
-                                            <option value="PhonePe">PhonePe</option>
-                                            <option value="Net Banking">Net Banking</option>
-                                            <option value="Cheque">Cheque</option>
-                                        </select>
+                                        {billPaymentsCashRegisterPrefill && selectedAccountType === 'Bill Payments' ? (
+                                            <select
+                                                value="Cash"
+                                                disabled
+                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] border-opacity-[0.20] bg-gray-50 text-gray-800 cursor-not-allowed"
+                                            >
+                                                <option value="Cash">Cash</option>
+                                            </select>
+                                        ) : (
+                                            <select
+                                                value={paymentMode}
+                                                onChange={(e) => setPaymentMode(e.target.value)}
+                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
+                                            >
+                                                <option value="">Select Payment Mode</option>
+                                                {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
+                                                <option value="GPay">GPay</option>
+                                                <option value="PhonePe">PhonePe</option>
+                                                <option value="Net Banking">Net Banking</option>
+                                                <option value="Cheque">Cheque</option>
+                                            </select>
+                                        )}
                                     </div>
                                 ) : showMachineTools ? (
                                     <div className='text-left'>
@@ -1772,7 +2098,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                             {showMachineTools &&
                                 !(selectedAccountType === 'Claim' ||
                                     selectedAccountType === 'Utility Bills' ||
-                                    selectedAccountType === 'Weekly Payment') && (
+                                    selectedAccountType === 'Weekly Payment' ||
+                                    selectedAccountType === 'Bill Payments') && (
                                     <div className='flex gap-10 mb-3'>
                                         <div className='w-[290px] min-w-[290px] shrink-0' aria-hidden="true" />
                                         <div className='text-left'>
@@ -1798,7 +2125,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                             {showMachineTools &&
                                 (selectedAccountType === 'Claim' ||
                                     selectedAccountType === 'Utility Bills' ||
-                                    selectedAccountType === 'Weekly Payment') && (
+                                    selectedAccountType === 'Weekly Payment' ||
+                                    selectedAccountType === 'Bill Payments') && (
                                     <div className='flex gap-10 mb-3'>
                                         <div className='text-left'>
                                             <label className="text-md font-semibold mb-2 block">Item Name</label>
@@ -1919,7 +2247,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                 <div className='flex'>
                                     <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
                                         <img className='w-5 h-4' alt='' src={Attach}></img>
-                                        Attach file {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Refund') && <span className="text-red-500 ml-1">*</span>}
+                                        Attach file {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && <span className="text-red-500 ml-1">*</span>}
                                     </label>
                                     <input
                                         type="file"
@@ -2293,21 +2621,31 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                                     className="custom-select rounded-lg"
                                                 />
                                             </div>
-                                            {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment') && (
+                                            {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') && (
                                                 <div>
                                                     <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
-                                                    <select
-                                                        value={paymentMode}
-                                                        onChange={(e) => setPaymentMode(e.target.value)}
-                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
-                                                    >
-                                                        <option value="">Select Payment Mode</option>
-                                                        {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
-                                                        <option value="GPay">GPay</option>
-                                                        <option value="PhonePe">PhonePe</option>
-                                                        <option value="Net Banking">Net Banking</option>
-                                                        <option value="Cheque">Cheque</option>
-                                                    </select>
+                                                    {billPaymentsCashRegisterPrefill && selectedAccountType === 'Bill Payments' ? (
+                                                        <select
+                                                            value="Cash"
+                                                            disabled
+                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20 bg-gray-50 cursor-not-allowed"
+                                                        >
+                                                            <option value="Cash">Cash</option>
+                                                        </select>
+                                                    ) : (
+                                                        <select
+                                                            value={paymentMode}
+                                                            onChange={(e) => setPaymentMode(e.target.value)}
+                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                        >
+                                                            <option value="">Select Payment Mode</option>
+                                                            {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
+                                                            <option value="GPay">GPay</option>
+                                                            <option value="PhonePe">PhonePe</option>
+                                                            <option value="Net Banking">Net Banking</option>
+                                                            <option value="Cheque">Cheque</option>
+                                                        </select>
+                                                    )}
                                                 </div>
                                             )}
                                             {selectedAccountType === 'Utility Bills' && (

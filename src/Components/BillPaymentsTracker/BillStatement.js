@@ -1,19 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Select from 'react-select';
-import axios from "axios";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 const BillStatement = ({ username, userRoles = [] }) => {
+  const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
   const [apiData, setApiData] = useState([])
-  const [filteredData, setFilteredData] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [vendorOptions, setVendorOptions] = useState([])
-  const [contractorOptions, setContractorOptions] = useState([])
-  const [combinedOptions, setCombinedOptions] = useState([])
-  const [allBillEntries, setAllBillEntries] = useState([])
-  const [paymentInfo, setPaymentInfo] = useState({})
   // Filter states
   const [selectedVendor, setSelectedVendor] = useState(null)
   const [fromDate, setFromDate] = useState('')
@@ -21,29 +16,24 @@ const BillStatement = ({ username, userRoles = [] }) => {
   const [fromPaymentDate, setFromPaymentDate] = useState('')
   const [selectedPaymentMode, setSelectedPaymentMode] = useState(null)
   const paymentModeOptions = useMemo(() => {
-    const modes = new Set()
-    Object.values(paymentInfo || {}).forEach(payments => {
-      if (!Array.isArray(payments)) return
-      payments.forEach(payment => {
-        const mode = (payment?.mode || '').trim()
-        if (mode && mode !== '-') {
-          modes.add(mode)
-        }
-      })
-    })
+    const modes = new Set();
+    (Array.isArray(apiData) ? apiData : []).forEach((r) => {
+      const m = String(r?.mode ?? '').trim();
+      if (m && m !== '-') modes.add(m);
+    });
     return Array.from(modes)
       .sort((a, b) => a.localeCompare(b))
-      .map(mode => ({ value: mode, label: mode }))
-  }, [paymentInfo])
+      .map((m) => ({ value: m, label: m }));
+  }, [apiData])
   // Sort state
   const [sortConfig, setSortConfig] = useState({
-    key: null,
-    direction: 'asc'
+    key: 'bill_arrival_date',
+    direction: 'desc'
   })
   // Fetch vendor names
   const fetchVendorNames = async () => {
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
         method: "GET",
         credentials: "include",
         headers: {
@@ -65,306 +55,34 @@ const BillStatement = ({ username, userRoles = [] }) => {
       console.error("Error fetching vendor names:", error);
     }
   };
-  // Fetch contractor names
-  const fetchContractorNames = async () => {
-    try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-      if (!response.ok) {
-        throw new Error("Network response was not ok: " + response.statusText);
-      }
-      const data = await response.json();
-      const formattedData = data.map(item => ({
-        value: item.contractorName,
-        label: item.contractorName,
-        id: item.id,
-        type: "Contractor"
-      }));
-      setContractorOptions(formattedData);
-    } catch (error) {
-      console.error("Error fetching contractor names:", error);
-    }
-  };
-  // Fetch tracker data
-  const fetchTrackerData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/vendor-payments/trackers", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
+  const fetchStatementData = async (signal) => {
+    const q = String(selectedVendor?.label || '').trim();
+    const from = String(fromDate || '').trim();
+    const to = String(toDate || '').trim();
+    const paymentDate = String(fromPaymentDate || '').trim();
+    const paymentMode = String(selectedPaymentMode?.value || '').trim();
 
-      if (!response.ok) {
-        throw new Error(`Network response was not ok: ${response.statusText}`);
-      }
+    const params = new URLSearchParams();
+    if (q) params.set('query', q);
+    if (from) params.set('fromDate', from);
+    if (to) params.set('toDate', to);
+    if (paymentDate) params.set('paymentDate', paymentDate);
+    if (paymentMode) params.set('paymentMode', paymentMode);
 
-      try {
-        const data = await response.json();
-        setApiData(data);
-        setFilteredData(data);
-      } catch (parseError) {
-        console.warn("Detected circular reference in API response. This needs to be fixed in the backend.");
-        setError("Invalid data format received from server");
-      }
-    } catch (error) {
-      console.error("Error fetching tracker data:", error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
+    const url = `${API_BASE}/vendor-payments/statement${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      signal
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || `Request failed (${res.status})`);
     }
-  };
-
-  // Fetch all bill entries
-  const fetchAllBillEntries = async () => {
-    try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/bill-entry/getAll", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Network response was not ok: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setAllBillEntries(data);
-    } catch (error) {
-      console.error("Error fetching bill entries:", error);
-    }
-  };
-  // Load payment information for all bills
-  const loadPaymentInfo = async () => {
-    const paymentData = {};
-    for (const item of apiData) {
-      const info = await getPaymentInfo(item);
-      paymentData[item.id] = info; // info is an array of payments
-    }
-    setPaymentInfo(paymentData);
-  };
-
-  // Check if this is the last payment for a vendor
-  const isLastPayment = (payments, currentIndex) => {
-    return currentIndex === payments.length - 1;
-  };
-
-  // Get vendor name by ID
-  const getVendorNameById = (vendorId) => {
-    const vendor = combinedOptions.find(option => option.id === vendorId);
-    return vendor ? vendor.label : 'Unknown Vendor';
-  };
-  // Get bill verification date
-  const getBillVerificationDate = (item) => {
-    if (!item.billVerifications || item.billVerifications.length === 0) {
-      return '-'
-    }
-    const verifiedBills = item.billVerifications.filter(verification =>
-      verification.is_verified === true || verification.status === 'VERIFIED'
-    );
-    if (verifiedBills.length === 0) {
-      return '-'
-    }
-    const dates = verifiedBills.map(verification => {
-      // Check for verification date or timestamp fields
-      const dateValue = verification.verified_date || verification.verification_date || verification.created_at || verification.updated_at || verification.timestamp || verification.date;
-      if (dateValue) {
-        try {
-          const date = new Date(dateValue);
-          return date.toLocaleDateString('en-GB');
-        } catch (error) {
-          console.error('Error parsing date:', dateValue, error);
-          return null;
-        }
-      }
-      return null
-    }).filter(date => date !== null);
-
-    if (dates.length === 0) {
-      return '-'
-    }
-    // Remove duplicate dates and return unique dates only
-    const uniqueDates = [...new Set(dates)];
-    return uniqueDates.join(', ')
-  };
-  // Get entry date(s) - modified to show multiple dates
-  const getEntryDate = (item) => {
-    const entries = allBillEntries.filter(entry => entry.vendor_payments_tracker_id === item.id);
-    if (entries.length === 0) {
-      return '-'
-    }
-    // Get all unique entry dates for this vendor
-    const entryDates = entries
-      .map(entry => entry.entered_date)
-      .filter(date => date) // Remove null/undefined dates
-      .map(date => new Date(date))
-      .sort((a, b) => a - b) // Sort dates chronologically
-      .map(date => {
-        const day = date.getDate();
-        const month = date.toLocaleDateString('en-GB', { month: 'short' });
-        const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
-        return { day, month, year };
-      });
-    if (entryDates.length === 0) {
-      return '-'
-    }
-    // Remove duplicate dates (same day, month, year)
-    const uniqueDates = entryDates.filter((date, index, arr) =>
-      index === arr.findIndex(d => d.day === date.day && d.month === date.month && d.year === date.year)
-    );
-    if (uniqueDates.length === 1) {
-      // Single date format: DD/MM/YYYY
-      const date = uniqueDates[0];
-      const day = date.day.toString().padStart(2, '0');
-      const month = (new Date(0, ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(date.month)).getMonth() + 1).toString().padStart(2, '0');
-      const year = `20${date.year}`; // Convert 25 to 2025
-      return `${day}/${month}/${year}`;
-    } else if (uniqueDates.length === 2) {
-      // Format as "15 & 17 Oct 25"
-      const [first, second] = uniqueDates;
-      if (first.month === second.month && first.year === second.year) {
-        return `${first.day} & ${second.day} ${first.month} ${first.year}`
-      } else {
-        return `${first.day} ${first.month} ${first.year} & ${second.day} ${second.month} ${second.year}`
-      }
-    } else {
-      // For more than 2 dates, show first and last with "&" in between
-      const first = uniqueDates[0];
-      const last = uniqueDates[uniqueDates.length - 1];
-      if (first.month === last.month && first.year === last.year) {
-        return `${first.day} & ${last.day} ${first.month} ${first.year}`
-      } else {
-        return `${first.day} ${first.month} ${first.year} & ${last.day} ${last.month} ${last.year}`
-      }
-    }
-  };
-  // Get payment date and mode - each payment as its own row
-  const getPaymentInfo = async (item) => {
-    try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${item.id}`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-      if (!response.ok) {
-        return []
-      }
-      const paymentDetails = await response.json();
-      if (!paymentDetails || paymentDetails.length === 0) {
-        return []
-      }
-      // Map each payment to its own display object
-      const payments = paymentDetails.map(payment => {
-        const rawUrl = payment?.bill_url || payment?.file_url || payment?.document_url || payment?.bill_document_url || payment?.url;
-        const isHttpUrl = typeof rawUrl === 'string' && /^(http|https):\/\//i.test(rawUrl);
-        const rawDate = payment?.date;
-        // Include carry_forward_amount in the amount calculation
-        const amount = parseFloat(payment?.amount) || 0;
-        const carryForwardAmount = parseFloat(payment?.carry_forward_amount) || 0;
-        const totalAmount = amount + carryForwardAmount;
-        return ({
-          date: rawDate ? new Date(rawDate).toLocaleDateString('en-GB') : '-',
-          rawDate: rawDate || null, // Store raw date for filtering
-          mode: payment?.vendor_bill_payment_mode || '-',
-          amount: totalAmount > 0 ? totalAmount : (payment?.amount || payment?.payment_amount || '-'),
-          billUrl: isHttpUrl ? rawUrl : null
-        });
-      });
-      return payments;
-    } catch (error) {
-      console.error('Error fetching payment info:', error);
-      return []
-    }
-  };
-  // Apply filters
-  const applyFilters = () => {
-    let filtered = [...apiData];
-    // Filter by vendor
-    if (selectedVendor) {
-      filtered = filtered.filter(item =>
-        getVendorNameById(item.vendor_id).toLowerCase().includes(selectedVendor.label.toLowerCase())
-      );
-    }
-    // Filter by date range (bill arrival date)
-    if (fromDate) {
-      filtered = filtered.filter(item => {
-        const itemDate = new Date(item.bill_arrival_date);
-        const from = new Date(fromDate);
-        return itemDate >= from;
-      });
-    }
-    if (toDate) {
-      filtered = filtered.filter(item => {
-        const itemDate = new Date(item.bill_arrival_date);
-        const to = new Date(toDate);
-        return itemDate <= to;
-      });
-    }
-    // Filter by exact payment date match
-    if (fromPaymentDate) {
-      filtered = filtered.filter(item => {
-        const payments = paymentInfo[item.id] || [];
-        if (payments.length === 0) {
-          // If no payments and filtering by payment date, exclude this item
-          return false;
-        }
-        // Check if any payment matches the exact selected date
-        return payments.some(payment => {
-          // Use rawDate if available (original API date), otherwise try to parse formatted date
-          const dateToCheck = payment.rawDate || payment.date;
-          if (!dateToCheck || dateToCheck === '-') return false;
-          try {
-            const paymentDate = new Date(dateToCheck);
-            if (isNaN(paymentDate.getTime())) {
-              // If rawDate parsing failed, try parsing formatted date (DD/MM/YYYY)
-              if (payment.date && payment.date !== '-') {
-                const parts = payment.date.split('/');
-                if (parts.length === 3) {
-                  paymentDate.setFullYear(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                } else {
-                  return false;
-                }
-              } else {
-                return false;
-              }
-            }
-            paymentDate.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
-            const selectedDate = new Date(fromPaymentDate);
-            selectedDate.setHours(0, 0, 0, 0);
-            // Compare dates: year, month, and day must match exactly
-            return paymentDate.getTime() === selectedDate.getTime();
-          } catch (error) {
-            console.error('Error parsing payment date:', dateToCheck, error);
-            return false;
-          }
-        });
-      });
-    }
-    if (selectedPaymentMode?.value) {
-      filtered = filtered.filter(item => {
-        const payments = paymentInfo[item.id] || []
-        if (payments.length === 0) {
-          return false
-        }
-        return payments.some(payment => {
-          const modeToCheck = (payment.mode || '').trim().toLowerCase()
-          return modeToCheck === selectedPaymentMode.value.trim().toLowerCase()
-        })
-      })
-    }
-    const sorted = applySorting(filtered);
-    setFilteredData(sorted);
+    const data = await res.json().catch(() => []);
+    const list = Array.isArray(data) ? data : [];
+    setApiData(list);
   };
   // Clear filters
   const clearFilters = () => {
@@ -373,7 +91,6 @@ const BillStatement = ({ username, userRoles = [] }) => {
     setToDate('');
     setFromPaymentDate('');
     setSelectedPaymentMode(null);
-    setFilteredData(apiData);
   };
   // Handle sort
   const handleSort = (key) => {
@@ -382,6 +99,81 @@ const BillStatement = ({ username, userRoles = [] }) => {
       direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
     }))
   }
+
+  const getNoOfBills = (item) => {
+    const direct =
+      item?.no_of_bills ??
+      item?.noOfBills ??
+      item?.no_of_bill ??
+      item?.noOfBill ??
+      item?.bill_count ??
+      item?.billCount ??
+      item?.bills_count ??
+      item?.billsCount ??
+      item?.bills_total ??
+      item?.billsTotal ??
+      null;
+    if (direct != null && String(direct).trim() !== '' && String(direct).trim() !== '-') return direct;
+
+    const arrays = [
+      item?.bills,
+      item?.billEntries,
+      item?.bill_entries,
+      item?.billIds,
+      item?.bill_ids,
+      item?.bill_id_list,
+      item?.billIdList
+    ];
+    for (const a of arrays) {
+      if (Array.isArray(a)) return a.length;
+    }
+
+    // Mobile UI mainly uses `title`; many backends encode bill count there.
+    // Examples we try to support:
+    // - "Bills - 12"
+    // - "12 Bills"
+    // - "Bills (12)"
+    // - "Bill Count: 12"
+    const title = String(item?.title ?? item?.bill_title ?? item?.tracker_title ?? '').trim();
+    if (title) {
+      const m1 = title.match(/\b(\d+)\s*bills?\b/i); // "12 Bills"
+      if (m1) return Number(m1[1]);
+      const m1b = title.match(/\bbills?\s*(\d+)\b/i); // "Bills 12"
+      if (m1b) return Number(m1b[1]);
+      const m2 = title.match(/\bbills?\s*[-:]\s*(\d+)\b/i); // "Bills - 12"
+      if (m2) return Number(m2[1]);
+      const m3 = title.match(/\bbills?\s*\(\s*(\d+)\s*\)/i); // "Bills (12)"
+      if (m3) return Number(m3[1]);
+      const m4 = title.match(/\bcount\s*[:\-]?\s*(\d+)\b/i); // "Count: 12"
+      if (m4) return Number(m4[1]);
+    }
+    return '-';
+  };
+
+  const getSortDate = (row) => {
+    // "Latest first" should follow actual payment timestamp if present, else payment date, else arrival.
+    const raw =
+      row?.payment_timestamp ??
+      row?.paymentTimestamp ??
+      row?.payment_ts ??
+      row?.paymentTs ??
+      row?.p_timestamp ??
+      row?.pTimestamp ??
+      row?.p_date ??
+      row?.pDate ??
+      row?.payment_date ??
+      row?.arrival_date ??
+      row?.bill_arrival_date ??
+      null;
+    const d = raw ? new Date(raw) : new Date(0);
+    return isNaN(d.getTime()) ? new Date(0) : d;
+  };
+
+  const getArrivalDate = (row) => {
+    const raw = row?.arrival_date ?? row?.bill_arrival_date ?? null;
+    const d = raw ? new Date(raw) : new Date(0);
+    return isNaN(d.getTime()) ? new Date(0) : d;
+  };
   // Apply sorting to filtered data
   const applySorting = (data) => {
     if (!sortConfig.key) return data
@@ -389,49 +181,41 @@ const BillStatement = ({ username, userRoles = [] }) => {
       let aValue, bValue
       switch (sortConfig.key) {
         case 'si_no':
-          // Sort by item ID or index
-          aValue = a.id || 0
-          bValue = b.id || 0
+          // Keep SI.No purely visual (1..N). Sorting by backend IDs is confusing.
+          return 0
           break
         case 'bill_arrival_date':
-          aValue = new Date(a.bill_arrival_date || 0)
-          bValue = new Date(b.bill_arrival_date || 0)
+          // Sort strictly by Bill Arrival Date (as requested).
+          aValue = getArrivalDate(a)
+          bValue = getArrivalDate(b)
           break
         case 'vendor_name':
-          aValue = getVendorNameById(a.vendor_id).toLowerCase()
-          bValue = getVendorNameById(b.vendor_id).toLowerCase()
+          aValue = String(a.vendor_name || '').toLowerCase()
+          bValue = String(b.vendor_name || '').toLowerCase()
           break
         case 'no_of_bills':
-          aValue = parseInt(a.no_of_bills || a.noOfBills || 0)
-          bValue = parseInt(b.no_of_bills || b.noOfBills || 0)
+          aValue = parseInt(getNoOfBills(a) || 0)
+          bValue = parseInt(getNoOfBills(b) || 0)
           break
         case 'total_amount':
-          aValue = parseFloat(a.total_amount || 0)
-          bValue = parseFloat(b.total_amount || 0)
+          aValue = parseFloat(a.overall_amount ?? a.total_amount ?? 0)
+          bValue = parseFloat(b.overall_amount ?? b.total_amount ?? 0)
           break
         case 'bill_verification':
-          aValue = getBillVerificationDate(a)
-          bValue = getBillVerificationDate(b)
+          aValue = String(a.v_date || '').toLowerCase()
+          bValue = String(b.v_date || '').toLowerCase()
           break
         case 'entry_date':
-          aValue = getEntryDate(a)
-          bValue = getEntryDate(b)
+          aValue = String(a.e_date || '').toLowerCase()
+          bValue = String(b.e_date || '').toLowerCase()
           break
         case 'payment_date':
-          // Sort by first payment date if available
-          const aPayments = paymentInfo[a.id] || []
-          const bPayments = paymentInfo[b.id] || []
-          const aFirstPayment = aPayments.length > 0 && aPayments[0].rawDate ? new Date(aPayments[0].rawDate) : null
-          const bFirstPayment = bPayments.length > 0 && bPayments[0].rawDate ? new Date(bPayments[0].rawDate) : null
-          aValue = aFirstPayment || new Date(0)
-          bValue = bFirstPayment || new Date(0)
+          aValue = getSortDate(a)
+          bValue = getSortDate(b)
           break
         case 'payment_amount':
-          // Sort by total payment amount
-          const aTotalPayment = (paymentInfo[a.id] || []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-          const bTotalPayment = (paymentInfo[b.id] || []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-          aValue = aTotalPayment
-          bValue = bTotalPayment
+          aValue = parseFloat(a.paid_amount ?? a.payment_amount ?? 0)
+          bValue = parseFloat(b.paid_amount ?? b.payment_amount ?? 0)
           break
         default:
           return 0
@@ -445,6 +229,12 @@ const BillStatement = ({ username, userRoles = [] }) => {
       return 0
     })
   }
+
+  // Always render a consistently sorted list (prevents "random mixing").
+  const displayData = useMemo(() => {
+    return applySorting(Array.isArray(apiData) ? apiData : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiData, sortConfig]);
   // Format amount in Indian numbering system with 2 decimal places
   const formatIndianCurrency = (amount) => {
     if (!amount || amount === '-') return '-';
@@ -487,17 +277,13 @@ const BillStatement = ({ username, userRoles = [] }) => {
     doc.text("Bill Statement Report", 14, 15);
     // Add filter information if any filters are applied
     let filterText = [];
-    if (selectedVendor) {
-      filterText.push(`Vendor: ${selectedVendor.label}`);
-    }
+    if (selectedVendor) filterText.push(`Vendor: ${selectedVendor.label}`);
     if (fromDate || toDate) {
       const from = fromDate ? new Date(fromDate).toLocaleDateString('en-GB') : 'All';
       const to = toDate ? new Date(toDate).toLocaleDateString('en-GB') : 'All';
       filterText.push(`Bill Arrival Date: ${from} to ${to}`);
     }
-    if (fromPaymentDate) {
-      filterText.push(`Payment Date: ${new Date(fromPaymentDate).toLocaleDateString('en-GB')}`);
-    }
+    if (fromPaymentDate) filterText.push(`Payment Date: ${new Date(fromPaymentDate).toLocaleDateString('en-GB')}`);
     if (selectedPaymentMode?.label) {
       filterText.push(`Payment Mode: ${selectedPaymentMode.label}`);
     }
@@ -529,45 +315,27 @@ const BillStatement = ({ username, userRoles = [] }) => {
       "Summary Bill"
     ];
     const tableRows = [];
-    filteredData.forEach((item, index) => {
-      const payments = paymentInfo[item.id] || [];
-      if (payments.length === 0) {
-        // No payments - single row
-        tableRows.push([
-          String(item.id || index + 1),
-          item.bill_arrival_date ? new Date(item.bill_arrival_date).toLocaleDateString('en-GB') : '-',
-          getVendorNameById(item.vendor_id),
-          String(item.no_of_bills || item.noOfBills || '-'),
-          formatIndianCurrency(item.total_amount),
-          getBillVerificationDate(item),
-          getEntryDate(item),
-          '-',
-          '-',
-          '-',
-          '-',
-          '-'
-        ]);
-      } else {
-        // Multiple payments - one row per payment
-        payments.forEach((pay, pIndex) => {
-          const overallPdfUrl = item.over_all_payment_pdf_url || item.overAllPaymentPdfUrl;
-          const showOverallPdf = isLastPayment(payments, pIndex) && overallPdfUrl;
-          tableRows.push([
-            String(item.id || index + 1),
-            item.bill_arrival_date ? new Date(item.bill_arrival_date).toLocaleDateString('en-GB') : '-',
-            getVendorNameById(item.vendor_id),
-            String(item.no_of_bills || item.noOfBills || '-'),
-            formatIndianCurrency(item.total_amount),
-            getBillVerificationDate(item),
-            getEntryDate(item),
-            pay.date || '-',
-            pay.amount !== '-' ? formatIndianCurrency(pay.amount) : '-',
-            pay.mode || '-',
-            pay.billUrl ? 'Yes' : '-',
-            showOverallPdf ? 'Yes' : '-'
-          ]);
-        });
-      }
+    displayData.forEach((item, index) => {
+      const arrival = item?.arrival_date || item?.bill_arrival_date || null;
+      const overallAmount = item?.overall_amount ?? item?.total_amount ?? null;
+      const paidAmount = item?.paid_amount ?? item?.payment_amount ?? null;
+      const billUrl = item?.bill_url ?? item?.billUrl ?? null;
+      const overallPdfUrl = item?.overall_pdf_url ?? item?.overallPdfUrl ?? item?.over_all_payment_pdf_url ?? null;
+
+      tableRows.push([
+        String(index + 1),
+        arrival ? new Date(arrival).toLocaleDateString('en-GB') : '-',
+        String(item?.vendor_name ?? item?.vendorName ?? '-'),
+        String(getNoOfBills(item)),
+        overallAmount != null && String(overallAmount).trim() !== '' ? formatIndianCurrency(overallAmount) : '-',
+        String(item?.v_date ?? item?.vDate ?? '-'),
+        String(item?.e_date ?? item?.eDate ?? '-'),
+        String(item?.p_date ?? item?.pDate ?? item?.payment_date ?? '-'),
+        paidAmount != null && String(paidAmount).trim() !== '' ? formatIndianCurrency(paidAmount) : '-',
+        String(item?.mode ?? '-'),
+        billUrl ? 'Yes' : '-',
+        overallPdfUrl ? 'Yes' : '-'
+      ]);
     });
     // Generate table
     doc.autoTable({
@@ -627,21 +395,32 @@ const BillStatement = ({ username, userRoles = [] }) => {
   };
   useEffect(() => {
     fetchVendorNames();
-    fetchContractorNames();
-    fetchTrackerData();
-    fetchAllBillEntries();
   }, []);
   useEffect(() => {
-    setCombinedOptions([...vendorOptions, ...contractorOptions]);
-  }, [vendorOptions, contractorOptions]);
-  useEffect(() => {
-    applyFilters();
-  }, [selectedVendor, fromDate, toDate, fromPaymentDate, selectedPaymentMode, apiData, paymentInfo, sortConfig]);
-  useEffect(() => {
-    if (apiData.length > 0) {
-      loadPaymentInfo();
-    }
-  }, [apiData]);
+    let mounted = true;
+    const controller = new AbortController();
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await fetchStatementData(controller.signal);
+        if (!mounted) return;
+      } catch (e) {
+        if (String(e?.name || '') === 'AbortError') return;
+        if (!mounted) return;
+        setApiData([]);
+        setError(e?.message || 'Failed to load statement');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [selectedVendor, fromDate, toDate, fromPaymentDate, selectedPaymentMode]);
+
   return (
     <div className="">
       <div className=' ml-10 mr-10'>
@@ -650,7 +429,7 @@ const BillStatement = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Vendor Name</label>
               <Select
-                options={combinedOptions}
+                options={vendorOptions}
                 value={selectedVendor}
                 onChange={setSelectedVendor}
                 placeholder="Select Vendor Name"
@@ -825,95 +604,69 @@ const BillStatement = ({ username, userRoles = [] }) => {
                     </td>
                   </tr>
                 )}
-                {filteredData.length === 0 && !loading && !error && (
+                {displayData.length === 0 && !loading && !error && (
                   <tr>
                     <td colSpan="12" className="px-4 py-8 text-center text-sm text-gray-500">
                       No data found
                     </td>
                   </tr>
                 )}
-                {filteredData.map((item, index) => {
-                  const payments = paymentInfo[item.id] || [];
-                  if (payments.length === 0) {
-                    return (
-                      <tr key={`statement-${item.id || index}`} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}  text-left`}>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">{item.id || index + 1}</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {item.bill_arrival_date ? new Date(item.bill_arrival_date).toLocaleDateString('en-GB') : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {getVendorNameById(item.vendor_id)}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {item.no_of_bills || item.noOfBills || '-'}
-                        </td>
-                        <td className=" py-3 text-sm border-b border-gray-200 text-center">
-                          {item.total_amount ? `₹${formatIndianCurrency(item.total_amount)}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {getBillVerificationDate(item)}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {getEntryDate(item)}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">-</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">-</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">-</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">-</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">-</td>
-                      </tr>
-                    );
-                  }
-                  return payments.map((pay, pIndex) => {
-                    const overallPdfUrl = item.over_all_payment_pdf_url || item.overAllPaymentPdfUrl;
-                    const showOverallPdf = isLastPayment(payments, pIndex) && overallPdfUrl;
-                    return (
-                      <tr key={`statement-${item.id || index}-${pIndex}`} className={`${(index + pIndex) % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}  text-left`}>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">{item.id || index + 1}</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {item.bill_arrival_date ? new Date(item.bill_arrival_date).toLocaleDateString('en-GB') : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {getVendorNameById(item.vendor_id)}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {item.no_of_bills || item.noOfBills || '-'}
-                        </td>
-                        <td className=" py-3 text-sm border-b border-gray-200 text-center">
-                          {item.total_amount ? `₹${formatIndianCurrency(item.total_amount)}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {getBillVerificationDate(item)}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {getEntryDate(item)}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">{pay.date}</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200 text-center">
-                          {pay.amount !== '-' ? `₹${formatIndianCurrency(pay.amount)}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">{pay.mode}</td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {pay.billUrl ? (
-                            <a href={pay.billUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[#656635] hover:underline" title="Open bill attachment">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
-                              </svg>
-                            </a>
-                          ) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm border-b border-gray-200">
-                          {showOverallPdf ? (
-                            <a href={overallPdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[#656635] hover:underline" title="Open summary bill">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
-                              </svg>
-                            </a>
-                          ) : '-'}
-                        </td>
-                      </tr>
-                    );
-                  });
+                {displayData.map((item, index) => {
+                  const arrival = item?.arrival_date || item?.bill_arrival_date || null;
+                  const overallAmount = item?.overall_amount ?? item?.total_amount ?? null;
+                  const paidAmount = item?.paid_amount ?? item?.payment_amount ?? null;
+                  const billUrl = item?.bill_url ?? item?.billUrl ?? null;
+                  const overallPdfUrl = item?.overall_pdf_url ?? item?.overallPdfUrl ?? item?.over_all_payment_pdf_url ?? null;
+                  return (
+                    <tr key={`statement-${item.tracker_id || item.id || index}`} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}  text-left`}>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">{index + 1}</td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {arrival ? new Date(arrival).toLocaleDateString('en-GB') : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {item.vendor_name || item.vendorName || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {getNoOfBills(item)}
+                      </td>
+                      <td className="py-3 text-sm border-b border-gray-200 text-center">
+                        {overallAmount != null && String(overallAmount).trim() !== '' ? `₹${formatIndianCurrency(overallAmount)}` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {item.v_date || item.vDate || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {item.e_date || item.eDate || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {item.p_date || item.pDate || item.payment_date || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200 text-center">
+                        {paidAmount != null && String(paidAmount).trim() !== '' ? `₹${formatIndianCurrency(paidAmount)}` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {item.mode || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {billUrl ? (
+                          <a href={billUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[#656635] hover:underline" title="Open bill attachment">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                            </svg>
+                          </a>
+                        ) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm border-b border-gray-200">
+                        {overallPdfUrl ? (
+                          <a href={overallPdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[#656635] hover:underline" title="Open summary bill">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                            </svg>
+                          </a>
+                        ) : '-'}
+                      </td>
+                    </tr>
+                  );
                 })}
               </tbody>
             </table>

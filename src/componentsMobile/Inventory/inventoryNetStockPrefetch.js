@@ -24,8 +24,8 @@ export async function prefetchInventoryNetStockData() {
   if (isFresh()) return cache;
 
   inFlight = (async () => {
-    const base8081 = 'https://backendaab.in/aabuilderDash/api';
-    const base8082 = 'https://backendaab.in/aabuildersDash/api';
+    const base8081 = 'https://backendaab.in/demoAabuilderDash/api';
+    const base8082 = 'https://backendaab.in/demoAabuildersDash/api';
 
     const requests = {
       categories: fetch(`${base8082}/po_category/getAll`, { credentials: 'include' })

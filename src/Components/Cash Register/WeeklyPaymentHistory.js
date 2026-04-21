@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
@@ -14,6 +14,7 @@ import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { i } from 'mathjs';
+import ExpenseEntryForm from '../ExpensesEntry/Form';
 function cleanUrl(url) {
     if (!url) return url;
     let cleanedUrl = url.replace(/^["']|["']$/g, '');
@@ -56,6 +57,13 @@ const History = ({ username, userRoles = [] }) => {
             ? { params: { branchId: activeBranchId } }
             : {}
     );
+    /** Only rows for the selected branch — used so “last week” and lists never mix branches if the API returns extra rows. */
+    const isRowForActiveBranch = (row) => {
+        if (activeBranchId === null || activeBranchId === undefined || activeBranchId === "") return true;
+        const bid = row?.branch_id ?? row?.branchId;
+        if (bid === null || bid === undefined || bid === "") return false;
+        return Number(bid) === Number(activeBranchId);
+    };
     useEffect(() => {
         const syncBranch = () => {
             const nextBranchId = resolveActiveBranchId();
@@ -86,7 +94,8 @@ const History = ({ username, userRoles = [] }) => {
     const [weeks, setWeeks] = useState([]);
     const [lastWeekWithData, setLastWeekWithData] = useState(null);
     const [lastEditableWeek, setLastEditableWeek] = useState(null); // { weekNumber, year }
-    const [lastActiveWeek, setLastActiveWeek] = useState(null);
+    /** Tracks branch+year for the last fetchWeeks run — used to reset the week dropdown when branch/year changes. */
+    const prevWeeksContextKeyRef = useRef(null);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -147,6 +156,8 @@ const History = ({ username, userRoles = [] }) => {
     const [previousPayments, setPreviousPayments] = useState([]);
     const [accountDetails, setAccountDetails] = useState([]);
     const [fileUploadPopup, setFileUploadPopup] = useState(false);
+    const [showBillExpenseEntryModal, setShowBillExpenseEntryModal] = useState(false);
+    const [expenseEntryRefreshNonce, setExpenseEntryRefreshNonce] = useState(0);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     const [showCategoryPopup, setShowCategoryPopup] = useState(false);
@@ -360,7 +371,7 @@ const History = ({ username, userRoles = [] }) => {
     }, []);
     const fetchLaboursList = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formattedData = data.map(item => ({
@@ -421,7 +432,7 @@ const History = ({ username, userRoles = [] }) => {
     }, []);
     const fetchWeeklyType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setWeeklyTypes(data);
@@ -434,7 +445,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const fetchWeeklyReceivedType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_received_types/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setWeeklyReceivedTypes(data);
@@ -447,7 +458,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const fetchAccountDetails = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setAccountDetails(data);
@@ -460,7 +471,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const fetchCategories = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
+            const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -483,7 +494,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const fetchPurposeOptions = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll', {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -507,6 +518,57 @@ const History = ({ username, userRoles = [] }) => {
         }
     };
     const handleFileUploadClick = (row) => {
+        if (row.type === 'Bill') {
+            const project = siteOptions.find((opt) => Number(opt.id) === Number(row.project_id));
+            const resolvedSiteName = project?.label ?? '';
+            const isSummaryBillProject = String(resolvedSiteName).trim() === "Summary Bill";
+            const siteName = isSummaryBillProject ? "" : resolvedSiteName;
+            let dateStr = '';
+            if (row.date) {
+                const d = String(row.date);
+                dateStr = d.includes('T') ? d.split('T')[0] : d;
+            }
+            const rawVid = row.vendor_id ?? row.vendorId;
+            const rawCid = row.contractor_id ?? row.contractorId;
+            const vendorName =
+                row.vendor ??
+                row.vendor_name ??
+                row.vendorName ??
+                (rawVid != null && !Number.isNaN(Number(rawVid)) ? getVendorName(Number(rawVid)) : "") ??
+                "";
+            const contractorName =
+                row.contractor ??
+                row.contractor_name ??
+                row.contractorName ??
+                (rawCid != null && !Number.isNaN(Number(rawCid)) ? getContractorName(Number(rawCid)) : "") ??
+                "";
+            const prefill = {
+                accountType: 'Bill Payments',
+                siteName,
+                amount: row.amount,
+                date: dateStr,
+                vendorId:
+                    rawVid != null && String(rawVid).trim() !== '' && !Number.isNaN(Number(rawVid))
+                        ? Number(rawVid)
+                        : null,
+                contractorId:
+                    rawCid != null && String(rawCid).trim() !== '' && !Number.isNaN(Number(rawCid))
+                        ? Number(rawCid)
+                        : null,
+                vendorName,
+                contractorName,
+                summaryBillTotal:
+                    isSummaryBillProject && row.amount != null && row.amount !== ""
+                        ? Number(row.amount)
+                        : null,
+                paymentMode: 'Cash',
+                fromWeeklyCashRegister: true,
+                weeklyExpenseId: row.id,
+            };
+            localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefill));
+            setShowBillExpenseEntryModal(true);
+            return;
+        }
         setCurrentFileRow(row);
         setSelectedFileForPopup(null);
         setFileUploadPopup(true);
@@ -555,7 +617,7 @@ const History = ({ username, userRoles = [] }) => {
             uploadFormData.append("fileName", finalName);
 
             const uploadResponse = await fetch(
-                "https://backendaab.in/aabuildersDash/api/files/upload",
+                "https://backendaab.in/demoAabuildersDash/api/files/upload",
                 {
                     method: "POST",
                     body: uploadFormData,
@@ -571,7 +633,7 @@ const History = ({ username, userRoles = [] }) => {
             // ✅ CHANGE 4: new response format
             const pdfUrl = uploadResult.urls[0];
 
-            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
+            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${currentFileRow.id}/bill-copy-url`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -605,7 +667,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const fetchWeeklyPaymentBills = async () => {
         try {
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/all", {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -653,7 +715,7 @@ const History = ({ username, userRoles = [] }) => {
             }
             try {
                 const response = await axios.get(
-                    `https://backendaab.in/aabuildersDash/api/payments-received/week/${nextWeekNumber}`,
+                    `https://backendaab.in/demoAabuildersDash/api/payments-received/week/${nextWeekNumber}`,
                     withBranchParams()
                 );
                 const allNextWeekPayments = Array.isArray(response.data) ? response.data : [];
@@ -689,7 +751,7 @@ const History = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -716,7 +778,7 @@ const History = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchEmployeeDetails = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/basic/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/basic/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -743,7 +805,7 @@ const History = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchContractorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -768,6 +830,12 @@ const History = ({ username, userRoles = [] }) => {
         fetchContractorNames();
     }, []);
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
+
+    const siteOptionsForNewEntry = useMemo(() => {
+        return (siteOptions || []).filter(
+            (opt) => String(opt?.label || opt?.value || "").trim() !== "Multi-Project Batch"
+        );
+    }, [siteOptions]);
     useEffect(() => {
         const predefinedSiteOptions = [
             { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
@@ -784,7 +852,7 @@ const History = ({ username, userRoles = [] }) => {
         ];
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/projects/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/projects/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -872,32 +940,37 @@ const History = ({ username, userRoles = [] }) => {
     }, [clientProjectOptions, isClientToggleActive]);
     useEffect(() => {
         const fetchWeeks = async () => {
+            const selectedYear = parseInt(year, 10);
+            const requestBranchId = activeBranchId;
+            const requestYearNum = selectedYear;
+            const requestKey = `${requestBranchId ?? "none"}-${requestYearNum}`;
             try {
-                const selectedYear = parseInt(year, 10);
                 const currentWeekNumber = getCurrentISOWeekNumber();
                 const currentWeekYear = getCurrentWeekYear();
 
-                // Fetch all payments to determine which weeks have data
+                // Fetch all payments to determine which weeks have data (branch-scoped rows only)
                 let weeksWithData = new Set();
                 try {
-                    const paymentsResponse = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/getAll', withBranchParams());
+                    const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
                     paymentsResponse.data.forEach(payment => {
-                        // Only include payments with status === true and period_end_date exists
-                        if (payment.status === true && payment.period_end_date) {
-                            const paymentDate = new Date(payment.period_end_date);
-                            // Validate that the date is valid
-                            if (!isNaN(paymentDate.getTime())) {
-                                const paymentWeekYear = getWeekYear(paymentDate);
-                                if (paymentWeekYear === selectedYear) {
-                                    const weekNumber = getISOWeekNumber(paymentDate);
-                                    weeksWithData.add(weekNumber);
-                                }
-                            }
+                        if (!isRowForActiveBranch(payment)) return;
+                        if (payment.status !== true) return;
+                        const wn = Number(payment.weekly_number);
+                        if (!Number.isFinite(wn)) return;
+                        const paymentWeekYear = getIsoYearFromRowDate(payment);
+                        if (paymentWeekYear === selectedYear) {
+                            weeksWithData.add(wn);
                         }
                     });
                 } catch (error) {
                     console.error('Error fetching payments for week filtering:', error);
                 }
+
+                // Ignore stale responses if branch/year changed while the request was in flight
+                if (requestBranchId !== activeBranchId || requestYearNum !== parseInt(year, 10)) {
+                    return;
+                }
+
                 // Get all possible weeks for the year (1-53)
                 const allWeeks = [];
                 for (let weekNum = 1; weekNum <= 53; weekNum++) {
@@ -908,22 +981,38 @@ const History = ({ username, userRoles = [] }) => {
                     const hasData = weeksWithData.has(weekNum);
                     const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
                     const isFutureWeek = weekEndDate > new Date();
-                    // Include week if:
-                    // 1. It has data for the selected year (regardless of ISO week year calculation)
-                    // 2. It belongs to the selected year AND (is current week or is future week)
                     if (hasData || (weekYear === selectedYear && (isCurrentWeek || isFutureWeek))) {
                         allWeeks.push(weekInfo);
                     }
                 }
 
-                // Sort weeks by week number (descending - most recent first)
                 allWeeks.sort((a, b) => b.number - a.number);
 
-                // Find the last week number that has data with status === true
                 const lastWeekWithDataValue = weeksWithData.size > 0 ? Math.max(...Array.from(weeksWithData)) : null;
-                setLastWeekWithData(lastWeekWithDataValue);
+                const defaultWeekNum =
+                    lastWeekWithDataValue != null && allWeeks.some((w) => w.number === lastWeekWithDataValue)
+                        ? lastWeekWithDataValue
+                        : allWeeks[0]?.number ?? null;
 
+                const previousKey = prevWeeksContextKeyRef.current;
+                const contextChanged = previousKey !== null && previousKey !== requestKey;
+                prevWeeksContextKeyRef.current = requestKey;
+
+                setLastWeekWithData(lastWeekWithDataValue);
                 setWeeks(allWeeks);
+
+                setSelectedWeek((prev) => {
+                    if (allWeeks.length === 0 || defaultWeekNum == null) return "";
+                    const prevNum = prev !== "" && prev != null ? Number(prev) : NaN;
+                    const prevInList = !Number.isNaN(prevNum) && allWeeks.some((w) => w.number === prevNum);
+                    if (contextChanged) {
+                        return String(defaultWeekNum);
+                    }
+                    if (!prev || prev === "" || !prevInList) {
+                        return String(defaultWeekNum);
+                    }
+                    return prev;
+                });
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
             }
@@ -931,105 +1020,79 @@ const History = ({ username, userRoles = [] }) => {
         fetchWeeks();
     }, [year, activeBranchId]);
 
-    // Fetch active weeks from API and set the last week as default
-    useEffect(() => {
-        const fetchActiveWeeks = async () => {
-            try {
-                const response = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/active_weeks', withBranchParams());
-                if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-                    const lastWeek = response.data[response.data.length - 1];
-                    setLastActiveWeek(lastWeek);
-                    // Set the selected week to the last active week if weeks are loaded and no week is currently selected
-                    if (weeks.length > 0 && !selectedWeek) {
-                        const weekExists = weeks.some(w => w.number === lastWeek);
-                        if (weekExists) {
-                            setSelectedWeek(lastWeek.toString());
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching active weeks:', error);
-            }
-        };
-        fetchActiveWeeks();
-    }, [weeks.length, selectedWeek, activeBranchId]);
-
-    // Find the most recent week (across all years) that has data with status === true
+    // Editable week: current ISO week if any payment has status true for that weekly_number; else latest status-true week (by weekly_number + ISO year from date).
     useEffect(() => {
         const computeEditableWeek = async () => {
             try {
                 const now = new Date();
                 const currentWeekNumber = getISOWeekNumber(now);
                 const currentWeekYear = getWeekYear(now);
-                const paymentsResponse = await axios.get('https://backendaab.in/aabuildersDash/api/payments-received/getAll', withBranchParams());
-                const hasCurrentWeekTrue = Array.isArray(paymentsResponse.data) && paymentsResponse.data.some(payment => {
-                    if (payment?.status !== true || !payment?.period_end_date) return false;
-                    const paymentDate = new Date(payment.period_end_date);
-                    if (isNaN(paymentDate.getTime())) return false;
-                    const weekYear = getWeekYear(paymentDate);
-                    const weekNumber = getISOWeekNumber(paymentDate);
-                    return weekYear === currentWeekYear && weekNumber === currentWeekNumber;
+                const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
+                const data = (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).filter(isRowForActiveBranch);
+                const hasCurrentWeekTrue = data.some((payment) => {
+                    if (payment?.status !== true) return false;
+                    const wn = Number(payment.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== currentWeekNumber) return false;
+                    return getIsoYearFromRowDate(payment) === currentWeekYear;
                 });
                 if (hasCurrentWeekTrue) {
                     setLastEditableWeek({ weekNumber: currentWeekNumber, year: currentWeekYear });
                 } else {
-                    const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
-                    const prevDate = new Date(startDate);
-                    prevDate.setDate(prevDate.getDate() - 1);
-                    const prevWeekNumber = getISOWeekNumber(prevDate);
-                    const prevWeekYear = getWeekYear(prevDate);
-                    setLastEditableWeek({ weekNumber: prevWeekNumber, year: prevWeekYear });
+                    const latest = getLatestStatusTrueWeekFromPayments(data);
+                    if (latest) {
+                        setLastEditableWeek(latest);
+                    } else {
+                        const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+                        const prevDate = new Date(startDate);
+                        prevDate.setDate(prevDate.getDate() - 1);
+                        setLastEditableWeek({
+                            weekNumber: getISOWeekNumber(prevDate),
+                            year: getWeekYear(prevDate),
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error computing editable week:', error);
-                // Fallback to previous ISO week if request fails
                 const now = new Date();
                 const currentWeekNumber = getISOWeekNumber(now);
                 const currentWeekYear = getWeekYear(now);
                 const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
                 const prevDate = new Date(startDate);
                 prevDate.setDate(prevDate.getDate() - 1);
-                const prevWeekNumber = getISOWeekNumber(prevDate);
-                const prevWeekYear = getWeekYear(prevDate);
-                setLastEditableWeek({ weekNumber: prevWeekNumber, year: prevWeekYear });
+                setLastEditableWeek({
+                    weekNumber: getISOWeekNumber(prevDate),
+                    year: getWeekYear(prevDate),
+                });
             }
         };
         computeEditableWeek();
     }, [activeBranchId]); // Run again when branch changes
-
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
             try {
                 const [expensesRes, paymentsRes] = await Promise.all([
-                    axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                    axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                    axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                    axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
                 ]);
 
                 const selectedYear = parseInt(year, 10);
+                const selectedWeekNum = Number(selectedWeek);
 
-                // Filter expenses to only include entries that belong to the selected year (ISO 8601)
-                // Only include expenses with status === true and valid period_end_date
-                const filteredExpenses = expensesRes.data.filter(expense => {
-                    // Exclude expenses without period_end_date or with status !== true
-                    if (!expense.period_end_date || expense.status !== true) return false;
-                    const expenseDate = new Date(expense.period_end_date);
-                    // Validate that the date is valid
-                    if (isNaN(expenseDate.getTime())) return false;
-                    const expenseWeekYear = getWeekYear(expenseDate);
-                    return expenseWeekYear === selectedYear;
+                const filteredExpenses = expensesRes.data.filter((expense) => {
+                    if (!isRowForActiveBranch(expense)) return false;
+                    if (expense.status !== true) return false;
+                    const wn = Number(expense.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                    return getIsoYearFromRowDate(expense) === selectedYear;
                 });
 
-                // Filter payments to only include entries that belong to the selected year (ISO 8601)
-                // Only include payments with status === true and valid period_end_date
-                const filteredPaymentsByYear = paymentsRes.data.filter(payment => {
-                    // Exclude payments without period_end_date or with status !== true
-                    if (!payment.period_end_date || payment.status !== true) return false;
-                    const paymentDate = new Date(payment.period_end_date);
-                    // Validate that the date is valid
-                    if (isNaN(paymentDate.getTime())) return false;
-                    const paymentWeekYear = getWeekYear(paymentDate);
-                    return paymentWeekYear === selectedYear;
+                const filteredPaymentsByYear = paymentsRes.data.filter((payment) => {
+                    if (!isRowForActiveBranch(payment)) return false;
+                    if (payment.status !== true) return false;
+                    const wn = Number(payment.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                    return getIsoYearFromRowDate(payment) === selectedYear;
                 });
 
                 // Also filter out "Handover" type payments
@@ -1045,7 +1108,7 @@ const History = ({ username, userRoles = [] }) => {
                 for (const row of projectAdvanceRows) {
                     try {
                         const res = await fetch(
-                            `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                            `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
                         );
                         if (res.ok) {
                             const data = await res.json();
@@ -1062,7 +1125,7 @@ const History = ({ username, userRoles = [] }) => {
             }
         };
         fetchWeekData();
-    }, [selectedWeek, year, activeBranchId]);
+    }, [selectedWeek, year, activeBranchId, expenseEntryRefreshNonce]);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === "type") {
@@ -1270,7 +1333,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            `https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
+            `https://backendaab.in/demoAabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -1303,7 +1366,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            `https://backendaab.in/aabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
+            `https://backendaab.in/demoAabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -1335,7 +1398,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            "https://backendaab.in/aabuildersDash/api/loans/save",
+            "https://backendaab.in/demoAabuildersDash/api/loans/save",
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1375,7 +1438,7 @@ const History = ({ username, userRoles = [] }) => {
                 enteredBy: username,
             };
 
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/update/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1474,6 +1537,32 @@ const History = ({ username, userRoles = [] }) => {
         thursday.setHours(0, 0, 0, 0);
         return thursday.getFullYear();
     };
+    /** ISO week-year from transaction date — do not use period_start_date / period_end_date. */
+    const getIsoYearFromRowDate = (row) => {
+        if (!row?.date) return null;
+        const d = new Date(row.date);
+        return isNaN(d.getTime()) ? null : getWeekYear(d);
+    };
+    /** Latest (weekNumber, year) among status-true rows, using weekly_number + ISO year from date. */
+    const getLatestStatusTrueWeekFromPayments = (payments) => {
+        const list = (Array.isArray(payments) ? payments : [])
+            .filter((p) => isRowForActiveBranch(p))
+            .filter((p) => p?.status === true)
+            .map((p) => {
+                const wn = Number(p.weekly_number);
+                if (!Number.isFinite(wn)) return null;
+                const y = getIsoYearFromRowDate(p);
+                if (y === null) return null;
+                return { weekNumber: wn, year: y };
+            })
+            .filter(Boolean);
+        if (list.length === 0) return null;
+        return list.reduce((best, cur) => {
+            if (cur.year > best.year) return cur;
+            if (cur.year === best.year && cur.weekNumber > best.weekNumber) return cur;
+            return best;
+        });
+    };
     const updateAdvancePortalEntry = async (advancePortalId, { date, amount, vendorId, contractorId, projectId, description, weekNo }) => {
         if (!advancePortalId) return;
         const payload = {
@@ -1493,7 +1582,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            `https://backendaab.in/aabuildersDash/api/advance_portal/edit/${advancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            `https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${advancePortalId}?editedBy=${encodeURIComponent(username)}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -1525,7 +1614,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            `https://backendaab.in/aabuildersDash/api/advance_portal/edit/${advancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            `https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${advancePortalId}?editedBy=${encodeURIComponent(username)}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -1554,7 +1643,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            `https://backendaab.in/aabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -1583,7 +1672,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
         };
         const response = await fetch(
-            `https://backendaab.in/aabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -1596,7 +1685,7 @@ const History = ({ username, userRoles = [] }) => {
         return response.json();
     };
     const createAdvancePortalEntry = async ({ date, amount, vendorId, contractorId, projectId }) => {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
         if (!response.ok) {
             throw new Error("Failed to fetch advance portal entry numbers");
         }
@@ -1622,7 +1711,7 @@ const History = ({ username, userRoles = [] }) => {
             branch_id: activeBranchId ?? null,
             enteredBy: username,
         };
-        const saveResponse = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/save", {
+        const saveResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/save", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -1747,7 +1836,7 @@ const History = ({ username, userRoles = [] }) => {
             }
             if (newExpense.type === "Staff Advance") {
                 try {
-                    const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
+                    const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
                     if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
                     const staffAdvanceData = await staffAdvanceRes.json();
                     const maxEntryNo = staffAdvanceData.length > 0
@@ -1772,7 +1861,7 @@ const History = ({ username, userRoles = [] }) => {
                         enteredBy: username,
                     };
                     const staffAdvanceResponse = await fetch(
-                        "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                        "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -1788,7 +1877,7 @@ const History = ({ username, userRoles = [] }) => {
                     console.error("Error creating staff advance portal entry:", staffAdvanceError);
                 }
             }
-            const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-expenses/update/save", {
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/update/save", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1843,7 +1932,7 @@ const History = ({ username, userRoles = [] }) => {
                 enteredBy: username,
             };
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/payments-received/update/save", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payments-received/update/save", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -2024,9 +2113,9 @@ const History = ({ username, userRoles = [] }) => {
         let loanPortalData = [];
         try {
             const [advanceRes, staffAdvanceRes, loanRes] = await Promise.all([
-                fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll").catch(() => null),
-                fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all").catch(() => null),
-                fetch("https://backendaab.in/aabuildersDash/api/loans/all").catch(() => null)
+                fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll").catch(() => null),
+                fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all").catch(() => null),
+                fetch("https://backendaab.in/demoAabuildersDash/api/loans/all").catch(() => null)
             ]);
             if (advanceRes && advanceRes.ok) {
                 advancePortalData = await advanceRes.json();
@@ -2606,7 +2695,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const updateDescription = async (id, description) => {
         try {
-            const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/update/${id}`, {
+            const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/update/${id}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -2766,7 +2855,7 @@ const History = ({ username, userRoles = [] }) => {
                     await updateStaffAdvancePortalEntry(row.staff_advance_portal_id, staffAdvancePayload);
                 } else {
                     try {
-                        const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
+                        const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
                         if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
                         const staffAdvanceData = await staffAdvanceRes.json();
                         const maxEntryNo = staffAdvanceData.length > 0
@@ -2791,7 +2880,7 @@ const History = ({ username, userRoles = [] }) => {
                             enteredBy: username,
                         };
                         const staffAdvanceResponse = await fetch(
-                            "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                            "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
                             {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -2819,7 +2908,7 @@ const History = ({ username, userRoles = [] }) => {
                 ...row,
                 branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
             };
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
                 username
             )}`,
                 {
@@ -2896,7 +2985,7 @@ const History = ({ username, userRoles = [] }) => {
                 ...row,
                 branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
             };
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(username)}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(username)}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -2914,32 +3003,22 @@ const History = ({ username, userRoles = [] }) => {
         }
     };
     useEffect(() => {
-        if (weeks.length > 0) {
-            // Check if the currently selected week exists in the filtered weeks
-            const currentSelectedWeek = selectedWeek;
-            const selectedWeekExists = currentSelectedWeek && weeks.some(w => w.number === Number(currentSelectedWeek));
-            if (!selectedWeekExists) {
-                // If lastActiveWeek is available and exists in weeks, use it; otherwise use the last week
-                if (lastActiveWeek !== null) {
-                    const lastActiveWeekExists = weeks.some(w => w.number === lastActiveWeek);
-                    if (lastActiveWeekExists) {
-                        setSelectedWeek(lastActiveWeek.toString());
-                    } else {
-                        setSelectedWeek(weeks[weeks.length - 1].number);
-                    }
-                } else {
-                    // If selected week doesn't exist in new year, select the last week
-                    setSelectedWeek(weeks[weeks.length - 1].number);
-                }
-            }
-        } else {
-            // If no weeks available for the selected year, clear the selection
+        if (weeks.length === 0) {
             setSelectedWeek("");
+            return;
         }
-    }, [weeks, year, lastActiveWeek]);
+        const n = Number(selectedWeek);
+        const selectedWeekExists = selectedWeek && weeks.some((w) => w.number === n);
+        if (selectedWeekExists) return;
+        const preferred =
+            lastWeekWithData != null && weeks.some((w) => w.number === lastWeekWithData)
+                ? lastWeekWithData
+                : weeks[0].number;
+        setSelectedWeek(String(preferred));
+    }, [weeks, year, lastWeekWithData]);
     const fetchAuditDetailsForExpense = async (expensesId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_payment_audit/expenses/${expensesId}`);
             const data = await response.json();
             setWeeklyPaymentExpensesAudits(data);
             setShowWeeklyPaymentExpensesModal(true);
@@ -2949,7 +3028,7 @@ const History = ({ username, userRoles = [] }) => {
     };
     const fetchAuditDetailsForPaymentReceived = async (receivedId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_payment_audit/payments/${receivedId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_payment_audit/payments/${receivedId}`);
             const data = await response.json();
             setWeeklyPaymentReceivedAudits(data);
             setShowWeeklyPaymentReceivedModal(true);
@@ -2989,7 +3068,7 @@ const History = ({ username, userRoles = [] }) => {
                         return;
                     }
                 }
-                const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/delete/${id}`, {
+                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/delete/${id}`, {
                     method: 'DELETE',
                 });
                 if (response.ok) {
@@ -3011,7 +3090,7 @@ const History = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Expense Data?");
         if (confirmed) {
             try {
-                const response = await fetch(`https://backendaab.in/aabuildersDash/api/payments-received/delete/${id}`, {
+                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payments-received/delete/${id}`, {
                     method: 'DELETE',
                 });
                 if (response.ok) {
@@ -3547,7 +3626,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             }));
                                                             setProjectId(selectedOption ? selectedOption.id : "");
                                                         }}
-                                                        options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptions}
+                                                        options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptionsForNewEntry}
                                                         placeholder={isClientToggleActive ? "Client Project..." : "Select Site"}
                                                         isSearchable
                                                         isClearable
@@ -3848,7 +3927,7 @@ const History = ({ username, userRoles = [] }) => {
                                                                         if (row.advance_portal_id) {
                                                                             try {
                                                                                 const res = await fetch(
-                                                                                    `https://backendaab.in/aabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                    `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
                                                                                 );
                                                                                 if (!res.ok) throw new Error("Failed to fetch advance portal data");
                                                                                 const data = await res.json();
@@ -4448,7 +4527,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 let staffAdvancePortalId = null;
                                                 if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
                                                     try {
-                                                        const res = await fetch("https://backendaab.in/aabuildersDash/api/advance_portal/getAll");
+                                                        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
                                                         if (!res.ok) throw new Error("Failed to fetch entry numbers");
                                                         const allData = await res.json();
                                                         const maxEntryNo =
@@ -4480,7 +4559,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             enteredBy: username,
                                                         };
                                                         const advanceResponse = await fetch(
-                                                            "https://backendaab.in/aabuildersDash/api/advance_portal/save",
+                                                            "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
                                                             {
                                                                 method: "POST",
                                                                 headers: { "Content-Type": "application/json" },
@@ -4499,7 +4578,7 @@ const History = ({ username, userRoles = [] }) => {
                                                 }
                                                 if (currentProjectAdvanceRow.type === "Staff Advance") {
                                                     try {
-                                                        const staffAdvanceRes = await fetch("https://backendaab.in/aabuildersDash/api/staff-advance/all");
+                                                        const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
                                                         if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
                                                         const staffAdvanceData = await staffAdvanceRes.json();
                                                         const maxEntryNo =
@@ -4529,7 +4608,7 @@ const History = ({ username, userRoles = [] }) => {
                                                             enteredBy: username,
                                                         };
                                                         const staffAdvanceResponse = await fetch(
-                                                            "https://backendaab.in/aabuildersDash/api/staff-advance/save",
+                                                            "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
                                                             {
                                                                 method: "POST",
                                                                 headers: { "Content-Type": "application/json" },
@@ -4568,7 +4647,7 @@ const History = ({ username, userRoles = [] }) => {
                                                     branch_id: activeBranchId ?? null,
                                                     enteredBy: username,
                                                 };
-                                                const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save", {
+                                                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
                                                     method: "POST",
                                                     headers: { "Content-Type": "application/json" },
                                                     body: JSON.stringify(paymentData)
@@ -4577,8 +4656,8 @@ const History = ({ username, userRoles = [] }) => {
                                                     throw new Error("Failed to save payment");
                                                 }
                                                 const [expensesRes, paymentsRes] = await Promise.all([
-                                                    axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                                                    axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                    axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                    axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
                                                 ]);
                                                 setExpenses(expensesRes.data);
                                                 const filteredPayments = paymentsRes.data.filter(
@@ -4655,6 +4734,37 @@ const History = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
+            {showBillExpenseEntryModal ? (
+                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowBillExpenseEntryModal(false);
+                                    localStorage.removeItem('expenseEntryPrefill');
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-3">
+                            <ExpenseEntryForm
+                                username={username}
+                                userRoles={userRoles}
+                                embedded
+                                onSuccess={() => {
+                                    setShowBillExpenseEntryModal(false);
+                                    localStorage.removeItem('expenseEntryPrefill');
+                                    setExpenseEntryRefreshNonce((n) => n + 1);
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
             {fileUploadPopup && (
                 <div
                     className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
@@ -4840,7 +4950,7 @@ const History = ({ username, userRoles = [] }) => {
                                     setIsConfirmingCategory(true);
                                     setShowCategoryPopup(false);
                                     try {
-                                        const enoResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+                                        const enoResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
                                         if (!enoResponse.ok) {
                                             throw new Error('Failed to fetch ENo');
                                         }
@@ -4863,7 +4973,7 @@ const History = ({ username, userRoles = [] }) => {
                                             branchId: activeBranchId ?? null,
                                             enteredBy: username,
                                         };
-                                        const expensesFormResponse = await fetch('https://backendaab.in/aabuilderDash/expenses_form/save', {
+                                        const expensesFormResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/save', {
                                             method: 'POST',
                                             headers: {
                                                 'Content-Type': 'application/json',
@@ -4873,7 +4983,7 @@ const History = ({ username, userRoles = [] }) => {
                                         if (!expensesFormResponse.ok) {
                                             throw new Error('Failed to save to expenses form');
                                         }
-                                        const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
+                                        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
                                             method: 'PUT',
                                             headers: {
                                                 'Content-Type': 'application/json',
@@ -4881,8 +4991,8 @@ const History = ({ username, userRoles = [] }) => {
                                         });
                                         if (response.ok) {
                                             const [expensesRes, paymentsRes] = await Promise.all([
-                                                axios.get(`https://backendaab.in/aabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                                                axios.get(`https://backendaab.in/aabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
                                             ]);
                                             setExpenses(expensesRes.data);
                                             const filteredPayments = paymentsRes.data.filter(

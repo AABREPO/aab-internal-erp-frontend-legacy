@@ -51,7 +51,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         // Fetch staff advance records
         let recData = [];
         try {
-          const recRes = await fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all');
+          const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
           if (recRes.ok) {
             recData = await recRes.json();
           } else {
@@ -64,7 +64,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         // Fetch employee data
         let empData = [];
         try {
-          const empRes = await fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+          const empRes = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
             credentials: 'include',
           });
           if (empRes.ok) {
@@ -79,7 +79,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         // Fetch purposes data
         let purData = [];
         try {
-          const purRes = await fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll');
+          const purRes = await fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll');
           if (purRes.ok) {
             purData = await purRes.json();
           } else {
@@ -111,7 +111,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   }, []);
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -719,7 +719,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
 
   const fetchAuditDetails = async (staffAdvancePortalId) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/audit/history/${staffAdvancePortalId}`);
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/staff-advance/audit/history/${staffAdvancePortalId}`);
       const data = await response.json();
       setStaffAdvanceAudits(data);
       setShowHistoryModal(true);
@@ -730,7 +730,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
 
   const handleUpdate = useCallback(async () => {
     try {
-      const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
+      const url = `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
       const payload = {
         type: editFormData.type || '',
         date: editFormData.date || '',
@@ -800,7 +800,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         staff_refund_amount: ''
       };
 
-      const res = await fetch(`https://backendaab.in/aabuildersDash/api/staff-advance/${idToDelete}?editedBy=${username}`, {
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/staff-advance/${idToDelete}?editedBy=${username}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

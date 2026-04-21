@@ -169,7 +169,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     }, []);
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const ownProjects = Array.isArray(data)
@@ -210,7 +210,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
-                const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+                const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
                 const allRoles = response.data;
                 const userRoleNames = userRoles.map(r => r.roles);
                 const matchedRoles = allRoles.filter(role =>
@@ -266,7 +266,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     }, []);
     const fetchPaymentModes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/payment_mode/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const formattedOptions = data.map(mode => ({
@@ -285,7 +285,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchAccountDetails = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     setAccountDetails(data);
@@ -492,7 +492,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     };
     useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
+            .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll')
             .then((response) => {
                 const sortedExpenses = response.data.sort((a, b) => {
                     const enoA = parseInt(a.id, 10);
@@ -628,7 +628,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     }, [projects]);
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
@@ -744,7 +744,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     };
     const fetchAuditDetails = async (rentFormId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/audit/${rentFormId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/audit/${rentFormId}`);
             const data = await response.json();
             setAudits(data);
             console.log(data);
@@ -802,7 +802,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         };
         setIsSubmitting(true);
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -892,7 +892,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             };
 
             // Update rental form first
-            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/rental_forms/update/${editId}`, {
+            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -937,7 +937,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 tenant_complex_name: projectReferenceName || null
             };
 
-            const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+            const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -986,7 +986,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         const formData = new FormData();
         formData.append("file", selectedFile);
         try {
-            const response = await axios.post("https://backendaab.in/aabuildersDash/api/rental_forms/upload_old_data", formData, {
+            const response = await axios.post("https://backendaab.in/demoAabuildersDash/api/rental_forms/upload_old_data", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
@@ -1103,7 +1103,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         if (window.confirm('Are you sure you want to delete this Rent?')) {
             try {
                 const response = await fetch(
-                    `https://backendaab.in/aabuildersDash/api/rental_forms/delete/${id}?editedBy=${encodeURIComponent(username)}`,
+                    `https://backendaab.in/demoAabuildersDash/api/rental_forms/delete/${id}?editedBy=${encodeURIComponent(username)}`,
                     {
                         method: 'POST',
                     }

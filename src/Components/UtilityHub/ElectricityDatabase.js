@@ -22,7 +22,7 @@ const ElectricityDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchElectricityData = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/electricity');
                 setElectricityData(response.data || []);
                 setFilteredData(response.data || []);
             } catch (error) {

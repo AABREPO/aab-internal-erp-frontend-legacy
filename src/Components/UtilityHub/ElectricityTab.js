@@ -47,7 +47,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/api/projects/getAll');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
                 const projectsWithEbNo = response.data.filter(project =>
                     project.propertyDetails &&
                     project.propertyDetails.some(property => property.ebNo && property.ebNo.trim() !== '')
@@ -67,7 +67,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchElectricityPayments = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/electricity');
                 setElectricityPayments(response.data || []);
             } catch (error) {
                 console.error('Error fetching electricity payments:', error);
@@ -80,7 +80,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchFrequencyHistory = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/api/frequency-history/getAll');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll');
                 setFrequencyHistory(response.data || []);
             } catch (error) {
                 console.error('Error fetching frequency history:', error);
@@ -91,7 +91,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -504,7 +504,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     );
     const toggleProjectHideStatus = async (projectId, isHide) => {
         try {
-            const response = await axios.put(`https://backendaab.in/aabuilderDash/api/projects/hide/${projectId}`, null, {
+            const response = await axios.put(`https://backendaab.in/demoAabuilderDash/api/projects/hide/${projectId}`, null, {
                 params: { isHide }
             });
             if (response.data) {
@@ -565,7 +565,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 waterFrequencyNo: null, 
                 startingMonthOfWaterFrequency: null 
             };
-            const response = await axios.post('https://backendaab.in/aabuilderDash/api/frequency-history/save', frequencyHistoryData);
+            const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/frequency-history/save', frequencyHistoryData);
             if (response.data) {
                 setSubmittedFrequencyData(prev => ({
                     ...prev,
@@ -576,7 +576,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 }));
                 const fetchFrequencyHistory = async () => {
                     try {
-                        const response = await axios.get('https://backendaab.in/aabuilderDash/api/frequency-history/getAll');
+                        const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll');
                         setFrequencyHistory(response.data || []);
                     } catch (error) {
                         console.error('Error fetching frequency history:', error);
@@ -639,7 +639,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                     setExpenseEntryPrefill(null);
                                     localStorage.removeItem('expenseEntryPrefill');
                                     try {
-                                        const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/electricity');
+                                        const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/electricity');
                                         setElectricityPayments(response.data || []);
                                     } catch {
                                         // ignore refresh errors

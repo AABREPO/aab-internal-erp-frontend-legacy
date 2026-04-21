@@ -128,7 +128,7 @@ const PaintAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint/bulkUploadPaintVariants", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint/bulkUploadPaintVariants", {
         method: "POST",
         body: formData,
       });
@@ -153,7 +153,7 @@ const PaintAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/formulas/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/formulas/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -174,7 +174,7 @@ const PaintAddInput = () => {
   }, []);
   const fetchPaints = async () => {
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/all/data");
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/all/data");
       const data = await response.json();
       setPaints(data);
     } catch (error) {
@@ -191,7 +191,7 @@ const PaintAddInput = () => {
   };
   const fetchPaintData = useCallback(async () => {
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/all/data");
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/all/data");
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -248,7 +248,7 @@ const PaintAddInput = () => {
     }
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/paints/change/${editingPaint.id}`,
+        `https://backendaab.in/demoAabuilderDash/api/paints/change/${editingPaint.id}`,
         {
           method: "PUT",
           body: formData,
@@ -270,7 +270,7 @@ const PaintAddInput = () => {
   const handleDeletePaint = async (id) => {
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/paints/delete/${id}`,
+        `https://backendaab.in/demoAabuilderDash/api/paints/delete/${id}`,
         {
           method: "DELETE",
         }
@@ -297,7 +297,7 @@ const PaintAddInput = () => {
   const deletePaint = async (id) => {
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/paints/delete/${id}`,
+        `https://backendaab.in/demoAabuilderDash/api/paints/delete/${id}`,
         { method: "DELETE" }
       );
       const result = await response.text();
@@ -307,7 +307,7 @@ const PaintAddInput = () => {
     }
   };
   useEffect(() => {
-    fetch("https://backendaab.in/aabuilderDash/api/paint/variant/get/all")
+    fetch("https://backendaab.in/demoAabuilderDash/api/paint/variant/get/all")
       .then((response) => response.json())
       .then((data) => setPaintVariants(data))
       .catch((error) => console.error("Error fetching paint variants:", error));
@@ -320,7 +320,7 @@ const PaintAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/bulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/bulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -340,7 +340,7 @@ const PaintAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/bulk-upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/bulk-upload", {
         method: "POST",
         body: formData,
       });
@@ -360,7 +360,7 @@ const PaintAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/floorNameBulkUpload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/floorNameBulkUpload", {
         method: "POST",
         body: formData,
       });
@@ -380,7 +380,7 @@ const PaintAddInput = () => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint_type/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_type/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -400,7 +400,7 @@ const PaintAddInput = () => {
   const handleEditFloorName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${selectedFloorId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -420,7 +420,7 @@ const PaintAddInput = () => {
 
   const deleteFloor = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameFloor/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/${id}`, {
         method: 'DELETE',
       });
 
@@ -444,7 +444,7 @@ const PaintAddInput = () => {
 
   const handleAreaDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameArea/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameArea/${id}`, {
         method: 'DELETE',
       });
 
@@ -465,7 +465,7 @@ const PaintAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameArea/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameArea/all", {
           method: "DELETE",
         });
 
@@ -489,7 +489,7 @@ const PaintAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/tile/nameFloor/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/nameFloor/all", {
           method: "DELETE",
         });
 
@@ -514,7 +514,7 @@ const PaintAddInput = () => {
 
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/paint/variant/delete/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint/variant/delete/all", {
           method: "DELETE",
         });
 
@@ -535,7 +535,7 @@ const PaintAddInput = () => {
   };
   const handlePaintVariantDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint/variant/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint/variant/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -554,7 +554,7 @@ const PaintAddInput = () => {
     if (!areaEdit) return;
 
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tile/nameArea/${areaEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -592,7 +592,7 @@ const PaintAddInput = () => {
     console.log(paintVariantData);
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/paint/variant/update/${selectedVariantId}`,
+        `https://backendaab.in/demoAabuilderDash/api/paint/variant/update/${selectedVariantId}`,
         {
           method: "PUT",
           headers: {
@@ -631,7 +631,7 @@ const PaintAddInput = () => {
   }, []);
   const fetchTileAreaNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/areaName');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/areaName');
       if (response.ok) {
         const data = await response.json();
         setTileAreaNames(data);
@@ -647,7 +647,7 @@ const PaintAddInput = () => {
     e.preventDefault();
     const newTileArea = { areaName };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/nameArea', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/nameArea', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -673,7 +673,7 @@ const PaintAddInput = () => {
   }, []);
   const fetchPaintType = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_type/getAll');
 
       if (response.ok) {
         const data = await response.json();
@@ -709,7 +709,7 @@ const PaintAddInput = () => {
     };
     console.log(selectedPaintTypeId);
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint_type/edit/${selectedPaintTypeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint_type/edit/${selectedPaintTypeId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -737,7 +737,7 @@ const PaintAddInput = () => {
   };
   const handlePaintItemDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/paint_type/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/paint_type/delete/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -753,7 +753,7 @@ const PaintAddInput = () => {
   const handlePaintItemDeleteAll = async () => {
     if (window.confirm("Are you sure you want to delete all items?")) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/paint_type/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint_type/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -770,7 +770,7 @@ const PaintAddInput = () => {
   const handlePaintFormulasDeleteAll = async () => {
     if (window.confirm("Are you sure you want to delete all Formulas?")) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/formulas/delete/all", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/formulas/delete/all", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -792,7 +792,7 @@ const PaintAddInput = () => {
     };
     console.log("before send", newPaintType);
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/paint_type/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/paint_type/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -820,7 +820,7 @@ const PaintAddInput = () => {
   }, []);
   const fetchCalculationFormula = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/formulas/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/formulas/getAll');
       if (response.ok) {
         const data = await response.json();
         setCalculationFormulaOptions(data);
@@ -841,7 +841,7 @@ const PaintAddInput = () => {
     console.log("before send", newTileArea);  // Verify the data
 
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/formulas/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/formulas/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -868,7 +868,7 @@ const PaintAddInput = () => {
   }, []);
   const fetchTileFloorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/floorName');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/floorName');
       if (response.ok) {
         const data = await response.json();
         setTileFloorNames(data);
@@ -884,7 +884,7 @@ const PaintAddInput = () => {
     e.preventDefault();
     const newTileFloor = { floorName };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/nameFloor', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/nameFloor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -919,7 +919,7 @@ const PaintAddInput = () => {
     formData.append("paintColor", paintColor);
     if (paintImage) formData.append("paintImage", paintImage);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paints/upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paints/upload", {
         method: "POST",
         body: formData,
       });
@@ -938,7 +938,7 @@ const PaintAddInput = () => {
       paintCoverBySqft,
     };
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/paint/variant/save", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/paint/variant/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -963,7 +963,7 @@ const PaintAddInput = () => {
     e.preventDefault();
     try {
       const response = await fetch(
-        `https://backendaab.in/aabuilderDash/api/formulas/edit/${calculationFormulas.id}`,
+        `https://backendaab.in/demoAabuilderDash/api/formulas/edit/${calculationFormulas.id}`,
         {
           method: 'PUT',
           headers: {
@@ -985,7 +985,7 @@ const PaintAddInput = () => {
   };
   const handleDeleteFormula = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/formulas/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/formulas/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {

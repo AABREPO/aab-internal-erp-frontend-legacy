@@ -16,7 +16,7 @@ const ClaimPaymentCashRegister = () => {
       setLoading(true);
       
       // Fetch all expenses data first
-      const expensesResponse = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+      const expensesResponse = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
       const allExpenses = expensesResponse.data;
       
       // Filter only claim expenses
@@ -42,7 +42,7 @@ const ClaimPaymentCashRegister = () => {
         setProgress(Math.round((currentBatch / totalBatches) * 100));
         
         const batchPromises = batch.map(expense => 
-          axios.get(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${expense.id}`, {
+          axios.get(`https://backendaab.in/demoAabuildersDash/api/claim_payments/get/${expense.id}`, {
             timeout: 10000 // 10 second timeout
           })
             .then(response => ({

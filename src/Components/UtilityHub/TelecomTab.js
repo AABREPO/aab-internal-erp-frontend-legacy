@@ -7,11 +7,11 @@ import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 
-const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/api/utility-telecom/getAll';
-const PROJECTS_ENDPOINT = 'https://backendaab.in/aabuilderDash/api/projects/getAll';
-const TELECOM_EXPENSES_ENDPOINT = 'https://backendaab.in/aabuilderDash/expenses_form/utility/telecom';
-const FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/api/utility-frequency/getAll';
-const SAVE_FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/aabuildersDash/api/utility-frequency/save';
+const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
+const PROJECTS_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/api/projects/getAll';
+const TELECOM_EXPENSES_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/expenses_form/utility/telecom';
+const FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-frequency/getAll';
+const SAVE_FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-frequency/save';
 
 const TelecomTab = ({ username, userRoles = [] }) => {
     const [filters, setFilters] = useState({
@@ -150,6 +150,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                     return normalize(tenantValue) === tenantTarget;
                                 })
                                 : null) || projectProperties[0] || null;
+
                         existingProject.propertyDetails.push({
                             id: propertyId,
                             utilityTelecomId: entry.id ?? propertyId,
@@ -1216,7 +1217,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap"></td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">D.No</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Shop No</td>
-                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Phase</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Service No</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Jan</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Feb</td>
@@ -1283,7 +1283,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                             </td>
                                                             <td className="px-2 py-2">{property.doorNo || '-'}</td>
                                                             <td className="px-2 py-2">{property.shopNo || '-'}</td>
-                                                            <td className="px-2 py-2">-</td>
                                                             <td
                                                                 className="px-2 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
                                                                 onClick={() => openTelecomExpenseEntry(property.ebNo, project)}

@@ -270,7 +270,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       return;
     }
     try {
-      const response = await fetch(buildBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+      const response = await fetch(buildBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll'));
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -430,7 +430,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     const fetchVendorNames = async () => {
       try {
         setProgress(10);
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -460,7 +460,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     const fetchContractorNames = async () => {
       try {
         setProgress(35);
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -491,7 +491,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     const fetchSites = async () => {
       try {
         setProgress(60);
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -549,7 +549,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
     const fetchData = async () => {
       try {
         setProgress(85);
-        const response = await fetch(buildBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/getAll'));
+        const response = await fetch(buildBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll'));
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -846,7 +846,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         request_approval: false,
         request_completed: false
       };
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -963,7 +963,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
           formData.append('files', selectedFile);
           formData.append('folder', 'FileUpload / Advance_Portal');
           formData.append('fileName', finalName);          
-          const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
             method: "POST",
             body: formData,
           });
@@ -1026,7 +1026,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
         return payload;
       };
       const updateRecord = async (id, payload) => {
-        const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
+        const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1044,7 +1044,7 @@ const AdvanceTableView = ({ username, userRoles = [] }) => {
       };
       const setAllowToEdit = async (id, allow) => {
         try {
-          const res = await fetch(`https://backendaab.in/aabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
+          const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
             method: 'PUT',
             credentials: 'include'
           });

@@ -346,11 +346,11 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       setError(null);
       try {
         const [recRes, empRes, purRes] = await Promise.allSettled([
-          fetch('https://backendaab.in/aabuildersDash/api/staff-advance/all'),
-          fetch('https://backendaab.in/aabuildersDash/api/employee_details/getAll', {
+          fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all'),
+          fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
             credentials: 'include',
           }),
-          fetch('https://backendaab.in/aabuildersDash/api/purposes/getAll')
+          fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll')
         ]);
         const recData = recRes.status === 'fulfilled' && recRes.value.ok
           ? await recRes.value.json()
@@ -388,7 +388,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   }, []);
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -548,7 +548,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -575,7 +575,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -603,7 +603,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -685,7 +685,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
 
   const handleUpdate = useCallback(async () => {
     try {
-      const url = `https://backendaab.in/aabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
+      const url = `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
       const payload = {
         type: editFormData.type || '',
         date: editFormData.date || '',
@@ -1026,7 +1026,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         request_approval: false,
         request_completed: false
       };
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/edit_requests/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

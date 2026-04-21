@@ -96,7 +96,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
 
   useEffect(() => {
     // Fetch data from the API
-    fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form')
+    fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to fetch data');
@@ -116,7 +116,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -145,7 +145,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -174,7 +174,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchContractorNames = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -203,7 +203,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     // Fetch employee details
     const fetchEmployeeDetails = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -233,7 +233,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/account-details/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/account-details/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -260,7 +260,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       const discounts = {};
       for (const row of filteredData) {
         try {
-          const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
+          const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/claim_payments/get/${row.id}`);
           const payments = await res.json();
 
           const totalReceived = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
@@ -328,7 +328,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     setActualAmount(row.amount);
     setSelectedRow(row);
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/claim_payments/get/${row.id}`);
       const claimPayments = await response.json();
       const totalReceived = claimPayments.reduce(
         (sum, payment) => sum + Number(payment.amount),
@@ -394,7 +394,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       account_number: paymentPopupData.accountNumber
     };
     try {
-      const response = await fetch("https://backendaab.in/aabuildersDash/api/claim_payments/save", {
+      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/claim_payments/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newPayment),
@@ -428,7 +428,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
           account_number: paymentPopupData.accountNumber || null
         };
         const weeklyPaymentBillResponse = await axios.post(
-          "https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save",
+          "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
           weeklyPaymentBillPayload,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -1122,7 +1122,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                 if (payment.cash_register_status) return;
                                                 try {
                                                   const res = await axios.get(
-                                                    `https://backendaab.in/aabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
+                                                    `https://backendaab.in/demoAabuildersDash/api/cash-register/get/${payment.claimPaymentsId}`
                                                   );
                                                   if (res.data && res.data.length > 0) {
                                                     alert("This payment is already in the cash register.");
@@ -1136,7 +1136,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     cash_register_status: true,
                                                   };
                                                   await axios.post(
-                                                    "https://backendaab.in/aabuildersDash/api/cash-register/save",
+                                                    "https://backendaab.in/demoAabuildersDash/api/cash-register/save",
                                                     cashRegisterPayload,
                                                     { headers: { "Content-Type": "application/json" } }
                                                   );
@@ -1157,12 +1157,12 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
                                                     enteredBy: username,
                                                   };
                                                   await axios.post(
-                                                    "https://backendaab.in/aabuildersDash/api/payments-received/save",
+                                                    "https://backendaab.in/demoAabuildersDash/api/payments-received/save",
                                                     paymentsReceivedPayload,
                                                     { headers: { "Content-Type": "application/json" } }
                                                   );
                                                   await axios.put(
-                                                    `https://backendaab.in/aabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
+                                                    `https://backendaab.in/demoAabuildersDash/api/claim_payments/update-status/${payment.claimPaymentsId}?status=true`
                                                   );
                                                   setClaimPaymentsData((prev) =>
                                                     prev.map((p, i) =>

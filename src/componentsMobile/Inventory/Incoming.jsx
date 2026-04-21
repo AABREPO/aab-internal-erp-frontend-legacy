@@ -100,7 +100,7 @@ const Incoming = ({ user }) => {
   useEffect(() => {
     const fetchVendorNames = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
         if (response.ok) {
           const data = await response.json();
           const formattedData = data.map(item => ({
@@ -124,7 +124,7 @@ const Incoming = ({ user }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -182,7 +182,7 @@ const Incoming = ({ user }) => {
   // Fetch PO item names from API
   const fetchPoItemName = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoItemName(data);
@@ -194,7 +194,7 @@ const Incoming = ({ user }) => {
   // Fetch PO brand from API
   const fetchPoBrand = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoBrand(data);
@@ -206,7 +206,7 @@ const Incoming = ({ user }) => {
   // Fetch PO model from API
   const fetchPoModel = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoModel(data);
@@ -218,7 +218,7 @@ const Incoming = ({ user }) => {
   // Fetch PO type from API
   const fetchPoType = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
@@ -230,7 +230,7 @@ const Incoming = ({ user }) => {
   // Fetch PO categories from API
   const fetchPoCategory = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
       if (response.ok) {
         const data = await response.json();
         const options = (data || []).map(item => ({
@@ -291,7 +291,7 @@ const Incoming = ({ user }) => {
   // Fetch all purchase orders and cache them
   const fetchAllPurchaseOrders = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll');
       if (response.ok) {
         const data = await response.json();
         setAllPurchaseOrders(data);
@@ -361,7 +361,7 @@ const Incoming = ({ user }) => {
         let inventoryItemQuantities = {}; // Map of composite key to total quantity already added
         try {
           const poNumberStr = String(eno).replace('#', '').trim();
-          const inventoryResponse = await fetch('https://backendaab.in/aabuildersDash/api/inventory/getAll');
+          const inventoryResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/inventory/getAll');
           if (inventoryResponse.ok) {
             const inventoryRecords = await inventoryResponse.json();
             // Filter inventory records by purchase_no matching the PO number and exclude deleted records
@@ -1333,7 +1333,7 @@ const Incoming = ({ user }) => {
         const formData = new FormData();
         formData.append('file', pdfFile);
         formData.append('file_name', finalName);
-        const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+        const uploadResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
           method: "POST",
           body: formData,
         });
@@ -1448,7 +1448,7 @@ const Incoming = ({ user }) => {
       // For new records, get ENO
       if (!isUpdate) {
         const countResponse = await fetch(
-          `https://backendaab.in/aabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
+          `https://backendaab.in/demoAabuildersDash/api/inventory/incomingCount?stockingLocationId=${stockingLocationId}`
         );
         if (!countResponse.ok) {
           throw new Error('Failed to fetch incoming count');
@@ -1463,8 +1463,8 @@ const Incoming = ({ user }) => {
       const username = (user && user.username) || '';
       // Save or update to backend
       const url = isUpdate
-        ? `https://backendaab.in/aabuildersDash/api/inventory/edit_with_history/${incomingData.inventoryId}?changedBy=${encodeURIComponent(username)}`
-        : 'https://backendaab.in/aabuildersDash/api/inventory/save';
+        ? `https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history/${incomingData.inventoryId}?changedBy=${encodeURIComponent(username)}`
+        : 'https://backendaab.in/demoAabuildersDash/api/inventory/save';
       const method = isUpdate ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -1492,7 +1492,7 @@ const Incoming = ({ user }) => {
                 incoming_pdf: file.pdfUrl,
                 inventory_management_id: inventoryManagementId
               };
-              const pdfResponse = await fetch('https://backendaab.in/aabuildersDash/api/incoming_pdfs/save', {
+              const pdfResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/incoming_pdfs/save', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'

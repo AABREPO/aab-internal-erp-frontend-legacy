@@ -63,7 +63,7 @@ const ManageUsers = ({ isOpen, onClose }) => {
         userRoles: updatedUserRoles,
       };
       const response = await axios.put(
-        `https://backendaab.in/aabuilderDash/api/user/edit/${user.id}`,
+        `https://backendaab.in/demoAabuilderDash/api/user/edit/${user.id}`,
         updatedUserDto
       );
       const updatedUser = response.data;
@@ -89,7 +89,7 @@ const ManageUsers = ({ isOpen, onClose }) => {
         userRoles: updatedUserRoles,
       };
       const response = await axios.put(
-        `https://backendaab.in/aabuilderDash/api/user/edit/${user.id}`,
+        `https://backendaab.in/demoAabuilderDash/api/user/edit/${user.id}`,
         updatedUserDto
       );
       const updatedUser = response.data;
@@ -106,7 +106,7 @@ const ManageUsers = ({ isOpen, onClose }) => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user/all");
+        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user/all");
         const usersWithRoles = response.data.map((user) => ({
           ...user,
           roles: user.userRoles ? user.userRoles.map((role) => role.roles) : [],
@@ -120,7 +120,7 @@ const ManageUsers = ({ isOpen, onClose }) => {
   }, []);
   const fetchRoleNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/roles/all');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/roles/all');
       if (response.ok) {
         const data = await response.json();
         setAllRoles(data);

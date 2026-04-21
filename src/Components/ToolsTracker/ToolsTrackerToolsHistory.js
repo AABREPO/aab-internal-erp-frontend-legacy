@@ -33,7 +33,7 @@ const ToolsTrackerToolsHistory = () => {
   useEffect(() => {
     const fetchItemNames = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/po_itemNames/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/po_itemNames/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = data.map(item => ({
@@ -54,7 +54,7 @@ const ToolsTrackerToolsHistory = () => {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/po_brand/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/po_brand/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = data
@@ -109,7 +109,7 @@ const ToolsTrackerToolsHistory = () => {
   useEffect(() => {
     if (selectedItemId && selectedMachineNumber) {
       // TODO: Replace with actual API endpoint
-      // Example: fetch(`https://backendaab.in/aabuilderDash/api/tools_tracker/history/${selectedItemId.value}/${selectedMachineNumber.value}`)
+      // Example: fetch(`https://backendaab.in/demoAabuilderDash/api/tools_tracker/history/${selectedItemId.value}/${selectedMachineNumber.value}`)
 
       // Sample data matching the image
       setItemDetails({

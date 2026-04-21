@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import axios from 'axios';
 import Edit from '../Images/Edit.svg'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+/** Keeps react-select menus above sticky table headers (e.g. EB No thead z-10). */
+const withSelectMenuAboveTable = (styleObj) => ({
+    ...styleObj,
+    menuPortal: (base) => ({ ...base, zIndex: 10050 }),
+    menu: (base) => ({ ...base, zIndex: 10050 }),
+});
+
 const Ebno = () => {
 
     const [rentForms, setRentForms] = useState([]);
-    const [ebtenantShopData, setEbTenantShopData] = useState([]);
     const [ebprojects, setEbProjects] = useState([]);
     const [selectedEbShopNo, setSelectedEbShopNo] = useState('');
     const [selectedEbDoorNo, setSelectedEbDoorNo] = useState('');
@@ -17,6 +23,7 @@ const Ebno = () => {
     const [selectedEbProperty, setSelectedEbProperty] = useState(null);
     const [ebtableData, setEbTableData] = useState([]);
     const [ebNoOptions, setEbNoOptions] = useState([]);
+    const [tenantLinkList, setTenantLinkList] = useState([]);
     const [sortField, setSortField] = useState('');
     const [sortOrder, setSortOrder] = useState('asc');
 
@@ -26,7 +33,7 @@ const Ebno = () => {
 
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 // Filter for "own project" category
@@ -60,42 +67,62 @@ const Ebno = () => {
             console.error('❌ Fetch error:', error);
         }
     };
-    useEffect(() => {
-        fetchTenants();
-    }, []);
-    const fetchTenants = async () => {
-        try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenantShop/getAll');
-            if (response.ok) {
-                const data = await response.json();
-                setEbTenantShopData(data);
-                console.log(data);
-            } else {
-                console.error('Error fetching tenants.');
+
+    const getShopDetailsById = useCallback((shopNoId) => {
+        if (shopNoId == null || shopNoId === '') return null;
+        for (const project of ebprojects) {
+            if (!project.propertyDetails) continue;
+            const propertyDetailsArray = Array.isArray(project.propertyDetails)
+                ? project.propertyDetails
+                : Array.from(project.propertyDetails || []);
+            const detail = propertyDetailsArray.find((d) =>
+                (d.id != null && String(d.id).trim() === String(shopNoId).trim()) ||
+                (d.shopNo != null && String(d.shopNo).trim() === String(shopNoId).trim())
+            );
+            if (detail) {
+                return {
+                    shopNo: detail.shopNo || '',
+                    doorNo: detail.doorNo || '',
+                    projectReferenceName: project.projectReferenceName || '',
+                };
             }
-        } catch (error) {
-            console.error('Error:', error);
         }
-    };
-    const shopInfoMap = {};
-    ebtenantShopData.forEach(tenant => {
-        tenant.property?.forEach(property => {
-            property.shops?.forEach(shop => {
-                if (shop.shopNo) {
-                    shopInfoMap[shop.shopNo] = {
-                        doorNo: shop.doorNo || '',
-                        projectReferenceName: property.propertyName || '', // propertyName stores projectReferenceName
+        return null;
+    }, [ebprojects]);
+
+    useEffect(() => {
+        const loadTenantLinkShop = async () => {
+            try {
+                const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+                setTenantLinkList(Array.isArray(response.data) ? response.data : []);
+            } catch (error) {
+                console.error('Error fetching tenant link with shop:', error);
+            }
+        };
+        loadTenantLinkShop();
+    }, []);
+
+    const shopInfoMap = useMemo(() => {
+        const map = {};
+        tenantLinkList.forEach((tenant) => {
+            tenant.shopNos?.forEach((shop) => {
+                const d = getShopDetailsById(shop.shopNoId);
+                if (d?.shopNo) {
+                    map[d.shopNo] = {
+                        doorNo: d.doorNo || '',
+                        projectReferenceName: d.projectReferenceName || '',
                         advanceAmount: shop.advanceAmount || '',
                         monthlyRent: shop.monthlyRent || '',
-                        tenantId: tenant.id,     // ← Add tenant ID
-                        shopId: shop.id,          // ← Add shop ID
+                        tenantId: tenant.id,
+                        shopId: shop.id,
                         startingDate: shop.startingDate,
-                        shouldCollectAdvance: shop.shouldCollectAdvance
+                        shouldCollectAdvance: shop.shouldCollectAdvance,
                     };
                 }
             });
         });
-    });
+        return map;
+    }, [tenantLinkList, getShopDetailsById]);
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -129,20 +156,21 @@ const Ebno = () => {
                     }
                 });
             });
-        // 2. Merge tenant data (excluding advance)
-        ebtenantShopData.forEach(tenant => {
-            tenant.property?.forEach(property => {
-                property.shops?.forEach(shop => {
-                    const shopEntryIndex = allShops.findIndex(s => s.shopNo === shop.shopNo);
-                    if (shopEntryIndex !== -1) {
-                        allShops[shopEntryIndex] = {
-                            ...allShops[shopEntryIndex],
-                            tenantName: tenant.tenantName || '',
-                            tenantId: tenant.id,
-                            active: shop.active ?? true
-                        };
-                    }
-                });
+        // 2. Merge tenant data from tenant_link_shop (shopNoId → project shopNo)
+        tenantLinkList.forEach((tenant) => {
+            tenant.shopNos?.forEach((shop) => {
+                const resolved = getShopDetailsById(shop.shopNoId);
+                const resolvedShopNo = resolved?.shopNo;
+                if (!resolvedShopNo) return;
+                const shopEntryIndex = allShops.findIndex((s) => s.shopNo === resolvedShopNo);
+                if (shopEntryIndex !== -1) {
+                    allShops[shopEntryIndex] = {
+                        ...allShops[shopEntryIndex],
+                        tenantName: tenant.tenantName || '',
+                        tenantId: tenant.id,
+                        active: shop.active ?? true,
+                    };
+                }
             });
         });
         // 3. Filter rent data for selected year
@@ -230,7 +258,7 @@ const Ebno = () => {
             }
         });
         setEbTableData(finalTableData);
-    }, [rentForms, ebtenantShopData, ebprojects]);
+    }, [rentForms, tenantLinkList, ebprojects, shopInfoMap, getShopDetailsById]);
 
     const options = ebprojects
         .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
@@ -249,14 +277,22 @@ const Ebno = () => {
         : filteredByShop;
     const doorOptions = [...new Set(filteredByTenant.map(shop => shop.doorNo))].map(door => ({ value: door, label: door }));
 
-    const selectedTenant = ebtenantShopData.find(
-        t => t.tenantName === selectedEbTenantName
-    );
+    const selectedTenantLink = useMemo(() => {
+        if (!selectedEbTenantName || !Array.isArray(tenantLinkList)) return null;
+        return tenantLinkList.find(
+            (item) => String(item?.tenantName || '').trim() === String(selectedEbTenantName).trim()
+        ) || null;
+    }, [tenantLinkList, selectedEbTenantName]);
 
-    // Extract all shopNos for the selected tenant
-    const tenantShopNos = selectedTenant?.property?.flatMap(p =>
-        p.shops?.map(shop => shop.shopNo)
-    ) || [];
+    const tenantShopNos = useMemo(() => {
+        if (!selectedTenantLink) return [];
+        const nos = [];
+        for (const shop of selectedTenantLink.shopNos || []) {
+            const d = getShopDetailsById(shop.shopNoId);
+            if (d?.shopNo) nos.push(d.shopNo);
+        }
+        return nos;
+    }, [selectedTenantLink, getShopDetailsById]);
 
     const filteredEbProperties = ebprojects
         .filter(project => project.projectReferenceName) // Only include projects with projectReferenceName
@@ -287,14 +323,13 @@ const Ebno = () => {
                 .map(detail => {
                     let matchedTenantName = '';
                     let matchedTenantRent = null;
-                    for (const tenant of ebtenantShopData) {
-                        for (const prop of tenant.property || []) {
-                            for (const shop of prop.shops || []) {
-                                if (shop.shopNo === detail.shopNo && shop.doorNo === detail.doorNo) {
-                                    matchedTenantName = tenant.tenantName;
-                                    matchedTenantRent = shop.monthlyRent;
-                                    break;
-                                }
+                    for (const tenant of tenantLinkList) {
+                        for (const shop of tenant.shopNos || []) {
+                            const d = getShopDetailsById(shop.shopNoId);
+                            if (d && d.shopNo === detail.shopNo && d.doorNo === detail.doorNo) {
+                                matchedTenantName = tenant.tenantName;
+                                matchedTenantRent = shop.monthlyRent;
+                                break;
                             }
                         }
                         if (matchedTenantName) break;
@@ -328,14 +363,13 @@ const Ebno = () => {
             return propertyDetailsArray.map(detail => {
                 let matchedTenantName = '';
                 let matchedTenantRent = null;
-                for (const tenant of ebtenantShopData) {
-                    for (const prop of tenant.property || []) {
-                        for (const shop of prop.shops || []) {
-                            if (shop.shopNo === detail.shopNo && shop.doorNo === detail.doorNo) {
-                                matchedTenantName = tenant.tenantName;
-                                matchedTenantRent = shop.monthlyRent;
-                                break;
-                            }
+                for (const tenant of tenantLinkList) {
+                    for (const shop of tenant.shopNos || []) {
+                        const d = getShopDetailsById(shop.shopNoId);
+                        if (d && d.shopNo === detail.shopNo && d.doorNo === detail.doorNo) {
+                            matchedTenantName = tenant.tenantName;
+                            matchedTenantRent = shop.monthlyRent;
+                            break;
                         }
                     }
                     if (matchedTenantName) break;
@@ -619,7 +653,8 @@ const Ebno = () => {
                         value={ebNoOptions.find(o => o.value === selectedEbNo) || null}
                         onChange={(option) => setSelectedEbNo(option?.value || '')}
                         className="w-[200px]"
-                        styles={{
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        styles={withSelectMenuAboveTable({
                             control: (provided, state) => ({
                                 ...provided,
                                 height: '45px',
@@ -641,7 +676,7 @@ const Ebno = () => {
                                 ...provided,
                                 color: 'black',
                             }),
-                        }}
+                        })}
                     />
                 </div>
                 <div className="flex gap-4 mt-9 ml-3.5 w-full flex-wrap">
@@ -656,7 +691,8 @@ const Ebno = () => {
                                 setSelectedEbTenantName('');
                                 setSelectedEbDoorNo('');
                             }}
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -680,7 +716,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                     <div className="min-w-[200px]">
@@ -694,7 +730,8 @@ const Ebno = () => {
                                 setSelectedEbDoorNo('');
                             }}
                             isDisabled={!filteredByShop.length}
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -718,7 +755,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                     <div className="min-w-[200px]">
@@ -729,7 +766,8 @@ const Ebno = () => {
                             value={doorOptions.find(o => o.value === selectedEbDoorNo) || null}
                             onChange={(option) => setSelectedEbDoorNo(option?.value || '')}
                             isDisabled={!filteredByTenant.length}
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -753,7 +791,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                     <div className="min-w-[200px]">
@@ -765,7 +803,8 @@ const Ebno = () => {
                             onChange={setSelectedEbProperty}
                             placeholder="Select"
                             isSearchable
-                            styles={{
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                            styles={withSelectMenuAboveTable({
                                 control: (provided, state) => ({
                                     ...provided,
                                     height: '45px',
@@ -789,7 +828,7 @@ const Ebno = () => {
                                     ...provided,
                                     color: 'black',
                                 }),
-                            }}
+                            })}
                         />
                     </div>
                 </div>

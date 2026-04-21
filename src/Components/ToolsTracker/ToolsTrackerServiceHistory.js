@@ -19,7 +19,7 @@ const ToolsTrackerServiceHistory = ({ username, userRoles = [] }) => {
     const fetchData = async () => {
       try {
         // TODO: Replace with actual API endpoint when available
-        // const response = await fetch(`https://backendaab.in/aabuilderDash/api/tools_tracker/service_history?shop=${selectedShop.value}`);
+        // const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/tools_tracker/service_history?shop=${selectedShop.value}`);
         // if (response.ok) {
         //   const data = await response.json();
         //   setTableData(data);
@@ -281,7 +281,7 @@ const ToolsTrackerServiceHistory = ({ username, userRoles = [] }) => {
     }
 
     // TODO: Save to API
-    // await fetch('https://backendaab.in/aabuilderDash/api/tools_tracker/shop', {
+    // await fetch('https://backendaab.in/demoAabuilderDash/api/tools_tracker/shop', {
     //   method: 'POST',
     //   headers: { 'Content-Type': 'application/json' },
     //   body: JSON.stringify(shopFormData)

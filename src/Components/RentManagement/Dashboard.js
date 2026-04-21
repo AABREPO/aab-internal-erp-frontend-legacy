@@ -4,6 +4,7 @@ import Edit from '../Images/Edit.svg'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import RentForm from './Form';
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const Dashboard = () => {
@@ -34,6 +35,7 @@ const Dashboard = () => {
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [selectedOccupancyStatus, setSelectedOccupancyStatus] = useState('');
     const [selectedMonthYear, setSelectedMonthYear] = useState(getCurrentMonth());
+    const [showRentFormPopup, setShowRentFormPopup] = useState(false);
     const [tableHeight, setTableHeight] = useState(400); // Default height in pixels
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -164,7 +166,7 @@ const Dashboard = () => {
     }, []);
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const ownProjects = Array.isArray(data)
@@ -179,16 +181,41 @@ const Dashboard = () => {
         }
     };
     useEffect(() => {
-        axios
-            .get('https://backendaab.in/aabuildersDash/api/rental_forms/getAll')
-            .then((response) => {
-                const sortedForms = response.data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                setRentForms(sortedForms);
-            })
-            .catch((error) => {
-                console.error('Error fetching rental data:', error);
-            });
+        fetchRentForms();
     }, []);
+    const fetchRentForms = async () => {
+        try {
+            const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');
+            const list = Array.isArray(response.data) ? response.data : [];
+            const sortedForms = list.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            setRentForms(sortedForms);
+        } catch (error) {
+            console.error('Error fetching rental data:', error);
+        }
+    };
+
+    const openRentFormPopupForUnpaidMonth = (shop, monthIdx) => {
+        if (!shop || monthIdx == null) return;
+        const monthStr = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
+        const monthlyRent =
+            shopInfoMap?.[shop.shopNo]?.monthlyRent ??
+            shop.monthlyRent ??
+            '';
+        try {
+            sessionStorage.setItem('selectedRentType', JSON.stringify('Rent'));
+            sessionStorage.setItem('selectedMonth', JSON.stringify(monthStr));
+            sessionStorage.setItem('formShopNo', JSON.stringify(shop.shopNo));
+            sessionStorage.setItem('formTenantName', JSON.stringify(shop.tenantName));
+            sessionStorage.setItem('amount', JSON.stringify(String(monthlyRent || '')));
+            sessionStorage.setItem('calculatedRent', JSON.stringify(String(monthlyRent || '')));
+            sessionStorage.setItem('paidOnDate', JSON.stringify(new Date().toISOString().split('T')[0]));
+            sessionStorage.setItem('formPaymentMode', JSON.stringify(''));
+            sessionStorage.setItem('closureDate', JSON.stringify(''));
+        } catch (e) {
+            console.error('Failed to set rent form prefill', e);
+        }
+        setShowRentFormPopup(true);
+    };
     useEffect(() => {
         if (projects.length > 0) {
             fetchTenants();
@@ -196,7 +223,7 @@ const Dashboard = () => {
     }, [projects]);
     const fetchTenants = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
@@ -566,7 +593,7 @@ const Dashboard = () => {
     const handleSaveRentAdvance = async () => {
         const { tenantId, shopId } = selectedShop;
         try {
-            const updateResponse = await fetch(`https://backendaab.in/aabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
+            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -583,7 +610,7 @@ const Dashboard = () => {
                         rentAmount: editRent,
                         startingMonthForThisRent: editStartingMonth
                     };
-                    const historyResponse = await fetch('https://backendaab.in/aabuildersDash/api/rent-history/save', {
+                    const historyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/rent-history/save', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -1299,7 +1326,13 @@ const Dashboard = () => {
                                                     ) : isFutureMonth ? (
                                                         <span className="text-gray-400 font-medium">-</span>
                                                     ) : (
-                                                        <span className="text-[#E4572E] font-medium">0</span>
+                                                        <button
+                                                            type="button"
+                                                            className="text-[#E4572E] font-medium hover:underline"
+                                                            onClick={() => openRentFormPopupForUnpaidMonth(shop, i)}
+                                                        >
+                                                            0
+                                                        </button>
                                                     )}
                                                 </td>
                                             );
@@ -1472,6 +1505,31 @@ const Dashboard = () => {
                     </div>
                 </div>
             )}
+            {showRentFormPopup ? (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-[#202020]">Rent Entry</p>
+                            <button
+                                type="button"
+                                onClick={() => setShowRentFormPopup(false)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-3">
+                            <RentForm
+                                embedded
+                                onSuccess={async () => {
+                                    setShowRentFormPopup(false);
+                                    await fetchRentForms();
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 };

@@ -25,7 +25,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
   useEffect(() => {
-    fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form')
+    fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to fetch data');
@@ -43,7 +43,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -76,7 +76,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       const discounts = {};
       for (const row of filteredData) {
         try {
-          const res = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
+          const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/claim_payments/get/${row.id}`);
           const payments = await res.json();
           const totalReceived = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
           const totalDiscount = payments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
@@ -202,7 +202,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   const handleViewDetails = async (row) => {
     setSelectedRow(row);
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/claim_payments/get/${row.id}`);
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/claim_payments/get/${row.id}`);
       const claimPayments = await response.json();
       setClaimPaymentsData(claimPayments);
       setShowModal(true);

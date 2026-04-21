@@ -18,7 +18,7 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/api/projects/getAll');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
                 // Filter projects that have waterNo in propertyDetails
                 const projectsWithWaterNo = response.data.filter(project =>
                     project.propertyDetails &&

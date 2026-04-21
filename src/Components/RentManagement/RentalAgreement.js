@@ -191,7 +191,7 @@ const RentalAgreement = () => {
     }, [Noticeperiod, Lockinperiod, owners, Agreementstartdate, Agreementvalidity, Renttobepaid, tenants, selectedProperty, Agreementenddate, ownersProperty, selectedPropertyType]);
     const getRevisionNumber = async (propertyName, doorNos) => {
         try {
-            const clientResponse = await fetch("https://backendaab.in/aabuildersDash/api/agreements/all");
+            const clientResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/agreements/all");
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch agreements from the backend");
             }
@@ -256,7 +256,7 @@ const RentalAgreement = () => {
     }, []);
     const fetchAgreements = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/agreements/all');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/agreements/all');
             if (response.ok) {
                 const data = await response.json();
                 const formattedOptions = data.map(calculation => ({
@@ -847,7 +847,7 @@ WITNESSES:
     }, []);
     const fetchProjects = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
             if (response.ok) {
                 const data = await response.json();
                 const ownProjects = Array.isArray(data)
@@ -1056,7 +1056,7 @@ WITNESSES:
     useEffect(() => {
         const fetchTenants = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     const tenantNameOptions = [...new Set(data.map(t => t.tenantName))]
@@ -1096,7 +1096,7 @@ WITNESSES:
             formData.append("files", pdfBlob);
             formData.append("folder", "FileUpload / Rental_Agreements");
             formData.append("fileName", filename);            
-            const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+            const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
                 method: "POST",
                 body: formData,
             });
@@ -1161,7 +1161,7 @@ WITNESSES:
                 agreementTenantNames: updatedTenants,
                 annexureItems: updatedAnnexureItem,
             };
-            const saveResponse = await fetch("https://backendaab.in/aabuildersDash/api/agreements/save", {
+            const saveResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/agreements/save", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(agreementPayload),

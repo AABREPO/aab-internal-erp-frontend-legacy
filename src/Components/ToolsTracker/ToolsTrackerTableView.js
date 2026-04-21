@@ -14,7 +14,7 @@ const ToolsTrackerTableView = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = data.map(item => ({
@@ -41,7 +41,7 @@ const ToolsTrackerTableView = () => {
     const fetchData = async () => {
       try {
         // TODO: Replace with actual API endpoint when available
-        // const response = await fetch('https://backendaab.in/aabuilderDash/api/tools_tracker/getAll');
+        // const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tools_tracker/getAll');
         // if (response.ok) {
         //   const data = await response.json();
         //   setTableData(data);

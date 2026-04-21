@@ -14,9 +14,10 @@ import autoTable from "jspdf-autotable";
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
-const TOOLS_API_BASE = 'https://backendaab.in/aabuildersDash';
+const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 
 const DatabaseExpenses = ({ username, userRoles = [] }) => {
+    const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
     const resolveActiveBranchId = useCallback(() => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -104,7 +105,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
-                const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+                const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
                 const allRoles = response.data;
                 const userRoleNames = userRoles.map(r => r.roles);
                 const matchedRoles = allRoles.filter(role =>
@@ -254,7 +255,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchAccountDetails = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     setAccountDetails(data);
@@ -283,10 +284,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         utilityTypeNumber: '',
         utilityForTheMonth: '',
         utilityValidityDays: '',
+        utilityValidityType: '',
+        serviceStartingDate: '',
         projectId: '',
         vendorId: '',
         contractorId: ''
     });
+    const [projectData, setProjectData] = useState(null);
+    const [ebNumberOptions, setEbNumberOptions] = useState([]);
+    const [selectedEbNumber, setSelectedEbNumber] = useState(null);
     const customStyles = useMemo(() => ({
         control: (provided, state) => ({
             ...provided,
@@ -352,6 +358,110 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }),
     }), []);
     const [modalIsOpen, setModalIsOpen] = useState(false);
+
+    const fetchProjectData = async (projectId) => {
+        try {
+            if (!projectId) return null;
+            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/projects/get/${projectId}`);
+            if (!response.ok) return null;
+            const data = await response.json();
+            setProjectData(data);
+            return data;
+        } catch (error) {
+            console.error("Error fetching project data:", error);
+            return null;
+        }
+    };
+
+    const updateEbNumberOptions = async (utilityType, project) => {
+        if (!utilityType) {
+            setEbNumberOptions([]);
+            return;
+        }
+        if (utilityType === 'Telecom') {
+            const pid =
+                project?.id ??
+                project?.projectId ??
+                project?.project_id ??
+                formData?.projectId ??
+                null;
+            if (!pid) {
+                setEbNumberOptions([]);
+                return;
+            }
+            try {
+                const res = await axios.get(TELECOM_DIRECTORY_ENDPOINT);
+                const rows = Array.isArray(res.data) ? res.data : [];
+                const serviceNos = rows
+                    .filter(r => String(r?.project_id ?? r?.projectId ?? '') === String(pid))
+                    .map(r => r?.service_number ?? r?.serviceNumber ?? '')
+                    .map(v => String(v || '').trim())
+                    .filter(Boolean);
+                const unique = Array.from(new Set(serviceNos));
+                setEbNumberOptions(unique.map((no, idx) => ({ value: no, label: no, id: idx })));
+            } catch (e) {
+                console.error('Failed to fetch telecom service numbers', e);
+                setEbNumberOptions([]);
+            }
+            return;
+        }
+        if (!project || !project.propertyDetails) {
+            setEbNumberOptions([]);
+            return;
+        }
+        const options = [];
+        project.propertyDetails.forEach((property, index) => {
+            let optionValue = '';
+            switch (utilityType) {
+                case 'Electricity':
+                    optionValue = property.ebNo || '';
+                    break;
+                case 'Property':
+                    optionValue = property.propertyTaxNo || '';
+                    break;
+                case 'Water':
+                    optionValue = property.waterTaxNo || '';
+                    break;
+                default:
+                    return;
+            }
+            const v = String(optionValue || '').trim();
+            if (v) options.push({ value: v, label: v, id: index });
+        });
+        setEbNumberOptions(options);
+    };
+
+    useEffect(() => {
+        if (!modalIsOpen) return;
+        if (formData.accountType !== 'Utility Bills') return;
+        if (!formData.projectId) return;
+        fetchProjectData(formData.projectId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modalIsOpen, formData.accountType, formData.projectId]);
+
+    useEffect(() => {
+        if (!modalIsOpen) return;
+        if (formData.accountType !== 'Utility Bills') return;
+        if (!formData.utilityType) {
+            setEbNumberOptions([]);
+            setSelectedEbNumber(null);
+            return;
+        }
+        if (projectData) updateEbNumberOptions(formData.utilityType, projectData);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modalIsOpen, formData.accountType, formData.utilityType, projectData]);
+
+    useEffect(() => {
+        if (!modalIsOpen) return;
+        if (formData.accountType !== 'Utility Bills') return;
+        if (!formData.utilityTypeNumber) {
+            setSelectedEbNumber(null);
+            return;
+        }
+        const target = String(formData.utilityTypeNumber).trim();
+        const opt = ebNumberOptions.find(o => String(o.value).trim() === target || String(o.label).trim() === target);
+        if (opt) setSelectedEbNumber(opt);
+    }, [modalIsOpen, formData.accountType, formData.utilityTypeNumber, ebNumberOptions]);
     useEffect(() => {
         const syncBranch = () => {
             const nextBranchId = resolveActiveBranchId();
@@ -367,7 +477,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     }, [resolveActiveBranchId]);
     useEffect(() => {
         axios
-            .get('https://backendaab.in/aabuilderDash/expenses_form/get_form', {
+            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
                 params: activeBranchId ? { branchId: activeBranchId } : {},
             })
             .then((response) => {
@@ -401,7 +511,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -428,7 +538,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -455,7 +565,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchContractorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -482,7 +592,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -507,7 +617,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchMachinTools = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/machine_tools/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -592,7 +702,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchAccountType = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/account_type/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/account_type/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -619,7 +729,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchLaboursList = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/labours-details/getAll');
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
                 if (response.ok) {
                     const data = await response.json();
                     const formattedData = data.map(item => ({
@@ -644,7 +754,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchEmployeeDetails = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/employee_details/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -672,7 +782,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchBranches = async () => {
             try {
-                const response = await fetch('https://backendaab.in/aabuildersDash/api/branch/getAll', {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
                     method: 'GET',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' }
@@ -818,6 +928,16 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         if (name === "date" && value === "") {
             return; // Don't update formData if date is being cleared
         }
+        if (name === "utilityType") {
+            setSelectedEbNumber(null);
+            setEbNumberOptions([]);
+            setFormData({
+                ...formData,
+                utilityType: value,
+                utilityTypeNumber: "",
+            });
+            return;
+        }
         setFormData({
             ...formData,
             [name]: type === "file" ? files[0] : value
@@ -865,7 +985,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 // ✅ CHANGE 3: optional filename
                 uploadFormData.append("fileName", finalName);
 
-                const uploadResponse = await fetch("https://backendaab.in/aabuildersDash/api/files/upload", {
+                const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
                     method: "POST",
                     body: uploadFormData,
                 });
@@ -915,7 +1035,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }
     };
     const performUpdateAndWeeklyBills = async (updatedFormData, modalPaymentData = null) => {
-        const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/update/${editId}`, {
+        const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatedFormData)
@@ -947,7 +1067,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     transaction_number: (modalPaymentData && modalPaymentData.transactionNumber) || null,
                     account_number: (modalPaymentData && modalPaymentData.accountNumber) || null
                 };
-                const weeklyResponse = await fetch('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save', {
+                const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -1149,6 +1269,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             utilityTypeNumber: expense.utilityTypeNumber || '',
             utilityForTheMonth: expense.utilityForTheMonth || '',
             utilityValidityDays: expense.utilityValidityDays || '',
+            utilityValidityType: expense.utilityValidityType || '',
+            serviceStartingDate: expense.serviceStartingDate || '',
             projectId: expense.projectId || '',
             vendorId: expense.vendorId || '',
             contractorId: expense.contractorId || ''
@@ -1159,7 +1281,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         if (window.confirm('Are you sure you want to delete this expense?')) {
             try {
                 const response = await fetch(
-                    `https://backendaab.in/aabuilderDash/expenses_form/delete/${id}?editedBy=${encodeURIComponent(username)}`,
+                    `https://backendaab.in/demoAabuilderDash/expenses_form/delete/${id}?editedBy=${encodeURIComponent(username)}`,
                     {
                         method: 'POST',
                     }
@@ -1181,7 +1303,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     };
     const fetchAuditDetails = async (expenseId) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuilderDash/expenses_form/audit/${expenseId}`);
+            const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/audit/${expenseId}`);
             const data = await response.json();
             setAudits(data);
             setShowModal(true);
@@ -2061,15 +2183,20 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                         formData.utilityType === 'Property' ? 'Property Tax Number' :
                                                             formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
                                                 </label>
-                                                <input
-                                                    type="text"
-                                                    name="utilityTypeNumber"
-                                                    value={formData.utilityTypeNumber}
-                                                    onChange={handleChange}
-                                                    placeholder={`Enter ${formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                <Select
+                                                    options={ebNumberOptions}
+                                                    value={selectedEbNumber}
+                                                    onChange={(opt) => {
+                                                        setSelectedEbNumber(opt);
+                                                        setFormData((prev) => ({ ...prev, utilityTypeNumber: opt?.label || "" }));
+                                                    }}
+                                                    isClearable
+                                                    placeholder={`Select ${formData.utilityType === 'Electricity' ? 'EB Number' :
                                                         formData.utilityType === 'Property' ? 'Property Tax Number' :
                                                             formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                    styles={customStyles}
+                                                    menuPlacement="bottom"
+                                                    menuPosition="absolute"
                                                 />
                                             </div>
                                             <div>
@@ -2085,13 +2212,41 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             </div>
                                             {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
                                                 <div>
-                                                    <label className="block text-gray-500 font-semibold text-left">Additional Input</label>
+                                                    <label className="block text-gray-500 font-semibold text-left">Validity</label>
                                                     <input
                                                         type="text"
                                                         name="utilityValidityDays"
                                                         value={formData.utilityValidityDays}
                                                         onChange={handleChange}
-                                                        placeholder="Enter additional information..."
+                                                        placeholder="Enter validity..."
+                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                    />
+                                                </div>
+                                            )}
+                                            {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
+                                                <div>
+                                                    <label className="block text-gray-500 font-semibold text-left">Validity Type</label>
+                                                    <select
+                                                        name="utilityValidityType"
+                                                        value={formData.utilityValidityType}
+                                                        onChange={handleChange}
+                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                    >
+                                                        <option value="">--- Select ---</option>
+                                                        <option value="Days">Days</option>
+                                                        <option value="Month">Month</option>
+                                                        <option value="Year">Year</option>
+                                                    </select>
+                                                </div>
+                                            )}
+                                            {formData.utilityType === 'Telecom' && (
+                                                <div>
+                                                    <label className="block text-gray-500 font-semibold text-left">Service Start Date</label>
+                                                    <input
+                                                        type="date"
+                                                        name="serviceStartingDate"
+                                                        value={formData.serviceStartingDate}
+                                                        onChange={handleChange}
                                                         className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
                                                     />
                                                 </div>

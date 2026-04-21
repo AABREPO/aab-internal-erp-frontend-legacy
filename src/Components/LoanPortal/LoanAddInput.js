@@ -35,7 +35,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
 
     const fetchLoanTypes = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setLoanTypes(data);
@@ -52,7 +52,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete all Loan Types?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/aabuildersDash/api/loan-purposes/deleteAll", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/loan-purposes/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -73,7 +73,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
 
     const handleLoanTypeDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/loan-purposes/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/loan-purposes/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -93,7 +93,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
         e.preventDefault();
         const newLoanType = { purpose: loanType };
         try {
-            const response = await fetch('https://backendaab.in/aabuildersDash/api/loan-purposes/save', {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
     const handleEditLoanTypes = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/loan-purposes/edit/${selectedLoanTypeId}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/loan-purposes/edit/${selectedLoanTypeId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

@@ -7,8 +7,8 @@ import imports from '../Images/Import.svg'
 import filterIcon from '../Images/filter (3).png'
 
 const DirectoryTelecom = () => {
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/aabuildersDash';
-  const API_BASE_URL1 = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/aabuilderDash';
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/demoAabuildersDash';
+  const API_BASE_URL1 = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/demoAabuilderDash';
   const [activeTab, setActiveTab] = useState('clients');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isInputsOpen, setIsInputsOpen] = useState(false);
@@ -615,7 +615,7 @@ const DirectoryTelecom = () => {
   };
   const fetchProjectItems = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
       if (!response.ok) {
         throw new Error('Failed to fetch project list');
       }

@@ -175,7 +175,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     if (rfqLoadedForVendorRef.current === vendorId && rfqOptionLabels.length > 0) return;
     setIsRfqLoading(true);
     try {
-      const res = await fetch('https://backendaab.in/aabuildersDash/api/rfq/getAll');
+      const res = await fetch('https://backendaab.in/demoAabuildersDash/api/rfq/getAll');
       if (!res.ok) {
         setRfqOptionLabels([]);
         rfqLabelToRfqRef.current = new Map();
@@ -219,7 +219,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     // Fetch full RFQ (ensures rfqTable exists)
     let apiRfq = null;
     try {
-      const res = await fetch(`https://backendaab.in/aabuildersDash/api/rfq/get/${rfqId}`);
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/rfq/get/${rfqId}`);
       if (res.ok) apiRfq = await res.json();
     } catch (e) {
       // best-effort
@@ -237,7 +237,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         setPoData((prev) => ({ ...prev, projectName: existing.value }));
       } else {
         try {
-          const projRes = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/get/${clientId}`);
+          const projRes = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/get/${clientId}`);
           if (projRes.ok) {
             const proj = await projRes.json();
             const name = proj?.siteName || proj?.projectName || proj?.name || '';
@@ -261,7 +261,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         let emp = employeeList.find((e) => String(e?.id) === String(inchargeId)) || null;
         if (!emp) {
           try {
-            const empRes = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`);
+            const empRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/get/${inchargeId}`);
             if (empRes.ok) emp = await empRes.json();
           } catch (e) {
             // ignore
@@ -613,7 +613,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 const cacheKey = String(inchargeId);
                 let empObj = cache.get(cacheKey);
                 if (empObj === undefined) {
-                  const res = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`);
+                  const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/get/${inchargeId}`);
                   empObj = res.ok ? await res.json() : null;
                   cache.set(cacheKey, empObj);
                 }
@@ -982,7 +982,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                 const cacheKey = String(inchargeId);
                 let empObj = cache.get(cacheKey);
                 if (empObj === undefined) {
-                  const res = await fetch(`https://backendaab.in/aabuildersDash/api/employee_details/get/${inchargeId}`);
+                  const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/employee_details/get/${inchargeId}`);
                   empObj = res.ok ? await res.json() : null;
                   cache.set(cacheKey, empObj);
                 }
@@ -1152,7 +1152,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch PO categories (id + label) - extracted as reusable for refresh when new category is created
   const fetchPoCategory = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
       if (response.ok) {
         const data = await response.json();
         const options = (data || []).map(item => ({
@@ -1307,7 +1307,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   }, []);
   const fetchVendorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         const formattedData = data.map(item => ({
@@ -1333,7 +1333,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchSites = async () => {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
           method: "GET",
           credentials: "include",
           headers: {
@@ -1369,14 +1369,14 @@ const PurchaseOrder = ({ user, onLogout }) => {
       try {
         // Fetch both APIs in parallel - no waiting, fire immediately
         const [employeeResponse, supportStaffResponse] = await Promise.all([
-          fetch('https://backendaab.in/aabuildersDash/api/employee_details/site_engineers', {
+          fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/site_engineers', {
             method: 'GET',
             credentials: 'include',
             headers: {
               'Content-Type': 'application/json'
             }
           }),
-          fetch('https://backendaab.in/aabuildersDash/api/support_staff/getAll', {
+          fetch('https://backendaab.in/demoAabuildersDash/api/support_staff/getAll', {
             method: 'GET',
             credentials: 'include',
             headers: {
@@ -1485,7 +1485,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch PO item names from API - extracted as reusable function
   const fetchPoItemName = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_itemNames/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_itemNames/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoItemName(data);
@@ -1497,7 +1497,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch PO model from API - extracted as reusable function
   const fetchPoModel = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_model/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_model/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoModel(data);
@@ -1509,7 +1509,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch PO brand from API - extracted as reusable function
   const fetchPoBrand = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_brand/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_brand/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoBrand(data);
@@ -1521,7 +1521,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch PO type from API - extracted as reusable function
   const fetchPoType = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/po_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setPoType(data);
@@ -1549,7 +1549,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch tiles data (for TILE category)
   const fetchTiles = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tiles/all/data');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tiles/all/data');
       if (response.ok) {
         const data = await response.json();
         setTileData(data || []);
@@ -1562,7 +1562,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   // Fetch tile sizes data (for TILE category)
   const fetchTileSizes = useCallback(async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/quantity/size');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/quantity/size');
       if (response.ok) {
         const data = await response.json();
         setTileSizeData(data || []);
@@ -1594,7 +1594,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       return 1;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll');
       if (!response.ok) {
         throw new Error('Failed to fetch purchase orders');
       }
@@ -2093,7 +2093,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
       return null;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/purchase_orders/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll');
       if (!response.ok) {
         throw new Error('Failed to fetch purchase orders');
       }
@@ -2257,7 +2257,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
         alert("You don't have permission to create a new Purchase Order.");
         return;
       }
-      const baseUrl = "https://backendaab.in/aabuildersDash/api/purchase_orders";
+      const baseUrl = "https://backendaab.in/demoAabuildersDash/api/purchase_orders";
       const url = isEditingExistingPo
         ? `${baseUrl}/edit_with_history/${poData.originalId}?changedBy=${encodeURIComponent(username)}`
         : `${baseUrl}/save`;

@@ -153,7 +153,7 @@ const AdvanceForm = ({
     }
     const run = (async () => {
       try {
-        const vRes = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll', {
+        const vRes = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -171,7 +171,7 @@ const AdvanceForm = ({
         );
         await new Promise((r) => setTimeout(r, 0));
 
-        const cRes = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll', {
+        const cRes = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -204,7 +204,7 @@ const AdvanceForm = ({
           { value: 'Bill Payment Tracker', label: 'Bill Payment Tracker', id: 12, sNo: '12' },
         ];
         try {
-          const sRes = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll', {
+          const sRes = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll', {
             method: 'GET',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -224,7 +224,7 @@ const AdvanceForm = ({
         }
         await new Promise((r) => setTimeout(r, 0));
 
-        const catRes = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll', {
+        const catRes = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -260,7 +260,7 @@ const AdvanceForm = ({
     }
     const run = (async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/account-details/getAll', {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -345,7 +345,7 @@ const AdvanceForm = ({
   // Latest expense E.No — only needed for Bill Settlement → expenses_form/save (get_form is huge; do not load on tab open)
   const fetchLatestEno = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/expenses_form/get_form');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
       if (!response.ok) {
         throw new Error('Failed to fetch ENo');
       }
@@ -536,7 +536,7 @@ const AdvanceForm = ({
     const dateStr = checkDate ? new Date(checkDate).toISOString().split('T')[0] : '';
 
     try {
-      const response = await fetch(withBranchUrl('https://backendaab.in/aabuilderDash/expenses_form/get_form'));
+      const response = await fetch(withBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/get_form'));
       if (!response.ok) return [];
       const allExpenses = await response.json();
 
@@ -608,7 +608,7 @@ const AdvanceForm = ({
           const finalName = `${formatDateOnly(dateValue)} ${selectedSite.sNo} ${selectedOption.label}`;
           formData.append('file', selectedAdvanceFile);
           formData.append('file_name', finalName);
-          const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+          const uploadResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
             method: "POST",
             body: formData,
           });
@@ -669,7 +669,7 @@ const AdvanceForm = ({
             file_url: "",
             branch_id: activeBranchId
           };
-          const loanResponse = await fetch(withBranchUrl("https://backendaab.in/aabuildersDash/api/loans/save"), {
+          const loanResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(loanPayload)
@@ -683,7 +683,7 @@ const AdvanceForm = ({
             amount: -Math.abs(amountValue),
             loan_portal_id: loanPortalId
           });
-          await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+          await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(advancePayload)
@@ -698,7 +698,7 @@ const AdvanceForm = ({
             bill_amount: 0,
             refund_amount: 0
           };
-          const vendorCarryForwardResponse = await fetch("https://backendaab.in/aabuildersDash/api/vendor_carry_forward/save", {
+          const vendorCarryForwardResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(vendorCarryForwardPayload)
@@ -712,7 +712,7 @@ const AdvanceForm = ({
             amount: -Math.abs(amountValue),
             vendor_carry_forward_id: vendorCarryForwardId
           });
-          await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+          await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(advancePayload)
@@ -725,12 +725,12 @@ const AdvanceForm = ({
             amount: Math.abs(amountValue)
           });
           await Promise.all([
-            fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+            fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(firstPayload)
             }),
-            fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+            fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(secondPayload)
@@ -739,7 +739,7 @@ const AdvanceForm = ({
         }
       } else {
         const payload = createPayload();
-        await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+        await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -771,7 +771,7 @@ const AdvanceForm = ({
             source: "Advance Portal",
             branchId: activeBranchId,
           };
-          const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
+          const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -931,7 +931,7 @@ const AdvanceForm = ({
         const finalName = `${formatDateOnly(paymentModalData.date)} ${selectedSite.sNo} ${selectedOption.label}`;
         formData.append('file', selectedAdvanceFile);
         formData.append('file_name', finalName);
-        const uploadResponse = await fetch("https://backendaab.in/aabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
+        const uploadResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
           method: "POST",
           body: formData,
         });
@@ -961,7 +961,7 @@ const AdvanceForm = ({
         file_url: fileUrl,
         branch_id: activeBranchId,
       };
-      const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/advance_portal/save'), {
+      const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(advancePayload)
@@ -992,7 +992,7 @@ const AdvanceForm = ({
         account_number: paymentModalData.accountNumber || null,
         branch_id: activeBranchId
       };
-      const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/aabuildersDash/api/weekly-payment-bills/save'), {
+      const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(weeklyPaymentBillPayload)
@@ -1023,7 +1023,7 @@ const AdvanceForm = ({
           source: "Advance Portal",
           branchId: activeBranchId,
         };
-        const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/aabuilderDash/expenses_form/save"), {
+        const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(expensesPayload),

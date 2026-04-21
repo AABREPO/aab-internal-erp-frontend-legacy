@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../ProjectAdvance/Header';
+import MasterDataHeader from './MasterDataHeader';
 import Sidebar from '../Bars/Sidebar';
 import BottomNav from '../ProjectAdvance/BottomNav';
 import editIcon from '../Images/edit.png';
+import editIconHistory from '../Images/edit1.png';
 import deleteIcon from '../Images/delete.png';
 import AccountQrCodeImage from '../../Components/Images/AAB_QR_CODE.jpeg';
+import MasterDataCopyButton from '../../Components/MasterData/MasterDataCopyButton';
 
 const masterDataItems = [
   'Project Name',
@@ -60,22 +62,22 @@ const MasterData = ({ user, onLogout }) => {
   const getListApiUrl = (item) => {
     switch (item) {
       case 'Vendor Name':
-        return 'https://backendaab.in/aabuilderDash/api/vendor_Names/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll';
       case 'Contractor Name':
-        return 'https://backendaab.in/aabuilderDash/api/contractor_Names/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll';
       case 'Categories':
-        return 'https://backendaab.in/aabuilderDash/api/expenses_categories/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll';
       case 'Machine tools':
-        return 'https://backendaab.in/aabuilderDash/api/machine_tools/getAll';
+        return 'https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll';
       case 'Employee Details':
-        return 'https://backendaab.in/aabuildersDash/api/employee_details/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/employee_details/getAll';
       case 'Company Labour':
-        return 'https://backendaab.in/aabuildersDash/api/labours-details/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/labours-details/getAll';
       case 'Account Details':
       case 'Bank Details':
-        return 'https://backendaab.in/aabuildersDash/api/account-details/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/account-details/getAll';
       case 'Support Associate Name':
-        return 'https://backendaab.in/aabuildersDash/api/support_staff/getAll';
+        return 'https://backendaab.in/demoAabuildersDash/api/support_staff/getAll';
       default:
         return null;
     }
@@ -162,6 +164,11 @@ const MasterData = ({ user, onLogout }) => {
   const [isAddProjectViewOpen, setIsAddProjectViewOpen] = useState(false);
   const [expandedProjectSection, setExpandedProjectSection] = useState('project-details');
   const [projectFormMode, setProjectFormMode] = useState('new');
+  const [isProjectPictureModalOpen, setIsProjectPictureModalOpen] = useState(false);
+  const [isProjectLocationSheetOpen, setIsProjectLocationSheetOpen] = useState(false);
+  const [isProjectQrModalOpen, setIsProjectQrModalOpen] = useState(false);
+  const [projectQrPreview, setProjectQrPreview] = useState('');
+  const [projectPictureDraft, setProjectPictureDraft] = useState('');
   const [projectForm, setProjectForm] = useState({
     projectName: '',
     projectId: '',
@@ -169,6 +176,7 @@ const MasterData = ({ user, onLogout }) => {
     referenceName: '',
     branch: '',
     projectAddress: '',
+    latitudeLongitude: '',
     clientName: '',
     fatherName: '',
     mobileNumber: '',
@@ -182,12 +190,14 @@ const MasterData = ({ user, onLogout }) => {
     ifscCode: '',
     accountBranch: '',
     upiPhoneNumber: '',
-    upiId: ''
+    upiId: '',
+    projectPicture: ''
   });
   const [isAddOnSheetOpen, setIsAddOnSheetOpen] = useState(false);
   const [isAddVendorViewOpen, setIsAddVendorViewOpen] = useState(false);
   const [expandedVendorSection, setExpandedVendorSection] = useState('vendor-details');
   const [isVendorQrModalOpen, setIsVendorQrModalOpen] = useState(false);
+  const [isVendorLocationSheetOpen, setIsVendorLocationSheetOpen] = useState(false);
   const [vendorQrPreview, setVendorQrPreview] = useState('');
   const [vendorFormMode, setVendorFormMode] = useState('new');
   const [vendorForm, setVendorForm] = useState({
@@ -199,6 +209,7 @@ const MasterData = ({ user, onLogout }) => {
     branch: '',
     emailId: '',
     vendorAddress: '',
+    latitudeLongitude: '',
     location: '',
     accountHolderName: '',
     qrCode: '',
@@ -345,7 +356,7 @@ const MasterData = ({ user, onLogout }) => {
       setIsProjectsLoading(true);
 
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/projects/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
         if (!response.ok) {
           throw new Error('Failed to fetch projects');
         }
@@ -425,7 +436,7 @@ const MasterData = ({ user, onLogout }) => {
     const fetchBankTypes = async () => {
       setIsBankTypesLoading(true);
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/bank_type/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/bank_type/getAll');
         if (!response.ok) throw new Error('Failed to fetch bank account types');
         const data = await response.json();
         if (isMounted) setBankAccountTypes(Array.isArray(data) ? data : []);
@@ -459,6 +470,7 @@ const MasterData = ({ user, onLogout }) => {
       referenceName: valueOr(item?.projectReferenceName, item?.project_reference_name, item?.referenceName, item?.reference_name),
       branch: valueOr(item?.branch, item?.branch_name),
       projectAddress: valueOr(item?.projectAddress, item?.project_address, item?.address),
+      latitudeLongitude: valueOr(item?.latitudeLongitude, item?.latitude_longitude, item?.latLong, item?.lat_long),
       clientName: valueOr(item?.clientName, item?.client_name),
       fatherName: valueOr(item?.fatherName, item?.father_name),
       mobileNumber: valueOr(item?.mobileNumber, item?.mobile_number),
@@ -472,7 +484,8 @@ const MasterData = ({ user, onLogout }) => {
       ifscCode: valueOr(item?.ifscCode, item?.ifsc_code),
       accountBranch: valueOr(item?.accountBranch, item?.account_branch, item?.branch),
       upiPhoneNumber: valueOr(item?.upiPhoneNumber, item?.upi_phone_number, item?.gpayNumber, item?.gpay_number),
-      upiId: valueOr(item?.upiId, item?.upi_id)
+      upiId: valueOr(item?.upiId, item?.upi_id),
+      projectPicture: valueOr(item?.projectPicture, item?.project_picture, item?.projectImage, item?.project_image)
     };
   };
 
@@ -604,6 +617,12 @@ const MasterData = ({ user, onLogout }) => {
       branch: valueOr(item?.branch, item?.branch_name),
       emailId: valueOr(item?.emailId, item?.email_id, item?.vendorContactEmail, item?.vendor_contact_email),
       vendorAddress: valueOr(item?.vendorAddress, item?.vendor_address, item?.address),
+      latitudeLongitude: valueOr(
+        item?.latitudeLongitude,
+        item?.latitude_longitude,
+        item?.latLong,
+        item?.lat_long
+      ),
       location: valueOr(item?.location, item?.branchLocation, item?.branch_location),
       accountHolderName: valueOr(item?.accountHolderName, item?.account_holder_name, item?.vendorAccountHolderName, item?.vendor_account_holder_name),
       qrCode,
@@ -856,35 +875,6 @@ const MasterData = ({ user, onLogout }) => {
     </svg>
   );
 
-  const copyToClipboard = async (text) => {
-    const value = String(text ?? '');
-    if (!value) return;
-
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-        return;
-      }
-    } catch (error) {
-      console.error('Clipboard write failed:', error);
-    }
-
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = value;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      textarea.style.top = '0';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    } catch (error) {
-      console.error('Clipboard fallback failed:', error);
-    }
-  };
-
   const renderInput = ({
     label,
     required,
@@ -895,13 +885,26 @@ const MasterData = ({ user, onLogout }) => {
     readOnly = true,
     onChange,
     onRightIconClick,
-    rightIconInteractive = false
+    rightIconInteractive = false,
+    copyButtonId,
+    copyFieldName,
+    labelRight
   }) => (
     <div className="w-full">
-      <label className="block text-left text-[12px] font-medium text-black">
-        {label}
-        {required && <span className="text-[#E26D47]">*</span>}
-      </label>
+      {labelRight ? (
+        <div className="flex w-full items-center justify-between">
+          <label className="block text-left text-[12px] font-medium text-black">
+            {label}
+            {required && <span className="text-[#E26D47]">*</span>}
+          </label>
+          {labelRight}
+        </div>
+      ) : (
+        <label className="block text-left text-[12px] font-medium text-black">
+          {label}
+          {required && <span className="text-[#E26D47]">*</span>}
+        </label>
+      )}
       <div className="relative">
         {multiline ? (
           <textarea
@@ -919,11 +922,14 @@ const MasterData = ({ user, onLogout }) => {
             onChange={onChange}
             placeholder={placeholder}
             className={`h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0] ${
-              rightIcon ? 'pr-[30px]' : ''
+              copyButtonId || rightIcon ? 'pr-12' : ''
             }`}
           />
         )}
-        {rightIcon &&
+        {copyButtonId && (
+          <MasterDataCopyButton text={value} fieldName={copyFieldName} buttonId={copyButtonId} />
+        )}
+        {rightIcon && !copyButtonId &&
           (rightIconInteractive ? (
             <button
               type="button"
@@ -994,39 +1000,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderBankNameFormView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button type="button" onClick={() => setIsBankNameFormOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button type="button" onClick={() => setIsBankNameFormOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
-              Bank Name
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{bankNameFormMode === 'edit' ? 'Edit' : 'New'}</span>
-          </div>
-          <button type="button" className="shrink-0 text-[12px] font-medium text-black">
-            Update
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>Upload File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1042,7 +1017,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderStaticBankDetailsCard(
             'Bank Name Details',
@@ -1064,39 +1039,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderBankTypeFormView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button type="button" onClick={() => setIsBankTypeFormOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button type="button" onClick={() => setIsBankTypeFormOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
-              Account Type
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{bankTypeFormMode === 'edit' ? 'Edit' : 'New'}</span>
-          </div>
-          <button type="button" className="shrink-0 text-[12px] font-medium text-black">
-            Update
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>Upload File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1112,7 +1056,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderStaticBankDetailsCard(
             'Account Type Details',
@@ -1134,46 +1078,15 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderBankLocationFormView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button type="button" onClick={() => setIsBankLocationFormOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button type="button" onClick={() => setIsBankLocationFormOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
-              Branch Name
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{bankLocationFormMode === 'edit' ? 'Edit' : 'New'}</span>
-          </div>
-          <button type="button" className="shrink-0 text-[12px] font-medium text-black">
-            {bankLocationFormMode === 'edit' ? 'Save' : 'Save'}
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="text-right">
           <button type="button" className="text-[12px] font-medium text-black">
             Upload File
           </button>
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderStaticBankDetailsCard(
             'Branch Name Details',
@@ -1239,50 +1152,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddContractorView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddContractorViewOpen(false);
-                setSelectedItem(null);
-              }}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button
-              type="button"
-              onClick={() => setIsAddContractorViewOpen(false)}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Contractor Name
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{contractorFormMode === 'edit' ? 'Edit' : 'NEW'}</span>
-          </div>
-          <button type="button" className="shrink-0 text-[12px] font-medium text-black">
-            Update
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>View File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1298,7 +1169,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderContractorAccordion(
             'contractor-details',
@@ -1417,18 +1288,13 @@ const MasterData = ({ user, onLogout }) => {
                     value={contractorForm.accountHolderName || ''}
                     onChange={(e) => setContractorForm((s) => ({ ...s, accountHolderName: e.target.value }))}
                     placeholder=""
-                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-[30px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(contractorForm.accountHolderName)}
-                    aria-label="Copy"
-                    className="absolute right-[10px] top-1/2 -translate-y-1/2 flex h-[20px] w-[20px] items-center justify-center p-0 text-[#4B4B4B] bg-transparent"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  </button>
+                  <MasterDataCopyButton
+                    text={contractorForm.accountHolderName}
+                    fieldName="Account Holder Name"
+                    buttonId="m-contractor-account-holder"
+                  />
                 </div>
               </div>
 
@@ -1444,18 +1310,13 @@ const MasterData = ({ user, onLogout }) => {
                     value={contractorForm.accountNumber || ''}
                     onChange={(e) => setContractorForm((s) => ({ ...s, accountNumber: e.target.value }))}
                     placeholder=""
-                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-[30px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(contractorForm.accountNumber)}
-                    aria-label="Copy"
-                    className="absolute right-[10px] top-1/2 -translate-y-1/2 flex h-[20px] w-[20px] items-center justify-center p-0 text-[#4B4B4B] bg-transparent"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  </button>
+                  <MasterDataCopyButton
+                    text={contractorForm.accountNumber}
+                    fieldName="Account Number"
+                    buttonId="m-contractor-account-number"
+                  />
                 </div>
               </div>
 
@@ -1467,13 +1328,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: contractorForm.ifscCode,
                   readOnly: false,
                   onChange: (e) => setContractorForm((s) => ({ ...s, ifscCode: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(contractorForm.ifscCode)
+                  copyButtonId: 'm-contractor-ifsc',
+                  copyFieldName: 'IFSC Code'
                 })}
                 {renderInput({
                   label: 'Branch',
@@ -1482,13 +1338,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: contractorForm.location,
                   readOnly: false,
                   onChange: (e) => setContractorForm((s) => ({ ...s, location: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(contractorForm.location)
+                  copyButtonId: 'm-contractor-branch',
+                  copyFieldName: 'Branch'
                 })}
               </div>
 
@@ -1500,13 +1351,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: contractorForm.upiPhoneNumber,
                   readOnly: false,
                   onChange: (e) => setContractorForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(contractorForm.upiPhoneNumber)
+                  copyButtonId: 'm-contractor-upi-phone',
+                  copyFieldName: 'UPI Phone Number'
                 })}
                 {renderInput({
                   label: 'UPI ID',
@@ -1515,13 +1361,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: contractorForm.upiId,
                   readOnly: false,
                   onChange: (e) => setContractorForm((s) => ({ ...s, upiId: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(contractorForm.upiId)
+                  copyButtonId: 'm-contractor-upi-id',
+                  copyFieldName: 'UPI ID'
                 })}
               </div>
             </div>
@@ -1633,35 +1474,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddCategoryView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-          <button type="button" onClick={() => setIsAddCategoryViewOpen(false)} className="flex items-center gap-[6px]">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <button type="button" className="text-[12px] font-medium text-black">
-            {categoryFormMode === 'edit' ? 'Update' : 'Add'}
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>View File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1677,7 +1491,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderCategoryAccordion(
             'category-details',
@@ -1722,50 +1536,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddMachineView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddMachineViewOpen(false);
-                setSelectedItem(null);
-              }}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button
-              type="button"
-              onClick={() => setIsAddMachineViewOpen(false)}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Machine tools
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{machineFormMode === 'edit' ? 'Edit' : 'New'}</span>
-          </div>
-          <button type="button" className="shrink-0 text-[12px] font-medium text-black">
-            Update
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>View File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1781,7 +1553,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderMachineAccordion(
             'machine-details',
@@ -1826,33 +1598,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddEmployeeView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-          <button type="button" onClick={() => setIsAddEmployeeViewOpen(false)} className="flex items-center gap-[6px]">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <button type="button">{employeeFormMode === 'edit' ? 'Update' : 'Submit'}</button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
+      <div className="bg-white">
+        <div className="flex items-center justify-between text-[12px] font-medium text-black">
           <button type="button" onClick={() => setIsEmployeeAadhaarModalOpen(true)}>
             Aadhaar Upload
           </button>
@@ -1860,7 +1607,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderEmployeeAccordion(
             'employee-details',
@@ -1965,12 +1712,19 @@ const MasterData = ({ user, onLogout }) => {
                     QR Code
                   </button>
                 </div>
-                <input
-                  value={employeeForm.accountHolderName || ''}
-                  onChange={(e) => setEmployeeForm((s) => ({ ...s, accountHolderName: e.target.value }))}
-                  placeholder="Enter Name"
-                  className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
-                />
+                <div className="relative">
+                  <input
+                    value={employeeForm.accountHolderName || ''}
+                    onChange={(e) => setEmployeeForm((s) => ({ ...s, accountHolderName: e.target.value }))}
+                    placeholder="Enter Name"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={employeeForm.accountHolderName}
+                    fieldName="Account Holder Name"
+                    buttonId="m-employee-account-holder"
+                  />
+                </div>
               </div>
 
               <div className="w-full">
@@ -1980,12 +1734,19 @@ const MasterData = ({ user, onLogout }) => {
                   </label>
                   <span className="text-[12px] font-medium text-[#4B4B4B]">Bank Name</span>
                 </div>
-                <input
-                  value={employeeForm.accountNumber || ''}
-                  onChange={(e) => setEmployeeForm((s) => ({ ...s, accountNumber: e.target.value }))}
-                  placeholder="Enter Account Number"
-                  className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
-                />
+                <div className="relative">
+                  <input
+                    value={employeeForm.accountNumber || ''}
+                    onChange={(e) => setEmployeeForm((s) => ({ ...s, accountNumber: e.target.value }))}
+                    placeholder="Enter Account Number"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={employeeForm.accountNumber}
+                    fieldName="Account Number"
+                    buttonId="m-employee-account-number"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-[12px]">
@@ -1995,7 +1756,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: 'Enter IFSC Code',
                   value: employeeForm.ifscCode,
                   readOnly: false,
-                  onChange: (e) => setEmployeeForm((s) => ({ ...s, ifscCode: e.target.value }))
+                  onChange: (e) => setEmployeeForm((s) => ({ ...s, ifscCode: e.target.value })),
+                  copyButtonId: 'm-employee-ifsc',
+                  copyFieldName: 'IFSC Code'
                 })}
                 {renderInput({
                   label: 'Branch',
@@ -2004,11 +1767,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: employeeForm.branch,
                   readOnly: false,
                   onChange: (e) => setEmployeeForm((s) => ({ ...s, branch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-employee-branch',
+                  copyFieldName: 'Branch'
                 })}
               </div>
 
@@ -2019,7 +1779,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: 'Enter Number',
                   value: employeeForm.upiPhoneNumber,
                   readOnly: false,
-                  onChange: (e) => setEmployeeForm((s) => ({ ...s, upiPhoneNumber: e.target.value }))
+                  onChange: (e) => setEmployeeForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
+                  copyButtonId: 'm-employee-upi-phone',
+                  copyFieldName: 'UPI Phone Number'
                 })}
                 {renderInput({
                   label: 'UPI ID',
@@ -2027,7 +1789,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: 'Enter UPI ID',
                   value: employeeForm.upiId,
                   readOnly: false,
-                  onChange: (e) => setEmployeeForm((s) => ({ ...s, upiId: e.target.value }))
+                  onChange: (e) => setEmployeeForm((s) => ({ ...s, upiId: e.target.value })),
+                  copyButtonId: 'm-employee-upi-id',
+                  copyFieldName: 'UPI ID'
                 })}
               </div>
             </div>
@@ -2247,35 +2011,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddAccountView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-          <button type="button" onClick={() => setIsAddAccountViewOpen(false)} className="flex items-center gap-[6px]">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <button type="button" className="text-[12px] font-medium text-black">
-            {accountFormMode === 'edit' ? 'Update' : 'Submit'}
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="py-[8px] text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>Upload File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2291,7 +2028,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderAccountAccordion(
             'account-details',
@@ -2310,12 +2047,19 @@ const MasterData = ({ user, onLogout }) => {
                     QR Code
                   </button>
                 </div>
-                <input
-                  value={accountForm.accountHolderName || ''}
-                  onChange={(e) => setAccountForm((s) => ({ ...s, accountHolderName: e.target.value }))}
-                  placeholder=""
-                  className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
-                />
+                <div className="relative">
+                  <input
+                    value={accountForm.accountHolderName || ''}
+                    onChange={(e) => setAccountForm((s) => ({ ...s, accountHolderName: e.target.value }))}
+                    placeholder=""
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={accountForm.accountHolderName}
+                    fieldName="Account Holder Name"
+                    buttonId="m-account-account-holder"
+                  />
+                </div>
               </div>
 
               <div className="w-full">
@@ -2325,12 +2069,19 @@ const MasterData = ({ user, onLogout }) => {
                   </label>
                   <span className="text-[12px] font-medium text-[#4B4B4B]">{accountForm.bankName || ''}</span>
                 </div>
-                <input
-                  value={accountForm.accountNumber || ''}
-                  onChange={(e) => setAccountForm((s) => ({ ...s, accountNumber: e.target.value }))}
-                  placeholder=""
-                  className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
-                />
+                <div className="relative">
+                  <input
+                    value={accountForm.accountNumber || ''}
+                    onChange={(e) => setAccountForm((s) => ({ ...s, accountNumber: e.target.value }))}
+                    placeholder=""
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={accountForm.accountNumber}
+                    fieldName="Account Number"
+                    buttonId="m-account-account-number"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-[12px]">
@@ -2340,7 +2091,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: '',
                   value: accountForm.ifscCode,
                   readOnly: false,
-                  onChange: (e) => setAccountForm((s) => ({ ...s, ifscCode: e.target.value }))
+                  onChange: (e) => setAccountForm((s) => ({ ...s, ifscCode: e.target.value })),
+                  copyButtonId: 'm-account-ifsc',
+                  copyFieldName: 'IFSC Code'
                 })}
                 {renderInput({
                   label: 'Branch',
@@ -2349,11 +2102,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: accountForm.branch,
                   readOnly: false,
                   onChange: (e) => setAccountForm((s) => ({ ...s, branch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-account-branch',
+                  copyFieldName: 'Branch'
                 })}
               </div>
 
@@ -2364,11 +2114,8 @@ const MasterData = ({ user, onLogout }) => {
                 value: accountForm.accountType,
                 readOnly: false,
                 onChange: (e) => setAccountForm((s) => ({ ...s, accountType: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
+                copyButtonId: 'm-account-type',
+                copyFieldName: 'Account Type'
               })}
 
               <div className="grid grid-cols-2 gap-[12px]">
@@ -2378,7 +2125,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: '',
                   value: accountForm.upiPhoneNumber,
                   readOnly: false,
-                  onChange: (e) => setAccountForm((s) => ({ ...s, upiPhoneNumber: e.target.value }))
+                  onChange: (e) => setAccountForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
+                  copyButtonId: 'm-account-upi-phone',
+                  copyFieldName: 'UPI Phone Number'
                 })}
                 {renderInput({
                   label: 'UPI ID',
@@ -2386,7 +2135,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: '',
                   value: accountForm.upiId,
                   readOnly: false,
-                  onChange: (e) => setAccountForm((s) => ({ ...s, upiId: e.target.value }))
+                  onChange: (e) => setAccountForm((s) => ({ ...s, upiId: e.target.value })),
+                  copyButtonId: 'm-account-upi-id',
+                  copyFieldName: 'UPI ID'
                 })}
               </div>
             </div>
@@ -2498,39 +2249,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddLabourView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-          <button type="button" onClick={() => setIsAddLabourViewOpen(false)} className="flex items-center gap-[6px]">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <button
-            type="button"
-            className="text-[12px] font-medium text-[#F26B3A]"
-            aria-label={labourFormMode === 'edit' ? 'Update labour' : 'Submit labour'}
-          >
-            Submit
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
+      <div className="bg-white">
+        <div className="flex items-center justify-between py-[8px] text-[12px] font-medium text-black">
           <span />
           <button type="button" className="text-[#2B2B2B]">
             View File
@@ -2538,7 +2258,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="flex flex-col ">
           {renderLabourAccordion(
             'labour-details',
@@ -2683,12 +2403,19 @@ const MasterData = ({ user, onLogout }) => {
                     QR Code
                   </button>
                 </div>
-                <input
-                  value={labourForm.accountHolderName || ''}
-                  onChange={(e) => setLabourForm((s) => ({ ...s, accountHolderName: e.target.value }))}
-                  placeholder="Enter Name"
-                  className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
-                />
+                <div className="relative">
+                  <input
+                    value={labourForm.accountHolderName || ''}
+                    onChange={(e) => setLabourForm((s) => ({ ...s, accountHolderName: e.target.value }))}
+                    placeholder="Enter Name"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={labourForm.accountHolderName}
+                    fieldName="Account Holder Name"
+                    buttonId="m-labour-account-holder"
+                  />
+                </div>
               </div>
 
               <div className="w-full">
@@ -2698,12 +2425,19 @@ const MasterData = ({ user, onLogout }) => {
                   </label>
                   <span className="text-[12px] font-medium text-[#4B4B4B]">Bank Name</span>
                 </div>
-                <input
-                  value={labourForm.accountNumber || ''}
-                  onChange={(e) => setLabourForm((s) => ({ ...s, accountNumber: e.target.value }))}
-                  placeholder="Enter Account Number"
-                  className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
-                />
+                <div className="relative">
+                  <input
+                    value={labourForm.accountNumber || ''}
+                    onChange={(e) => setLabourForm((s) => ({ ...s, accountNumber: e.target.value }))}
+                    placeholder="Enter Account Number"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={labourForm.accountNumber}
+                    fieldName="Account Number"
+                    buttonId="m-labour-account-number"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-[12px]">
@@ -2713,7 +2447,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: 'Enter IFSC Code',
                   value: labourForm.ifscCode,
                   readOnly: false,
-                  onChange: (e) => setLabourForm((s) => ({ ...s, ifscCode: e.target.value }))
+                  onChange: (e) => setLabourForm((s) => ({ ...s, ifscCode: e.target.value })),
+                  copyButtonId: 'm-labour-ifsc',
+                  copyFieldName: 'IFSC Code'
                 })}
                 {renderInput({
                   label: 'Branch',
@@ -2722,11 +2458,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: labourForm.accountBranch,
                   readOnly: false,
                   onChange: (e) => setLabourForm((s) => ({ ...s, accountBranch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-labour-branch',
+                  copyFieldName: 'Branch'
                 })}
               </div>
 
@@ -2737,7 +2470,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: 'Enter Number',
                   value: labourForm.upiPhoneNumber,
                   readOnly: false,
-                  onChange: (e) => setLabourForm((s) => ({ ...s, upiPhoneNumber: e.target.value }))
+                  onChange: (e) => setLabourForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
+                  copyButtonId: 'm-labour-upi-phone',
+                  copyFieldName: 'UPI Phone Number'
                 })}
                 {renderInput({
                   label: 'UPI ID',
@@ -2745,7 +2480,9 @@ const MasterData = ({ user, onLogout }) => {
                   placeholder: 'Enter UPI ID',
                   value: labourForm.upiId,
                   readOnly: false,
-                  onChange: (e) => setLabourForm((s) => ({ ...s, upiId: e.target.value }))
+                  onChange: (e) => setLabourForm((s) => ({ ...s, upiId: e.target.value })),
+                  copyButtonId: 'm-labour-upi-id',
+                  copyFieldName: 'UPI ID'
                 })}
               </div>
             </div>
@@ -2835,50 +2572,8 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddVendorView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddVendorViewOpen(false);
-                setSelectedItem(null);
-              }}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button
-              type="button"
-              onClick={() => setIsAddVendorViewOpen(false)}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Vendor Name
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{vendorFormMode === 'edit' ? 'Edit' : 'NEW'}</span>
-          </div>
-          <button type="button" className="shrink-0 text-[12px] font-medium text-black">
-            Update
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
+      <div className="bg-white">
+        <div className="py-[8px] text-right">
           <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
             <span>Upload File</span>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2894,7 +2589,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderVendorAccordion(
             'vendor-details',
@@ -2986,7 +2681,16 @@ const MasterData = ({ user, onLogout }) => {
                 value: vendorForm.vendorAddress,
                 readOnly: false,
                 onChange: (e) => setVendorForm((s) => ({ ...s, vendorAddress: e.target.value })),
-                multiline: true
+                multiline: true,
+                labelRight: (
+                  <button
+                    type="button"
+                    className="shrink-0 text-[12px] font-medium text-black"
+                    onClick={() => setIsVendorLocationSheetOpen(true)}
+                  >
+                    Location
+                  </button>
+                )
               })}
             </div>
           )}
@@ -2995,10 +2699,6 @@ const MasterData = ({ user, onLogout }) => {
             'account-details',
             'Account Details',
             <div className="space-y-[10px]">
-              {/*
-                Copy buttons are only enabled on this NEW add screen by passing:
-                rightIconInteractive + onRightIconClick.
-              */}
               <div className="w-full">
                 <div className="flex items-center justify-between">
                   <label className="block text-left text-[12px] font-medium text-black">
@@ -3017,18 +2717,13 @@ const MasterData = ({ user, onLogout }) => {
                     value={vendorForm.accountHolderName || ''}
                     onChange={(e) => setVendorForm((s) => ({ ...s, accountHolderName: e.target.value }))}
                     placeholder=""
-                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-[30px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(vendorForm.accountHolderName)}
-                    aria-label="Copy"
-                    className="absolute right-[10px] top-1/2 -translate-y-1/2 flex h-[20px] w-[20px] items-center justify-center p-0 text-[#4B4B4B] bg-transparent"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  </button>
+                  <MasterDataCopyButton
+                    text={vendorForm.accountHolderName}
+                    fieldName="Account Holder Name"
+                    buttonId="m-vendor-account-holder"
+                  />
                 </div>
               </div>
 
@@ -3044,18 +2739,13 @@ const MasterData = ({ user, onLogout }) => {
                     value={vendorForm.accountNumber || ''}
                     onChange={(e) => setVendorForm((s) => ({ ...s, accountNumber: e.target.value }))}
                     placeholder=""
-                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-[30px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(vendorForm.accountNumber)}
-                    aria-label="Copy"
-                    className="absolute right-[10px] top-1/2 -translate-y-1/2 flex h-[20px] w-[20px] items-center justify-center p-0 text-[#4B4B4B] bg-transparent"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  </button>
+                  <MasterDataCopyButton
+                    text={vendorForm.accountNumber}
+                    fieldName="Account Number"
+                    buttonId="m-vendor-account-number"
+                  />
                 </div>
               </div>
 
@@ -3067,13 +2757,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: vendorForm.ifscCode,
                   readOnly: false,
                   onChange: (e) => setVendorForm((s) => ({ ...s, ifscCode: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(vendorForm.ifscCode)
+                  copyButtonId: 'm-vendor-ifsc',
+                  copyFieldName: 'IFSC Code'
                 })}
                 {renderInput({
                   label: 'Branch',
@@ -3082,13 +2767,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: vendorForm.location,
                   readOnly: false,
                   onChange: (e) => setVendorForm((s) => ({ ...s, location: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(vendorForm.location)
+                  copyButtonId: 'm-vendor-branch',
+                  copyFieldName: 'Branch'
                 })}
               </div>
 
@@ -3100,13 +2780,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: vendorForm.upiPhoneNumber,
                   readOnly: false,
                   onChange: (e) => setVendorForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(vendorForm.upiPhoneNumber)
+                  copyButtonId: 'm-vendor-upi-phone',
+                  copyFieldName: 'UPI Phone Number'
                 })}
                 {renderInput({
                   label: 'UPI ID',
@@ -3115,19 +2790,65 @@ const MasterData = ({ user, onLogout }) => {
                   value: vendorForm.upiId,
                   readOnly: false,
                   onChange: (e) => setVendorForm((s) => ({ ...s, upiId: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  ),
-                  rightIconInteractive: true,
-                  onRightIconClick: () => copyToClipboard(vendorForm.upiId)
+                  copyButtonId: 'm-vendor-upi-id',
+                  copyFieldName: 'UPI ID'
                 })}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {isVendorLocationSheetOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close overlay"
+            onClick={() => setIsVendorLocationSheetOpen(false)}
+            className="fixed inset-0 z-[9999] bg-black/50"
+          />
+
+          <div className="fixed inset-x-0 bottom-0 z-[10000] mx-auto w-full rounded-t-[18px] bg-white px-[16px] pb-[16px] pt-[18px] shadow-[0px_-4px_20px_rgba(0,0,0,0.12)]">
+            <div className="mb-[14px] flex items-start justify-between">
+              <div className="text-[15px] font-semibold text-black">Location Details</div>
+              <button
+                type="button"
+                onClick={() => setIsVendorLocationSheetOpen(false)}
+                className="text-[28px] leading-none text-[#F26B3A]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {renderInput({
+              label: 'Latitude & Longitude',
+              required: true,
+              placeholder: 'Example: 9°31\'53.5"N 77°38\'01.9"E',
+              value: vendorForm.latitudeLongitude,
+              readOnly: vendorFormMode !== 'edit',
+              onChange: (e) => setVendorForm((s) => ({ ...s, latitudeLongitude: e.target.value }))
+            })}
+
+            <div className="mt-[16px] grid grid-cols-2 gap-[14px]">
+              <button
+                type="button"
+                onClick={() => setIsVendorLocationSheetOpen(false)}
+                className="h-[38px] rounded-[8px] border border-[#BEBEBE] bg-white text-[14px] font-medium text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsVendorLocationSheetOpen(false)}
+                className="h-[38px] rounded-[8px] bg-black text-[14px] font-medium text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {isVendorQrModalOpen && (
         <>
@@ -3211,64 +2932,22 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddProjectView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
+      <div className="bg-white">
+        <div className=" text-right">
           <button
             type="button"
-            className="pb-[8px] text-[#2B2B2B]"
-            aria-label="More options"
+            className="text-[12px] font-medium text-black"
+            onClick={() => {
+              setProjectPictureDraft(projectForm.projectPicture || '');
+              setIsProjectPictureModalOpen(true);
+            }}
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px]">
-          <div className="flex min-w-0 items-center truncate text-[11px] text-[#A4A4A4]">
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddProjectViewOpen(false);
-                setSelectedItem(null);
-              }}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Master Table
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <button
-              type="button"
-              onClick={() => setIsAddProjectViewOpen(false)}
-              className="truncate text-[11px] text-[#A4A4A4]"
-            >
-              Project Name
-            </button>
-            <span className="px-[4px]">&gt;</span>
-            <span className="font-medium text-black">{projectFormMode === 'edit' ? 'Edit' : 'New'}</span>
-          </div>
-          <button
-            type="button"
-            className="shrink-0 text-[12px] font-medium text-black"
-          >
-            Submit
-          </button>
-        </div>
-
-        <div className="border-t border-[#EFEFEF] px-[16px] py-[8px] text-right">
-          <button type="button" className="text-[12px] font-medium text-black">
             Upload File
           </button>
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px] pb-[18px]">
+      <div className="w-full px-0 pt-0 pb-[18px]">
         <div className="">
           {renderProjectAccordion(
             'project-details',
@@ -3343,7 +3022,16 @@ const MasterData = ({ user, onLogout }) => {
                 value: projectForm.projectAddress,
                 readOnly: projectFormMode !== 'edit',
                 onChange: (e) => setProjectForm((s) => ({ ...s, projectAddress: e.target.value })),
-                multiline: true
+                multiline: true,
+                labelRight: (
+                  <button
+                    type="button"
+                    className="shrink-0 text-[12px] font-medium text-black"
+                    onClick={() => setIsProjectLocationSheetOpen(true)}
+                  >
+                    Location
+                  </button>
+                )
               })}
             </div>
           )}
@@ -3414,50 +3102,56 @@ const MasterData = ({ user, onLogout }) => {
             'account-details',
             'Account Details',
             <div className="space-y-[10px]">
-              <div className="grid grid-cols-[minmax(0,1fr)_92px] gap-[12px]">
-                {renderInput({
-                  label: 'Account Holder Name',
-                  required: true,
-                  placeholder: '',
-                  value: projectForm.accountHolderName,
-                  readOnly: projectFormMode !== 'edit',
-                  onChange: (e) => setProjectForm((s) => ({ ...s, accountHolderName: e.target.value }))
-                })}
-                {renderInput({
-                  label: 'QR Code',
-                  placeholder: '',
-                  value: projectForm.qrCode,
-                  readOnly: projectFormMode !== 'edit',
-                  onChange: (e) => setProjectForm((s) => ({ ...s, qrCode: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  )
-                })}
+              <div className="w-full">
+                <div className="flex items-center justify-between">
+                  <label className="block text-left text-[12px] font-medium text-black">
+                    Account Holder Name<span className="text-[#E26D47]">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsProjectQrModalOpen(true)}
+                    className="text-[12px] font-medium text-black "
+                  >
+                    QR Code
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    value={projectForm.accountHolderName || ''}
+                    onChange={(e) => setProjectForm((s) => ({ ...s, accountHolderName: e.target.value }))}
+                    placeholder=""
+                    readOnly={projectFormMode !== 'edit'}
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={projectForm.accountHolderName}
+                    fieldName="Account Holder Name"
+                    buttonId="m-project-account-holder"
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-[12px]">
-                {renderInput({
-                  label: 'Account Number',
-                  required: true,
-                  placeholder: '',
-                  value: projectForm.accountNumber,
-                  readOnly: projectFormMode !== 'edit',
-                  onChange: (e) => setProjectForm((s) => ({ ...s, accountNumber: e.target.value }))
-                })}
-                {renderInput({
-                  label: ' ',
-                  placeholder: '',
-                  value: projectForm.bankName,
-                  readOnly: projectFormMode !== 'edit',
-                  onChange: (e) => setProjectForm((s) => ({ ...s, bankName: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  )
-                })}
+              <div className="w-full">
+                <div className="flex items-center justify-between">
+                  <label className="block text-left text-[12px] font-medium text-black">
+                    Account Number<span className="text-[#E26D47]">*</span>
+                  </label>
+                  <span className="text-[12px] font-medium text-[#4B4B4B]">{projectForm.bankName || ''}</span>
+                </div>
+                <div className="relative">
+                  <input
+                    value={projectForm.accountNumber || ''}
+                    onChange={(e) => setProjectForm((s) => ({ ...s, accountNumber: e.target.value }))}
+                    placeholder=""
+                    readOnly={projectFormMode !== 'edit'}
+                    className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+                  />
+                  <MasterDataCopyButton
+                    text={projectForm.accountNumber}
+                    fieldName="Account Number"
+                    buttonId="m-project-account-number"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-[12px]">
@@ -3468,11 +3162,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: projectForm.ifscCode,
                   readOnly: projectFormMode !== 'edit',
                   onChange: (e) => setProjectForm((s) => ({ ...s, ifscCode: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-project-ifsc',
+                  copyFieldName: 'IFSC Code'
                 })}
                 {renderInput({
                   label: 'Branch',
@@ -3481,11 +3172,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: projectForm.accountBranch,
                   readOnly: projectFormMode !== 'edit',
                   onChange: (e) => setProjectForm((s) => ({ ...s, accountBranch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-project-branch',
+                  copyFieldName: 'Branch'
                 })}
               </div>
 
@@ -3497,11 +3185,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: projectForm.upiPhoneNumber,
                   readOnly: projectFormMode !== 'edit',
                   onChange: (e) => setProjectForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-project-upi-phone',
+                  copyFieldName: 'UPI Phone Number'
                 })}
                 {renderInput({
                   label: 'UPI ID',
@@ -3510,11 +3195,8 @@ const MasterData = ({ user, onLogout }) => {
                   value: projectForm.upiId,
                   readOnly: projectFormMode !== 'edit',
                   onChange: (e) => setProjectForm((s) => ({ ...s, upiId: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2.25" y="2.25" width="7.5" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                    </svg>
-                  )
+                  copyButtonId: 'm-project-upi-id',
+                  copyFieldName: 'UPI ID'
                 })}
               </div>
             </div>
@@ -3523,8 +3205,8 @@ const MasterData = ({ user, onLogout }) => {
           {renderProjectAccordion(
             'project-information',
             'Project Information',
-            <div className="space-y-[12px]">
-              <div className="relative">
+            <div className="space-y-[12px] ">
+              <div className="relative mt-[8px]">
                 <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="8" cy="8" r="5.75" stroke="currentColor" strokeWidth="1.5" />
@@ -3539,19 +3221,63 @@ const MasterData = ({ user, onLogout }) => {
                 />
               </div>
 
-              <div className="rounded-[12px] border border-[#F0F0F0] bg-white p-[12px] shadow-[0px_1px_4px_rgba(0,0,0,0.05)]">
-                <div className="grid grid-cols-[minmax(0,1fr)_92px] gap-[10px] text-[12px] text-black">
-                  <div className="space-y-[4px] text-left">
-                    <div>SL - 01 - 13/41B</div>
-                    <div>Home</div>
-                    <div>First Floor</div>
-                    <div className="text-[#5B5B5B]">07989837327949, 1Phase</div>
-                  </div>
-                  <div className="space-y-[4px] text-right">
-                    <div>1200 Sqft</div>
-                    <div>Sh.No 134</div>
-                    <div className="whitespace-nowrap text-[#C79B53]">PT 3564743897879</div>
-                    <div className="whitespace-nowrap text-[#C79B53]">WT 843646H76346</div>
+              <div
+                className="relative w-full overflow-hidden rounded-[12px] border border-[#E8E8E8] bg-[#F8F8F8] shadow-[0px_1px_4px_rgba(0,0,0,0.06)] select-none"
+                style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
+                onTouchStart={handleProjectTouchStart}
+                onTouchEnd={(event) => handleProjectTouchEnd(event, 'project-information-card')}
+                onMouseDown={handleProjectMouseDown}
+                onMouseUp={(event) => handleProjectMouseUp(event, 'project-information-card')}
+                onMouseLeave={(event) => handleProjectMouseUp(event, 'project-information-card')}
+              >
+                <div className="absolute right-0 top-0 bottom-0 z-0 flex gap-[8px]">
+                  <button
+                    type="button"
+                    className="flex w-[48px] shrink-0 self-stretch items-center justify-center rounded-[6px] bg-[#007233] text-white shadow-sm transition-colors hover:bg-[#22a882]"
+                    aria-label="Edit"
+                    onClick={() => {
+                      setIsAddOnSheetOpen(true);
+                      setSwipedProjectId(null);
+                    }}
+                  >
+                    <img src={editIconHistory} alt="Edit" className="w-[18px] h-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-[48px] shrink-0 self-stretch items-center justify-center rounded-[6px] bg-[#E4572E] text-white shadow-sm transition-colors hover:bg-[#cc4d26]"
+                    aria-label="Delete"
+                    onClick={() => setSwipedProjectId(null)}
+                  >
+                    <img src={deleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
+                  </button>
+                </div>
+
+                <div
+                  className={`relative z-[1] rounded-[12px] border border-[#E8E8E8] bg-white px-[16px] pr-[20px] py-[8px] transition-transform duration-200 ${
+                    swipedProjectId === 'project-information-card' ? '-translate-x-[110px]' : 'translate-x-0'
+                  }`}
+                >
+                  <div className="grid grid-cols-[minmax(0,1fr)_92px] gap-x-[12px] gap-y-[6px] text-[12px] text-black">
+                    <div className="space-y-[6px] text-left">
+                      <div className="font-semibold">SL - 01 - 13/41B</div>
+                      <div>Home</div>
+                      <div>First Floor</div>
+                      <div className="text-[#5B5B5B]">
+                        07989837327949, <span className="font-semibold text-black">1Phase</span>
+                      </div>
+                    </div>
+                    <div className="space-y-[6px] text-right">
+                      <div>1200 Sqft</div>
+                      <div>Sh.No 134</div>
+                      <div className="whitespace-nowrap">
+                        <span className="font-semibold text-[#C79B53]">PT</span>{' '}
+                        <span className="text-black">3564743897879</span>
+                      </div>
+                      <div className="whitespace-nowrap">
+                        <span className="font-semibold text-[#C79B53]">WT</span>{' '}
+                        <span className="text-black">843646H76346</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3568,6 +3294,230 @@ const MasterData = ({ user, onLogout }) => {
           )}
         </div>
       </div>
+
+      {isProjectPictureModalOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close overlay"
+            onClick={() => setIsProjectPictureModalOpen(false)}
+            className="fixed inset-0 z-[9999] bg-black/60"
+          />
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center px-[16px]">
+            <div
+              className="w-full max-w-[330px] rounded-[14px] bg-white px-[18px] pt-[16px] pb-[18px] shadow-[0px_10px_30px_rgba(0,0,0,0.22)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative mb-[12px] text-center">
+                <div className="text-[16px] font-semibold text-black">Project Picture</div>
+                <div className="mt-[2px] text-[11px] text-black">Uploaded Photo</div>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setIsProjectPictureModalOpen(false)}
+                  className="absolute right-0 top-0 text-[#F26B3A]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 5L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M13 5L5 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mx-auto mb-[12px] w-full max-w-[220px] rounded-[12px] border border-[#DEDEDE] bg-[#FAFAFA] p-[10px] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[8px] border-[3px] border-[#CFCFCF] bg-[#E8E8E8] shadow-[inset_0_3px_10px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.65)]">
+                  {projectPictureDraft ? (
+                    <img src={projectPictureDraft} alt="" className="h-full w-full object-contain" />
+                  ) : (
+                    <svg className="h-[56px] w-[56px] text-[#B5B5B5]" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <rect x="6" y="10" width="52" height="44" rx="4" stroke="currentColor" strokeWidth="1.75" />
+                      <circle cx="44" cy="22" r="5" fill="currentColor" fillOpacity="0.4" />
+                      <path
+                        d="M8 48 L24 24 L36 40 L48 28 L56 36 V52 H8 Z"
+                        fill="currentColor"
+                        fillOpacity="0.32"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+
+              <input
+                type="file"
+                accept="image/*"
+                id="projectPictureFileInput"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = typeof reader.result === 'string' ? reader.result : '';
+                    setProjectPictureDraft(result);
+                  };
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => document.getElementById('projectPictureFileInput')?.click()}
+                className="mb-[12px] h-[40px] w-full rounded-[8px] border border-[#D9D9D9] bg-white text-[14px] font-medium text-black"
+              >
+                Upload Photo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setProjectForm((s) => ({ ...s, projectPicture: projectPictureDraft }));
+                  setIsProjectPictureModalOpen(false);
+                }}
+                className="h-[44px] w-full rounded-[8px] bg-black text-[14px] font-semibold text-white"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {isProjectLocationSheetOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close overlay"
+            onClick={() => setIsProjectLocationSheetOpen(false)}
+            className="fixed inset-0 z-[9999] bg-black/50"
+          />
+
+          <div className="fixed inset-x-0 bottom-0 z-[10000] mx-auto w-full rounded-t-[18px] bg-white px-[16px] pb-[16px] pt-[18px] shadow-[0px_-4px_20px_rgba(0,0,0,0.12)]">
+            <div className="mb-[14px] flex items-start justify-between">
+              <div className="text-[15px] font-semibold text-black">Location Details</div>
+              <button
+                type="button"
+                onClick={() => setIsProjectLocationSheetOpen(false)}
+                className="text-[28px] leading-none text-[#F26B3A]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {renderInput({
+              label: 'Latitude & Longitude',
+              required: true,
+              placeholder: 'Example: 9°31\'53.5"N 77°38\'01.9"E',
+              value: projectForm.latitudeLongitude,
+              readOnly: projectFormMode !== 'edit',
+              onChange: (e) => setProjectForm((s) => ({ ...s, latitudeLongitude: e.target.value }))
+            })}
+
+            <div className="mt-[16px] grid grid-cols-2 gap-[14px]">
+              <button
+                type="button"
+                onClick={() => setIsProjectLocationSheetOpen(false)}
+                className="h-[38px] rounded-[8px] border border-[#BEBEBE] bg-white text-[14px] font-medium text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsProjectLocationSheetOpen(false)}
+                className="h-[38px] rounded-[8px] bg-black text-[14px] font-medium text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {isProjectQrModalOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close overlay"
+            onClick={() => setIsProjectQrModalOpen(false)}
+            className="fixed inset-0 z-[9999] bg-black/60"
+          />
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center px-[16px]">
+            <div
+              className="w-full max-w-[330px] rounded-[14px] bg-white px-[18px] pt-[16px] pb-[18px] shadow-[0px_10px_30px_rgba(0,0,0,0.22)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative mb-[12px] text-center">
+                <div className="text-[16px] font-semibold text-black">QR Code</div>
+                <div className="mt-[2px] text-[11px] text-[#7A7A7A]">Scan for Payment</div>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setIsProjectQrModalOpen(false)}
+                  className="absolute right-0 top-0 text-[#F26B3A]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 5L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M13 5L5 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mx-auto mb-[12px] flex h-[160px] w-[200px] items-center justify-center rounded-[10px] border border-[#E6E6E6] bg-white">
+                {projectQrPreview || projectForm.qrCode ? (
+                  <img
+                    src={projectQrPreview || projectForm.qrCode}
+                    alt="QR Code"
+                    className="h-[140px] w-[140px] object-contain"
+                  />
+                ) : (
+                  <img src={AccountQrCodeImage} alt="QR Code" className="h-[140px] w-[140px] object-contain" />
+                )}
+              </div>
+
+              <input
+                value={projectForm.upiId || ''}
+                onChange={(e) => setProjectForm((s) => ({ ...s, upiId: e.target.value }))}
+                readOnly={projectFormMode !== 'edit'}
+                placeholder="9876543210@Axis"
+                className="mb-[10px] h-[34px] w-full rounded-[6px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
+              />
+
+              <input
+                type="file"
+                accept="image/*"
+                id="projectAccountQrUpload"
+                className="hidden"
+                disabled={projectFormMode !== 'edit'}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = typeof reader.result === 'string' ? reader.result : '';
+                    setProjectQrPreview(result);
+                    setProjectForm((s) => ({ ...s, qrCode: result }));
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => document.getElementById('projectAccountQrUpload')?.click()}
+                disabled={projectFormMode !== 'edit'}
+                className="mb-[12px] h-[36px] w-full rounded-[6px] border border-[#D9D9D9] bg-white text-[13px] font-medium text-black disabled:opacity-50"
+              >
+                Update QR Code
+              </button>
+
+              <button type="button" className="h-[44px] w-full rounded-[8px] bg-black text-[14px] font-semibold text-white">
+                Update
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {isAddOnSheetOpen && (
         <>
@@ -3816,34 +3766,7 @@ const MasterData = ({ user, onLogout }) => {
 
       return (
         <>
-          <div className="border-b border-[#E9E9E9] bg-white">
-            <div className="flex items-end justify-between px-[16px] pt-[10px]">
-              <div className="relative pb-[8px] text-[14px] font-medium text-black">
-                Master Data
-                <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-              </div>
-              <button type="button" className="pb-[8px] text-[#2B2B2B]" aria-label="More options">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-                  <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-                  <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-              <button type="button" onClick={() => setSelectedItem(null)} className="flex items-center gap-[6px]">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>Back</span>
-              </button>
-              <button type="button">Download</button>
-            </div>
-          </div>
-
-          <div className="px-[12px] pt-[8px]">
+          <div className="px-[2px] pt-[8px]">
             <div className="flex items-center gap-[10px]">
               <div className="relative flex-1">
                 <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
@@ -3892,7 +3815,7 @@ const MasterData = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="px-[12px] pt-[12px]">
+          <div className="px-[2px] pt-[12px]">
             <div className="space-y-0">
               {renderBankDetailsAccordion('bank-name', 'Bank Name', renderSimpleList(bankNameList, 'bank-name'))}
               {renderBankDetailsAccordion(
@@ -3913,42 +3836,7 @@ const MasterData = ({ user, onLogout }) => {
 
     return (
       <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button
-            type="button"
-            className="pb-[8px] text-[#2B2B2B]"
-            aria-label="More options"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-          <button
-            type="button"
-            onClick={() => setSelectedItem(null)}
-            className="flex items-center gap-[6px]"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <button type="button">Download</button>
-        </div>
-      </div>
-
-      <div className="px-[12px] pt-[8px]">
+      <div className="px-[2px] pt-[8px]">
         <div className="flex items-center gap-[10px]">
           <div className="relative flex-1">
             <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
@@ -3984,6 +3872,7 @@ const MasterData = ({ user, onLogout }) => {
                   branch: '',
                   emailId: '',
                   vendorAddress: '',
+                  latitudeLongitude: '',
                   location: '',
                   accountHolderName: '',
                   qrCode: '',
@@ -4106,7 +3995,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px]">
+      <div className="px-[2px] pt-[12px]">
         <div className="overflow-hidden rounded-[14px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)]">
           <div className="border-b border-[#EFEFEF] bg-[#F8F8F8] px-[14px] py-[10px]">
             <div className="flex items-center">
@@ -4255,42 +4144,7 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderProjectNameView = () => (
     <>
-      <div className="border-b border-[#E9E9E9] bg-white">
-        <div className="flex items-end justify-between px-[16px] pt-[10px]">
-          <div className="relative pb-[8px] text-[14px] font-medium text-black">
-            Master Data
-            <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-          </div>
-          <button
-            type="button"
-            className="pb-[8px] text-[#2B2B2B]"
-            aria-label="More options"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-              <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[#EFEFEF] px-[16px] py-[8px] text-[12px] font-medium text-black">
-          <button
-            type="button"
-            onClick={() => setSelectedItem(null)}
-            className="flex items-center gap-[6px]"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 6H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 9L2 6L5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <button type="button">Download</button>
-        </div>
-      </div>
-
-      <div className="px-[12px] pt-[8px]">
+      <div className="px-[2px] pt-[8px]">
         <div className="flex items-center gap-[10px]">
           <div className="relative flex-1">
             <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
@@ -4314,6 +4168,8 @@ const MasterData = ({ user, onLogout }) => {
             aria-label="Add"
             onClick={() => {
               setProjectFormMode('new');
+              setProjectQrPreview('');
+              setIsProjectQrModalOpen(false);
               setProjectForm({
                 projectName: '',
                 projectId: '',
@@ -4321,6 +4177,7 @@ const MasterData = ({ user, onLogout }) => {
                 referenceName: '',
                 branch: '',
                 projectAddress: '',
+                latitudeLongitude: '',
                 clientName: '',
                 fatherName: '',
                 mobileNumber: '',
@@ -4348,7 +4205,7 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="px-[12px] pt-[12px]">
+      <div className="px-[2px] pt-[12px]">
         <div className="overflow-hidden rounded-[14px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)]">
           <div className="border-b border-[#EFEFEF] bg-[#F8F8F8] px-[14px] py-[10px]">
             <div className="flex items-center">
@@ -4391,6 +4248,7 @@ const MasterData = ({ user, onLogout }) => {
                           const next = normalizeProjectForForm(item);
                           setProjectFormMode('edit');
                           setProjectForm(next);
+                          setProjectQrPreview(next.qrCode || '');
                           setIsAddProjectViewOpen(true);
                           setExpandedProjectSection('project-details');
                         }}
@@ -4443,6 +4301,268 @@ const MasterData = ({ user, onLogout }) => {
     </>
   );
 
+  const addEditFormHeaderSubRow =
+    selectedItem === 'Bank Details' && isBankNameFormOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => setIsBankNameFormOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsBankNameFormOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Bank Name
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{bankNameFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Update
+        </button>
+      </>
+    ) : selectedItem === 'Bank Details' && isBankTypeFormOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => setIsBankTypeFormOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsBankTypeFormOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Account Type
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{bankTypeFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Update
+        </button>
+      </>
+    ) : selectedItem === 'Bank Details' && isBankLocationFormOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => setIsBankLocationFormOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsBankLocationFormOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Branch Name
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{bankLocationFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Save
+        </button>
+      </>
+    ) : selectedItem === 'Project Name' && isAddProjectViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddProjectViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsAddProjectViewOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Project Name
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{projectFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Submit
+        </button>
+      </>
+    ) : selectedItem === 'Vendor Name' && isAddVendorViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddVendorViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsAddVendorViewOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Vendor Name
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{vendorFormMode === 'edit' ? 'Edit' : 'NEW'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Update
+        </button>
+      </>
+    ) : (selectedItem === 'Contractor Name' || selectedItem === 'Support Associate Name') && isAddContractorViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddContractorViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsAddContractorViewOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            {selectedItem === 'Support Associate Name' ? 'Support Associate Name' : 'Contractor Name'}
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{contractorFormMode === 'edit' ? 'Edit' : 'NEW'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Update
+        </button>
+      </>
+    ) : selectedItem === 'Categories' && isAddCategoryViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button type="button" onClick={() => setIsAddCategoryViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button type="button" onClick={() => setIsAddCategoryViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Categories
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{categoryFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          {categoryFormMode === 'edit' ? 'Update' : 'Add'}
+        </button>
+      </>
+    ) : selectedItem === 'Machine tools' && isAddMachineViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddMachineViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button
+            type="button"
+            onClick={() => setIsAddMachineViewOpen(false)}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
+            Machine tools
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{machineFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          Update
+        </button>
+      </>
+    ) : selectedItem === 'Employee Details' && isAddEmployeeViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button type="button" onClick={() => setIsAddEmployeeViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button type="button" onClick={() => setIsAddEmployeeViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Employee Details
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{employeeFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          {employeeFormMode === 'edit' ? 'Update' : 'Submit'}
+        </button>
+      </>
+    ) : selectedItem === 'Account Details' && isAddAccountViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button type="button" onClick={() => setIsAddAccountViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button type="button" onClick={() => setIsAddAccountViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Account Details
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{accountFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+          {accountFormMode === 'edit' ? 'Update' : 'Submit'}
+        </button>
+      </>
+    ) : selectedItem === 'Company Labour' && isAddLabourViewOpen ? (
+      <>
+        <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
+          <button type="button" onClick={() => setIsAddLabourViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Master Table
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <button type="button" onClick={() => setIsAddLabourViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+            Company Labour
+          </button>
+          <span className="px-[4px] shrink-0">&gt;</span>
+          <span className="shrink-0 font-medium text-black">{labourFormMode === 'edit' ? 'Edit' : 'New'}</span>
+        </div>
+        <button
+          type="button"
+          className="shrink-0 text-[12px] font-medium text-[#F26B3A]"
+          aria-label={labourFormMode === 'edit' ? 'Update labour' : 'Submit labour'}
+        >
+          Submit
+        </button>
+      </>
+    ) : null;
+
   return (
     <div
       className="relative w-full min-h-screen bg-white max-w-[360px] mx-auto overflow-hidden"
@@ -4456,18 +4576,38 @@ const MasterData = ({ user, onLogout }) => {
         userRoles={user?.userRoles || []}
       />
 
-      <Header
-        title="Master Data"
+      <MasterDataHeader
         user={user}
         onLogout={onLogout}
         onMenuClick={() => setSidebarOpen(true)}
+        showSubHeader
+        customSubHeaderRow={addEditFormHeaderSubRow}
+        showDrillBackDownload={
+          Boolean(selectedItem) &&
+          !(selectedItem === 'Project Name' && isAddProjectViewOpen) &&
+          !(selectedItem === 'Vendor Name' && isAddVendorViewOpen) &&
+          !(
+            (selectedItem === 'Contractor Name' || selectedItem === 'Support Associate Name') &&
+            isAddContractorViewOpen
+          ) &&
+          !(selectedItem === 'Categories' && isAddCategoryViewOpen) &&
+          !(selectedItem === 'Machine tools' && isAddMachineViewOpen) &&
+          !(selectedItem === 'Employee Details' && isAddEmployeeViewOpen) &&
+          !(selectedItem === 'Account Details' && isAddAccountViewOpen) &&
+          !(selectedItem === 'Company Labour' && isAddLabourViewOpen) &&
+          !(
+            selectedItem === 'Bank Details' &&
+            (isBankNameFormOpen || isBankTypeFormOpen || isBankLocationFormOpen)
+          )
+        }
+        onDrillBack={() => setSelectedItem(null)}
       />
 
       <div
         className="bg-white"
         style={{
           minHeight: '100vh',
-          paddingTop: '56px',
+          paddingTop: '126px',
           paddingBottom: 'calc(60px + 18px + env(safe-area-inset-bottom, 0px))'
         }}
       >
@@ -4478,32 +4618,13 @@ const MasterData = ({ user, onLogout }) => {
             renderSelectedItemView()
           )
         ) : (
-          <>
-            <div className="border-b border-[#E9E9E9] bg-white">
-              <div className="flex items-end justify-between px-[16px] pt-[10px]">
-                <div className="relative pb-[8px] text-[14px] font-medium text-black">
-                  Master Data
-                  <div className="absolute left-0 bottom-0 h-[2px] w-[80px] rounded-full bg-[#C79B53]" />
-                </div>
-                <button
-                  type="button"
-                  className="pb-[8px] text-[#2B2B2B]"
-                  aria-label="More options"
-                >
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="9" cy="4" r="1.3" fill="currentColor" />
-                    <circle cx="9" cy="9" r="1.3" fill="currentColor" />
-                    <circle cx="9" cy="14" r="1.3" fill="currentColor" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-end border-t border-[#EFEFEF] px-[16px] py-[6px] text-[12px] font-medium text-black">
-                Table
-              </div>
-            </div>
-
-            <div className="px-[12px] pt-[8px]">
+          <div
+            className="flex flex-col"
+            style={{
+              minHeight: 'calc(100vh - 126px - 60px - 18px - env(safe-area-inset-bottom, 0px))'
+            }}
+          >
+            <div className="mt-[10px] shrink-0 pt-0">
               <div className="relative">
                 <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4521,8 +4642,8 @@ const MasterData = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className="px-[12px] pt-[12px]">
-              <div className="rounded-[14px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)] overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto pt-2">
+              <div className="w-full rounded-[14px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)] overflow-hidden">
                 {filteredItems.map((item, index) => (
                   <button
                     key={item}
@@ -4553,7 +4674,7 @@ const MasterData = ({ user, onLogout }) => {
                 )}
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
 

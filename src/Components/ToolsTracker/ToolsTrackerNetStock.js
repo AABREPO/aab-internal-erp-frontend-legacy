@@ -22,7 +22,7 @@ const ToolsTrackerNetStock = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuildersDash/api/po_category/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/po_category/getAll');
         if (response.ok) {
           const data = await response.json();
           const options = data.map(item => ({
@@ -48,7 +48,7 @@ const ToolsTrackerNetStock = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchItemNames = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/po_itemNames/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/po_itemNames/getAll');
         if (response.ok) {
           const data = await response.json();
           const filteredItems = selectedCategory
@@ -73,7 +73,7 @@ const ToolsTrackerNetStock = ({ username, userRoles = [] }) => {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        const response = await fetch('https://backendaab.in/aabuilderDash/api/po_brand/getAll');
+        const response = await fetch('https://backendaab.in/demoAabuilderDash/api/po_brand/getAll');
         if (response.ok) {
           const data = await response.json();
           const filteredBrands = selectedCategory
@@ -100,7 +100,7 @@ const ToolsTrackerNetStock = ({ username, userRoles = [] }) => {
     const fetchInventoryData = async () => {
       try {
         // TODO: Replace with actual API endpoint when available
-        // const response = await fetch('https://backendaab.in/aabuilderDash/api/tools_tracker/netStock');
+        // const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tools_tracker/netStock');
         // if (response.ok) {
         //   const data = await response.json();
         //   setInventoryData(data);

@@ -9,15 +9,15 @@ import CloseIcon from '../Images/Close F.svg';
 import Filter from '../Images/Filter.png';
 import { getToolsNetStockPrefetchCache } from './netStockPrefetch';
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
-const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_stock_management';
-const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_tracker_management';
-const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_name';
-const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_item_id';
-const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/project_Names';
-const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/aabuilderDash/api/vendor_Names';
-const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_brand';
-const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/aabuildersDash/api/tools_machine_number';
-const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/aabuildersDash/api/employee_details';
+const TOOLS_STOCK_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_stock_management';
+const TOOLS_TRACKER_MANAGEMENT_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_tracker_management';
+const TOOLS_ITEM_NAME_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_name';
+const TOOLS_ITEM_ID_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_item_id';
+const PROJECT_NAMES_BASE_URL = 'https://backendaab.in/demoAabuilderDash/api/project_Names';
+const VENDOR_NAMES_BASE_URL = 'https://backendaab.in/demoAabuilderDash/api/vendor_Names';
+const TOOLS_BRAND_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_brand';
+const TOOLS_MACHINE_NUMBER_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/tools_machine_number';
+const EMPLOYEE_DETAILS_BASE_URL = 'https://backendaab.in/demoAabuildersDash/api/employee_details';
 
 const isQuantityTransferEntryType = (entry) => {
   const t = (entry.tools_entry_type || entry.toolsEntryType || '').toLowerCase().trim();

@@ -7,7 +7,7 @@ const HandoverPaymentsPage = () => {
   useEffect(() => {
     const fetchHandoverPayments = async () => {
       try {
-        const res = await axios.get("https://backendaab.in/aabuildersDash/api/payments-received/getAll");
+        const res = await axios.get("https://backendaab.in/demoAabuildersDash/api/payments-received/getAll");
         // Filter only Handover payments
         const filtered = res.data.filter((payment) => payment.type === "Handover");
         setHandoverPayments(filtered);

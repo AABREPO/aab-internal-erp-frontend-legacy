@@ -151,7 +151,7 @@ const BathFixtureHistory = () => {
     }, []);
     const fetchPaintCalculations = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -165,7 +165,7 @@ const BathFixtureHistory = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -278,7 +278,7 @@ const BathFixtureHistory = () => {
     });
     const deleteCalculation = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/delete/${id}`, {
                 method: 'DELETE',
             });
 
@@ -306,7 +306,7 @@ const BathFixtureHistory = () => {
     const handleSave = async () => {
         const formattedDate = formatDates(formData.date);
         try {
-            const response = await fetch(`https://backendaab.in/aabuilderDash/api/bath_fixture_calculation/edit/${formData.id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/bath_fixture_calculation/edit/${formData.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

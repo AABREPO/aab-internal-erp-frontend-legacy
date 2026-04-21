@@ -5,7 +5,7 @@
  * Backend (Spring): {@code GET /api/advance_portal/paged?page=0&size=150&sort=advancePortalId,desc}
  */
 
-const ADVANCE_PORTAL_BASE = 'https://backendaab.in/aabuildersDash/api/advance_portal';
+const ADVANCE_PORTAL_BASE = 'https://backendaab.in/demoAabuildersDash/api/advance_portal';
 
 /** Spring Page JSON or a plain array (legacy). */
 export function parsePagedRows(json) {

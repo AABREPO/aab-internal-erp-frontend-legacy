@@ -99,7 +99,7 @@ const DTableView = ({username, userRoles = []}) => {
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
         const allRoles = response.data;
         const userRoleNames = userRoles.map(r => r.roles);
         const matchedRoles = allRoles.filter(role =>
@@ -200,7 +200,7 @@ const DTableView = ({username, userRoles = []}) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -220,7 +220,7 @@ const DTableView = ({username, userRoles = []}) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -240,7 +240,7 @@ const DTableView = ({username, userRoles = []}) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -260,7 +260,7 @@ const DTableView = ({username, userRoles = []}) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -280,7 +280,7 @@ const DTableView = ({username, userRoles = []}) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/machine_tools/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/machine_tools/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -300,7 +300,7 @@ const DTableView = ({username, userRoles = []}) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("https://backendaab.in/aabuilderDash/api/account_type/bulk_upload", {
+      const response = await fetch("https://backendaab.in/demoAabuilderDash/api/account_type/bulk_upload", {
         method: "POST",
         body: formData,
       });
@@ -316,7 +316,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Site Names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/project_Names/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/project_Names/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -338,7 +338,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Site Names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -360,7 +360,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Site Names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/contractor_Names/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/contractor_Names/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -382,7 +382,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Site Names?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses_categories/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -404,7 +404,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Machine Tools?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/machine_tools/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/machine_tools/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -426,7 +426,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Machine Tools?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuilderDash/api/account_type/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/account_type/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -448,7 +448,7 @@ const DTableView = ({username, userRoles = []}) => {
     const confirmed = window.confirm("Are you sure you want to delete all Machine Tools?");
     if (confirmed) {
       try {
-        const response = await fetch("https://backendaab.in/aabuildersDash/api/weekly_types/deleteAll", {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_types/deleteAll", {
           method: "DELETE",
         });
         if (response.ok) {
@@ -471,7 +471,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchSiteNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setSiteNames(data);
@@ -489,7 +489,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchVendorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setVendorNames(data);
@@ -506,7 +506,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchContractorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setContractorNames(data);
@@ -523,7 +523,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchCategories = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll');
       if (response.ok) {
         const data = await response.json();
         setExpensesCategory(data);
@@ -540,7 +540,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchMachinTools = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/machine_tools/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll');
       if (response.ok) {
         const data = await response.json();
         setMachineToolsOptions(data);
@@ -557,7 +557,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchAccountType = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/account_type/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/account_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setExpensesAccountType(data);
@@ -574,7 +574,7 @@ const DTableView = ({username, userRoles = []}) => {
   }, []);
   const fetchWeeklyType = async () => {
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/getAll');
       if (response.ok) {
         const data = await response.json();
         setWeeklyTypes(data);
@@ -590,7 +590,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newSiteNames = { siteName, siteNo };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -612,7 +612,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newMachineTool = { machineTool };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/machine_tools/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/machine_tools/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -635,7 +635,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newAccountType = { accountType };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/account_type/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/account_type/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -658,7 +658,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newWeeklyType = { type: weeklyType };
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/weekly_types/save', {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -681,7 +681,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newVendorName = { vendorName };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -704,7 +704,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newContractorName = { contractorName };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/contractor_Names/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -727,7 +727,7 @@ const DTableView = ({username, userRoles = []}) => {
     e.preventDefault();
     const newCategory = { category };
     try {
-      const response = await fetch('https://backendaab.in/aabuilderDash/api/expenses_categories/save', {
+      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -748,7 +748,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleSiteNameDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -766,7 +766,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditSiteName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/project_Names/edit/${selectedSiteId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${selectedSiteId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -786,7 +786,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditVendorName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/vendor_Names/edit/${selectedVendorId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/edit/${selectedVendorId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -806,7 +806,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditContractorName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/contractor_Names/edit/${selectedContractorId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/contractor_Names/edit/${selectedContractorId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -826,7 +826,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditCategoriesName = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/expenses_categories/edit/${selectedCategoryId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/expenses_categories/edit/${selectedCategoryId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -846,7 +846,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditAccountTypes = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/account_type/edit/${selectedAccountTypeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/account_type/edit/${selectedAccountTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -866,7 +866,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditWeeklyTypes = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_types/edit/${selectedWeeklyTypeId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/edit/${selectedWeeklyTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -886,7 +886,7 @@ const DTableView = ({username, userRoles = []}) => {
   const handleEditMachineTools = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/machine_tools/edit/${selectedMachineId}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/machine_tools/edit/${selectedMachineId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -905,7 +905,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleVendorNameDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/vendor_Names/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/vendor_Names/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -922,7 +922,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleContractorNameDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/contractor_Names/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/contractor_Names/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -939,7 +939,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleCategoriesDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/expenses_categories/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/expenses_categories/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -956,7 +956,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleAccountTypeDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/account_type/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/account_type/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -973,7 +973,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleWeeklyTypeDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuildersDash/api/weekly_types/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -990,7 +990,7 @@ const DTableView = ({username, userRoles = []}) => {
   };
   const handleMachineToolsDelete = async (id) => {
     try {
-      const response = await fetch(`https://backendaab.in/aabuilderDash/api/machine_tools/delete/${id}`, {
+      const response = await fetch(`https://backendaab.in/demoAabuilderDash/api/machine_tools/delete/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {

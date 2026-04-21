@@ -38,7 +38,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/api/projects/getAll');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
                 // Filter projects that have waterTaxNo in propertyDetails
                 const projectsWithWaterTaxNo = response.data.filter(project =>
                     project.propertyDetails &&
@@ -65,7 +65,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchWaterTaxPayments = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/expenses_form/utility/water');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/water');
                 setWaterTaxPayments(response.data || []);
             } catch (error) {
                 console.error('Error fetching water tax payments:', error);
@@ -82,7 +82,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchFrequencyHistory = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/aabuilderDash/api/frequency-history/getAll');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll');
                 setFrequencyHistory(response.data || []);
             } catch (error) {
                 console.error('Error fetching frequency history:', error);
@@ -97,7 +97,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -428,7 +428,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
     };
     const toggleProjectHideStatus = async (projectId, isHide) => {
         try {
-            const response = await axios.put(`https://backendaab.in/aabuilderDash/api/projects/hide/${projectId}`, null, {
+            const response = await axios.put(`https://backendaab.in/demoAabuilderDash/api/projects/hide/${projectId}`, null, {
                 params: { isHide }
             });
             if (response.data) {
@@ -491,7 +491,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                 waterFrequencyNo: null, // Not applicable for water tax tab
                 startingMonthOfWaterFrequency: null // Not applicable for water tax tab
             };
-            const response = await axios.post('https://backendaab.in/aabuilderDash/api/frequency-history/save', frequencyHistoryData);
+            const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/frequency-history/save', frequencyHistoryData);
             if (response.data) {
                 setSubmittedFrequencyData(prev => ({
                     ...prev,
@@ -502,7 +502,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                 }));
                 const fetchFrequencyHistory = async () => {
                     try {
-                        const response = await axios.get('https://backendaab.in/aabuilderDash/api/frequency-history/getAll');
+                        const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll');
                         setFrequencyHistory(response.data || []);
                     } catch (error) {
                         console.error('Error fetching frequency history:', error);

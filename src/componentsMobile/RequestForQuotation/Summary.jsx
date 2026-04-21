@@ -30,7 +30,7 @@ const Summary = () => {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const res = await fetch('https://backendaab.in/aabuilderDash/api/vendor_Names/getAll');
+        const res = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
         if (res.ok) {
           const data = await res.json();
           setAllVendors(data);
@@ -45,7 +45,7 @@ const Summary = () => {
     };
     const fetchProjects = async () => {
       try {
-        const res = await fetch('https://backendaab.in/aabuilderDash/api/project_Names/getAll', {
+        const res = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -72,7 +72,7 @@ const Summary = () => {
       return;
     }
     try {
-      const response = await fetch('https://backendaab.in/aabuildersDash/api/rfq/getAll');
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/rfq/getAll');
       if (!response.ok) {
         throw new Error('Failed to fetch RFQs');
       }

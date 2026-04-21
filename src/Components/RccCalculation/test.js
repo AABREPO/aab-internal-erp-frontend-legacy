@@ -828,7 +828,7 @@ const RccCalculator = () => {
     useEffect(() => {
         const fetchSites = async () => {
             try {
-                const response = await fetch("https://backendaab.in/aabuilderDash/api/expenses/sites", {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses/sites", {
                     method: "GET",
                     credentials: "include",
                     headers: {
@@ -856,7 +856,7 @@ const RccCalculator = () => {
         }, []);
     const fetchCalculation = async () => {
         try {
-            const response = await fetch('https://backendaab.in/aabuilderDash/api/tile/tile/all');
+            const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }

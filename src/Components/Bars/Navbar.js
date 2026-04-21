@@ -30,7 +30,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
-        const response = await axios.get("https://backendaab.in/aabuilderDash/api/user_roles/all");
+        const response = await axios.get("https://backendaab.in/demoAabuilderDash/api/user_roles/all");
         const allRoles = response.data;
         const userRoleNames = userRoles.map(r => r.roles);
         const matchedRoles = allRoles.filter(role =>
@@ -73,7 +73,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
     let isMounted = true;
     const fetchBranches = async () => {
       try {
-        const response = await axios.get('https://backendaab.in/aabuildersDash/api/branch/getAll', { withCredentials: true });
+        const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/branch/getAll', { withCredentials: true });
         if (!isMounted) return;
         const branches = Array.isArray(response.data) ? response.data : [];
         setBranchOptions(branches);
@@ -167,27 +167,27 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
         purposesResponse,
         vendorPaymentsTrackerResponse
       ] = await Promise.all([
-        axios.get("https://backendaab.in/aabuilderDash/expenses_form/get_form"),
-        axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/advance_portal/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/loans/all"),
-        axios.get("https://backendaab.in/aabuildersDash/api/loan-purposes/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuilderDash/api/projects/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/rental_forms/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/tenant_link_shop/getAll"),
+        axios.get("https://backendaab.in/demoAabuilderDash/expenses_form/get_form"),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/loans/all"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/projects/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll"),
         // MasterData API calls
-        axios.get("https://backendaab.in/aabuilderDash/api/expenses_categories/getAll"),
-        axios.get("https://backendaab.in/aabuilderDash/api/machine_tools/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/employee_details/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/labours-details/getAll", { withCredentials: true }),
-        axios.get("https://backendaab.in/aabuildersDash/api/account-details/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/bank_type/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/eb-service-no/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/staff-advance/all"),
-        axios.get("https://backendaab.in/aabuildersDash/api/purposes/getAll"),
-        axios.get("https://backendaab.in/aabuildersDash/api/vendor-payments/trackers", { withCredentials: true })
+        axios.get("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll"),
+        axios.get("https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", { withCredentials: true }),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/account-details/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/bank_type/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/eb-service-no/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/staff-advance/all"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/purposes/getAll"),
+        axios.get("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers", { withCredentials: true })
       ]);
       const buildLookup = (items = [], idKey, labelKey) => {
         if (!Array.isArray(items)) return {};
@@ -762,7 +762,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
         const allBillEntries = [];
         for (const tracker of vendorPaymentsTrackerData) {
           try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/bill-entry/get/${tracker.id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/bill-entry/get/${tracker.id}`, {
               method: "GET",
               credentials: "include",
               headers: { "Content-Type": "application/json" }
@@ -786,7 +786,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
         const allPaymentDetails = [];
         for (const tracker of vendorPaymentsTrackerData) {
           try {
-            const response = await fetch(`https://backendaab.in/aabuildersDash/api/vendor-bill-tracker/get/${tracker.id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/get/${tracker.id}`, {
               method: 'GET',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' }
@@ -917,11 +917,11 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
     const fetchReferenceData = async () => {
       try {
         const [vendorsRes, contractorsRes, sitesRes, employeesRes, laboursRes] = await Promise.all([
-          axios.get("https://backendaab.in/aabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuilderDash/api/project_Names/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuildersDash/api/employee_details/getAll", { withCredentials: true }),
-          axios.get("https://backendaab.in/aabuildersDash/api/labours-details/getAll", { withCredentials: true })
+          axios.get("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuilderDash/api/project_Names/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", { withCredentials: true }),
+          axios.get("https://backendaab.in/demoAabuildersDash/api/labours-details/getAll", { withCredentials: true })
         ]);
         const buildLookup = (items = [], idKey, labelKey) =>
           items.reduce((acc, item) => {
@@ -963,7 +963,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   }, [canViewEditRequests]);
   const fetchEditRequests = async () => {
     try {
-      const response = await axios.get('https://backendaab.in/aabuildersDash/api/edit_requests/getAll', {
+      const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/edit_requests/getAll', {
         withCredentials: true
       });
       const allRequests = response.data || [];
@@ -982,17 +982,17 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       let response;
       if (request.module_name === 'Advance Portal') {
         response = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/advance_portal/get/${request.module_name_id}`,
+          `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${request.module_name_id}`,
           { withCredentials: true }
         );
       } else if (request.module_name === 'Staff Portal') {
         response = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/staff-advance/${request.module_name_id}`,
+          `https://backendaab.in/demoAabuildersDash/api/staff-advance/${request.module_name_id}`,
           { withCredentials: true }
         );
       } else if (request.module_name === 'Loan Portal') {
         response = await axios.get(
-          `https://backendaab.in/aabuildersDash/api/loans/${request.module_name_id}`,
+          `https://backendaab.in/demoAabuildersDash/api/loans/${request.module_name_id}`,
           { withCredentials: true }
         );
       }else {
@@ -1045,26 +1045,26 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       if (moduleNameId) {
         if (moduleName === 'Advance Portal') {
           await axios.put(
-            `https://backendaab.in/aabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
+            `https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${moduleNameId}?allow=true`,
             {},
             { withCredentials: true }
           );
         } else if (moduleName === 'Staff Portal') {
           await axios.put(
-            `https://backendaab.in/aabuildersDash/api/staff-advance/allow/${moduleNameId}?allow=true`,
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/allow/${moduleNameId}?allow=true`,
             {},
             { withCredentials: true }
           );
         } else if (moduleName === 'Loan Portal') {
           await axios.put(
-            `https://backendaab.in/aabuildersDash/api/loans/allow/${moduleNameId}?allow=true`,
+            `https://backendaab.in/demoAabuildersDash/api/loans/allow/${moduleNameId}?allow=true`,
             {},
             { withCredentials: true }
           );
         }
       }
       await axios.put(
-        `https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`,
+        `https://backendaab.in/demoAabuildersDash/api/edit_requests/edit/${requestId}`,
         {
           request_approval: true,
           request_completed: true,
@@ -1082,7 +1082,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   };
   const handleRejectRequest = async (requestId) => {
     try {
-      await axios.put(`https://backendaab.in/aabuildersDash/api/edit_requests/edit/${requestId}`, {
+      await axios.put(`https://backendaab.in/demoAabuildersDash/api/edit_requests/edit/${requestId}`, {
         request_approval: false,
         request_completed: true
       }, {

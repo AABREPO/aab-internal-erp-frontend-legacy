@@ -5,6 +5,7 @@ import StaffDatabase from './StaffDatabase';
 import StaffReport from './StaffReport';
 import StaffSummary from './StaffSummary';
 import StaffAddInput from './StaffAddInput';
+import MobileStaffAdvance from '../../componentsMobile/StaffAdvance/StaffAdvance';
 
 // Payment Mode options
 const paymentModeOptions = [
@@ -17,6 +18,20 @@ const paymentModeOptions = [
 ];
 
 const StaffHeading = ({ username, userRoles = [] }) => {
+    const [isMobile, setIsMobile] = useState(() => {
+        return window.innerWidth <= 768;
+    });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
     const [activeTab, setActiveTab] = useState(() => {
         const savedTab = localStorage.getItem('activePaintTab');
         if (savedTab === 'staffDatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
@@ -31,6 +46,17 @@ const StaffHeading = ({ username, userRoles = [] }) => {
             localStorage.setItem('activePaintTab', activeTab);
         }
     }, [activeTab, username]);
+
+    if (isMobile) {
+        const storedUser = localStorage.getItem('user');
+        const user = storedUser ? JSON.parse(storedUser) : { username, userRoles };
+        return (
+            <div style={{ textAlign: 'left' }}>
+                <MobileStaffAdvance user={user} onLogout={() => { }} />
+            </div>
+        );
+    }
+
     const renderContent = () => {
         switch (activeTab) {
             case 'staffAdvance':

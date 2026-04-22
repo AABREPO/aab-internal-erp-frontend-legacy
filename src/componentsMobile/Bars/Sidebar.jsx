@@ -17,6 +17,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       currentPage === 'inventory' ||
       currentPage === 'tools-tracker',
     account: currentPage === 'project-advance' || currentPage === 'loan-portal',
+    hrm: currentPage === 'staff-advance',
     'master-data': currentPage === 'master-data'
   });
   const [roleModels, setRoleModels] = useState([]);
@@ -33,6 +34,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
         currentPage === 'inventory' ||
         currentPage === 'tools-tracker',
       account: currentPage === 'project-advance' || currentPage === 'loan-portal',
+      hrm: currentPage === 'staff-advance',
       'master-data': currentPage === 'master-data'
     });
   }, [currentPage]);
@@ -84,6 +86,11 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
         onClose();
         return;
       }
+      if (page === 'staff-advance') {
+        navigate('/staffadvance/staffAdvance');
+        onClose();
+        return;
+      }
       if (page === 'inventory') {
         try {
           const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -121,6 +128,10 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
     toggleExpand('master-data');
   };
 
+  const handleHrmClick = () => {
+    toggleExpand('hrm');
+  };
+
   const menuItems = [
     { id: 'home', label: 'Home', icon: 'grid' },
     {
@@ -152,7 +163,12 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
       ]
     },
     { id: 'design-tools', label: 'Design Tools', icon: 'tools' },
-    { id: 'hrm', label: 'HRM', icon: 'person' },
+    {
+      id: 'hrm',
+      label: 'HRM',
+      icon: 'person',
+      subItems: [{ id: 'staff-advance', label: 'Staff Advance', modelName: 'Staff Advance' }]
+    },
     { id: 'utility-hub', label: 'Utility Hub', icon: 'utility' },
     {
       id: 'master-data',
@@ -268,6 +284,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
                             ? handleAccountClick
                             : item.id === 'billing'
                               ? handleBillingClick
+                              : item.id === 'hrm'
+                                ? handleHrmClick
                               : item.id === 'master-data'
                                 ? handleMasterDataClick
                                 : undefined
@@ -327,7 +345,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, userRoles = [] }) =
             </p>
           </div>
         </div>
-      </div >
+      </div>
     </>
   );
 };

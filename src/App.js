@@ -72,6 +72,7 @@ function AppContent({ user, handleLogout }) {
     location.pathname.startsWith('/tracker') ||
     location.pathname.startsWith('/portal') ||
     location.pathname.startsWith('/loan') ||
+    location.pathname.startsWith('/staffadvance') ||
     location.pathname.startsWith('/rfq') ||
     location.pathname.startsWith('/grn') ||
     location.pathname.startsWith('/master-data');

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import AdvanceForm from './AdvancePortal';
+import { use } from 'react';
 const AdvanceSummary = () => {
   const resolveActiveBranchId = useCallback(() => {
     try {
@@ -14,6 +16,7 @@ const AdvanceSummary = () => {
       return null;
     }
   }, []);
+  const [showAdvanceForm, setShowAdvanceForm] = useState(false);
   const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
   const buildBranchUrl = useCallback((baseUrl) => {
     const url = new URL(baseUrl);
@@ -130,6 +133,35 @@ const AdvanceSummary = () => {
       setSelectedContractorOrVendorOption(JSON.parse(saved));
     }
   }, []);
+
+
+  const openAdvanceFormWithPrefill = (contractorVendorOption, projectOption) => {
+    try {
+      // AdvancePortal reads these keys on mount for autofill.
+      if (contractorVendorOption) {
+        sessionStorage.setItem('selectedOption', JSON.stringify(contractorVendorOption));
+        localStorage.setItem('advanceContractorVendor', JSON.stringify(contractorVendorOption));
+      } else {
+        sessionStorage.removeItem('selectedOption');
+        localStorage.removeItem('advanceContractorVendor');
+      }
+
+      if (projectOption) {
+        sessionStorage.setItem('selectedSite', JSON.stringify(projectOption));
+        localStorage.setItem('advanceProjectName', JSON.stringify(projectOption));
+      } else {
+        sessionStorage.removeItem('selectedSite');
+        localStorage.removeItem('advanceProjectName');
+      }
+
+      sessionStorage.setItem('selectedType', JSON.stringify('Advance'));
+    } catch (err) {
+      console.error('Failed to set advance prefill', err);
+    }
+    setShowAdvanceForm(true);
+  };
+
+
   // Removed localStorage effect for selectedAdvanceSite to allow default null state
   // Fetch Vendor Names
   useEffect(() => {
@@ -258,24 +290,38 @@ const AdvanceSummary = () => {
     };
   }, [resolveActiveBranchId]);
 
-  // Fetch Advance Data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setProgress(85);
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
-        const data = await res.json();
-        setAdvanceData(data);
-        setProgress(100);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching advance data", err);
-        setError("Failed to load advance data");
+  const fetchAdvanceFormData = useCallback(async ({ showLoader = false } = {}) => {
+    try {
+      if (showLoader) {
+        setLoading(true);
+      }
+      setProgress(85);
+      const response = await fetch(buildBranchUrl("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"), {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch advance data: ${response.status}`);
+      }
+      const data = await response.json();
+      setAdvanceData(Array.isArray(data) ? data : []);
+      setProgress(100);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching advance form data", err);
+      setError("Failed to load advance data");
+    } finally {
+      if (showLoader) {
         setLoading(false);
       }
-    };
-    fetchData();
-  }, []);
+    }
+  }, [buildBranchUrl]);
+
+  useEffect(() => {
+    fetchAdvanceFormData({ showLoader: true });
+  }, [fetchAdvanceFormData]);
+
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
@@ -703,6 +749,29 @@ const AdvanceSummary = () => {
     setBillStatusPopupContext(`${projectName} - ${contractorVendorName}`);
     setIsBillStatusFromFirstTable(false);
     setShowBillStatusPopup(true);
+  };
+
+  const handleProjectNameClick = (proj) => {
+    if (!selectedContractorOrVendorOption || !proj?.projectId) return;
+    const projectOption = siteOptions.find((s) => String(s.id) === String(proj.projectId)) || {
+      id: proj.projectId,
+      value: proj.projectName,
+      label: proj.projectName
+    };
+    openAdvanceFormWithPrefill(selectedContractorOrVendorOption, projectOption);
+  };
+
+  const handleSiteNameClick = (siteRow) => {
+    if (!selectedAdvanceSite || !siteRow?.entityId || !siteRow?.entityType) return;
+    const sourceOptions = siteRow.entityType === 'Contractor' ? contractorOptions : vendorOptions;
+    const matched = sourceOptions.find((o) => String(o.id) === String(siteRow.entityId));
+    const contractorVendorOption = matched || {
+      id: siteRow.entityId,
+      value: siteRow.name,
+      label: siteRow.name,
+      type: siteRow.entityType
+    };
+    openAdvanceFormWithPrefill(contractorVendorOption, selectedAdvanceSite);
   };
   useEffect(() => {
     if (selectedAdvanceSite) {
@@ -1636,7 +1705,13 @@ const AdvanceSummary = () => {
                     {sortedFilteredData.length > 0 ? (
                       sortedFilteredData.map((proj, idx) => (
                         <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td className="py-2 px-6 text-left">{proj.projectName}</td>
+                          <td
+                            className={`py-2 px-6 text-left ${selectedContractorOrVendorOption ? 'cursor-pointer hover:underline' : ''}`}
+                            onClick={() => handleProjectNameClick(proj)}
+                            title={selectedContractorOrVendorOption ? "Open Advance Portal" : "Select Vendor/Contractor first"}
+                          >
+                            {proj.projectName}
+                          </td>
                           <td className="py-2 cursor-pointer relative text-right"
                             onMouseEnter={(e) => handleProjectAdvanceMouseEnter(e, proj.projectId, selectedContractorOrVendorOption?.id, selectedContractorOrVendorOption?.type)}
                             onMouseLeave={handleProjectMouseLeave}
@@ -1730,7 +1805,13 @@ const AdvanceSummary = () => {
                     {sortData(siteDetails, siteSortConfig).length > 0 ? (
                       sortData(siteDetails, siteSortConfig).map((d, idx) => (
                         <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF6ED]"}>
-                          <td className="p-2 text-left">{d.name}</td>
+                          <td
+                            className={`p-2 text-left ${selectedAdvanceSite ? 'cursor-pointer hover:underline' : ''}`}
+                            onClick={() => handleSiteNameClick(d)}
+                            title={selectedAdvanceSite ? "Open Advance Portal" : "Select Project first"}
+                          >
+                            {d.name}
+                          </td>
                           <td className="p-2 cursor-pointer relative text-right"
                             onMouseEnter={(e) => handleSiteAdvanceMouseEnter(e, selectedAdvanceSite?.id || null, d.entityId, d.entityType)}
                             onMouseLeave={handleSiteMouseLeave}
@@ -2309,6 +2390,32 @@ const AdvanceSummary = () => {
           </div>
         </div>
       )}
+      {showAdvanceForm ? (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-[#202020]">Advance Portal Entry</p>
+              <button
+                type="button"
+                onClick={() => setShowAdvanceForm(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-3">
+              <AdvanceForm
+                embedded
+                onSuccess={async () => {
+                  setShowAdvanceForm(false);
+                  await fetchAdvanceFormData();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }

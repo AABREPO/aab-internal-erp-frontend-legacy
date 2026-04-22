@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MasterDataHeader from './MasterDataHeader';
 import Sidebar from '../Bars/Sidebar';
+import editblack from '../Images/edit.png';
+import Save from '../Images/Save.svg';
 import BottomNav from '../ProjectAdvance/BottomNav';
-import editIcon from '../Images/edit.png';
+import editIcon from '../Images/Edit.svg';
 import editIconHistory from '../Images/edit1.png';
 import deleteIcon from '../Images/delete.png';
 import AccountQrCodeImage from '../../Components/Images/AAB_QR_CODE.jpeg';
 import MasterDataCopyButton from '../../Components/MasterData/MasterDataCopyButton';
+import UpDownFilter from '../Images/UpDownFilter.svg'
 
 const masterDataItems = [
   'Project Name',
@@ -33,8 +36,42 @@ const LABOUR_WAGE_TYPE_OPTIONS = [
   'Other'
 ];
 
+const PROJECT_TYPE_OPTIONS = ['Home', 'Shop', 'Office', 'Other'];
+const FLOOR_NAME_OPTIONS = ['Ground Floor', 'First Floor', 'Second Floor', 'Third Floor', 'Other'];
+const BRANCH_OPTIONS = ['Madurai', 'Srivilliputtur'];
+
 const MasterData = ({ user, onLogout }) => {
   const navigate = useNavigate();
+  const canEditMasterData = useMemo(() => {
+    const roles = Array.isArray(user?.userRoles) ? user.userRoles : [];
+    const candidateStrings = [
+      ...roles.map((r) => {
+        if (typeof r === 'string') return r;
+        if (r && typeof r === 'object') {
+          return (
+            r?.roleName ||
+            r?.role_name ||
+            r?.name ||
+            r?.role ||
+            r?.userRole ||
+            r?.user_role ||
+            r?.role?.roleName ||
+            r?.role?.name ||
+            JSON.stringify(r)
+          );
+        }
+        return String(r ?? '');
+      }),
+      user?.roleName,
+      user?.role_name,
+      user?.role,
+      user?.userRole,
+      user?.user_role
+    ].filter(Boolean);
+
+    const normalized = candidateStrings.map((s) => String(s).toLowerCase().replace(/[^a-z]/g, ''));
+    return normalized.some((s) => s === 'superadmin' || s.includes('superadmin') || s === 'admin' || (s.includes('admin') && !s.includes('subadmin')));
+  }, [user]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState('master-data');
   const [search, setSearch] = useState('');
@@ -43,10 +80,14 @@ const MasterData = ({ user, onLogout }) => {
   const [projectSearch, setProjectSearch] = useState('');
   const [listData, setListData] = useState([]);
   const [itemSearch, setItemSearch] = useState('');
+  const [masterTableSortReversed, setMasterTableSortReversed] = useState(false);
+  const [uploadFileRowShowsSaveIcon, setUploadFileRowShowsSaveIcon] = useState(false);
   const [isProjectsLoading, setIsProjectsLoading] = useState(false);
   const [isListLoading, setIsListLoading] = useState(false);
+  const listDataCacheRef = useRef({});
   const [swipedProjectId, setSwipedProjectId] = useState(null);
   const [expandedBankDetailsSection, setExpandedBankDetailsSection] = useState('bank-name');
+  const [bankDetailsSortReversed, setBankDetailsSortReversed] = useState(false);
   const [bankAccountTypes, setBankAccountTypes] = useState([]);
   const [isBankTypesLoading, setIsBankTypesLoading] = useState(false);
   const [isBankNameFormOpen, setIsBankNameFormOpen] = useState(false);
@@ -58,6 +99,360 @@ const MasterData = ({ user, onLogout }) => {
   const [isBankLocationFormOpen, setIsBankLocationFormOpen] = useState(false);
   const [bankLocationFormMode, setBankLocationFormMode] = useState('new');
   const [bankLocationForm, setBankLocationForm] = useState({ branchName: '' });
+
+  const dataUrlToBlob = (dataUrl) => {
+    if (!dataUrl || typeof dataUrl !== 'string') return null;
+    const s = dataUrl.trim();
+    if (!s.startsWith('data:')) return null;
+    const commaIdx = s.indexOf(',');
+    if (commaIdx < 0) return null;
+    const meta = s.slice(0, commaIdx);
+    const base64 = s.slice(commaIdx + 1);
+    const match = meta.match(/^data:([^;]+);base64$/i);
+    const mime = match?.[1] || 'application/octet-stream';
+    try {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    } catch {
+      return null;
+    }
+  };
+
+  const submitVendorToBackend = async () => {
+    const vendorData = {
+      vendorName: vendorForm.vendorName,
+      account_holder_name: vendorForm.accountHolderName || '',
+      account_number: vendorForm.accountNumber || '',
+      bank_name: vendorForm.bankName || '',
+      ifsc_code: vendorForm.ifscCode || '',
+      branch: vendorForm.branch || '',
+      gpay_number: vendorForm.upiPhoneNumber || '',
+      upi_id: vendorForm.upiId || '',
+      contact_number: vendorForm.contactNumber || '',
+      contact_email: vendorForm.emailId || '',
+      category: vendorForm.vendorCategory || ''
+    };
+
+    const formData = new FormData();
+    formData.append('vendor', new Blob([JSON.stringify(vendorData)], { type: 'application/json' }));
+
+    const qrBlob = dataUrlToBlob(vendorForm.qrCode);
+    if (qrBlob) formData.append('file', qrBlob, 'vendor_qr.png');
+
+    const isEdit = vendorFormMode === 'edit' && String(vendorForm.vendorId || '').trim() !== '';
+    const url = isEdit
+      ? `https://backendaab.in/demoAabuilderDash/api/vendor_Names/edit/${vendorForm.vendorId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/vendor_Names/save';
+
+    const res = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      credentials: 'include',
+      body: formData
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || `Request failed (${res.status})`);
+    }
+  };
+
+  const submitContractorToBackend = async () => {
+    const contractorData = {
+      contractorName: contractorForm.contractorName,
+      account_holder_name: contractorForm.accountHolderName || '',
+      account_number: contractorForm.accountNumber || '',
+      bank_name: contractorForm.bankName || '',
+      branch: contractorForm.branch || '',
+      ifsc_code: contractorForm.ifscCode || '',
+      gpay_number: contractorForm.upiPhoneNumber || '',
+      upi_id: contractorForm.upiId || '',
+      contact_number: contractorForm.contractorNumber || contractorForm.contactNumber || '',
+      contact_email: contractorForm.emailId || '',
+      category: contractorForm.contractorCategory || ''
+    };
+
+    const formData = new FormData();
+    formData.append('contractor', new Blob([JSON.stringify(contractorData)], { type: 'application/json' }));
+
+    const qrBlob = dataUrlToBlob(contractorForm.qrCode);
+    if (qrBlob) formData.append('file', qrBlob, 'contractor_qr.png');
+
+    const isEdit = contractorFormMode === 'edit' && String(contractorForm.contractorId || '').trim() !== '';
+    const url = isEdit
+      ? `https://backendaab.in/demoAabuilderDash/api/contractor_Names/edit/${contractorForm.contractorId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/contractor_Names/save';
+
+    const res = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      credentials: 'include',
+      body: formData
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || `Request failed (${res.status})`);
+    }
+  };
+
+  const submitCategoryToBackend = async () => {
+    const isEdit = categoryFormMode === 'edit' && String(categoryForm.categoryId || '').trim() !== '';
+    const url = isEdit
+      ? `https://backendaab.in/demoAabuilderDash/api/expenses_categories/update/${categoryForm.categoryId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/expenses_categories/save';
+
+    const res = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: categoryForm.categoryName || '' })
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || `Request failed (${res.status})`);
+    }
+  };
+
+  const submitMachineToBackend = async () => {
+    const isEdit = machineFormMode === 'edit' && String(machineForm.machineId || '').trim() !== '';
+    const url = isEdit
+      ? `https://backendaab.in/demoAabuilderDash/api/machine_tools/update/${machineForm.machineId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/machine_tools/save';
+
+    const res = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ machineTool: machineForm.machineName || '' })
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || `Request failed (${res.status})`);
+    }
+  };
+
+  const uploadMasterDataFileAndGetUrl = async (fileBlob, finalName) => {
+    const formData = new FormData();
+    formData.append("files", fileBlob);
+    formData.append("folder", "FileUpload / Master_Data_Files");
+    formData.append("fileName", finalName);
+    const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!uploadResponse.ok) {
+      throw new Error("File upload failed");
+    }
+    const result = await uploadResponse.json();
+    const uploadedUrl = Array.isArray(result?.urls) ? result.urls[0] : '';
+    if (!uploadedUrl) {
+      throw new Error("File upload URL missing");
+    }
+    return uploadedUrl;
+  };
+
+  const buildProjectPayload = (qrCodeUrlOverride) => {
+    const owner = {
+      clientName: projectForm.clientName || '',
+      fatherName: projectForm.fatherName || '',
+      mobile: projectForm.mobileNumber || '',
+      age: projectForm.age || '',
+      emailId: projectForm.emailId || '',
+      clientAddress: projectForm.clientAddress || ''
+    };
+
+    const property = {
+      projectType: addOnBillForm.projectType || '',
+      floorName: addOnBillForm.floorName || '',
+      shopNo: addOnBillForm.shopNo || '',
+      doorNo: addOnBillForm.doorNo || '',
+      area: addOnBillForm.area || '',
+      ebNo: '',
+      ebNoPhase: '',
+      ebNoFrequency: '',
+      propertyTaxNo: addOnBillForm.propertyTaxNo || '',
+      propertyTaxFrequency: '',
+      waterTaxNo: addOnBillForm.waterTaxNo || '',
+      waterTaxFrequency: ''
+    };
+
+    const account = {
+      accountHolderName: projectForm.accountHolderName || '',
+      accountNumber: projectForm.accountNumber || '',
+      nameOfTheBank: projectForm.bankName || '',
+      branchOfTheBank: projectForm.accountBranch || '',
+      ifscCode: projectForm.ifscCode || '',
+      upiPhoneNumber: projectForm.upiPhoneNumber || '',
+      upiId: projectForm.upiId || '',
+      qrCodeUrl: (qrCodeUrlOverride ?? projectForm.qrCode) || ''
+    };
+
+    return {
+      projectName: projectForm.projectName || '',
+      projectAddress: projectForm.projectAddress || '',
+      projectId: projectForm.projectId || '',
+      projectCategory: projectForm.projectCategory || '',
+      projectReferenceName: projectForm.referenceName || '',
+      branch: projectForm.branch || '',
+      location: projectForm.latitudeLongitude || '',
+      isHide: false,
+      ownerDetails: [owner],
+      propertyDetails: [property],
+      accountDetails: [account]
+    };
+  };
+
+  const syncProjectNameMasterApi = async ({ projectName, projectId, branch, projectDbId }) => {
+    const siteNamePayload = {
+      siteName: projectName || '',
+      siteNo: projectId || '',
+      branch: branch || ''
+    };
+
+    const projectNamesRes = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll', {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const projectNames = projectNamesRes.ok ? await projectNamesRes.json() : [];
+    const normalizedList = Array.isArray(projectNames) ? projectNames : [];
+    const existingBySiteNo = normalizedList.find(
+      (site) => String(site?.siteNo ?? '') === String(projectId ?? '')
+    );
+    const existingById = normalizedList.find(
+      (site) => String(site?.id ?? '') === String(projectDbId ?? '')
+    );
+    const existingSiteName = existingById || existingBySiteNo;
+
+    if (existingSiteName?.id) {
+      const editRes = await fetch(`https://backendaab.in/demoAabuilderDash/api/project_Names/edit/${existingSiteName.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(siteNamePayload),
+      });
+      if (!editRes.ok) {
+        const editMsg = await editRes.text().catch(() => '');
+        throw new Error(editMsg || `project_Names edit failed (${editRes.status})`);
+      }
+      return;
+    }
+
+    const saveRes = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/save', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(siteNamePayload),
+    });
+    if (!saveRes.ok) {
+      const saveMsg = await saveRes.text().catch(() => '');
+      throw new Error(saveMsg || `project_Names save failed (${saveRes.status})`);
+    }
+  };
+
+  const submitProjectToBackend = async () => {
+    let qrCodeUrl = projectForm.qrCode || '';
+    const isDataUrl = typeof qrCodeUrl === 'string' && qrCodeUrl.startsWith('data:');
+    if (isDataUrl) {
+      const qrBlob = dataUrlToBlob(qrCodeUrl);
+      if (qrBlob) {
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-');
+        const safeProjectName = String(projectForm.projectName || 'Project').replace(/[^a-zA-Z0-9-_ ]/g, '').trim() || 'Project';
+        const finalName = `${timestamp}_${safeProjectName}_QR`;
+        qrCodeUrl = await uploadMasterDataFileAndGetUrl(qrBlob, finalName);
+        setProjectForm((s) => ({ ...s, qrCode: qrCodeUrl }));
+        setProjectQrPreview(qrCodeUrl);
+      }
+    }
+
+    const isEdit = projectFormMode === 'edit' && String(projectForm.projectDbId || '').trim() !== '';
+    const url = isEdit
+      ? `https://backendaab.in/demoAabuilderDash/api/projects/edit/${projectForm.projectDbId}`
+      : 'https://backendaab.in/demoAabuilderDash/api/projects/save';
+
+    const res = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildProjectPayload(qrCodeUrl))
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || `Request failed (${res.status})`);
+    }
+
+    try {
+      await syncProjectNameMasterApi({
+        projectName: projectForm.projectName,
+        projectId: projectForm.projectId,
+        branch: projectForm.branch,
+        projectDbId: projectForm.projectDbId
+      });
+    } catch (syncError) {
+      console.error('Error syncing with Project Names:', syncError);
+    }
+  };
+
+  const fetchProjectsData = async () => {
+    const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll', {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch projects');
+    }
+    const data = await response.json();
+    setProjects(Array.isArray(data) ? data : []);
+  };
+
+  const handleHeaderSubmit = async () => {
+    try {
+      if (selectedItem === 'Project Name' && isAddProjectViewOpen) {
+        await submitProjectToBackend();
+        await fetchProjectsData();
+        setUploadFileRowShowsSaveIcon(false);
+        setIsProjectViewOnly(true);
+        setIsAddProjectViewOpen(false);
+        setSelectedItem(null);
+        return;
+      }
+      if (selectedItem === 'Vendor Name' && isAddVendorViewOpen) {
+        await submitVendorToBackend();
+        setUploadFileRowShowsSaveIcon(false);
+        setIsVendorViewOnly(true);
+        setIsAddVendorViewOpen(false);
+        setSelectedItem(null);
+        return;
+      }
+      if ((selectedItem === 'Contractor Name' || selectedItem === 'Support Associate Name') && isAddContractorViewOpen) {
+        await submitContractorToBackend();
+        setUploadFileRowShowsSaveIcon(false);
+        setIsContractorViewOnly(true);
+        setIsAddContractorViewOpen(false);
+        setSelectedItem(null);
+        return;
+      }
+      if (selectedItem === 'Categories' && isAddCategoryViewOpen) {
+        await submitCategoryToBackend();
+        setUploadFileRowShowsSaveIcon(false);
+        setIsCategoryViewOnly(true);
+        setIsAddCategoryViewOpen(false);
+        setSelectedItem(null);
+        return;
+      }
+      if (selectedItem === 'Machine tools' && isAddMachineViewOpen) {
+        await submitMachineToBackend();
+        setUploadFileRowShowsSaveIcon(false);
+        setIsMachineViewOnly(true);
+        setIsAddMachineViewOpen(false);
+        setSelectedItem(null);
+        return;
+      }
+    } catch (e) {
+      alert(e?.message || 'Failed to save');
+    }
+  };
 
   const getListApiUrl = (item) => {
     switch (item) {
@@ -125,7 +520,7 @@ const MasterData = ({ user, onLogout }) => {
       case 'Company Labour':
         return item.labour_salary || item.salary || '';
       case 'Account Details':
-        return item.bank_name || item.bankName || item.account_number || item.accountNumber || '';
+        return item.account_number || item.accountNumber || '';
       case 'Bank Details':
         return item.branch || item.branch_name || '';
       case 'Support Associate Name':
@@ -162,6 +557,7 @@ const MasterData = ({ user, onLogout }) => {
   const [touchStartX, setTouchStartX] = useState(null);
   const [mouseStartX, setMouseStartX] = useState(null);
   const [isAddProjectViewOpen, setIsAddProjectViewOpen] = useState(false);
+  const [isProjectViewOnly, setIsProjectViewOnly] = useState(false);
   const [expandedProjectSection, setExpandedProjectSection] = useState('project-details');
   const [projectFormMode, setProjectFormMode] = useState('new');
   const [isProjectPictureModalOpen, setIsProjectPictureModalOpen] = useState(false);
@@ -169,7 +565,17 @@ const MasterData = ({ user, onLogout }) => {
   const [isProjectQrModalOpen, setIsProjectQrModalOpen] = useState(false);
   const [projectQrPreview, setProjectQrPreview] = useState('');
   const [projectPictureDraft, setProjectPictureDraft] = useState('');
+  const [addOnBillForm, setAddOnBillForm] = useState({
+    projectType: '',
+    floorName: '',
+    shopNo: '',
+    doorNo: '',
+    area: '',
+    propertyTaxNo: '',
+    waterTaxNo: ''
+  });
   const [projectForm, setProjectForm] = useState({
+    projectDbId: '',
     projectName: '',
     projectId: '',
     projectCategory: '',
@@ -195,9 +601,12 @@ const MasterData = ({ user, onLogout }) => {
   });
   const [isAddOnSheetOpen, setIsAddOnSheetOpen] = useState(false);
   const [isAddVendorViewOpen, setIsAddVendorViewOpen] = useState(false);
+  const [isVendorViewOnly, setIsVendorViewOnly] = useState(false);
   const [expandedVendorSection, setExpandedVendorSection] = useState('vendor-details');
   const [isVendorQrModalOpen, setIsVendorQrModalOpen] = useState(false);
   const [isVendorLocationSheetOpen, setIsVendorLocationSheetOpen] = useState(false);
+  const [isVendorPictureModalOpen, setIsVendorPictureModalOpen] = useState(false);
+  const [vendorPictureDraft, setVendorPictureDraft] = useState('');
   const [vendorQrPreview, setVendorQrPreview] = useState('');
   const [vendorFormMode, setVendorFormMode] = useState('new');
   const [vendorForm, setVendorForm] = useState({
@@ -217,9 +626,11 @@ const MasterData = ({ user, onLogout }) => {
     bankName: '',
     ifscCode: '',
     upiPhoneNumber: '',
-    upiId: ''
+    upiId: '',
+    vendorPicture: ''
   });
   const [isAddContractorViewOpen, setIsAddContractorViewOpen] = useState(false);
+  const [isContractorViewOnly, setIsContractorViewOnly] = useState(false);
   const [expandedContractorSection, setExpandedContractorSection] = useState('contractor-details');
   const [isContractorQrModalOpen, setIsContractorQrModalOpen] = useState(false);
   const [contractorQrPreview, setContractorQrPreview] = useState('');
@@ -243,14 +654,17 @@ const MasterData = ({ user, onLogout }) => {
     upiId: ''
   });
   const [isAddCategoryViewOpen, setIsAddCategoryViewOpen] = useState(false);
+  const [isCategoryViewOnly, setIsCategoryViewOnly] = useState(false);
   const [expandedCategorySection, setExpandedCategorySection] = useState('category-details');
   const [categoryFormMode, setCategoryFormMode] = useState('new');
-  const [categoryForm, setCategoryForm] = useState({ categoryName: '' });
+  const [categoryForm, setCategoryForm] = useState({ categoryId: '', categoryName: '' });
   const [isAddMachineViewOpen, setIsAddMachineViewOpen] = useState(false);
+  const [isMachineViewOnly, setIsMachineViewOnly] = useState(false);
   const [expandedMachineSection, setExpandedMachineSection] = useState('machine-details');
   const [machineFormMode, setMachineFormMode] = useState('new');
-  const [machineForm, setMachineForm] = useState({ machineName: '' });
+  const [machineForm, setMachineForm] = useState({ machineId: '', machineName: '' });
   const [isAddEmployeeViewOpen, setIsAddEmployeeViewOpen] = useState(false);
+  const [isEmployeeViewOnly, setIsEmployeeViewOnly] = useState(false);
   const [expandedEmployeeSection, setExpandedEmployeeSection] = useState('employee-details');
   const [isEmployeeQrModalOpen, setIsEmployeeQrModalOpen] = useState(false);
   const [employeeQrPreview, setEmployeeQrPreview] = useState('');
@@ -276,6 +690,7 @@ const MasterData = ({ user, onLogout }) => {
     upiId: ''
   });
   const [isAddLabourViewOpen, setIsAddLabourViewOpen] = useState(false);
+  const [isLabourViewOnly, setIsLabourViewOnly] = useState(false);
   const [expandedLabourSection, setExpandedLabourSection] = useState('wage-details');
   const [isLabourQrModalOpen, setIsLabourQrModalOpen] = useState(false);
   const [labourQrPreview, setLabourQrPreview] = useState('');
@@ -301,9 +716,12 @@ const MasterData = ({ user, onLogout }) => {
     upiId: ''
   });
   const [isAddAccountViewOpen, setIsAddAccountViewOpen] = useState(false);
+  const [isAccountViewOnly, setIsAccountViewOnly] = useState(false);
   const [expandedAccountSection, setExpandedAccountSection] = useState('account-details');
   const [isAccountQrModalOpen, setIsAccountQrModalOpen] = useState(false);
   const [accountQrPreview, setAccountQrPreview] = useState('');
+  const [isAccountDetailsPreviewOpen, setIsAccountDetailsPreviewOpen] = useState(false);
+  const [accountDetailsPreview, setAccountDetailsPreview] = useState(null);
   const [accountFormMode, setAccountFormMode] = useState('new');
   const [accountForm, setAccountForm] = useState({
     accountHolderName: '',
@@ -344,6 +762,161 @@ const MasterData = ({ user, onLogout }) => {
       return primary.includes(query) || secondary.includes(query);
     });
   }, [itemSearch, listData, selectedItem]);
+
+  const displayedProjects = useMemo(() => {
+    if (!masterTableSortReversed) return filteredProjects;
+    return [...filteredProjects].reverse();
+  }, [filteredProjects, masterTableSortReversed]);
+
+  const displayedList = useMemo(() => {
+    if (!masterTableSortReversed) return filteredList;
+    return [...filteredList].reverse();
+  }, [filteredList, masterTableSortReversed]);
+
+  const listSerialNumberByRowId = useMemo(() => {
+    const map = new Map();
+    filteredList.forEach((row, idx) => {
+      map.set(getListRowId(row, idx), idx + 1);
+    });
+    return map;
+  }, [filteredList]);
+
+  const uniqueStringOptions = useCallback((values) => {
+    const arr = Array.isArray(values) ? values : [];
+    return Array.from(
+      new Set(
+        arr
+          .map((v) => (typeof v === 'string' ? v.trim() : String(v ?? '').trim()))
+          .filter(Boolean)
+      )
+    );
+  }, []);
+
+  const vendorNameOptions = useMemo(() => {
+    if (selectedItem !== 'Vendor Name') return [];
+    return uniqueStringOptions((Array.isArray(listData) ? listData : []).map((row) => getItemPrimaryText(row, 'Vendor Name')));
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const vendorCategoryOptions = useMemo(() => {
+    if (selectedItem !== 'Vendor Name') return [];
+    return uniqueStringOptions(
+      (Array.isArray(listData) ? listData : []).map((row) => row?.vendorCategory || row?.vendor_category || row?.category || row?.categoryName || row?.category_name || '')
+    );
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const contractorNameOptions = useMemo(() => {
+    if (selectedItem !== 'Contractor Name' && selectedItem !== 'Support Associate Name') return [];
+    return uniqueStringOptions(
+      (Array.isArray(listData) ? listData : []).map((row) => getItemPrimaryText(row, selectedItem))
+    );
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const contractorCategoryOptions = useMemo(() => {
+    if (selectedItem !== 'Contractor Name' && selectedItem !== 'Support Associate Name') return [];
+    return uniqueStringOptions(
+      (Array.isArray(listData) ? listData : []).map((row) => row?.contractorCategory || row?.contractor_category || row?.category || '')
+    );
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const commonBranchOptions = useMemo(() => {
+    const fromProjects = (Array.isArray(projects) ? projects : []).map((p) => p?.branch || p?.branch_name || '');
+    const fromList = (Array.isArray(listData) ? listData : []).map((row) => row?.branch || row?.branch_name || '');
+    return uniqueStringOptions([...fromProjects, ...fromList]);
+  }, [projects, listData, uniqueStringOptions]);
+
+  const employeeNameOptions = useMemo(() => {
+    if (selectedItem !== 'Employee Details') return [];
+    return uniqueStringOptions((Array.isArray(listData) ? listData : []).map((row) => getItemPrimaryText(row, 'Employee Details')));
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const employeeDesignationOptions = useMemo(() => {
+    if (selectedItem !== 'Employee Details') return [];
+    return uniqueStringOptions(
+      (Array.isArray(listData) ? listData : []).map((row) => row?.designation || row?.roleOfEmployee || row?.role_of_employee || row?.role || '')
+    );
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const employeeMobileOptions = useMemo(() => {
+    if (selectedItem !== 'Employee Details') return [];
+    return uniqueStringOptions(
+      (Array.isArray(listData) ? listData : []).map((row) => row?.mobileNumber || row?.mobile_number || row?.contactNumber || row?.contact_number || '')
+    );
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const labourNameOptions = useMemo(() => {
+    if (selectedItem !== 'Company Labour') return [];
+    return uniqueStringOptions((Array.isArray(listData) ? listData : []).map((row) => getItemPrimaryText(row, 'Company Labour')));
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  const labourCategoryOptions = useMemo(() => {
+    if (selectedItem !== 'Company Labour') return [];
+    return uniqueStringOptions(
+      (Array.isArray(listData) ? listData : []).map((row) => row?.labourCategory || row?.labour_category || row?.category || '')
+    );
+  }, [listData, selectedItem, uniqueStringOptions]);
+
+  useEffect(() => {
+    setMasterTableSortReversed(false);
+  }, [selectedItem]);
+
+  useEffect(() => {
+    setUploadFileRowShowsSaveIcon(false);
+  }, [
+    selectedItem,
+    isBankNameFormOpen,
+    isBankTypeFormOpen,
+    isBankLocationFormOpen,
+    isAddProjectViewOpen,
+    isAddVendorViewOpen,
+    isAddAccountViewOpen,
+    bankNameFormMode,
+    bankTypeFormMode,
+    bankLocationFormMode,
+    projectFormMode,
+    vendorFormMode,
+    contractorFormMode,
+    categoryFormMode,
+    machineFormMode,
+    employeeFormMode,
+    labourFormMode,
+    accountFormMode
+  ]);
+
+  useEffect(() => {
+    if (selectedItem !== 'Project Name' || !isAddProjectViewOpen) {
+      setIsProjectViewOnly(false);
+    }
+  }, [selectedItem, isAddProjectViewOpen]);
+
+  useEffect(() => {
+    if (selectedItem !== 'Vendor Name' || !isAddVendorViewOpen) setIsVendorViewOnly(false);
+    if ((selectedItem !== 'Contractor Name' && selectedItem !== 'Support Associate Name') || !isAddContractorViewOpen)
+      setIsContractorViewOnly(false);
+    if (selectedItem !== 'Categories' || !isAddCategoryViewOpen) setIsCategoryViewOnly(false);
+    if (selectedItem !== 'Machine tools' || !isAddMachineViewOpen) setIsMachineViewOnly(false);
+    if (selectedItem !== 'Employee Details' || !isAddEmployeeViewOpen) setIsEmployeeViewOnly(false);
+    if (selectedItem !== 'Company Labour' || !isAddLabourViewOpen) setIsLabourViewOnly(false);
+    if (selectedItem !== 'Account Details' || !isAddAccountViewOpen) setIsAccountViewOnly(false);
+  }, [
+    selectedItem,
+    isAddVendorViewOpen,
+    isAddContractorViewOpen,
+    isAddCategoryViewOpen,
+    isAddMachineViewOpen,
+    isAddEmployeeViewOpen,
+    isAddLabourViewOpen,
+    isAddAccountViewOpen
+  ]);
+
+  useEffect(() => {
+    if (!isAccountDetailsPreviewOpen) {
+      setAccountDetailsPreview(null);
+    }
+  }, [isAccountDetailsPreviewOpen]);
+
+  useEffect(() => {
+    setBankDetailsSortReversed(false);
+  }, [expandedBankDetailsSection, selectedItem]);
 
   useEffect(() => {
     if (selectedItem !== 'Project Name') {
@@ -395,6 +968,11 @@ const MasterData = ({ user, onLogout }) => {
       return;
     }
 
+    const cached = listDataCacheRef.current?.[selectedItem];
+    if (Array.isArray(cached) && cached.length > 0) {
+      setListData(cached);
+    }
+
     let isMounted = true;
 
     const fetchListData = async () => {
@@ -408,7 +986,9 @@ const MasterData = ({ user, onLogout }) => {
 
         const data = await response.json();
         if (isMounted) {
-          setListData(Array.isArray(data) ? data : []);
+          const next = Array.isArray(data) ? data : [];
+          listDataCacheRef.current[selectedItem] = next;
+          setListData(next);
         }
       } catch (error) {
         console.error(`Error fetching ${selectedItem}:`, error);
@@ -462,30 +1042,48 @@ const MasterData = ({ user, onLogout }) => {
 
   const normalizeProjectForForm = (item) => {
     const valueOr = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '') || '';
+    const owner = Array.isArray(item?.ownerDetails) ? item.ownerDetails[0] || {} : {};
+    const property = Array.isArray(item?.propertyDetails) ? item.propertyDetails[0] || {} : {};
+    const account = Array.isArray(item?.accountDetails) ? item.accountDetails[0] || {} : {};
 
     return {
+      projectDbId: valueOr(item?.id, item?.projectDbId),
       projectName: valueOr(item?.projectName, item?.project_name, item?.name),
-      projectId: valueOr(item?.projectId, item?.project_id, item?.id),
+      projectId: valueOr(item?.projectId, item?.project_id),
       projectCategory: valueOr(item?.projectCategory, item?.project_category),
       referenceName: valueOr(item?.projectReferenceName, item?.project_reference_name, item?.referenceName, item?.reference_name),
       branch: valueOr(item?.branch, item?.branch_name),
       projectAddress: valueOr(item?.projectAddress, item?.project_address, item?.address),
-      latitudeLongitude: valueOr(item?.latitudeLongitude, item?.latitude_longitude, item?.latLong, item?.lat_long),
-      clientName: valueOr(item?.clientName, item?.client_name),
-      fatherName: valueOr(item?.fatherName, item?.father_name),
-      mobileNumber: valueOr(item?.mobileNumber, item?.mobile_number),
-      age: valueOr(item?.age),
-      emailId: valueOr(item?.emailId, item?.email_id),
-      clientAddress: valueOr(item?.clientAddress, item?.client_address),
-      accountHolderName: valueOr(item?.accountHolderName, item?.account_holder_name),
-      qrCode: valueOr(item?.qrCode, item?.qr_code, item?.qrImagePreview, item?.qr_image_preview),
-      accountNumber: valueOr(item?.accountNumber, item?.account_number),
-      bankName: valueOr(item?.bankName, item?.bank_name),
-      ifscCode: valueOr(item?.ifscCode, item?.ifsc_code),
-      accountBranch: valueOr(item?.accountBranch, item?.account_branch, item?.branch),
-      upiPhoneNumber: valueOr(item?.upiPhoneNumber, item?.upi_phone_number, item?.gpayNumber, item?.gpay_number),
-      upiId: valueOr(item?.upiId, item?.upi_id),
+      latitudeLongitude: valueOr(item?.location, item?.latitudeLongitude, item?.latitude_longitude, item?.latLong, item?.lat_long),
+      clientName: valueOr(owner?.clientName, owner?.client_name, item?.clientName, item?.client_name),
+      fatherName: valueOr(owner?.fatherName, owner?.father_name, item?.fatherName, item?.father_name),
+      mobileNumber: valueOr(owner?.mobile, owner?.mobileNumber, owner?.mobile_number, item?.mobileNumber, item?.mobile_number),
+      age: valueOr(owner?.age, item?.age),
+      emailId: valueOr(owner?.emailId, owner?.email_id, item?.emailId, item?.email_id),
+      clientAddress: valueOr(owner?.clientAddress, owner?.client_address, item?.clientAddress, item?.client_address),
+      accountHolderName: valueOr(account?.accountHolderName, account?.account_holder_name, item?.accountHolderName, item?.account_holder_name),
+      qrCode: valueOr(account?.qrCodeUrl, account?.qr_code_url, item?.qrCode, item?.qr_code, item?.qrImagePreview, item?.qr_image_preview),
+      accountNumber: valueOr(account?.accountNumber, account?.account_number, item?.accountNumber, item?.account_number),
+      bankName: valueOr(account?.nameOfTheBank, account?.name_of_the_bank, account?.bankName, account?.bank_name, item?.bankName, item?.bank_name),
+      ifscCode: valueOr(account?.ifscCode, account?.ifsc_code, item?.ifscCode, item?.ifsc_code),
+      accountBranch: valueOr(account?.branchOfTheBank, account?.branch_of_the_bank, account?.accountBranch, account?.account_branch, item?.accountBranch, item?.account_branch, item?.branch),
+      upiPhoneNumber: valueOr(account?.upiPhoneNumber, account?.upi_phone_number, item?.upiPhoneNumber, item?.upi_phone_number, item?.gpayNumber, item?.gpay_number),
+      upiId: valueOr(account?.upiId, account?.upi_id, item?.upiId, item?.upi_id),
       projectPicture: valueOr(item?.projectPicture, item?.project_picture, item?.projectImage, item?.project_image)
+    };
+  };
+
+  const normalizeProjectPropertyForForm = (item) => {
+    const valueOr = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '') || '';
+    const property = Array.isArray(item?.propertyDetails) ? item.propertyDetails[0] || {} : {};
+    return {
+      projectType: valueOr(property?.projectType, property?.project_type),
+      floorName: valueOr(property?.floorName, property?.floor_name),
+      shopNo: valueOr(property?.shopNo, property?.shop_no),
+      doorNo: valueOr(property?.doorNo, property?.door_no),
+      area: valueOr(property?.area),
+      propertyTaxNo: valueOr(property?.propertyTaxNo, property?.property_tax_no),
+      waterTaxNo: valueOr(property?.waterTaxNo, property?.water_tax_no)
     };
   };
 
@@ -503,11 +1101,11 @@ const MasterData = ({ user, onLogout }) => {
     setIsAddCategoryViewOpen(false);
     setExpandedCategorySection('category-details');
     setCategoryFormMode('new');
-    setCategoryForm({ categoryName: '' });
+    setCategoryForm({ categoryId: '', categoryName: '' });
     setIsAddMachineViewOpen(false);
     setExpandedMachineSection('machine-details');
     setMachineFormMode('new');
-    setMachineForm({ machineName: '' });
+    setMachineForm({ machineId: '', machineName: '' });
     setIsAddEmployeeViewOpen(false);
     setExpandedEmployeeSection('employee-details');
     setIsEmployeeQrModalOpen(false);
@@ -594,6 +1192,20 @@ const MasterData = ({ user, onLogout }) => {
     return `${Math.max(1, Math.round(kb))} KB`;
   };
 
+  const generateNextProjectId = () => {
+    if (!Array.isArray(projects) || projects.length === 0) return '1';
+    const projectIds = projects
+      .map((project) => project?.projectId)
+      .filter((projectId) => projectId && projectId.toString().trim() !== '')
+      .map((projectId) => {
+        const numericMatch = projectId.toString().match(/\d+/);
+        return numericMatch ? parseInt(numericMatch[0], 10) : null;
+      })
+      .filter((num) => num !== null && !Number.isNaN(num));
+    if (projectIds.length === 0) return '1';
+    return String(Math.max(...projectIds) + 1);
+  };
+
   const normalizeVendorForForm = (item) => {
     const valueOr = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '') || '';
 
@@ -630,7 +1242,8 @@ const MasterData = ({ user, onLogout }) => {
       bankName: valueOr(item?.bankName, item?.bank_name, item?.vendorBankName, item?.vendor_bank_name),
       ifscCode: valueOr(item?.ifscCode, item?.ifsc_code, item?.vendorIfscCode, item?.vendor_ifsc_code),
       upiPhoneNumber: valueOr(item?.upiPhoneNumber, item?.upi_phone_number, item?.gpayNumber, item?.gpay_number, item?.vendorGpayNumber, item?.vendor_gpay_number),
-      upiId: valueOr(item?.upiId, item?.upi_id, item?.vendorUpiId, item?.vendor_upi_id)
+      upiId: valueOr(item?.upiId, item?.upi_id, item?.vendorUpiId, item?.vendor_upi_id),
+      vendorPicture: valueOr(item?.vendorPicture, item?.vendor_picture, item?.vendorImage, item?.vendor_image, item?.picture, item?.photo)
     };
   };
 
@@ -677,6 +1290,7 @@ const MasterData = ({ user, onLogout }) => {
   const normalizeCategoryForForm = (item) => {
     const valueOr = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '') || '';
     return {
+      categoryId: valueOr(item?.id, item?._id, item?.categoryId, item?.category_id),
       categoryName: valueOr(item?.category, item?.categoryName, item?.category_name, item?.expensesCategory, item?.name, item?.value)
     };
   };
@@ -684,6 +1298,7 @@ const MasterData = ({ user, onLogout }) => {
   const normalizeMachineForForm = (item) => {
     const valueOr = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '') || '';
     return {
+      machineId: valueOr(item?.id, item?._id, item?.machineId, item?.machine_id),
       machineName: valueOr(item?.machineTool, item?.machine_tool, item?.tool_name, item?.name, item?.value)
     };
   };
@@ -808,7 +1423,7 @@ const MasterData = ({ user, onLogout }) => {
 
     setSelectedItem(item);
     setItemSearch('');
-    setListData([]);
+    setListData(listDataCacheRef.current?.[item] || []);
   };
 
   const getProjectRowId = (item, index) => item.id || item.projectId || item.projectName || `project-${index}`;
@@ -888,7 +1503,11 @@ const MasterData = ({ user, onLogout }) => {
     rightIconInteractive = false,
     copyButtonId,
     copyFieldName,
-    labelRight
+    labelRight,
+    listId,
+    datalistOptions,
+    asSelect = false,
+    selectOptions
   }) => (
     <div className="w-full">
       {labelRight ? (
@@ -906,7 +1525,23 @@ const MasterData = ({ user, onLogout }) => {
         </label>
       )}
       <div className="relative">
-        {multiline ? (
+        {asSelect ? (
+          <select
+            value={value || ''}
+            disabled={readOnly}
+            onChange={onChange}
+            className={`h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0] ${
+              copyButtonId || rightIcon ? 'pr-12' : ''
+            }`}
+          >
+            <option value="">{placeholder || 'Select'}</option>
+            {(Array.isArray(selectOptions) ? selectOptions : []).map((opt) => (
+              <option key={String(opt)} value={String(opt)}>
+                {String(opt)}
+              </option>
+            ))}
+          </select>
+        ) : multiline ? (
           <textarea
             value={value || ''}
             readOnly={readOnly}
@@ -920,11 +1555,19 @@ const MasterData = ({ user, onLogout }) => {
             value={value || ''}
             readOnly={readOnly}
             onChange={onChange}
+            list={listId || undefined}
             placeholder={placeholder}
             className={`h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0] ${
               copyButtonId || rightIcon ? 'pr-12' : ''
             }`}
           />
+        )}
+        {!asSelect && listId && Array.isArray(datalistOptions) && datalistOptions.length > 0 && (
+          <datalist id={listId}>
+            {Array.from(new Set(datalistOptions.filter(Boolean))).map((opt) => (
+              <option key={String(opt)} value={String(opt)} />
+            ))}
+          </datalist>
         )}
         {copyButtonId && (
           <MasterDataCopyButton text={value} fieldName={copyFieldName} buttonId={copyButtonId} />
@@ -975,15 +1618,32 @@ const MasterData = ({ user, onLogout }) => {
 
     return (
       <div className="overflow-hidden rounded-[10px] border border-[#F0F0F0] bg-white shadow-[0px_1px_4px_rgba(0,0,0,0.04)]">
-        <button
-          type="button"
-          onClick={() => toggleBankDetailsSection(sectionId)}
-          className="flex w-full items-center justify-between px-[14px] py-[13px] text-left"
+        <div
+          className={`flex w-full items-center justify-between px-[14px] py-[13px] text-left ${
+            isExpanded ? 'border-b border-[#EFEFEF] bg-[#F8F8F8]' : 'bg-white'
+          }`}
         >
-          <span className="text-[14px] font-medium text-black">{title}</span>
-          <span className="text-[#2B2B2B]">{renderChevron(isExpanded)}</span>
-        </button>
-        {isExpanded && <div className="border-t border-[#F2F2F2]">{content}</div>}
+          <button type="button" onClick={() => toggleBankDetailsSection(sectionId)} className="flex min-w-0 flex-1 items-center gap-[6px]">
+            <span className="truncate text-[14px] font-medium text-black">{title}</span>
+            {isExpanded && (
+              <button
+                type="button"
+                aria-label="Toggle list order"
+                className="flex h-[24px] w-[24px] shrink-0 items-center justify-center"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBankDetailsSortReversed((s) => !s);
+                }}
+              >
+                <img src={UpDownFilter} alt="" className="h-[14px] w-[14px]" />
+              </button>
+            )}
+          </button>
+          <button type="button" onClick={() => toggleBankDetailsSection(sectionId)} className="shrink-0 text-[#2B2B2B]">
+            {renderChevron(isExpanded)}
+          </button>
+        </div>
+        {isExpanded && <div>{content}</div>}
       </div>
     );
   };
@@ -1002,22 +1662,35 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>Upload File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M8.9 2.1L11.9 5.1M9.6 1.4L2.6 8.4V11.4H5.6L12.6 4.4C12.8667 4.13333 13 3.8 13 3.4C13 3 12.8667 2.66667 12.6 2.4L11.6 1.4C11.3333 1.13333 11 1 10.6 1C10.2 1 9.86667 1.13333 9.6 1.4Z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {bankNameFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              <button
+                type="button"
+                aria-label="Toggle edit mode"
+                className="inline-flex items-center justify-center"
+                onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+              >
+                <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          bankNameFormMode === 'edit' && !uploadFileRowShowsSaveIcon
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderStaticBankDetailsCard(
             'Bank Name Details',
@@ -1041,22 +1714,35 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>Upload File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M8.9 2.1L11.9 5.1M9.6 1.4L2.6 8.4V11.4H5.6L12.6 4.4C12.8667 4.13333 13 3.8 13 3.4C13 3 12.8667 2.66667 12.6 2.4L11.6 1.4C11.3333 1.13333 11 1 10.6 1C10.2 1 9.86667 1.13333 9.6 1.4Z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {bankTypeFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              <button
+                type="button"
+                aria-label="Toggle edit mode"
+                className="inline-flex items-center justify-center"
+                onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+              >
+                <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          bankTypeFormMode === 'edit' && !uploadFileRowShowsSaveIcon
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderStaticBankDetailsCard(
             'Account Type Details',
@@ -1080,13 +1766,35 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="text-right">
-          <button type="button" className="text-[12px] font-medium text-black">
-            Upload File
-          </button>
+          {bankLocationFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              <button
+                type="button"
+                aria-label="Toggle edit mode"
+                className="inline-flex items-center justify-center"
+                onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+              >
+                <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          bankLocationFormMode === 'edit' && !uploadFileRowShowsSaveIcon
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderStaticBankDetailsCard(
             'Branch Name Details',
@@ -1154,54 +1862,91 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>View File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M8.9 2.1L11.9 5.1M9.6 1.4L2.6 8.4V11.4H5.6L12.6 4.4C12.8667 4.13333 13 3.8 13 3.4C13 3 12.8667 2.66667 12.6 2.4L11.6 1.4C11.3333 1.13333 11 1 10.6 1C10.2 1 9.86667 1.13333 9.6 1.4Z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {contractorFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              {canEditMasterData && !isContractorViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          contractorFormMode === 'edit' && (isContractorViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderContractorAccordion(
             'contractor-details',
             'Contractor Details',
             <div className="space-y-[10px]">
-              {renderInput({
-                label: selectedItem === 'Support Associate Name' ? 'Associate Name' : 'Contractor Name',
-                required: true,
-                placeholder: 'Select',
-                value: contractorForm.contractorName,
-                readOnly: false,
-                onChange: (e) => setContractorForm((s) => ({ ...s, contractorName: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {contractorFormMode === 'edit'
+                ? renderInput({
+                    label: selectedItem === 'Support Associate Name' ? 'Associate Name' : 'Contractor Name',
+                    required: true,
+                    placeholder: 'Select',
+                    value: contractorForm.contractorName,
+                    readOnly: false,
+                    onChange: (e) => setContractorForm((s) => ({ ...s, contractorName: e.target.value })),
+                    listId: 'm-contractor-name-options',
+                    datalistOptions: contractorNameOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: selectedItem === 'Support Associate Name' ? 'Associate Name' : 'Contractor Name',
+                    required: true,
+                    placeholder: 'Enter Name',
+                    value: contractorForm.contractorName,
+                    readOnly: false,
+                    onChange: (e) => setContractorForm((s) => ({ ...s, contractorName: e.target.value }))
+                  })}
 
-              {renderInput({
-                label: 'Contractor Category',
-                required: true,
-                placeholder: 'Select',
-                value: contractorForm.contractorCategory,
-                readOnly: false,
-                onChange: (e) => setContractorForm((s) => ({ ...s, contractorCategory: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {contractorFormMode === 'edit'
+                ? renderInput({
+                    label: 'Contractor Category',
+                    required: true,
+                    placeholder: 'Select',
+                    value: contractorForm.contractorCategory,
+                    readOnly: false,
+                    onChange: (e) => setContractorForm((s) => ({ ...s, contractorCategory: e.target.value })),
+                    listId: 'm-contractor-category-options',
+                    datalistOptions: contractorCategoryOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: 'Contractor Category',
+                    required: true,
+                    placeholder: 'Enter Category',
+                    value: contractorForm.contractorCategory,
+                    readOnly: false,
+                    onChange: (e) => setContractorForm((s) => ({ ...s, contractorCategory: e.target.value }))
+                  })}
 
               <div className="grid grid-cols-2 gap-[12px]">
                 {renderInput({
@@ -1234,15 +1979,21 @@ const MasterData = ({ user, onLogout }) => {
                 {renderInput({
                   label: 'Branch',
                   required: true,
-                  placeholder: 'Select',
+                  placeholder: contractorFormMode === 'edit' ? 'Select' : 'Enter Branch',
                   value: contractorForm.branch,
                   readOnly: false,
                   onChange: (e) => setContractorForm((s) => ({ ...s, branch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  ...(contractorFormMode === 'edit'
+                    ? {
+                        listId: 'm-contractor-branch-options',
+                        datalistOptions: commonBranchOptions,
+                        rightIcon: (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )
+                      }
+                    : {})
                 })}
               </div>
 
@@ -1476,22 +2227,37 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>View File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M8.9 2.1L11.9 5.1M9.6 1.4L2.6 8.4V11.4H5.6L12.6 4.4C12.8667 4.13333 13 3.8 13 3.4C13 3 12.8667 2.66667 12.6 2.4L11.6 1.4C11.3333 1.13333 11 1 10.6 1C10.2 1 9.86667 1.13333 9.6 1.4Z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {categoryFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              {canEditMasterData && !isCategoryViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          categoryFormMode === 'edit' && (isCategoryViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderCategoryAccordion(
             'category-details',
@@ -1538,22 +2304,37 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>View File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M8.9 2.1L11.9 5.1M9.6 1.4L2.6 8.4V11.4H5.6L12.6 4.4C12.8667 4.13333 13 3.8 13 3.4C13 3 12.8667 2.66667 12.6 2.4L11.6 1.4C11.3333 1.13333 11 1 10.6 1C10.2 1 9.86667 1.13333 9.6 1.4Z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {machineFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              {canEditMasterData && !isMachineViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          machineFormMode === 'edit' && (isMachineViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderMachineAccordion(
             'machine-details',
@@ -1603,29 +2384,64 @@ const MasterData = ({ user, onLogout }) => {
           <button type="button" onClick={() => setIsEmployeeAadhaarModalOpen(true)}>
             Aadhaar Upload
           </button>
-          <button type="button">View File</button>
+          {employeeFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button">
+                View File
+              </button>
+              {canEditMasterData && !isEmployeeViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button">Upload File</button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          employeeFormMode === 'edit' && (isEmployeeViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderEmployeeAccordion(
             'employee-details',
             'Employee Details',
             <div className="space-y-[10px]">
-              {renderInput({
-                label: 'Employee Name',
-                required: true,
-                placeholder: 'Enter Name',
-                value: employeeForm.employeeName,
-                readOnly: false,
-                onChange: (e) => setEmployeeForm((s) => ({ ...s, employeeName: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {employeeFormMode === 'edit'
+                ? renderInput({
+                    label: 'Employee Name',
+                    required: true,
+                    placeholder: 'Enter Name',
+                    value: employeeForm.employeeName,
+                    readOnly: false,
+                    onChange: (e) => setEmployeeForm((s) => ({ ...s, employeeName: e.target.value })),
+                    listId: 'm-employee-name-options',
+                    datalistOptions: employeeNameOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: 'Employee Name',
+                    required: true,
+                    placeholder: 'Enter Name',
+                    value: employeeForm.employeeName,
+                    readOnly: false,
+                    onChange: (e) => setEmployeeForm((s) => ({ ...s, employeeName: e.target.value }))
+                  })}
 
               <div className="grid grid-cols-2 gap-[12px]">
                 {renderInput({
@@ -1639,15 +2455,21 @@ const MasterData = ({ user, onLogout }) => {
                 {renderInput({
                   label: 'Designation',
                   required: true,
-                  placeholder: 'Select',
+                  placeholder: employeeFormMode === 'edit' ? 'Select' : 'Enter Designation',
                   value: employeeForm.designation,
                   readOnly: false,
                   onChange: (e) => setEmployeeForm((s) => ({ ...s, designation: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  ...(employeeFormMode === 'edit'
+                    ? {
+                        listId: 'm-employee-designation-options',
+                        datalistOptions: employeeDesignationOptions,
+                        rightIcon: (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )
+                      }
+                    : {})
                 })}
               </div>
 
@@ -1663,15 +2485,21 @@ const MasterData = ({ user, onLogout }) => {
                 {renderInput({
                   label: 'Mobile Number',
                   required: true,
-                  placeholder: 'Select',
+                  placeholder: employeeFormMode === 'edit' ? 'Select' : 'Enter Number',
                   value: employeeForm.mobileNumber,
                   readOnly: false,
                   onChange: (e) => setEmployeeForm((s) => ({ ...s, mobileNumber: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  ...(employeeFormMode === 'edit'
+                    ? {
+                        listId: 'm-employee-mobile-options',
+                        datalistOptions: employeeMobileOptions,
+                        rightIcon: (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )
+                      }
+                    : {})
                 })}
               </div>
 
@@ -2013,22 +2841,37 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="py-[8px] text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>Upload File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M3.5 12.25H10.5M7 9.91667V1.75M7 1.75L4.66667 4.08333M7 1.75L9.33333 4.08333"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {accountFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button type="button" className="text-[12px] font-medium text-black">
+                View File
+              </button>
+              {canEditMasterData && !isAccountViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button" className="text-[12px] font-medium text-black">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          accountFormMode === 'edit' && (isAccountViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderAccountAccordion(
             'account-details',
@@ -2252,45 +3095,91 @@ const MasterData = ({ user, onLogout }) => {
       <div className="bg-white">
         <div className="flex items-center justify-between py-[8px] text-[12px] font-medium text-black">
           <span />
-          <button type="button" className="text-[#2B2B2B]">
-            View File
-          </button>
+          {labourFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px] text-[#2B2B2B]">
+              <button type="button" className="text-[#2B2B2B]">
+                View File
+              </button>
+              {canEditMasterData && !isLabourViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button type="button" className="text-[#2B2B2B]">
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          labourFormMode === 'edit' && (isLabourViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="flex flex-col ">
           {renderLabourAccordion(
             'labour-details',
             'Labour Details',
             <div className="space-y-[10px]">
-              {renderInput({
-                label: 'Labour Name',
-                required: true,
-                placeholder: '',
-                value: labourForm.labourName,
-                readOnly: false,
-                onChange: (e) => setLabourForm((s) => ({ ...s, labourName: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {labourFormMode === 'edit'
+                ? renderInput({
+                    label: 'Labour Name',
+                    required: true,
+                    placeholder: '',
+                    value: labourForm.labourName,
+                    readOnly: false,
+                    onChange: (e) => setLabourForm((s) => ({ ...s, labourName: e.target.value })),
+                    listId: 'm-labour-name-options',
+                    datalistOptions: labourNameOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: 'Labour Name',
+                    required: true,
+                    placeholder: 'Enter Name',
+                    value: labourForm.labourName,
+                    readOnly: false,
+                    onChange: (e) => setLabourForm((s) => ({ ...s, labourName: e.target.value }))
+                  })}
 
-              {renderInput({
-                label: 'Labour Category',
-                required: true,
-                placeholder: '',
-                value: labourForm.labourCategory,
-                readOnly: false,
-                onChange: (e) => setLabourForm((s) => ({ ...s, labourCategory: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {labourFormMode === 'edit'
+                ? renderInput({
+                    label: 'Labour Category',
+                    required: true,
+                    placeholder: '',
+                    value: labourForm.labourCategory,
+                    readOnly: false,
+                    onChange: (e) => setLabourForm((s) => ({ ...s, labourCategory: e.target.value })),
+                    listId: 'm-labour-category-options',
+                    datalistOptions: labourCategoryOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: 'Labour Category',
+                    required: true,
+                    placeholder: 'Enter Category',
+                    value: labourForm.labourCategory,
+                    readOnly: false,
+                    onChange: (e) => setLabourForm((s) => ({ ...s, labourCategory: e.target.value }))
+                  })}
 
               <div className="grid grid-cols-2 gap-[12px]">
                 {renderInput({
@@ -2327,11 +3216,18 @@ const MasterData = ({ user, onLogout }) => {
                   value: labourForm.branch,
                   readOnly: false,
                   onChange: (e) => setLabourForm((s) => ({ ...s, branch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  ...(labourFormMode === 'edit'
+                    ? {
+                        placeholder: 'Select',
+                        listId: 'm-labour-branch-options',
+                        datalistOptions: commonBranchOptions,
+                        rightIcon: (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )
+                      }
+                    : { placeholder: 'Enter Branch' })
                 })}
               </div>
 
@@ -2574,54 +3470,105 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className="py-[8px] text-right">
-          <button type="button" className="inline-flex items-center gap-[8px] text-[12px] font-medium text-black">
-            <span>Upload File</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M8.9 2.1L11.9 5.1M9.6 1.4L2.6 8.4V11.4H5.6L12.6 4.4C12.8667 4.13333 13 3.8 13 3.4C13 3 12.8667 2.66667 12.6 2.4L11.6 1.4C11.3333 1.13333 11 1 10.6 1C10.2 1 9.86667 1.13333 9.6 1.4Z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {vendorFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button
+                type="button"
+                className="text-[12px] font-medium text-black"
+                onClick={() => {
+                  setVendorPictureDraft(vendorForm.vendorPicture || '');
+                  setIsVendorPictureModalOpen(true);
+                }}
+              >
+                View File
+              </button>
+              {canEditMasterData && !isVendorViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => setUploadFileRowShowsSaveIcon((s) => !s)}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="text-[12px] font-medium text-black"
+              onClick={() => {
+                setVendorPictureDraft(vendorForm.vendorPicture || '');
+                setIsVendorPictureModalOpen(true);
+              }}
+            >
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          vendorFormMode === 'edit' && (isVendorViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderVendorAccordion(
             'vendor-details',
             'Vendor Details',
             <div className="space-y-[10px]">
-              {renderInput({
-                label: 'Vendor Name',
-                required: true,
-                placeholder: 'Select',
-                value: vendorForm.vendorName,
-                readOnly: false,
-                onChange: (e) => setVendorForm((s) => ({ ...s, vendorName: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {vendorFormMode === 'edit'
+                ? renderInput({
+                    label: 'Vendor Name',
+                    required: true,
+                    placeholder: 'Select',
+                    value: vendorForm.vendorName,
+                    readOnly: false,
+                    onChange: (e) => setVendorForm((s) => ({ ...s, vendorName: e.target.value })),
+                    listId: 'm-vendor-name-options',
+                    datalistOptions: vendorNameOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: 'Vendor Name',
+                    required: true,
+                    placeholder: 'Enter Vendor Name',
+                    value: vendorForm.vendorName,
+                    readOnly: false,
+                    onChange: (e) => setVendorForm((s) => ({ ...s, vendorName: e.target.value }))
+                  })}
 
-              {renderInput({
-                label: 'Vendor Category',
-                required: true,
-                placeholder: 'Select',
-                value: vendorForm.vendorCategory,
-                readOnly: false,
-                onChange: (e) => setVendorForm((s) => ({ ...s, vendorCategory: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              {vendorFormMode === 'edit'
+                ? renderInput({
+                    label: 'Vendor Category',
+                    required: true,
+                    placeholder: 'Select',
+                    value: vendorForm.vendorCategory,
+                    readOnly: false,
+                    onChange: (e) => setVendorForm((s) => ({ ...s, vendorCategory: e.target.value })),
+                    listId: 'm-vendor-category-options',
+                    datalistOptions: vendorCategoryOptions,
+                    rightIcon: (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  })
+                : renderInput({
+                    label: 'Vendor Category',
+                    required: true,
+                    placeholder: 'Enter Vendor Category',
+                    value: vendorForm.vendorCategory,
+                    readOnly: false,
+                    onChange: (e) => setVendorForm((s) => ({ ...s, vendorCategory: e.target.value }))
+                  })}
 
               <div className="grid grid-cols-2 gap-[12px]">
                 {renderInput({
@@ -2654,15 +3601,21 @@ const MasterData = ({ user, onLogout }) => {
                 {renderInput({
                   label: 'Branch',
                   required: true,
-                  placeholder: 'Select',
+                  placeholder: vendorFormMode === 'edit' ? 'Select' : 'Enter Branch',
                   value: vendorForm.branch,
                   readOnly: false,
                   onChange: (e) => setVendorForm((s) => ({ ...s, branch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  ...(vendorFormMode === 'edit'
+                    ? {
+                        listId: 'm-vendor-branch-options',
+                        datalistOptions: commonBranchOptions,
+                        rightIcon: (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )
+                      }
+                    : {})
                 })}
               </div>
 
@@ -2927,6 +3880,90 @@ const MasterData = ({ user, onLogout }) => {
           </div>
         </>
       )}
+
+      {isVendorPictureModalOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close overlay"
+            onClick={() => setIsVendorPictureModalOpen(false)}
+            className="fixed inset-0 z-[9999] bg-black/60"
+          />
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center px-[16px]">
+            <div
+              className="w-full max-w-[330px] rounded-[14px] bg-white px-[18px] pt-[16px] pb-[18px] shadow-[0px_10px_30px_rgba(0,0,0,0.22)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative mb-[12px] text-center">
+                <div className="text-[16px] font-semibold text-black">Vendor Picture</div>
+                <div className="mt-[2px] text-[11px] text-black">Uploaded Photo</div>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setIsVendorPictureModalOpen(false)}
+                  className="absolute right-0 top-0 text-[#F26B3A]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 5L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M13 5L5 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mx-auto mb-[12px] w-full max-w-[220px] rounded-[12px] border border-[#DEDEDE] bg-[#FAFAFA] p-[10px] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[8px] border-[3px] border-[#CFCFCF] bg-[#E8E8E8] shadow-[inset_0_3px_10px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.65)]">
+                  {vendorPictureDraft ? (
+                    <img src={vendorPictureDraft} alt="" className="h-full w-full object-contain" />
+                  ) : (
+                    <svg className="h-[56px] w-[56px] text-[#B5B5B5]" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <rect x="6" y="10" width="52" height="44" rx="4" stroke="currentColor" strokeWidth="1.75" />
+                      <circle cx="44" cy="22" r="5" fill="currentColor" fillOpacity="0.4" />
+                      <path d="M8 48 L24 24 L36 40 L48 28 L56 36 V52 H8 Z" fill="currentColor" fillOpacity="0.32" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+
+              <input
+                type="file"
+                accept="image/*"
+                id="vendorPictureFileInput"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = typeof reader.result === 'string' ? reader.result : '';
+                    setVendorPictureDraft(result);
+                  };
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => document.getElementById('vendorPictureFileInput')?.click()}
+                className="mb-[12px] h-[40px] w-full rounded-[8px] border border-[#D9D9D9] bg-white text-[14px] font-medium text-black"
+              >
+                Update Photo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setVendorForm((s) => ({ ...s, vendorPicture: vendorPictureDraft }));
+                  setIsVendorPictureModalOpen(false);
+                }}
+                className="h-[44px] w-full rounded-[8px] bg-black text-[14px] font-semibold text-white"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 
@@ -2934,38 +3971,85 @@ const MasterData = ({ user, onLogout }) => {
     <>
       <div className="bg-white">
         <div className=" text-right">
-          <button
-            type="button"
-            className="text-[12px] font-medium text-black"
-            onClick={() => {
-              setProjectPictureDraft(projectForm.projectPicture || '');
-              setIsProjectPictureModalOpen(true);
-            }}
-          >
-            Upload File
-          </button>
+          {projectFormMode === 'edit' ? (
+            <div className="inline-flex items-center gap-[10px]">
+              <button
+                type="button"
+                className="text-[12px] font-medium text-black"
+                onClick={() => {
+                  setProjectPictureDraft(projectForm.projectPicture || '');
+                  setIsProjectPictureModalOpen(true);
+                }}
+              >
+                View File
+              </button>
+              {canEditMasterData && !isProjectViewOnly && (
+                <button
+                  type="button"
+                  aria-label="Toggle edit mode"
+                  className="inline-flex items-center justify-center p-[4px]"
+                  onClick={() => {
+                    // First click: enable editing (show Save icon)
+                    // Second click: "save" (lock fields again; values already in state)
+                    setUploadFileRowShowsSaveIcon((s) => !s);
+                  }}
+                >
+                  <img src={uploadFileRowShowsSaveIcon ? Save : editblack} alt="" className="h-[14px] w-[14px] object-contain" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="text-[12px] font-medium text-black"
+              onClick={() => {
+                setProjectPictureDraft(projectForm.projectPicture || '');
+                setIsProjectPictureModalOpen(true);
+              }}
+            >
+              Upload File
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="w-full px-0 pt-0 pb-[18px]">
+      <div
+        className={`w-full px-0 pt-0 pb-[18px] ${
+          projectFormMode === 'edit' && (isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+            ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
+            : ''
+        }`}
+      >
         <div className="">
           {renderProjectAccordion(
             'project-details',
             'Project Details',
             <div className="space-y-[10px]">
-              {renderInput({
-                label: 'Project Name',
-                required: true,
-                placeholder: 'Enter Name',
-                value: projectForm.projectName,
-                readOnly: projectFormMode !== 'edit',
-                onChange: (e) => setProjectForm((s) => ({ ...s, projectName: e.target.value })),
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
-              })}
+              <div className="relative">
+                {renderInput({
+                  label: 'Project Name',
+                  required: true,
+                  placeholder: 'Enter Name',
+                  value: projectForm.projectName,
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
+                  onChange: (e) => setProjectForm((s) => ({ ...s, projectName: e.target.value }))
+                })}
+                {projectFormMode === 'edit' && !isProjectViewOnly && !uploadFileRowShowsSaveIcon && (
+                  <button
+                    type="button"
+                    aria-label="Open project list"
+                    className="absolute inset-0 z-[5]"
+                    style={{ background: 'transparent' }}
+                    onClick={() => {
+                      setUploadFileRowShowsSaveIcon(false);
+                      setIsAddProjectViewOpen(false);
+                    }}
+                  />
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-[12px]">
                 {renderInput({
@@ -2973,7 +4057,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Enter ID',
                   value: projectForm.projectId,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, projectId: e.target.value }))
                 })}
                 {renderInput({
@@ -2981,13 +4068,13 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Select',
                   value: projectForm.projectCategory,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, projectCategory: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  asSelect: true,
+                  selectOptions: ['Client Project', 'Own Project']
                 })}
               </div>
 
@@ -2997,7 +4084,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Enter Name',
                   value: projectForm.referenceName,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, referenceName: e.target.value }))
                 })}
                 {renderInput({
@@ -3005,13 +4095,13 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Select',
                   value: projectForm.branch,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, branch: e.target.value })),
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  asSelect: true,
+                  selectOptions: BRANCH_OPTIONS
                 })}
               </div>
 
@@ -3020,7 +4110,10 @@ const MasterData = ({ user, onLogout }) => {
                 required: true,
                 placeholder: 'Enter Address',
                 value: projectForm.projectAddress,
-                readOnly: projectFormMode !== 'edit',
+                readOnly:
+                  projectFormMode === 'edit'
+                    ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                    : false,
                 onChange: (e) => setProjectForm((s) => ({ ...s, projectAddress: e.target.value })),
                 multiline: true,
                 labelRight: (
@@ -3046,7 +4139,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Enter Number',
                   value: projectForm.clientName,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, clientName: e.target.value }))
                 })}
                 {renderInput({
@@ -3054,7 +4150,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Enter Age',
                   value: projectForm.fatherName,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, fatherName: e.target.value }))
                 })}
               </div>
@@ -3065,7 +4164,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Enter Number',
                   value: projectForm.mobileNumber,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, mobileNumber: e.target.value }))
                 })}
                 {renderInput({
@@ -3073,7 +4175,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: 'Enter Age',
                   value: projectForm.age,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, age: e.target.value }))
                 })}
               </div>
@@ -3082,7 +4187,10 @@ const MasterData = ({ user, onLogout }) => {
                 label: 'Email ID',
                 placeholder: '',
                 value: projectForm.emailId,
-                readOnly: projectFormMode !== 'edit',
+                readOnly:
+                  projectFormMode === 'edit'
+                    ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                    : false,
                 onChange: (e) => setProjectForm((s) => ({ ...s, emailId: e.target.value }))
               })}
 
@@ -3091,7 +4199,10 @@ const MasterData = ({ user, onLogout }) => {
                 required: true,
                 placeholder: 'Enter Address',
                 value: projectForm.clientAddress,
-                readOnly: projectFormMode !== 'edit',
+                readOnly:
+                  projectFormMode === 'edit'
+                    ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                    : false,
                 onChange: (e) => setProjectForm((s) => ({ ...s, clientAddress: e.target.value })),
                 multiline: true
               })}
@@ -3120,7 +4231,11 @@ const MasterData = ({ user, onLogout }) => {
                     value={projectForm.accountHolderName || ''}
                     onChange={(e) => setProjectForm((s) => ({ ...s, accountHolderName: e.target.value }))}
                     placeholder=""
-                    readOnly={projectFormMode !== 'edit'}
+                    readOnly={
+                      projectFormMode === 'edit'
+                        ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                        : false
+                    }
                     className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
                   />
                   <MasterDataCopyButton
@@ -3143,7 +4258,11 @@ const MasterData = ({ user, onLogout }) => {
                     value={projectForm.accountNumber || ''}
                     onChange={(e) => setProjectForm((s) => ({ ...s, accountNumber: e.target.value }))}
                     placeholder=""
-                    readOnly={projectFormMode !== 'edit'}
+                    readOnly={
+                      projectFormMode === 'edit'
+                        ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                        : false
+                    }
                     className="h-[32px] w-full rounded-[4px] border border-[#D9D9D9] bg-white px-[12px] pr-12 text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
                   />
                   <MasterDataCopyButton
@@ -3160,7 +4279,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: '',
                   value: projectForm.ifscCode,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, ifscCode: e.target.value })),
                   copyButtonId: 'm-project-ifsc',
                   copyFieldName: 'IFSC Code'
@@ -3170,7 +4292,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: '',
                   value: projectForm.accountBranch,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, accountBranch: e.target.value })),
                   copyButtonId: 'm-project-branch',
                   copyFieldName: 'Branch'
@@ -3183,7 +4308,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: '',
                   value: projectForm.upiPhoneNumber,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, upiPhoneNumber: e.target.value })),
                   copyButtonId: 'm-project-upi-phone',
                   copyFieldName: 'UPI Phone Number'
@@ -3193,7 +4321,10 @@ const MasterData = ({ user, onLogout }) => {
                   required: true,
                   placeholder: '',
                   value: projectForm.upiId,
-                  readOnly: projectFormMode !== 'edit',
+                  readOnly:
+                    projectFormMode === 'edit'
+                      ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                      : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, upiId: e.target.value })),
                   copyButtonId: 'm-project-upi-id',
                   copyFieldName: 'UPI ID'
@@ -3410,7 +4541,10 @@ const MasterData = ({ user, onLogout }) => {
               required: true,
               placeholder: 'Example: 9°31\'53.5"N 77°38\'01.9"E',
               value: projectForm.latitudeLongitude,
-              readOnly: projectFormMode !== 'edit',
+              readOnly:
+                projectFormMode === 'edit'
+                  ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                  : false,
               onChange: (e) => setProjectForm((s) => ({ ...s, latitudeLongitude: e.target.value }))
             })}
 
@@ -3478,7 +4612,11 @@ const MasterData = ({ user, onLogout }) => {
               <input
                 value={projectForm.upiId || ''}
                 onChange={(e) => setProjectForm((s) => ({ ...s, upiId: e.target.value }))}
-                readOnly={projectFormMode !== 'edit'}
+                readOnly={
+                  projectFormMode === 'edit'
+                    ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                    : false
+                }
                 placeholder="9876543210@Axis"
                 className="mb-[10px] h-[34px] w-full rounded-[6px] border border-[#D9D9D9] bg-white px-[12px] text-[12px] text-black outline-none placeholder:text-[#B0B0B0]"
               />
@@ -3488,7 +4626,11 @@ const MasterData = ({ user, onLogout }) => {
                 accept="image/*"
                 id="projectAccountQrUpload"
                 className="hidden"
-                disabled={projectFormMode !== 'edit'}
+                disabled={
+                  projectFormMode === 'edit'
+                    ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                    : false
+                }
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -3505,7 +4647,11 @@ const MasterData = ({ user, onLogout }) => {
               <button
                 type="button"
                 onClick={() => document.getElementById('projectAccountQrUpload')?.click()}
-                disabled={projectFormMode !== 'edit'}
+                disabled={
+                  projectFormMode === 'edit'
+                    ? isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon
+                    : false
+                }
                 className="mb-[12px] h-[36px] w-full rounded-[6px] border border-[#D9D9D9] bg-white text-[13px] font-medium text-black disabled:opacity-50"
               >
                 Update QR Code
@@ -3547,23 +4693,21 @@ const MasterData = ({ user, onLogout }) => {
                   label: 'Project Type',
                   required: true,
                   placeholder: 'Select',
-                  value: '',
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  value: addOnBillForm.projectType,
+                  readOnly: false,
+                  onChange: (e) => setAddOnBillForm((s) => ({ ...s, projectType: e.target.value })),
+                  asSelect: true,
+                  selectOptions: PROJECT_TYPE_OPTIONS
                 })}
                 {renderInput({
                   label: 'Floor Name',
                   required: true,
                   placeholder: 'Select',
-                  value: '',
-                  rightIcon: (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )
+                  value: addOnBillForm.floorName,
+                  readOnly: false,
+                  onChange: (e) => setAddOnBillForm((s) => ({ ...s, floorName: e.target.value })),
+                  asSelect: true,
+                  selectOptions: FLOOR_NAME_OPTIONS
                 })}
               </div>
 
@@ -3572,19 +4716,25 @@ const MasterData = ({ user, onLogout }) => {
                   label: 'Shop No',
                   required: true,
                   placeholder: 'Enter',
-                  value: ''
+                  value: addOnBillForm.shopNo,
+                  readOnly: false,
+                  onChange: (e) => setAddOnBillForm((s) => ({ ...s, shopNo: e.target.value }))
                 })}
                 {renderInput({
                   label: 'Door No',
                   required: true,
                   placeholder: 'Enter',
-                  value: ''
+                  value: addOnBillForm.doorNo,
+                  readOnly: false,
+                  onChange: (e) => setAddOnBillForm((s) => ({ ...s, doorNo: e.target.value }))
                 })}
                 {renderInput({
                   label: 'Area',
                   required: true,
                   placeholder: 'Enter Area',
-                  value: ''
+                  value: addOnBillForm.area,
+                  readOnly: false,
+                  onChange: (e) => setAddOnBillForm((s) => ({ ...s, area: e.target.value }))
                 })}
               </div>
 
@@ -3608,7 +4758,9 @@ const MasterData = ({ user, onLogout }) => {
                   label: 'Property Tax No',
                   required: true,
                   placeholder: 'Enter Number',
-                  value: ''
+                  value: addOnBillForm.propertyTaxNo,
+                  readOnly: false,
+                  onChange: (e) => setAddOnBillForm((s) => ({ ...s, propertyTaxNo: e.target.value }))
                 })}
               </div>
 
@@ -3616,12 +4768,9 @@ const MasterData = ({ user, onLogout }) => {
                 label: 'Water Tax No',
                 required: true,
                 placeholder: 'Enter Number',
-                value: '',
-                rightIcon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )
+                value: addOnBillForm.waterTaxNo,
+                readOnly: false,
+                onChange: (e) => setAddOnBillForm((s) => ({ ...s, waterTaxNo: e.target.value }))
               })}
             </div>
 
@@ -3702,9 +4851,10 @@ const MasterData = ({ user, onLogout }) => {
 
       const renderSimpleList = (values, sectionKey) => {
         const filtered = filterByQuery(values);
+        const ordered = bankDetailsSortReversed ? [...filtered].reverse() : filtered;
         return (
           <div className="bg-white">
-            {filtered.map((value, index) => (
+            {ordered.map((value, index) => (
               <div
                 key={`${sectionKey}-${value}-${index}`}
                 className="relative border-b border-[#EFEFEF] bg-white last:border-b-0 overflow-hidden select-none"
@@ -3757,7 +4907,7 @@ const MasterData = ({ user, onLogout }) => {
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && (
+            {ordered.length === 0 && (
               <div className="px-[16px] py-[18px] text-center text-[13px] text-[#7A7A7A]">No data found</div>
             )}
           </div>
@@ -3860,6 +5010,7 @@ const MasterData = ({ user, onLogout }) => {
             onClick={() => {
               if (selectedItem === 'Vendor Name') {
                 setVendorFormMode('new');
+                setIsVendorViewOnly(false);
                 setIsAddVendorViewOpen(true);
                 setExpandedVendorSection('vendor-details');
                 setVendorQrPreview('');
@@ -3880,10 +5031,12 @@ const MasterData = ({ user, onLogout }) => {
                   bankName: '',
                   ifscCode: '',
                   upiPhoneNumber: '',
-                  upiId: ''
+                  upiId: '',
+                  vendorPicture: ''
                 });
               } else if (selectedItem === 'Contractor Name' || selectedItem === 'Support Associate Name') {
                 setContractorFormMode('new');
+                setIsContractorViewOnly(false);
                 setIsAddContractorViewOpen(true);
                 setExpandedContractorSection('contractor-details');
                 setContractorQrPreview('');
@@ -3907,16 +5060,19 @@ const MasterData = ({ user, onLogout }) => {
                 });
               } else if (selectedItem === 'Categories') {
                 setCategoryFormMode('new');
+                setIsCategoryViewOnly(false);
                 setIsAddCategoryViewOpen(true);
                 setExpandedCategorySection('category-details');
                 setCategoryForm({ categoryName: '' });
               } else if (selectedItem === 'Machine tools') {
                 setMachineFormMode('new');
+                setIsMachineViewOnly(false);
                 setIsAddMachineViewOpen(true);
                 setExpandedMachineSection('machine-details');
                 setMachineForm({ machineName: '' });
               } else if (selectedItem === 'Employee Details') {
                 setEmployeeFormMode('new');
+                setIsEmployeeViewOnly(false);
                 setIsAddEmployeeViewOpen(true);
                 setExpandedEmployeeSection('employee-details');
                 setIsEmployeeQrModalOpen(false);
@@ -3943,6 +5099,7 @@ const MasterData = ({ user, onLogout }) => {
                 });
               } else if (selectedItem === 'Account Details') {
                 setAccountFormMode('new');
+                setIsAccountViewOnly(false);
                 setIsAddAccountViewOpen(true);
                 setExpandedAccountSection('account-details');
                 setIsAccountQrModalOpen(false);
@@ -3960,6 +5117,7 @@ const MasterData = ({ user, onLogout }) => {
                 });
               } else if (selectedItem === 'Company Labour') {
                 setLabourFormMode('new');
+                setIsLabourViewOnly(false);
                 setIsAddLabourViewOpen(true);
                 setExpandedLabourSection('wage-details');
                 setIsLabourQrModalOpen(false);
@@ -4000,7 +5158,17 @@ const MasterData = ({ user, onLogout }) => {
           <div className="border-b border-[#EFEFEF] bg-[#F8F8F8] px-[14px] py-[10px]">
             <div className="flex items-center">
               <span className="w-[28px]" />
-              <span className="text-[14px] font-semibold text-black">{selectedItem}</span>
+              <div className="flex items-center gap-[6px]">
+                <span className="text-[14px] font-semibold text-black">{selectedItem}</span>
+                <button
+                  type="button"
+                  aria-label="Toggle list order"
+                  className="flex h-[28px] w-[28px] shrink-0 items-center justify-center p-0"
+                  onClick={() => setMasterTableSortReversed((prev) => !prev)}
+                >
+                  <img src={UpDownFilter} alt="" className="h-[16px] w-[16px]" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -4014,7 +5182,7 @@ const MasterData = ({ user, onLogout }) => {
                 No data found
               </div>
             ) : (
-              filteredList.map((item, index) => {
+              displayedList.map((item, index) => {
                 const rowId = getListRowId(item, index);
                 const isSwiped = swipedProjectId === rowId;
 
@@ -4038,6 +5206,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Vendor Name') {
                             const next = normalizeVendorForForm(item);
                             setVendorFormMode('edit');
+                            setIsVendorViewOnly(false);
                             setVendorForm(next);
                             setVendorQrPreview(next.qrCode || '');
                             setExpandedVendorSection('vendor-details');
@@ -4048,6 +5217,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Contractor Name' || selectedItem === 'Support Associate Name') {
                             const next = normalizeContractorForForm(item);
                             setContractorFormMode('edit');
+                            setIsContractorViewOnly(false);
                             setContractorForm(next);
                             setContractorQrPreview(next.qrCode || '');
                             setExpandedContractorSection('contractor-details');
@@ -4058,6 +5228,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Categories') {
                             const next = normalizeCategoryForForm(item);
                             setCategoryFormMode('edit');
+                            setIsCategoryViewOnly(false);
                             setCategoryForm(next);
                             setExpandedCategorySection('category-details');
                             setIsAddCategoryViewOpen(true);
@@ -4067,6 +5238,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Machine tools') {
                             const next = normalizeMachineForForm(item);
                             setMachineFormMode('edit');
+                            setIsMachineViewOnly(false);
                             setMachineForm(next);
                             setExpandedMachineSection('machine-details');
                             setIsAddMachineViewOpen(true);
@@ -4076,6 +5248,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Employee Details') {
                             const next = normalizeEmployeeForForm(item);
                             setEmployeeFormMode('edit');
+                            setIsEmployeeViewOnly(false);
                             setEmployeeForm(next);
                             setEmployeeQrPreview(next.qrCode || '');
                             setIsEmployeeAadhaarModalOpen(false);
@@ -4088,6 +5261,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Account Details') {
                             const next = normalizeAccountForForm(item);
                             setAccountFormMode('edit');
+                            setIsAccountViewOnly(false);
                             setAccountForm(next);
                             setAccountQrPreview(next.qrCode || '');
                             setExpandedAccountSection('account-details');
@@ -4098,6 +5272,7 @@ const MasterData = ({ user, onLogout }) => {
                           if (selectedItem === 'Company Labour') {
                             const next = normalizeLabourForForm(item);
                             setLabourFormMode('edit');
+                            setIsLabourViewOnly(false);
                             setLabourForm(next);
                             setLabourQrPreview(next.qrCode || '');
                             setExpandedLabourSection('wage-details');
@@ -4122,14 +5297,119 @@ const MasterData = ({ user, onLogout }) => {
                       }`}
                     >
                       <span className="text-[13px] font-medium text-black text-left">
-                        {index + 1}
+                        {listSerialNumberByRowId.get(getListRowId(item, index)) ?? index + 1}
                       </span>
                       <span className="pr-[8px] text-[13px] font-medium text-black text-left">
-                        {getItemPrimaryText(item, selectedItem)}
+                        <button
+                          type="button"
+                          className="cursor-pointer text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedItem === 'Vendor Name') {
+                              const next = normalizeVendorForForm(item);
+                              setVendorFormMode('edit');
+                              setIsVendorViewOnly(true);
+                              setVendorForm(next);
+                              setVendorQrPreview(next.qrCode || '');
+                              setExpandedVendorSection('vendor-details');
+                              setIsAddVendorViewOpen(true);
+                              return;
+                            }
+                            if (selectedItem === 'Contractor Name' || selectedItem === 'Support Associate Name') {
+                              const next = normalizeContractorForForm(item);
+                              setContractorFormMode('edit');
+                              setIsContractorViewOnly(true);
+                              setContractorForm(next);
+                              setContractorQrPreview(next.qrCode || '');
+                              setExpandedContractorSection('contractor-details');
+                              setIsAddContractorViewOpen(true);
+                              return;
+                            }
+                            if (selectedItem === 'Categories') {
+                              const next = normalizeCategoryForForm(item);
+                              setCategoryFormMode('edit');
+                              setIsCategoryViewOnly(true);
+                              setCategoryForm(next);
+                              setExpandedCategorySection('category-details');
+                              setIsAddCategoryViewOpen(true);
+                              return;
+                            }
+                            if (selectedItem === 'Machine tools') {
+                              const next = normalizeMachineForForm(item);
+                              setMachineFormMode('edit');
+                              setIsMachineViewOnly(true);
+                              setMachineForm(next);
+                              setExpandedMachineSection('machine-details');
+                              setIsAddMachineViewOpen(true);
+                              return;
+                            }
+                            if (selectedItem === 'Employee Details') {
+                              const next = normalizeEmployeeForForm(item);
+                              setEmployeeFormMode('edit');
+                              setIsEmployeeViewOnly(true);
+                              setEmployeeForm(next);
+                              setEmployeeQrPreview(next.qrCode || '');
+                              setIsEmployeeAadhaarModalOpen(false);
+                              setEmployeeAadhaarFile(null);
+                              setExpandedEmployeeSection('employee-details');
+                              setIsAddEmployeeViewOpen(true);
+                              return;
+                            }
+                            if (selectedItem === 'Account Details') {
+                              const next = normalizeAccountForForm(item);
+                              setAccountFormMode('edit');
+                              setIsAccountViewOnly(true);
+                              setAccountForm(next);
+                              setAccountQrPreview(next.qrCode || '');
+                              setExpandedAccountSection('account-details');
+                              setIsAddAccountViewOpen(true);
+                              return;
+                            }
+                            if (selectedItem === 'Company Labour') {
+                              const next = normalizeLabourForForm(item);
+                              setLabourFormMode('edit');
+                              setIsLabourViewOnly(true);
+                              setLabourForm(next);
+                              setLabourQrPreview(next.qrCode || '');
+                              setExpandedLabourSection('wage-details');
+                              setIsAddLabourViewOpen(true);
+                            }
+                          }}
+                        >
+                          {getItemPrimaryText(item, selectedItem)}
+                        </button>
                       </span>
-                      <span className="text-[12px] font-medium text-left text-[#7A7A7A]">
-                        {getItemSecondaryText(item, selectedItem)}
-                      </span>
+                      {selectedItem === 'Account Details' ? (
+                        <button
+                          type="button"
+                          className="text-[12px] font-medium text-left text-[#7A7A7A]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = normalizeAccountForForm(item);
+                            setAccountDetailsPreview({
+                              accountHolderName: next.accountHolderName || '',
+                              bankName: next.bankName || '',
+                              accountNumber: next.accountNumber || '',
+                              ifscCode: next.ifscCode || '',
+                              branchName: next.branch || next.accountBranch || '',
+                              contactNumber:
+                                item?.contactNumber ||
+                                item?.contact_number ||
+                                item?.mobileNumber ||
+                                item?.mobile_number ||
+                                '',
+                              contactEmail: item?.emailId || item?.email || item?.email_id || ''
+                            });
+                            setIsAccountDetailsPreviewOpen(true);
+                          }}
+                        >
+                          {getItemSecondaryText(item, selectedItem)}
+                        </button>
+                      ) : (
+                        <span className="text-[12px] font-medium text-left text-[#7A7A7A]">
+                          {getItemSecondaryText(item, selectedItem)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -4170,9 +5450,19 @@ const MasterData = ({ user, onLogout }) => {
               setProjectFormMode('new');
               setProjectQrPreview('');
               setIsProjectQrModalOpen(false);
+              setAddOnBillForm({
+                projectType: '',
+                floorName: '',
+                shopNo: '',
+                doorNo: '',
+                area: '',
+                propertyTaxNo: '',
+                waterTaxNo: ''
+              });
               setProjectForm({
+                projectDbId: '',
                 projectName: '',
-                projectId: '',
+                projectId: generateNextProjectId(),
                 projectCategory: '',
                 referenceName: '',
                 branch: '',
@@ -4191,7 +5481,8 @@ const MasterData = ({ user, onLogout }) => {
                 ifscCode: '',
                 accountBranch: '',
                 upiPhoneNumber: '',
-                upiId: ''
+                upiId: '',
+                projectPicture: ''
               });
               setIsAddProjectViewOpen(true);
               setExpandedProjectSection('project-details');
@@ -4210,7 +5501,17 @@ const MasterData = ({ user, onLogout }) => {
           <div className="border-b border-[#EFEFEF] bg-[#F8F8F8] px-[14px] py-[10px]">
             <div className="flex items-center">
               <span className="w-[28px]" />
-              <span className="text-[14px] font-semibold text-black">Project Name</span>
+              <div className="flex items-center gap-[6px]">
+                <span className="text-[14px] font-semibold text-black">Project Name</span>
+                <button
+                  type="button"
+                  aria-label="Toggle list order"
+                  className="flex h-[28px] w-[28px] shrink-0 items-center justify-center p-0"
+                  onClick={() => setMasterTableSortReversed((prev) => !prev)}
+                >
+                  <img src={UpDownFilter} alt="" className="h-[16px] w-[16px]" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -4224,7 +5525,7 @@ const MasterData = ({ user, onLogout }) => {
                 No projects found
               </div>
             ) : (
-              filteredProjects.map((item, index) => {
+              displayedProjects.map((item, index) => {
                 const rowId = getProjectRowId(item, index);
                 const isSwiped = swipedProjectId === rowId;
 
@@ -4244,11 +5545,15 @@ const MasterData = ({ user, onLogout }) => {
                         type="button"
                         className="flex h-[36px] w-[30px] items-center justify-center rounded-[2px] bg-[#0B7A45] text-white"
                         aria-label="Edit"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           const next = normalizeProjectForForm(item);
+                          const propertyNext = normalizeProjectPropertyForForm(item);
                           setProjectFormMode('edit');
                           setProjectForm(next);
+                          setAddOnBillForm(propertyNext);
                           setProjectQrPreview(next.qrCode || '');
+                          setIsProjectViewOnly(false);
                           setIsAddProjectViewOpen(true);
                           setExpandedProjectSection('project-details');
                         }}
@@ -4259,6 +5564,7 @@ const MasterData = ({ user, onLogout }) => {
                         type="button"
                         className="flex h-[36px] w-[30px] items-center justify-center rounded-[2px] bg-[#F26B3A] text-white"
                         aria-label="Delete"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <img src={deleteIcon} alt="Delete" className="w-[18px] h-[18px]" />
                       </button>
@@ -4273,7 +5579,25 @@ const MasterData = ({ user, onLogout }) => {
                         {getProjectSerialNumber(item, index)}
                       </span>
                       <span className="pr-[8px] text-[13px] font-medium text-black text-left">
-                        {item.projectName || ''}
+                        <button
+                          type="button"
+                          className="cursor-pointer text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = normalizeProjectForForm(item);
+                            const propertyNext = normalizeProjectPropertyForForm(item);
+                            setProjectFormMode('edit');
+                            setProjectForm(next);
+                            setAddOnBillForm(propertyNext);
+                            setProjectQrPreview(next.qrCode || '');
+                            setUploadFileRowShowsSaveIcon(false);
+                            setIsProjectViewOnly(true);
+                            setIsAddProjectViewOpen(true);
+                            setExpandedProjectSection('project-details');
+                          }}
+                        >
+                          {item.projectName || ''}
+                        </button>
                       </span>
                       <span
                         className={`text-[12px] font-medium text-left ${
@@ -4307,7 +5631,10 @@ const MasterData = ({ user, onLogout }) => {
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
           <button
             type="button"
-            onClick={() => setIsBankNameFormOpen(false)}
+            onClick={() => {
+              setIsBankNameFormOpen(false);
+              setSelectedItem(null);
+            }}
             className="truncate text-[11px] text-[#A4A4A4]"
           >
             Master Table
@@ -4323,7 +5650,7 @@ const MasterData = ({ user, onLogout }) => {
           <span className="px-[4px] shrink-0">&gt;</span>
           <span className="shrink-0 font-medium text-black">{bankNameFormMode === 'edit' ? 'Edit' : 'New'}</span>
         </div>
-        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+        <button type="button" onClick={handleHeaderSubmit} className="shrink-0 text-[12px] font-medium text-black">
           Update
         </button>
       </>
@@ -4332,7 +5659,10 @@ const MasterData = ({ user, onLogout }) => {
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
           <button
             type="button"
-            onClick={() => setIsBankTypeFormOpen(false)}
+            onClick={() => {
+              setIsBankTypeFormOpen(false);
+              setSelectedItem(null);
+            }}
             className="truncate text-[11px] text-[#A4A4A4]"
           >
             Master Table
@@ -4348,7 +5678,7 @@ const MasterData = ({ user, onLogout }) => {
           <span className="px-[4px] shrink-0">&gt;</span>
           <span className="shrink-0 font-medium text-black">{bankTypeFormMode === 'edit' ? 'Edit' : 'New'}</span>
         </div>
-        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+        <button type="button" onClick={handleHeaderSubmit} className="shrink-0 text-[12px] font-medium text-black">
           Update
         </button>
       </>
@@ -4357,7 +5687,10 @@ const MasterData = ({ user, onLogout }) => {
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
           <button
             type="button"
-            onClick={() => setIsBankLocationFormOpen(false)}
+            onClick={() => {
+              setIsBankLocationFormOpen(false);
+              setSelectedItem(null);
+            }}
             className="truncate text-[11px] text-[#A4A4A4]"
           >
             Master Table
@@ -4399,9 +5732,11 @@ const MasterData = ({ user, onLogout }) => {
             Project Name
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{projectFormMode === 'edit' ? 'Edit' : 'New'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {projectFormMode === 'edit' ? (isProjectViewOnly ? 'View' : 'Edit') : 'New'}
+          </span>
         </div>
-        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+        <button type="button" onClick={handleHeaderSubmit} className="shrink-0 text-[12px] font-medium text-black">
           Submit
         </button>
       </>
@@ -4427,7 +5762,9 @@ const MasterData = ({ user, onLogout }) => {
             Vendor Name
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{vendorFormMode === 'edit' ? 'Edit' : 'NEW'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {vendorFormMode === 'edit' ? (isVendorViewOnly ? 'View' : 'Edit') : 'NEW'}
+          </span>
         </div>
         <button type="button" className="shrink-0 text-[12px] font-medium text-black">
           Update
@@ -4455,7 +5792,9 @@ const MasterData = ({ user, onLogout }) => {
             {selectedItem === 'Support Associate Name' ? 'Support Associate Name' : 'Contractor Name'}
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{contractorFormMode === 'edit' ? 'Edit' : 'NEW'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {contractorFormMode === 'edit' ? (isContractorViewOnly ? 'View' : 'Edit') : 'NEW'}
+          </span>
         </div>
         <button type="button" className="shrink-0 text-[12px] font-medium text-black">
           Update
@@ -4464,7 +5803,14 @@ const MasterData = ({ user, onLogout }) => {
     ) : selectedItem === 'Categories' && isAddCategoryViewOpen ? (
       <>
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
-          <button type="button" onClick={() => setIsAddCategoryViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddCategoryViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
             Master Table
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
@@ -4472,9 +5818,11 @@ const MasterData = ({ user, onLogout }) => {
             Categories
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{categoryFormMode === 'edit' ? 'Edit' : 'New'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {categoryFormMode === 'edit' ? (isCategoryViewOnly ? 'View' : 'Edit') : 'New'}
+          </span>
         </div>
-        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+        <button type="button" onClick={handleHeaderSubmit} className="shrink-0 text-[12px] font-medium text-black">
           {categoryFormMode === 'edit' ? 'Update' : 'Add'}
         </button>
       </>
@@ -4500,16 +5848,25 @@ const MasterData = ({ user, onLogout }) => {
             Machine tools
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{machineFormMode === 'edit' ? 'Edit' : 'New'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {machineFormMode === 'edit' ? (isMachineViewOnly ? 'View' : 'Edit') : 'New'}
+          </span>
         </div>
-        <button type="button" className="shrink-0 text-[12px] font-medium text-black">
+        <button type="button" onClick={handleHeaderSubmit} className="shrink-0 text-[12px] font-medium text-black">
           Update
         </button>
       </>
     ) : selectedItem === 'Employee Details' && isAddEmployeeViewOpen ? (
       <>
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
-          <button type="button" onClick={() => setIsAddEmployeeViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddEmployeeViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
             Master Table
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
@@ -4517,7 +5874,9 @@ const MasterData = ({ user, onLogout }) => {
             Employee Details
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{employeeFormMode === 'edit' ? 'Edit' : 'New'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {employeeFormMode === 'edit' ? (isEmployeeViewOnly ? 'View' : 'Edit') : 'New'}
+          </span>
         </div>
         <button type="button" className="shrink-0 text-[12px] font-medium text-black">
           {employeeFormMode === 'edit' ? 'Update' : 'Submit'}
@@ -4526,7 +5885,14 @@ const MasterData = ({ user, onLogout }) => {
     ) : selectedItem === 'Account Details' && isAddAccountViewOpen ? (
       <>
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
-          <button type="button" onClick={() => setIsAddAccountViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddAccountViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
             Master Table
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
@@ -4534,7 +5900,9 @@ const MasterData = ({ user, onLogout }) => {
             Account Details
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{accountFormMode === 'edit' ? 'Edit' : 'New'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {accountFormMode === 'edit' ? (isAccountViewOnly ? 'View' : 'Edit') : 'New'}
+          </span>
         </div>
         <button type="button" className="shrink-0 text-[12px] font-medium text-black">
           {accountFormMode === 'edit' ? 'Update' : 'Submit'}
@@ -4543,7 +5911,14 @@ const MasterData = ({ user, onLogout }) => {
     ) : selectedItem === 'Company Labour' && isAddLabourViewOpen ? (
       <>
         <div className="flex min-w-0 flex-1 items-center truncate text-[11px] text-[#A4A4A4]">
-          <button type="button" onClick={() => setIsAddLabourViewOpen(false)} className="truncate text-[11px] text-[#A4A4A4]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddLabourViewOpen(false);
+              setSelectedItem(null);
+            }}
+            className="truncate text-[11px] text-[#A4A4A4]"
+          >
             Master Table
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
@@ -4551,7 +5926,9 @@ const MasterData = ({ user, onLogout }) => {
             Company Labour
           </button>
           <span className="px-[4px] shrink-0">&gt;</span>
-          <span className="shrink-0 font-medium text-black">{labourFormMode === 'edit' ? 'Edit' : 'New'}</span>
+          <span className="shrink-0 font-medium text-black">
+            {labourFormMode === 'edit' ? (isLabourViewOnly ? 'View' : 'Edit') : 'New'}
+          </span>
         </div>
         <button
           type="button"
@@ -4600,7 +5977,20 @@ const MasterData = ({ user, onLogout }) => {
             (isBankNameFormOpen || isBankTypeFormOpen || isBankLocationFormOpen)
           )
         }
-        onDrillBack={() => setSelectedItem(null)}
+        onDrillBack={() => {
+          setIsAddProjectViewOpen(false);
+          setIsAddVendorViewOpen(false);
+          setIsAddContractorViewOpen(false);
+          setIsAddCategoryViewOpen(false);
+          setIsAddMachineViewOpen(false);
+          setIsAddEmployeeViewOpen(false);
+          setIsAddAccountViewOpen(false);
+          setIsAddLabourViewOpen(false);
+          setIsBankNameFormOpen(false);
+          setIsBankTypeFormOpen(false);
+          setIsBankLocationFormOpen(false);
+          setSelectedItem(null);
+        }}
       />
 
       <div
@@ -4677,6 +6067,137 @@ const MasterData = ({ user, onLogout }) => {
           </div>
         )}
       </div>
+
+      {isAccountDetailsPreviewOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close overlay"
+            onClick={() => setIsAccountDetailsPreviewOpen(false)}
+            className="fixed inset-0 z-[9999] bg-black/60"
+          />
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center px-[16px]">
+            <div
+              className="w-full max-w-[340px] rounded-[14px] bg-white px-[16px] pt-[14px] pb-[14px] shadow-[0px_10px_30px_rgba(0,0,0,0.22)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative mb-[10px]">
+                <div className="text-[16px] font-semibold text-black">Bank Details</div>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setIsAccountDetailsPreviewOpen(false)}
+                  className="absolute right-0 top-0 text-[#F26B3A]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 5L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M13 5L5 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="rounded-[10px] border border-[#E6E6E6] bg-white px-[10px] py-[10px] text-left">
+                {[
+                  {
+                    label: 'Account Holder Name',
+                    value: accountDetailsPreview?.accountHolderName || '',
+                    id: 'm-preview-account-holder',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    )
+                  },
+                  {
+                    label: 'Bank Name',
+                    value: accountDetailsPreview?.bankName || '',
+                    id: 'm-preview-bank-name',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 10.5 12 5l9 5.5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                        <path d="M5 10.5V19h14v-8.5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                        <path d="M8 19V12m4 7V12m4 7V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    )
+                  },
+                  {
+                    label: 'Account Number',
+                    value: accountDetailsPreview?.accountNumber || '',
+                    id: 'm-preview-account-number',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="M6.5 10h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    )
+                  },
+                  {
+                    label: 'IFSC Code',
+                    value: accountDetailsPreview?.ifscCode || '',
+                    id: 'm-preview-ifsc',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 3h10v6H7z" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="M8 21h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        <path d="M12 9v12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    )
+                  },
+                  {
+                    label: 'Branch Name',
+                    value: accountDetailsPreview?.branchName || '',
+                    id: 'm-preview-branch-name',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="M12 11.5a2.2 2.2 0 1 0-2.2-2.2 2.2 2.2 0 0 0 2.2 2.2Z" stroke="currentColor" strokeWidth="1.6" />
+                      </svg>
+                    )
+                  },
+                  {
+                    label: 'Contact Number',
+                    value: accountDetailsPreview?.contactNumber || '',
+                    id: 'm-preview-contact-number',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M6.5 3.8 9 3.2c.6-.1 1.1.2 1.3.7l1 2.6c.2.5 0 1.1-.4 1.4L9.6 9.2c.9 1.9 2.3 3.4 4.2 4.2l1.3-1.3c.4-.4.9-.5 1.4-.4l2.6 1c.5.2.8.7.7 1.3l-.6 2.5c-.1.5-.5.9-1.1 1-7 .9-13-5-12.1-12.1.1-.5.5-.9 1-1.1Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )
+                  },
+                  {
+                    label: 'Contact Email',
+                    value: accountDetailsPreview?.contactEmail || '-',
+                    id: 'm-preview-contact-email',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                      </svg>
+                    )
+                  }
+                ].map((row, idx, arr) => (
+                  <div key={row.id} className={idx === 0 ? '' : 'pt-[10px]'}>
+                    <div className="relative pr-[44px]">
+                      <div className="flex min-w-0 items-center gap-[8px] text-[11px] font-medium text-[#6B6B6B]">
+                        <span className="shrink-0 text-[#7A7A7A]">{row.icon}</span>
+                        <span className="truncate">{row.label}</span>
+                      </div>
+                      <MasterDataCopyButton text={row.value} fieldName={row.label} buttonId={row.id} />
+                    </div>
+                    <div className="mt-[4px] text-left text-[12px] font-semibold text-black break-words">{row.value || '-'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <BottomNav activeTab="home" />
     </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from '../PurchaseOrder/Header';
 import Kebab from '../Images/Kebab.svg';
 
-const MasterDataTabs = () => {
+const MasterDataTabs = ({ onMasterDataClick }) => {
   const tabsContainerRef = useRef(null);
   const activeTabRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -122,6 +122,7 @@ const MasterDataTabs = () => {
               type="button"
               ref={activeTabRef}
               className="font-semibold text-[12px] leading-normal mt-[8px] whitespace-nowrap flex-shrink-0 text-black"
+              onClick={onMasterDataClick}
             >
               Master Data
             </button>
@@ -215,7 +216,7 @@ const MasterDataHeader = ({
       onLogout={onLogout}
       onMenuClick={onMenuClick}
     >
-      <MasterDataTabs />
+      <MasterDataTabs onMasterDataClick={onDrillBack} />
       <div className="flex-shrink-0 flex w-full min-h-0 items-center justify-between border-b border-[#E0E0E0] pt-[8px] pb-[8px] bg-white">
         {showDrillBackDownload ? (
           <>

@@ -2258,44 +2258,51 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 />
                                             </div>
                                             {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
-                                                <div>
-                                                    <label className="block text-gray-500 font-semibold text-left">Validity</label>
-                                                    <input
-                                                        type="text"
-                                                        name="utilityValidityDays"
-                                                        value={formData.utilityValidityDays}
-                                                        onChange={handleChange}
-                                                        placeholder="Enter validity..."
-                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                                    />
-                                                </div>
-                                            )}
-                                            {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
-                                                <div>
-                                                    <label className="block text-gray-500 font-semibold text-left">Validity Type</label>
-                                                    <select
-                                                        name="utilityValidityType"
-                                                        value={formData.utilityValidityType}
-                                                        onChange={handleChange}
-                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                                    >
-                                                        <option value="">--- Select ---</option>
-                                                        <option value="Days">Days</option>
-                                                        <option value="Month">Month</option>
-                                                        <option value="Year">Year</option>
-                                                    </select>
-                                                </div>
-                                            )}
-                                            {formData.utilityType === 'Telecom' && (
-                                                <div>
-                                                    <label className="block text-gray-500 font-semibold text-left">Service Start Date</label>
-                                                    <input
-                                                        type="date"
-                                                        name="serviceStartingDate"
-                                                        value={formData.serviceStartingDate}
-                                                        onChange={handleChange}
-                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                                    />
+                                                <div className="col-span-2 grid grid-cols-3 gap-4 w-full">
+
+                                                    {/* Validity */}
+                                                    <div>
+                                                        <label className="block text-gray-500 font-semibold text-left">Validity</label>
+                                                        <input
+                                                            type="text"
+                                                            name="utilityValidityDays"
+                                                            value={formData.utilityValidityDays}
+                                                            onChange={handleChange}
+                                                            placeholder="Enter validity..."
+                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                        />
+                                                    </div>
+
+                                                    {/* Validity Type */}
+                                                    <div>
+                                                        <label className="block text-gray-500 font-semibold text-left">Validity Type</label>
+                                                        <select
+                                                            name="utilityValidityType"
+                                                            value={formData.utilityValidityType}
+                                                            onChange={handleChange}
+                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                        >
+                                                            <option value="">--- Select ---</option>
+                                                            <option value="Days">Days</option>
+                                                            <option value="Month">Month</option>
+                                                            <option value="Year">Year</option>
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Service Start Date */}
+                                                    {formData.utilityType === 'Telecom' && (
+                                                        <div>
+                                                            <label className="block text-gray-500 font-semibold text-left">Service Start Date</label>
+                                                            <input
+                                                                type="date"
+                                                                name="serviceStartingDate"
+                                                                value={formData.serviceStartingDate}
+                                                                onChange={handleChange}
+                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                            />
+                                                        </div>
+                                                    )}
+
                                                 </div>
                                             )}
                                         </>

@@ -3827,7 +3827,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         </thead>
                       </table>
                     </div>
-                    <div className="overflow-y-auto max-h-[250px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                    <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                       <table className="table-auto lg:w-[300px] w-full">
                         <tbody>
                           {filteredAccountDetails.map((item, index) => (

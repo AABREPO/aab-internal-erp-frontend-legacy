@@ -8,7 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import edit from '../Images/Edit.svg';
 import file from '../Images/file.png';
 
-const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embedded = false, onSuccess  }) => {
   const resolveEnteredBy = () => {
     const propUsername = typeof username === 'string' ? username.trim() : '';
     if (propUsername) return propUsername;
@@ -109,6 +109,19 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
+  const clearTransientFormSessionState = () => {
+    // Keep selectedOption/selectedSite available for popup prefill flows.
+    sessionStorage.removeItem('advanceAmount');
+    sessionStorage.removeItem('billAmount');
+    sessionStorage.removeItem('paymentMode');
+    sessionStorage.removeItem('description');
+    sessionStorage.removeItem('transferSiteId');
+  };
+  const notifyParentSuccess = async () => {
+    if (typeof onSuccess === 'function') {
+      try { await onSuccess(); } catch { }
+    }
+  };
   useEffect(() => {
     const savedselectedType = sessionStorage.getItem('selectedType');
     const savedContractorVendor = sessionStorage.getItem('selectedOption');
@@ -150,14 +163,49 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   };
   useEffect(() => {
     if (selectedType) sessionStorage.setItem('selectedType', JSON.stringify(selectedType));
+    else sessionStorage.removeItem('selectedType');
+
     if (selectedOption) sessionStorage.setItem('selectedOption', JSON.stringify(selectedOption));
+    else sessionStorage.removeItem('selectedOption');
+
     if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
-    if (overallAdvance) sessionStorage.setItem('overallAdvance', JSON.stringify(overallAdvance));
-    if (billAmount) sessionStorage.setItem('billAmount', JSON.stringify(billAmount));
-    if (advanceAmount) sessionStorage.setItem('advanceAmount', JSON.stringify(advanceAmount));
-    if (transferSiteId) sessionStorage.setItem('transferSiteId', JSON.stringify(transferSiteId));
-    if (paymentMode) sessionStorage.setItem('paymentMode', JSON.stringify(paymentMode));
-    if (description) sessionStorage.setItem('description', JSON.stringify(description));
+    else sessionStorage.removeItem('selectedSite');
+
+    if (overallAdvance !== null && overallAdvance !== undefined && String(overallAdvance).trim() !== '') {
+      sessionStorage.setItem('overallAdvance', JSON.stringify(overallAdvance));
+    } else {
+      sessionStorage.removeItem('overallAdvance');
+    }
+
+    if (billAmount !== null && billAmount !== undefined && String(billAmount).trim() !== '') {
+      sessionStorage.setItem('billAmount', JSON.stringify(billAmount));
+    } else {
+      sessionStorage.removeItem('billAmount');
+    }
+
+    if (advanceAmount !== null && advanceAmount !== undefined && String(advanceAmount).trim() !== '') {
+      sessionStorage.setItem('advanceAmount', JSON.stringify(advanceAmount));
+    } else {
+      sessionStorage.removeItem('advanceAmount');
+    }
+
+    if (transferSiteId !== null && transferSiteId !== undefined && String(transferSiteId).trim() !== '') {
+      sessionStorage.setItem('transferSiteId', JSON.stringify(transferSiteId));
+    } else {
+      sessionStorage.removeItem('transferSiteId');
+    }
+
+    if (paymentMode !== null && paymentMode !== undefined && String(paymentMode).trim() !== '') {
+      sessionStorage.setItem('paymentMode', JSON.stringify(paymentMode));
+    } else {
+      sessionStorage.removeItem('paymentMode');
+    }
+
+    if (description !== null && description !== undefined && String(description).trim() !== '') {
+      sessionStorage.setItem('description', JSON.stringify(description));
+    } else {
+      sessionStorage.removeItem('description');
+    }
   }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, advanceAmount, transferSiteId, paymentMode, description]);
   const formatWithCommas = (value) => {
     if (value === '' || value === null || value === undefined) return "";
@@ -985,9 +1033,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         fileInputRef.current.value = '';
       }
       setEntryNo(nextEntryNo);
+      clearTransientFormSessionState();
       fetchAdvanceData();
       if (selectedOption) handleChange(selectedOption);
       if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
+      await notifyParentSuccess();
     } catch (error) {
       console.error('Error submitting data:', error);
       toast.error('Failed to save data!', {
@@ -1580,9 +1630,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       }
       setEntryNo(nextEntryNo);
       setShowPaymentModal(false);
+      clearTransientFormSessionState();
       fetchAdvanceData();
       if (selectedOption) handleChange(selectedOption);
       if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
+      await notifyParentSuccess();
     } catch (error) {
       console.error('Error submitting data:', error);
       toast.error('Failed to save data!', {
@@ -1649,8 +1701,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         });
         if (!res.ok) throw new Error('Failed to update');
       }
-      window.location.reload();
       setIsEditModalOpen(false);
+      await fetchAdvanceData();
+      if (selectedOption) handleChange(selectedOption);
+      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
+      await notifyParentSuccess();
     } catch (err) {
       console.error(err);
     }

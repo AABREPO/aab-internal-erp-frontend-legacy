@@ -593,7 +593,7 @@ const Dashboard = () => {
     const handleSaveRentAdvance = async () => {
         const { tenantId, shopId } = selectedShop;
         try {
-            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenantShop/update/${tenantId}/shop/${shopId}`, {
+            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/update/${tenantId}/shopNo/${shopId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'

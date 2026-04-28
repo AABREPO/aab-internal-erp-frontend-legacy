@@ -14,6 +14,13 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const [isEditWeeklyReceivedTypeOpen, setIsEditWeeklyReceivedTypeOpen] = useState(false);
     const [selectedWeeklyReceivedTypeId, setSelectedWeeklyReceivedTypeId] = useState(null);
     const [editWeeklyReceivedType, setEditWeeklyReceivedType] = useState('');
+    const [isWeeklyReceivedTypeOpen, setIsWeeklyReceivedTypeOpen] = useState(false);
+    const [weeklyReceivedNameSearch, setWeeklyReceivedNameSearch] = useState('');
+    const [weeklyReceivedName, setWeeklyReceivedName] = useState('');
+    const [weeklyReceivedTypeRows, setWeeklyReceivedTypeRows] = useState([]);
+    const [isEditWeeklyReceivedNameOpen, setIsEditWeeklyReceivedNameOpen] = useState(false);
+    const [selectedWeeklyReceivedNameId, setSelectedWeeklyReceivedNameId] = useState(null);
+    const [editWeeklyReceivedName, setEditWeeklyReceivedName] = useState('');
     const [isLaboursListDataOpen, setIsLaboursListDataOpen] = useState(false);
     const [isEmployeeDataOpen, setIsEmployeeDataOpen] = useState(false);
     const [laboursListSearch, setLaboursListSearch] = useState('');
@@ -41,6 +48,8 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const closeLabourBulkUploadModal = () => setLaboursListBulkUploadOpen(false)
     const openWeeklyTypes = () => setIsWeeklyTypeOpen(true);
     const closeWeeklyTypes = () => setIsWeeklyTypeOpen(false);
+    const openWeeklyReceivedTypes = () => setIsWeeklyReceivedTypeOpen(true);
+    const closeWeeklyReceivedTypes = () => setIsWeeklyReceivedTypeOpen(false);
     const openLabourDetails = () => setIsLaboursListDataOpen(true);
     const closeLabourDetails = () => setIsLaboursListDataOpen(false);
     const openEmployeeDetails = () => setIsEmployeeDataOpen(true);
@@ -50,7 +59,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         setFile(e.target.files[0]);
     };
     const openEditWeeklyTypePopup = (item) => {
-        setEditWeeklyReceivedType(item.received_type);
+        setEditWeeklyReceivedType(item.type);
         setSelectedWeeklyReceivedTypeId(item.id)
         setIsEditWeeklyReceivedTypeOpen(true);
     }
@@ -58,6 +67,16 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         setIsEditWeeklyReceivedTypeOpen(false);
         setEditWeeklyReceivedType('');
         setSelectedWeeklyReceivedTypeId('');
+    }
+    const openEditWeeklyReceivedNamePopup = (item) => {
+        setEditWeeklyReceivedName(item.received_type);
+        setSelectedWeeklyReceivedNameId(item.id);
+        setIsEditWeeklyReceivedNameOpen(true);
+    }
+    const closeEditWeeklyReceivedNamePopup = () => {
+        setIsEditWeeklyReceivedNameOpen(false);
+        setEditWeeklyReceivedName('');
+        setSelectedWeeklyReceivedNameId('');
     }
 
     const openEditLaboursDetails = (item) => {
@@ -92,7 +111,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     }, []);
     const fetchWeeklyType = async () => {
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/getAll');
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setWeeklyReceivedTypes(data);
@@ -108,7 +127,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
         const confirmed = window.confirm("Are you sure you want to delete all Machine Tools?");
         if (confirmed) {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_received_types/deleteAll", {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_types/deleteAll", {
                     method: "DELETE",
                 });
                 if (response.ok) {
@@ -128,7 +147,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
     const handleWeeklyTypeDelete = async (id) => {
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/delete/${id}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/delete/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
@@ -145,9 +164,9 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
     const handleSubmitWeeklyTypes = async (e) => {
         e.preventDefault();
-        const newWeeklyType = { received_type: weeklyReceivedType };
+        const newWeeklyType = { type: weeklyReceivedType };
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/save', {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_types/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -169,18 +188,115 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const handleEditWeeklyTypes = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/edit/${selectedWeeklyReceivedTypeId}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_types/edit/${selectedWeeklyReceivedTypeId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ received_type: editWeeklyReceivedType }),
+                body: JSON.stringify({ type: editWeeklyReceivedType }),
             });
             if (response.ok) {
                 closeEditWeeklyTypePopup();
                 window.location.reload();
             } else {
                 console.error('Failed to update floor name');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
+    useEffect(() => {
+        fetchWeeklyReceivedTypes();
+    }, []);
+    const fetchWeeklyReceivedTypes = async () => {
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/getAll');
+            if (response.ok) {
+                const data = await response.json();
+                setWeeklyReceivedTypeRows(data);
+            } else {
+                setMessage('Error fetching received types.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error fetching received types.');
+        }
+    };
+    const handleDeleteAllWeeklyReceivedTypes = async () => {
+        const confirmed = window.confirm("Are you sure you want to delete all Weekly Received Types?");
+        if (confirmed) {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly_received_types/deleteAll", {
+                    method: "DELETE",
+                });
+                if (response.ok) {
+                    setWeeklyReceivedTypeRows([]);
+                    alert("All Weekly Received Types have been deleted successfully.");
+                } else {
+                    console.error("Failed to delete received types. Status:", response.status);
+                    alert("Error deleting received types. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error deleting received types:", error);
+                alert("An error occurred while deleting received types.");
+            }
+        }
+    };
+    const handleWeeklyReceivedTypeDelete = async (id) => {
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/delete/${id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                alert("Weekly Received Type deleted successfully!");
+                window.location.reload();
+            } else {
+                console.error("Failed to delete Weekly Received Type. Status:", response.status);
+                alert("Error deleting Weekly Received Type. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while deleting Weekly Received Type.");
+        }
+    };
+    const handleSubmitWeeklyReceivedType = async (e) => {
+        e.preventDefault();
+        const payload = { received_type: weeklyReceivedName };
+        try {
+            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly_received_types/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            if (response.ok) {
+                setMessage('Weekly Received Type saved successfully!');
+                setWeeklyReceivedName('');
+                window.location.reload();
+            } else {
+                setMessage('Error saving Weekly Received Type.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Error saving Weekly Received Type.');
+        }
+    };
+    const handleEditWeeklyReceivedType = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly_received_types/edit/${selectedWeeklyReceivedNameId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ received_type: editWeeklyReceivedName }),
+            });
+            if (response.ok) {
+                closeEditWeeklyReceivedNamePopup();
+                window.location.reload();
+            } else {
+                console.error('Failed to update Weekly Received Type');
             }
         } catch (error) {
             console.error('Error:', error);
@@ -410,7 +526,10 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     };
 
     const filteredWeeklyReceivedType = weeklyReceivedTypes.filter((item) =>
-        item.received_type.toLowerCase().includes(weeklyReceivedTypeSearch.toLowerCase())
+        (item.type || '').toLowerCase().includes(weeklyReceivedTypeSearch.toLowerCase())
+    );
+    const filteredWeeklyReceivedNameType = weeklyReceivedTypeRows.filter((item) =>
+        (item.received_type || '').toLowerCase().includes(weeklyReceivedNameSearch.toLowerCase())
     );
     const filteredLaboursData = laboursList.filter((item) =>
         item.labour_name.toLowerCase().includes(laboursListSearch.toLowerCase())
@@ -461,7 +580,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                             <td className="p-2 text-left font-semibold">{(weeklyReceivedTypes.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
                                             <td className="p-2 text-left group flex font-semibold">
                                                 <div className="flex flex-grow">
-                                                    {item.received_type}
+                                                    {item.type}
                                                 </div>
                                                 <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
                                                     <button type="button" >
@@ -469,6 +588,64 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                                     </button>
                                                     <button >
                                                         <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleWeeklyTypeDelete(item.id)} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div className="flex items-center mb-2 lg:mt-0 mt-3 ">
+                        <input
+                            type="text"
+                            className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
+                            placeholder="Search Weekly Received type.."
+                            value={weeklyReceivedNameSearch}
+                            onChange={(e) => setWeeklyReceivedNameSearch(e.target.value)}
+                        />
+                        <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+                            <img src={search} alt='search' className=' w-5 h-5' />
+                        </button>
+                        <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+                            onClick={openWeeklyReceivedTypes}>
+                            + Add
+                        </button>
+                    </div>
+                    <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
+                    <button onClick={handleDeleteAllWeeklyReceivedTypes}>
+                        <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
+                    </button>
+                    <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+                        <div className="bg-[#FAF6ED]">
+                            <table className="table-auto lg:w-72 ">
+                                <thead className='bg-[#FAF6ED]'>
+                                    <tr className="border-b">
+                                        <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
+                                        <th className="p-2 text-left lg:w-72 text-xl font-bold">Received Type</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                        </div>
+                        <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                            <table className="table-auto lg:w-72 w-full">
+                                <tbody>
+                                    {filteredWeeklyReceivedNameType.map((item) => (
+                                        <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
+                                            <td className="p-2 text-left font-semibold">{(weeklyReceivedTypeRows.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                                            <td className="p-2 text-left group flex font-semibold">
+                                                <div className="flex flex-grow">
+                                                    {item.received_type}
+                                                </div>
+                                                <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                                                    <button type="button" >
+                                                        <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditWeeklyReceivedNamePopup(item)} />
+                                                    </button>
+                                                    <button >
+                                                        <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleWeeklyReceivedTypeDelete(item.id)} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -645,6 +822,37 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             )}
+            {isWeeklyReceivedTypeOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+                    <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+                        <div>
+                            <button className="text-red-500 ml-[95%]" onClick={closeWeeklyReceivedTypes}>
+                                <img src={cross} alt='cross' className='w-5 h-5' />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmitWeeklyReceivedType}>
+                            <div className="mb-4">
+                                <label className="block text-lg font-medium mb-2 -ml-52">Received Type</label>
+                                <input
+                                    type="text"
+                                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                                    placeholder="Enter Received Type"
+                                    onChange={(e) => setWeeklyReceivedName(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="flex space-x-2 mt-4 ml-12">
+                                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                                    Submit
+                                </button>
+                                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeWeeklyReceivedTypes}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
             {isLaboursListDataOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
                     <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
@@ -772,6 +980,44 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                     type="button"
                                     className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
                                     onClick={closeEditWeeklyTypePopup}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {isEditWeeklyReceivedNameOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+                    <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+                        <div>
+                            <button className="text-red-500 ml-[95%]" onClick={closeEditWeeklyReceivedNamePopup}>
+                                <img src={cross} alt='close' className='w-5 h-5' />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditWeeklyReceivedType}>
+                            <div className="mb-4">
+                                <label className="block text-lg font-medium mb-2 -ml-[13rem]">Received Type</label>
+                                <input
+                                    type="text"
+                                    value={editWeeklyReceivedName}
+                                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                                    placeholder="Enter Received Type"
+                                    onChange={(e) => setEditWeeklyReceivedName(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="flex space-x-2 mt-8 ml-12">
+                                <button
+                                    type="submit"
+                                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                                >
+                                    Submit
+                                </button>
+                                <button
+                                    type="button"
+                                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                                    onClick={closeEditWeeklyReceivedNamePopup}>
                                     Cancel
                                 </button>
                             </div>

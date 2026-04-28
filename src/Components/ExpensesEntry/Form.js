@@ -93,6 +93,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [summaryBillTotal, setSummaryBillTotal] = useState(null);
     const [summaryBillRemaining, setSummaryBillRemaining] = useState(null);
     const summaryBillMode = summaryBillTotal != null && Number(summaryBillTotal) > 0;
+    const [summaryForceCloseAmount, setSummaryForceCloseAmount] = useState('');
     const [splitRemainingLabel, setSplitRemainingLabel] = useState('Summary Bill Remaining');
     const [allowSplitOverpay, setAllowSplitOverpay] = useState(false);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
@@ -1567,6 +1568,30 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         }
         setIsReviewEditMode(false);
     };
+    const handleSummaryForceClose = async () => {
+        if (!summaryBillMode) return;
+        const remaining = Number(summaryBillRemaining ?? summaryBillTotal ?? 0) || 0;
+        const entered = Number(String(summaryForceCloseAmount || '').replace(/,/g, ''));
+        if (!Number.isFinite(entered) || entered <= 0) {
+            alert('Please enter a valid balance amount to ignore.');
+            return;
+        }
+        if (Math.abs(entered - remaining) > 0.01) {
+            alert(`Entered amount should match remaining amount (₹${remaining.toLocaleString('en-IN')}).`);
+            return;
+        }
+        setSummaryBillTotal(null);
+        setSummaryBillRemaining(null);
+        setSummaryForceCloseAmount('');
+        try {
+            localStorage.removeItem('expenseEntryPrefill');
+        } catch {
+            // ignore
+        }
+        if (typeof onSuccess === 'function') {
+            try { await onSuccess({ forcedSummaryClose: true }); } catch { }
+        }
+    };
     const renderReviewRow = (label, value) => (
         <div className="flex justify-between gap-4 border border-gray-100 rounded-lg px-4 py-2" key={label}>
             <span className="text-sm font-semibold text-gray-600">{label}</span>
@@ -1934,6 +1959,29 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                     </div>
                                     <div className="text-xs text-orange-700">
                                         Total:&nbsp;₹{Number(summaryBillTotal ?? 0).toLocaleString('en-IN')}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            placeholder="Ignore balance amount"
+                                            value={summaryForceCloseAmount}
+                                            onChange={(e) => {
+                                                const raw = String(e.target.value || '');
+                                                const cleaned = raw.replace(/[^\d.]/g, '');
+                                                const parts = cleaned.split('.');
+                                                const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+                                                setSummaryForceCloseAmount(normalized);
+                                            }}
+                                            className="h-[34px] w-[185px] rounded-md border border-orange-300 bg-white px-3 text-[12px] text-black outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSummaryForceClose}
+                                            className="h-[34px] rounded-md bg-[#E4572E] px-3 text-[12px] font-semibold text-white"
+                                        >
+                                            Enter
+                                        </button>
                                     </div>
                                 </div>
                             )}

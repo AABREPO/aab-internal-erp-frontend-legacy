@@ -5,6 +5,7 @@ import Tableview from './ExpensesEntry/TableViewExpense';
 import Database from './ExpensesEntry/DatabaseExpenses';
 import ExpensesAddInput from './ExpensesEntry/ExpensesInputData';
 import EntryChecking from './ExpensesEntry/EntryCheck';
+import WeeklyPaymentHistory from './Cash Register/WeeklyPaymentHistory';
 const Heading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => {
         // Check if there's prefill data to navigate to expense-entry
@@ -37,6 +38,8 @@ const Heading = ({ username, userRoles = [] }) => {
                 return <ExpensesAddInput userRoles={userRoles} />;
             case 'entryCheck':
                 return <EntryChecking userRoles={userRoles} />;
+            case 'weeklyUploadHistory':
+                return <WeeklyPaymentHistory username={username} userRoles={userRoles} viewMode="expenses-entry-upload" />;
             default:
                 return <Form />;
         }
@@ -44,7 +47,7 @@ const Heading = ({ username, userRoles = [] }) => {
     return (
         <div className="bg-[#FAF6ED]">
             {/* Top Navigation Tabs */}
-            <div className="topbar-title gap-4 w-[350px] sm:w-[580px] lg:w-[850px] overflow-x-auto no-scrollbar px-2 py-3">
+            <div className="topbar-title gap-4 w-[350px] sm:w-[580px] lg:w-[950px] overflow-x-auto no-scrollbar px-2 py-3">
                 <h2 className={`link whitespace-nowrap ${activeTab === 'expense-entry' ? 'active' : ''}`}
                     onClick={() => setActiveTab('expense-entry')}>
                     Form
@@ -68,6 +71,10 @@ const Heading = ({ username, userRoles = [] }) => {
                 <h2 className={`link whitespace-nowrap ${activeTab === 'entryCheck' ? 'active' : ''}`}
                     onClick={() => setActiveTab('entryCheck')}>
                     Entry Check
+                </h2>
+                <h2 className={`link whitespace-nowrap ${activeTab === 'weeklyUploadHistory' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('weeklyUploadHistory')}>
+                    Weekly Uploads
                 </h2>
             </div>
             {/* Dynamic Content Area */}

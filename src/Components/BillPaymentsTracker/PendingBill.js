@@ -5320,6 +5320,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     <option value="">Select</option>
                                                                     <option value="Carry Forward">Carry Forward</option>
                                                                     <option value="Cash">Cash</option>
+                                                                    <option value="Direct">Direct</option>
                                                                     <option value="Net Banking">Net Banking</option>
                                                                     <option value="Gpay">Gpay</option>
                                                                     <option value="PhonePe">PhonePe</option>

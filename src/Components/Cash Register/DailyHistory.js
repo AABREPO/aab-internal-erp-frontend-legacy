@@ -566,6 +566,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             console.error("Fetch error: ", error);
         }
     };
+    const getWeeklyExpenseTypeId = useCallback((typeLabel) => {
+        if (typeLabel === null || typeLabel === undefined || String(typeLabel).trim() === "") return null;
+        const found = weeklyTypes.find((t) => t && t.type === typeLabel);
+        if (!found) return null;
+        const id = found.id;
+        return id !== undefined && id !== null && !Number.isNaN(Number(id)) ? Number(id) : null;
+    }, [weeklyTypes]);
     const fetchExpensesCategory = async () => {
         try {
             const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
@@ -785,6 +792,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 project_id: Number(newDailyExpense.project_id),
                 quantity: Number(newDailyExpense.quantity) || 0,
                 type: newDailyExpense.type,
+                type_id: getWeeklyExpenseTypeId(newDailyExpense.type),
                 amount: Number(newDailyExpense.amount),
                 extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
                 description: newDailyExpense.description || "",
@@ -1720,6 +1728,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 project_id: Number(currentFileRow.project_id),
                 quantity: Number(currentFileRow.quantity) || 0,
                 type: currentFileRow.type,
+                type_id: getWeeklyExpenseTypeId(currentFileRow.type),
                 amount: Number(currentFileRow.amount),
                 extra_amount: Number(currentFileRow.extra_amount || 0),
                 description: currentFileRow.description || "",
@@ -1762,6 +1771,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 project_id: Number(currentExpense.project_id),
                 quantity: Number(currentExpense.quantity) || 0,
                 type: currentExpense.type,
+                type_id: getWeeklyExpenseTypeId(currentExpense.type),
                 amount: Number(currentExpense.amount),
                 extra_amount: Number(currentExpense.extra_amount || 0),
                 description: description.trim(),
@@ -1823,6 +1833,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 project_id: Number(editDailyExpenseData.project_id),
                 quantity: Number(editDailyExpenseData.quantity) || 0,
                 type: editDailyExpenseData.type,
+                type_id: getWeeklyExpenseTypeId(editDailyExpenseData.type),
                 amount: Number(editDailyExpenseData.amount),
                 extra_amount: Number(editDailyExpenseData.extra_amount || 0),
                 description: editDailyExpenseData.description || "",

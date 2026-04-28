@@ -248,6 +248,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
           label: item.vendorName,
           id: item.id,
           type: "Vendor",
+          category: item.category,
         }));
         setVendorOptions(formattedData);
       } catch (error) {
@@ -275,6 +276,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
           label: item.contractorName,
           id: item.id,
           type: "Contractor",
+          category: item.category,
         }));
         setContractorOptions(formattedData);
       } catch (error) {
@@ -283,6 +285,21 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     };
     fetchContractorNames();
   }, []);
+  useEffect(() => {
+    if (selectedType !== 'Bill Settlement') return;
+    if (!selectedOption) return;
+    if (!Array.isArray(categoryOptions) || categoryOptions.length === 0) return;
+    if (selectedCategory) return;
+    const party = selectedOption.type === 'Vendor'
+      ? vendorOptions.find(v => Number(v.id) === Number(selectedOption.id))
+      : selectedOption.type === 'Contractor'
+        ? contractorOptions.find(c => Number(c.id) === Number(selectedOption.id))
+        : null;
+    const partyCategory = party?.category ? String(party.category).trim() : '';
+    if (!partyCategory) return;
+    const match = categoryOptions.find(cat => String(cat.label).trim() === partyCategory);
+    if (match) setSelectedCategory(match);
+  }, [selectedType, selectedOption, categoryOptions, vendorOptions, contractorOptions, selectedCategory]);
   useEffect(() => {
     const fetchSites = async () => {
       try {

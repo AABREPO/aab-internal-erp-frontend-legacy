@@ -3409,7 +3409,7 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 								</div>
 
 								{/* For all modes except Cash & Carry Forward, show Account Number. */}
-								{paymentForm.mode && paymentForm.mode !== 'Cash' && paymentForm.mode !== 'Carry Forward' && (
+								{paymentForm.mode && paymentForm.mode !== 'Cash' && paymentForm.mode !== 'Carry Forward' && paymentForm.mode !== 'Direct' && (
 									<>
 										{(paymentForm.mode === 'Net Banking' || paymentForm.mode === 'NEFT/RTGS') && (
 											<div className="mt-[12px]">

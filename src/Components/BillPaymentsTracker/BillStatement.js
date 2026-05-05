@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-const BillStatement = ({ username, userRoles = [] }) => {
+const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
   const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
   const [apiData, setApiData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -420,6 +420,36 @@ const BillStatement = ({ username, userRoles = [] }) => {
       controller.abort();
     };
   }, [selectedVendor, fromDate, toDate, fromPaymentDate, selectedPaymentMode]);
+
+  const billPaymentsTabActivePrevRef = useRef(undefined);
+  useEffect(() => {
+    const prev = billPaymentsTabActivePrevRef.current;
+    billPaymentsTabActivePrevRef.current = billPaymentsTabActive;
+    if (!billPaymentsTabActive) return;
+    if (prev !== false) return;
+    let mounted = true;
+    const controller = new AbortController();
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await fetchStatementData(controller.signal);
+        if (!mounted) return;
+      } catch (e) {
+        if (String(e?.name || '') === 'AbortError') return;
+        if (!mounted) return;
+        setApiData([]);
+        setError(e?.message || 'Failed to load statement');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [billPaymentsTabActive]);
 
   return (
     <div className="">

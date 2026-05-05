@@ -3442,6 +3442,23 @@ const InputData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold">Shop Details</h2>
+                {/* Sticky column headers for Shop Details rows */}
+                <div className="sticky top-0 z-20 bg-white pt-2 pb-2">
+                  <div className="w-[1150px]">
+                    <div className="flex gap-2 text-[11px] font-semibold text-gray-700 px-1 text-left items-start justify-start">
+                      <div className="w-60 text-left pl-2">Property Name</div>
+                      <div className="w-44 text-left pl-2">Shop No</div>
+                      <div className="w-16 text-left pl-2">Door No</div>
+                      <div className="w-20 text-left pl-2">Project Type</div>
+                      <div className="w-28 text-left pl-2">Floor</div>
+                      <div className="w-28 text-left pl-4">Rent</div>
+                      <div className="w-4 text-center"></div>
+                      <div className="w-28 text-left pl-2">Advance</div>
+                      <div className="w-28 text-left pl-2">Start Date</div>
+                    </div>
+                    <div className="h-px bg-gray-200 mt-2" />
+                  </div>
+                </div>
                 {(() => {
                   const projectRefNames = tenantLinkFormData.shopNos
                     .map(shop => {
@@ -3853,6 +3870,24 @@ const InputData = ({ username, userRoles = [] }) => {
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold">Shop Details</h2>
+                {/* Sticky column headers for Shop Details rows */}
+                <div className="sticky top-0 z-20 bg-white pt-2 pb-2">
+                  <div className="w-[1200px]">
+                    <div className="flex gap-2 text-[11px] font-semibold text-gray-700 px-1 text-left items-start justify-start">
+                      <div className="w-60 text-left pl-2">Property Name</div>
+                      <div className="w-44 text-left pl-2">Shop No</div>
+                      <div className="w-16 text-left pl-2">Door No</div>
+                      <div className="w-24 text-left pl-4">Project Type</div>
+                      <div className="w-28 text-left pl-2">Floor</div>
+                      <div className="w-28 text-left pl-4">Rent</div>
+                      <div className="w-4 text-center"></div>
+                      <div className="w-28 text-left pl-2">Advance</div>
+                      <div className="w-28 text-left pl-2">Start Date</div>                      
+                      <div className="w-28 text-left pl-4">Closure Date</div>
+                    </div>
+                    <div className="h-px bg-gray-200 mt-2" />
+                  </div>
+                </div>
                 {(() => {
                   const projectRefNames = editTenantLinkFormData.shopNos
                     .map(shop => {

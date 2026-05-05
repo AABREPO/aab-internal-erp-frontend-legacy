@@ -20,6 +20,8 @@ const paymentModeOptions = [
 const AdvanceHeading = ({ username, userRoles = [] }) => {
 
     const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
     useEffect(() => {
         const handleResize = () => {
@@ -63,60 +65,76 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
         );
     }
 
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'advanceportal':
-                return <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'advacetablview':
-                return <AdvanceTableView username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'advancedatabase':
-                return <AdvanceDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'advancereport':
-                return <AdvanceReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'advancesummary':
-                return <AdvanceSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            default:
-                return <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-        }
-    };
     return (
         <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
             <div className="topbar-title">
                 <h2
                     className={`link ${activeTab === 'advanceportal' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('advanceportal')}
+                    onClick={() => {
+                        setActiveTab('advanceportal');
+                        bumpRefresh();
+                    }}
                 >
                     Advance
                 </h2>
                 <h2
                     className={`link ${activeTab === 'advacetablview' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('advacetablview')}
+                    onClick={() => {
+                        setActiveTab('advacetablview');
+                        bumpRefresh();
+                    }}
                 >
                     Table View
                 </h2>
                 {(username === 'Mahalingam M' || username === 'Admin') && (
                     <h2
                         className={`link ${activeTab === 'advancedatabase' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('advancedatabase')}
+                        onClick={() => {
+                            setActiveTab('advancedatabase');
+                            bumpRefresh();
+                        }}
                     >
                         Database
                     </h2>
                 )}
                 <h2
                     className={`link ${activeTab === 'advancereport' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('advancereport')}
+                    onClick={() => {
+                        setActiveTab('advancereport');
+                        bumpRefresh();
+                    }}
                 >
                     Report
                 </h2>
                 <h2
                     className={`link ${activeTab === 'advancesummary' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('advancesummary')}
+                    onClick={() => {
+                        setActiveTab('advancesummary');
+                        bumpRefresh();
+                    }}
                 >
                     Summary
                 </h2>
             </div>
             <div className="content">
-                {renderContent()}
+                {/* Keep all tabs mounted so data can prefetch; just hide inactive tabs. */}
+                <div style={{ display: activeTab === 'advanceportal' ? 'block' : 'none' }}>
+                    <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                </div>
+                <div style={{ display: activeTab === 'advacetablview' ? 'block' : 'none' }}>
+                    <AdvanceTableView username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                </div>
+                {(username === 'Mahalingam M' || username === 'Admin') && (
+                    <div style={{ display: activeTab === 'advancedatabase' ? 'block' : 'none' }}>
+                        <AdvanceDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                    </div>
+                )}
+                <div style={{ display: activeTab === 'advancereport' ? 'block' : 'none' }}>
+                    <AdvanceReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                </div>
+                <div style={{ display: activeTab === 'advancesummary' ? 'block' : 'none' }}>
+                    <AdvanceSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                </div>
             </div>
         </div>
     )

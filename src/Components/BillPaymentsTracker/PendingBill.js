@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import Select from 'react-select';
 import axios from "axios";
 import edit from '../Images/Edit.svg';
@@ -6,7 +6,7 @@ import deletes from '../Images/Delete.svg';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
-const PendingBill = ({ username, userRoles = [] }) => {
+const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId")
@@ -56,6 +56,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
         enteredBy: null,
         date: new Date().toISOString().split('T')[0]
     })
+    const canOverrideEnteredBy = username === 'Admin' || username === 'Mahalingam M'
     const [editingPreviousEntry, setEditingPreviousEntry] = useState(null)
     const [previousEntryEditData, setPreviousEntryEditData] = useState({
         enteredBy: null,
@@ -85,6 +86,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [billData, setBillData] = useState([])
     const [serialNumber, setSerialNumber] = useState(1)
     const [apiData, setApiData] = useState([])
+    // Full tracker list (same API as BillDatabase) used for last PO + already-entered/paid checks
+    const [allTrackerDataForChecks, setAllTrackerDataForChecks] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
     const [purchaseOrders, setPurchaseOrders] = useState([])
@@ -151,6 +154,18 @@ const PendingBill = ({ username, userRoles = [] }) => {
         key: null,
         direction: 'asc'
     })
+    const defaultPaymentModeOptions = useMemo(() => ([
+        { value: "Cash", label: "Cash" },
+        { value: "Direct", label: "Direct" },
+        { value: "Net Banking", label: "Net Banking" },
+        { value: "Gpay", label: "Gpay" },
+        { value: "PhonePe", label: "PhonePe" },
+        { value: "Cheque", label: "Cheque" },
+    ]), []);
+    const [paymentModeOptions, setPaymentModeOptions] = useState(() => ([
+        { value: "Carry Forward", label: "Carry Forward" },
+        ...defaultPaymentModeOptions
+    ]));
     const [filters, setFilters] = useState({
         vendorName: null,
         fromDate: '',
@@ -163,6 +178,38 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const [showCheckModal, setShowCheckModal] = useState(false)
     const [checkFilteredExpenses, setCheckFilteredExpenses] = useState([])
     const [loadingCheckExpenses, setLoadingCheckExpenses] = useState(false)
+    useEffect(() => {
+        const normalizeMode = (modeOfPayment) => {
+            const raw = String(modeOfPayment || "").trim();
+            const lower = raw.toLowerCase();
+            if (lower === "gpay") return "Gpay";
+            if (lower === "phonepe") return "PhonePe";
+            if (lower === "cheque") return "Cheque";
+            if (lower === "cash") return "Cash";
+            if (lower === "direct") return "Direct";
+            if (lower === "net banking" || lower === "netbanking") return "Net Banking";
+            return raw;
+        };
+        const fetchPaymentModes = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll");
+                if (!response.ok) return;
+                const data = await response.json();
+                const backendOptions = (Array.isArray(data) ? data : [])
+                    .map((m) => normalizeMode(m?.modeOfPayment))
+                    .filter(Boolean)
+                    .map((mode) => ({ value: mode, label: mode }));
+                const uniqueByValue = new Map();
+                backendOptions.forEach((opt) => uniqueByValue.set(opt.value, opt));
+                defaultPaymentModeOptions.forEach((opt) => uniqueByValue.set(opt.value, opt));
+                const merged = Array.from(uniqueByValue.values());
+                setPaymentModeOptions([{ value: "Carry Forward", label: "Carry Forward" }, ...merged]);
+            } catch (e) {
+                // keep fallback options
+            }
+        };
+        fetchPaymentModes();
+    }, [defaultPaymentModeOptions]);
     useEffect(() => {
         const fetchVendorNames = async () => {
             try {
@@ -234,12 +281,41 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 console.error("Response Text:", responseText);
                 data = [];
             }
-            setApiData(Array.isArray(data) ? data : []);
+            const rows = Array.isArray(data) ? data : [];
+            setApiData(rows);
+            return rows;
         } catch (error) {
             console.error("Error fetching tracker data:", error);
             setError(error.message);
+            return [];
         } finally {
             setLoading(false);
+        }
+    };
+    const fetchAllTrackerDataForChecks = async () => {
+        try {
+            // Use BillDatabase API so checks work against ALL rows (not only pending list)
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/enriched/paid", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Network response was not ok: ${response.statusText}`);
+            }
+            const text = await response.text();
+            let data = []
+            try {
+                data = JSON.parse(text)
+            } catch (e) {
+                data = []
+            }
+            setAllTrackerDataForChecks(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error("Error fetching full tracker data for checks:", error);
+            setAllTrackerDataForChecks([]);
         }
     };
     const fetchAllBillEntries = async () => {
@@ -292,6 +368,14 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const calculateExpenseMatchStatus = (expensesData, billEntries = allBillEntries) => {
         const matchStatus = {};
         const matchDetailsMap = {};
+        const normalizeYmd = (value) => {
+            if (!value) return '';
+            const s = String(value).trim();
+            if (!s) return '';
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+            const d = new Date(s);
+            return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+        };
         const billMap = {};
         apiData.forEach(bill => {
             billMap[bill.id] = bill;
@@ -313,6 +397,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
             const vendorName = getVendorNameById(bill.vendor_id) || bill.vendor_name;
             const billAmount = parseFloat(bill.total_amount) || 0;
             if (vendorName && billAmount > 0) {
+                const trackerBillArrivalYmd = normalizeYmd(
+                    bill.bill_arrival_date ?? bill.billArrivalDate ?? bill.bill_arrivalDate ?? ''
+                );
                 const enteredDates = [...new Set(billEntriesForTracker.map(entry => entry.entered_date).filter(Boolean))];
                 if (enteredDates.length > 0) {
                     const billEnteredDates = enteredDates.map(date => new Date(date).toISOString().split('T')[0]);
@@ -324,7 +411,16 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         return expense.vendor === vendorName;
                     });
                     const matchingExpenses = vendorMatchedExpenses.filter((expense) => {
-                        return (expense.accountType === 'Bill Payments' || expense.accountType === 'Bill Refund' || expense.accountType === 'Bill Payments + Claim');
+                        const accountTypeOk = (expense.accountType === 'Bill Payments' || expense.accountType === 'Bill Refund' || expense.accountType === 'Bill Payments + Claim');
+                        if (!accountTypeOk) return false;
+
+                        // If the expenses_form entry has billArrivalDate, it must match the tracker bill arrival date.
+                        // If expenses_form entry doesn't have billArrivalDate, we don't enforce this check.
+                        const expenseArrivalRaw = expense.billArrivalDate ?? expense.bill_arrival_date ?? '';
+                        const expenseArrivalYmd = normalizeYmd(expenseArrivalRaw);
+                        if (!expenseArrivalYmd) return true;
+                        if (!trackerBillArrivalYmd) return true;
+                        return expenseArrivalYmd === trackerBillArrivalYmd;
                     });
                     const totalExpenseAmount = matchingExpenses.reduce((sum, expense) => {
                         return sum + (parseFloat(expense.amount) || 0);
@@ -379,9 +475,12 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 throw new Error(`Network response was not ok: ${response.statusText}`);
             }
             const data = await response.json();
-            setPurchaseOrders(data);
+            const normalizedData = Array.isArray(data) ? data : [];
+            setPurchaseOrders(normalizedData);
+            return normalizedData;
         } catch (error) {
             console.error("Error fetching purchase orders:", error);
+            return [];
         }
     };
     const fetchExistingBillEntryDetails = async (vendorPaymentsTrackerId) => {
@@ -439,7 +538,17 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setLastPaymentDates({});
         setPaidTodayBills({});
         fetchTrackerData();
+        fetchAllTrackerDataForChecks();
     }, [activeBranchId]);
+    const billPaymentsTabActivePrevRef = useRef(undefined);
+    useEffect(() => {
+        const prev = billPaymentsTabActivePrevRef.current;
+        billPaymentsTabActivePrevRef.current = billPaymentsTabActive;
+        if (!billPaymentsTabActive) return;
+        if (prev === false) {
+            fetchTrackerData();
+        }
+    }, [billPaymentsTabActive]);
     useEffect(() => {
         // Backend pending endpoint returns computed `payment_status` + `paid_today`.
         const statusMap = {};
@@ -551,17 +660,18 @@ const PendingBill = ({ username, userRoles = [] }) => {
             totalAmount: ''
         });
     };
-    const handleKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            handleAddBill();
-        }
-    };
+    // NOTE: Do not submit on Enter for dropdown/date/noOfBills.
+    // We only submit when the user is in the Amount input and presses Enter.
     const getLastBillNumberForVendor = (vendorId, currentBill = null) => {
-        if (!vendorId || !apiData || apiData.length === 0) {
+        // "Last PO" here means: for THIS vendor, take the PREVIOUS tracker entry's last/max bill number
+        // relative to the current entry (not the overall max from the BillDatabase/paid list).
+        // So we must use the same pending list ordering (`apiData`) that the user is working in.
+        const sourceData = apiData;
+        if (!vendorId || !sourceData || sourceData.length === 0) {
             return null;
         }
         // Filter bills for this vendor that have verifications (include current so we can find its position)
-        const vendorBills = apiData.filter(bill =>
+        const vendorBills = sourceData.filter(bill =>
             (bill.vendor_id === vendorId || bill.vendorId === vendorId) &&
             bill.billVerifications &&
             bill.billVerifications.length > 0
@@ -598,21 +708,69 @@ const PendingBill = ({ username, userRoles = [] }) => {
             });
             previousEntryBill = beforeCurrent.length > 0 ? beforeCurrent[beforeCurrent.length - 1] : null;
         }
-        if (!previousEntryBill) {
+        const parseBillNumberNumeric = (billNumber) => {
+            const v = String(billNumber || '').trim();
+            if (!v || v === 'NO_PO') return { v: null, n: NaN };
+            const m = v.match(/\d+/);
+            const n = m ? Number(m[0]) : NaN;
+            return { v, n };
+        };
+        const getLastNonEmptyBillNumberFromTracker = (tracker) => {
+            const verifications = tracker?.billVerifications || [];
+            if (!Array.isArray(verifications) || verifications.length === 0) return null;
+            for (let i = verifications.length - 1; i >= 0; i--) {
+                const billNumber = verifications[i]?.bill_number || verifications[i]?.billNumber;
+                const { v } = parseBillNumberNumeric(billNumber);
+                if (!v) continue;
+                return v;
+            }
             return null;
+        };
+        const getMaxBillNumberFromTracker = (tracker) => {
+            const verifications = tracker?.billVerifications || [];
+            if (!Array.isArray(verifications) || verifications.length === 0) return null;
+            let bestV = null;
+            let bestN = -1;
+            for (const verification of verifications) {
+                const billNumber = verification?.bill_number || verification?.billNumber;
+                const { v, n } = parseBillNumberNumeric(billNumber);
+                if (!v || !Number.isFinite(n)) continue;
+                if (n > bestN) {
+                    bestN = n;
+                    bestV = v;
+                }
+            }
+            return bestV;
+        };
+
+        // 1) Preferred: previous entry from pending list (relative previous)
+        if (previousEntryBill) {
+            const prevLast = getLastNonEmptyBillNumberFromTracker(previousEntryBill);
+            if (prevLast) return prevLast;
         }
-        const verifications = previousEntryBill.billVerifications || [];
-        if (verifications.length === 0) {
-            return null;
-        }
-        // Find the last non-empty, non-NO_PO bill number from the verifications
-        for (let i = verifications.length - 1; i >= 0; i--) {
-            const billNumber = verifications[i].bill_number || verifications[i].billNumber;
-            if (billNumber && billNumber !== 'NO_PO' && billNumber.trim() !== '') {
-                return billNumber.trim();
+
+        // 2) Fallback: if there is no previous entry in pending list, use BillDatabase API dataset
+        // and return the BIGGEST bill number for that vendor (max across all bill slots).
+        const fallbackSource = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+            ? allTrackerDataForChecks
+            : [];
+        if (fallbackSource.length === 0) return null;
+
+        let bestBill = null;
+        let bestNum = -1;
+        for (const tracker of fallbackSource) {
+            const trackerVendorId = tracker?.vendor_id ?? tracker?.vendorId ?? null;
+            if (String(trackerVendorId) !== String(vendorId)) continue;
+            const v = getMaxBillNumberFromTracker(tracker);
+            if (!v) continue;
+            const { n } = parseBillNumberNumeric(v);
+            if (!Number.isFinite(n)) continue;
+            if (n > bestNum) {
+                bestNum = n;
+                bestBill = v;
             }
         }
-        return null;
+        return bestBill;
     };
     const handleVerifyClick = (bill) => {
         setSelectedBill(bill)
@@ -1090,7 +1248,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 } else if (billNumber.trim()) {
                     const currentTrackerId = selectedBill.id
                     let isAlreadyEntered = false
-                    for (const tracker of apiData) {
+                    const checkTrackers = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+                        ? allTrackerDataForChecks
+                        : apiData;
+                    for (const tracker of checkTrackers) {
                         if (tracker.id !== currentTrackerId) { // Skip current tracker
                             const trackerVendorId = tracker.vendor_id || tracker.vendorId
                             if (trackerVendorId === vendorId) { // Same vendor
@@ -1135,7 +1296,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     } else if (billNumber.trim()) {
                         const currentTrackerId = selectedBill.id
                         let isAlreadyEntered = false
-                        for (const tracker of apiData) {
+                        const checkTrackers = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+                            ? allTrackerDataForChecks
+                            : apiData;
+                        for (const tracker of checkTrackers) {
                             if (tracker.id !== currentTrackerId) {
                                 const trackerVendorId = tracker.vendor_id || tracker.vendorId
                                 if (trackerVendorId === vendorId) {
@@ -1309,7 +1473,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setExtraPoNumbers([])
             setRangeStart('')
             setRangeEnd('')
-            window.location.reload()
+            await fetchAllTrackerDataForChecks()
         } catch (error) {
             alert(`Error saving bills: ${error.message}`)
         }
@@ -1510,7 +1674,8 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     extraBills: '',
                     totalAmount: ''
                 })
-                window.location.reload()
+                await fetchTrackerData()
+                await fetchAllTrackerDataForChecks()
             }
         } catch (error) {
             console.error('Error updating tracker details:', error)
@@ -1568,25 +1733,65 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setEditModeStartData(null)
         }
     }
+    const parseBillNumberNumeric = (billNumber) => {
+        const v = String(billNumber || '').trim();
+        if (!v || v === 'NO_PO') return { v: null, n: NaN };
+        const m = v.match(/\d+/);
+        const n = m ? Number(m[0]) : NaN;
+        return { v, n };
+    };
+    const getTrackersForDuplicateCheck = () => {
+        // allTrackerDataForChecks is the "paid/enriched" dataset (BillDatabase),
+        // apiData is the current PendingBill dataset. We need BOTH to prevent re-entry.
+        const merged = [
+            ...(Array.isArray(allTrackerDataForChecks) ? allTrackerDataForChecks : []),
+            ...(Array.isArray(apiData) ? apiData : [])
+        ];
+        const seen = new Set();
+        const unique = [];
+        for (const t of merged) {
+            const id = t?.id ?? t?.bill_id ?? t?.tracker_id;
+            const key = id != null ? String(id) : `idx-${unique.length}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            unique.push(t);
+        }
+        return unique;
+    };
     const handleCheckPO = async () => {
         setCheckingPO(true)
         try {
-            const vendorId = selectedBill.vendorId || selectedBill.vendor_id
+            const normalizeValue = (value) => String(value ?? '').trim()
+            const normalizeBillKey = (value) => {
+                const { n } = parseBillNumberNumeric(value);
+                return Number.isFinite(n) ? String(n) : '';
+            };
+            const vendorId = normalizeValue(selectedBill.vendorId || selectedBill.vendor_id)
+            console.groupCollapsed('[handleCheckPO] Starting PO validation')
             if (!vendorId) {
+                console.warn('[handleCheckPO] Vendor ID not found on selected bill')
                 alert('Vendor ID not found')
                 return
             }
-            const vendorPurchaseOrders = purchaseOrders.filter(po =>
-                po.vendor_id === vendorId || po.vendorId === vendorId
+            const purchaseOrdersSource = Array.isArray(purchaseOrders) && purchaseOrders.length > 0
+                ? purchaseOrders
+                : await fetchPurchaseOrders()
+            const vendorPurchaseOrders = purchaseOrdersSource.filter(po =>
+                normalizeValue(po.vendor_id || po.vendorId) === vendorId
             )
-            const vendorENOs = vendorPurchaseOrders.map(po =>
-                po.eno || po.po_number || po.purchase_order_number
-            ).filter(eno => eno)
+            const vendorENOs = vendorPurchaseOrders
+                .map(po => normalizeValue(po.eno || po.po_number || po.purchase_order_number))
+                .filter(Boolean)
+            const vendorENOsKeySet = new Set(vendorENOs.map((v) => normalizeBillKey(v)).filter(Boolean));
+            console.log('vendorPurchaseOrders:', vendorPurchaseOrders)
+            console.log('vendorENOs:', vendorENOs)
             const newValidationResults = {}
             const newExtraValidationResults = {}
             const duplicateNumbers = []
             // Check for duplicates in regular bills
-            const currentBillNumbers = poNumbers.filter(num => num.trim() !== '')
+            const currentBillNumbers = poNumbers
+                .map((num) => normalizeBillKey(num))
+                .filter(Boolean)
             const duplicateMap = {}
             currentBillNumbers.forEach((billNumber, index) => {
                 if (duplicateMap[billNumber]) {
@@ -1596,7 +1801,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
             })
             // Check for duplicates in extra bills
-            const currentExtraBillNumbers = extraPoNumbers.filter(num => num.trim() !== '')
+            const currentExtraBillNumbers = extraPoNumbers
+                .map((num) => normalizeBillKey(num))
+                .filter(Boolean)
             currentExtraBillNumbers.forEach((billNumber, index) => {
                 if (duplicateMap[billNumber]) {
                     duplicateMap[billNumber].push(`extra-${index}`)
@@ -1604,13 +1811,16 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     duplicateMap[billNumber] = [`extra-${index}`]
                 }
             })
+            console.log('duplicateMap:', duplicateMap)
             // Check for duplicates across all bills (regular + extra)
             Object.keys(duplicateMap).forEach(billNumber => {
                 if (duplicateMap[billNumber].length > 1) {
                     duplicateNumbers.push(billNumber)
                 }
             })
+            console.log('duplicateNumbers:', duplicateNumbers)
             if (duplicateNumbers.length > 0) {
+                console.warn('[handleCheckPO] Duplicate bill numbers found. Aborting validation.')
                 alert(` Duplicate bill found within the same bill number: ${duplicateNumbers.join(', ')}. Please enter unique bill numbers.`)
                 setCheckingPO(false)
                 return
@@ -1620,21 +1830,43 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 const isNoPo = noPoSelections[index]
                 let isMatched = false
                 let message = ''
+                const trimmedBillNumber = normalizeValue(billNumber)
+                const trimmedBillKey = normalizeBillKey(trimmedBillNumber)
+                const currentTrackerId = selectedBill.id
+                const currentDate = selectedBill.bill_arrival_date || selectedBill.billArrivalDate
+                console.groupCollapsed(`[handleCheckPO][regular][${index}] bill="${trimmedBillNumber || '(empty)'}"`)
+                console.log('rawBillNumber:', billNumber)
+                console.log('trimmedBillNumber:', trimmedBillNumber)
+                console.log('trimmedBillKey:', trimmedBillKey)
+                console.log('isNoPo:', isNoPo)
+                console.log('currentTrackerId:', currentTrackerId)
+                console.log('currentBillDate:', currentDate)
                 if (isNoPo) {
                     isMatched = true
                     message = 'No PO - Verified'
-                } else if (billNumber.trim()) {
-                    const currentTrackerId = selectedBill.id
-                    const currentDate = selectedBill.bill_arrival_date || selectedBill.billArrivalDate
+                    console.log('Decision: No PO selected, marking as verified')
+                } else if (trimmedBillNumber) {
                     let isAlreadyEntered = false
-                    for (const tracker of apiData) {
+                    const checkTrackers = getTrackersForDuplicateCheck();
+                    for (const tracker of checkTrackers) {
                         if (tracker.id !== currentTrackerId) { // Skip current tracker
-                            const trackerVendorId = tracker.vendor_id || tracker.vendorId
+                            const trackerVendorId = normalizeValue(tracker.vendor_id || tracker.vendorId)
                             if (trackerVendorId === vendorId) { // Same vendor
-                                const verifications = tracker.billVerifications || []
+                                const verifications =
+                                    tracker.billVerifications ||
+                                    tracker.bill_verifications ||
+                                    tracker.billVerification ||
+                                    tracker.bill_verification ||
+                                    [];
                                 for (const verification of verifications) {
-                                    const existingBill = verification.bill_number || verification.billNumber
-                                    if (existingBill && existingBill !== 'NO_PO' && String(existingBill).trim() === billNumber.trim()) {
+                                    const existingBill = normalizeValue(verification.bill_number || verification.billNumber)
+                                    const existingBillKey = normalizeBillKey(existingBill)
+                                    if (existingBill && existingBill !== 'NO_PO' && existingBillKey && trimmedBillKey && existingBillKey === trimmedBillKey) {
+                                        console.log('Duplicate found in tracker:', {
+                                            trackerId: tracker.id,
+                                            trackerVendorId,
+                                            verification
+                                        })
                                         isAlreadyEntered = true
                                         break
                                     }
@@ -1646,39 +1878,70 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     if (isAlreadyEntered) {
                         isMatched = false
                         message = 'Already Entered'
+                        console.log('Decision: bill already entered for same vendor')
                     } else {
-                        isMatched = vendorENOs.includes(billNumber.trim())
+                        isMatched = !!trimmedBillKey && vendorENOsKeySet.has(trimmedBillKey)
                         message = isMatched ? 'Matched' : 'Not Matched'
+                        console.log('PO match check:', {
+                            vendorENOs,
+                            checkedBillNumber: trimmedBillNumber,
+                            isMatched
+                        })
                     }
                 } else {
                     message = 'No PO Entered'
+                    console.log('Decision: bill number empty')
                 }
                 newValidationResults[index] = {
                     matched: isMatched,
                     message: message
                 }
+                console.log('Result:', newValidationResults[index])
+                console.groupEnd()
             })
             // Validate extra bills
             const extraBills = selectedBill.extraBills || selectedBill.extra_bills || 0
+            console.log('extraBills:', extraBills)
             if (extraBills > 0) {
                 extraPoNumbers.forEach((billNumber, index) => {
                     const isNoPo = extraNoPoSelections[index]
                     let isMatched = false
                     let message = ''
+                    const trimmedBillNumber = normalizeValue(billNumber)
+                    const trimmedBillKey = normalizeBillKey(trimmedBillNumber)
+                    const currentTrackerId = selectedBill.id
+                    console.groupCollapsed(`[handleCheckPO][extra][${index}] bill="${trimmedBillNumber || '(empty)'}"`)
+                    console.log('rawBillNumber:', billNumber)
+                    console.log('trimmedBillNumber:', trimmedBillNumber)
+                    console.log('trimmedBillKey:', trimmedBillKey)
+                    console.log('isNoPo:', isNoPo)
+                    console.log('currentTrackerId:', currentTrackerId)
                     if (isNoPo) {
                         isMatched = true
                         message = 'No PO - Verified'
-                    } else if (billNumber.trim()) {
-                        const currentTrackerId = selectedBill.id
+                        console.log('Decision: No PO selected, marking as verified')
+                    } else if (trimmedBillNumber) {
                         let isAlreadyEntered = false
-                        for (const tracker of apiData) {
+                        const checkTrackers = getTrackersForDuplicateCheck();
+                        for (const tracker of checkTrackers) {
                             if (tracker.id !== currentTrackerId) {
-                                const trackerVendorId = tracker.vendor_id || tracker.vendorId
+                                const trackerVendorId = normalizeValue(tracker.vendor_id || tracker.vendorId)
                                 if (trackerVendorId === vendorId) {
-                                    const verifications = tracker.billVerifications || []
+                                    const verifications =
+                                        tracker.billVerifications ||
+                                        tracker.bill_verifications ||
+                                        tracker.billVerification ||
+                                        tracker.bill_verification ||
+                                        [];
                                     for (const verification of verifications) {
-                                        const existingBill = verification.bill_number || verification.billNumber
-                                        if (existingBill && existingBill !== 'NO_PO' && String(existingBill).trim() === billNumber.trim()) {
+                                        const existingBill = normalizeValue(verification.bill_number || verification.billNumber)
+                                        const existingBillKey = normalizeBillKey(existingBill)
+                                        if (existingBill && existingBill !== 'NO_PO' && existingBillKey && trimmedBillKey && existingBillKey === trimmedBillKey) {
+                                            console.log('Duplicate found in tracker:', {
+                                                trackerId: tracker.id,
+                                                trackerVendorId,
+                                                verification
+                                            })
                                             isAlreadyEntered = true
                                             break
                                         }
@@ -1690,21 +1953,32 @@ const PendingBill = ({ username, userRoles = [] }) => {
                         if (isAlreadyEntered) {
                             isMatched = false
                             message = 'Already Entered'
+                            console.log('Decision: bill already entered for same vendor')
                         } else {
-                            isMatched = vendorENOs.includes(billNumber.trim())
+                            isMatched = !!trimmedBillKey && vendorENOsKeySet.has(trimmedBillKey)
                             message = isMatched ? 'Matched' : 'Not Matched'
+                            console.log('PO match check:', {
+                                vendorENOs,
+                                checkedBillNumber: trimmedBillNumber,
+                                isMatched
+                            })
                         }
                     } else {
                         message = 'No PO Entered'
+                        console.log('Decision: bill number empty')
                     }
                     newExtraValidationResults[index] = {
                         matched: isMatched,
                         message: message
                     }
+                    console.log('Result:', newExtraValidationResults[index])
+                    console.groupEnd()
                 })
             }
             setValidationResults(newValidationResults)
             setExtraValidationResults(newExtraValidationResults)
+            console.log('newValidationResults:', newValidationResults)
+            console.log('newExtraValidationResults:', newExtraValidationResults)
             const newCheckedBills = {}
             poNumbers.forEach((billNumber, index) => {
                 const isNoPo = noPoSelections[index]
@@ -1724,11 +1998,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     }
                 })
             }
+            console.log('newCheckedBills:', newCheckedBills)
+            console.log('newExtraCheckedBills:', newExtraCheckedBills)
             setCheckedBills(prev => ({ ...prev, ...newCheckedBills }))
             setExtraCheckedBills(prev => ({ ...prev, ...newExtraCheckedBills }))
         } catch (error) {
+            console.error('[handleCheckPO] Error while checking PO numbers:', error)
             alert('Error checking PO numbers')
         } finally {
+            console.groupEnd()
             setCheckingPO(false)
         }
     }
@@ -1869,7 +2147,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setExtraNoPoSelections({})
             setCheckedBills({})
             setExtraCheckedBills({})
-            window.location.reload()
+            await fetchAllTrackerDataForChecks()
         } catch (error) {
             alert(`Error sending request: ${error.message}`)
         }
@@ -1890,11 +2168,15 @@ const PendingBill = ({ username, userRoles = [] }) => {
         fetchUsers();
     }, []);
     const getUserOptions = () => {
-        return userList.map(user => ({
-            value: user.username,
-            label: user.username,
-            id: user.id
-        }));
+        const unique = new Map()
+        ;(Array.isArray(userList) ? userList : []).forEach((user) => {
+            const name = String(user?.username || '').trim()
+            if (!name) return
+            if (!unique.has(name)) {
+                unique.set(name, { value: name, label: name, id: user?.id })
+            }
+        })
+        return Array.from(unique.values()).sort((a, b) => String(a.label).localeCompare(String(b.label)))
     };
     const isAdminUser = () => {
         return username === 'Admin' || username === 'Mahalingam M'
@@ -1948,7 +2230,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 } else if (billNumber.trim()) {
                     const currentTrackerId = selectedBill.id
                     let isAlreadyEntered = false
-                    for (const tracker of apiData) {
+                    const checkTrackers = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+                        ? allTrackerDataForChecks
+                        : apiData;
+                    for (const tracker of checkTrackers) {
                         if (tracker.id !== currentTrackerId) {
                             const trackerVendorId = tracker.vendor_id || tracker.vendorId
                             if (trackerVendorId === vendorId) {
@@ -1992,7 +2277,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                     } else if (billNumber.trim()) {
                         const currentTrackerId = selectedBill.id
                         let isAlreadyEntered = false
-                        for (const tracker of apiData) {
+                        const checkTrackers = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+                            ? allTrackerDataForChecks
+                            : apiData;
+                        for (const tracker of checkTrackers) {
                             if (tracker.id !== currentTrackerId) {
                                 const trackerVendorId = tracker.vendor_id || tracker.vendorId
                                 if (trackerVendorId === vendorId) {
@@ -2075,7 +2363,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 }
             }
             for (const billNumber of currentBillNumbers) {
-                for (const tracker of apiData) {
+                const checkTrackers = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+                    ? allTrackerDataForChecks
+                    : apiData;
+                for (const tracker of checkTrackers) {
                     if (tracker.id !== trackerId) {
                         const trackerDate = tracker.bill_arrival_date || tracker.billArrivalDate
                         if (trackerDate === currentDate) {
@@ -2207,7 +2498,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setVerifiedBills({})
             setNoPoSelections({})
             setCheckedBills({})
-            window.location.reload()
+            await fetchAllTrackerDataForChecks()
         } catch (error) {
             alert(`Error approving request: ${error.message}`)
         }
@@ -2303,7 +2594,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             setExtraNoPoSelections({})
             setCheckedBills({})
             setExtraCheckedBills({})
-            window.location.reload()
+            await fetchAllTrackerDataForChecks()
         } catch (error) {
             alert(`Error rejecting request: ${error.message}`)
         }
@@ -2361,7 +2652,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
         setSelectedEntryBill(bill)
         setShowEntryModal(true)
         setEntryFormData({
-            enteredBy: null,
+            enteredBy: username || null,
             date: new Date().toISOString().split('T')[0]
         })
         setNumberInputValue(bill.adjustment_amount || bill.adjustmentAmount || '')
@@ -2391,7 +2682,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
             console.error('Error fetching tracker data:', error)
         }
         setEntryFormData({
-            enteredBy: null,
+            enteredBy: username || null,
             date: ''
         })
     }
@@ -2407,9 +2698,13 @@ const PendingBill = ({ username, userRoles = [] }) => {
             return
         }
         try {
+            const selectedEnteredBy = canOverrideEnteredBy
+                ? (entryFormData.enteredBy || username)
+                : username
+            const finalEnteredBy = selectedEnteredBy || username
             const billEntryData = {
                 vendor_payments_tracker_id: selectedEntryBill.id,
-                entered_by: username,
+                entered_by: finalEnteredBy,
                 entered_date: entryFormData.date,
                 branch_id: activeBranchId
             }
@@ -2546,12 +2841,25 @@ const PendingBill = ({ username, userRoles = [] }) => {
                 throw new Error(`Failed to update entry: ${response.statusText}`)
             }
             alert('Previous entry updated successfully!')
-            await fetchExistingBillEntryDetails(selectedEntryBill.id)
+
+            // Hide Save/Cancel immediately (don't wait for refetches)
             setEditingPreviousEntry(null)
             setPreviousEntryEditData({
                 enteredBy: null,
                 date: ''
             })
+
+            await fetchExistingBillEntryDetails(selectedEntryBill.id)
+            // Refresh main table data so Entry Status updates immediately (without closing the popup)
+            const refreshed = await fetchTrackerData()
+            await fetchAllTrackerDataForChecks()
+            const trackerId = selectedEntryBill?.id
+            if (trackerId != null && Array.isArray(refreshed) && refreshed.length > 0) {
+                const nextRow = refreshed.find((r) => String(r?.id) === String(trackerId))
+                if (nextRow) {
+                    setSelectedEntryBill((prev) => ({ ...prev, ...nextRow }))
+                }
+            }
         } catch (error) {
             console.error('Error updating previous entry:', error)
             alert(`Error updating previous entry: ${error.message}`)
@@ -2654,7 +2962,56 @@ const PendingBill = ({ username, userRoles = [] }) => {
             alert('No matching expenses found for this bill')
             return
         }
-        setCheckFilteredExpenses(matchDetails.matchingExpenses)
+        // After editing entered_date in the popup, "Check" must use the CURRENT entered date
+        // (latest saved bill-entry date for this tracker, or the in-progress edit date).
+        const normalizeToYyyyMmDd = (raw) => {
+            const s = String(raw || '').trim();
+            if (!s) return '';
+            const m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m1) return `${m1[1]}-${m1[2]}-${m1[3]}`;
+            const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+            if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+            const d = new Date(s);
+            if (Number.isNaN(d.getTime())) return '';
+            const yyyy = String(d.getFullYear());
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+        const getExpenseDateOnly = (expense) => {
+            const raw =
+                expense?.timestamp ??
+                expense?.timeStamp ??
+                expense?.created_at ??
+                expense?.createdAt ??
+                expense?.date ??
+                null;
+            return normalizeToYyyyMmDd(raw);
+        };
+        const resolveCheckDateOnly = () => {
+            if (editingPreviousEntry) return normalizeToYyyyMmDd(previousEntryEditData?.date);
+            if (Array.isArray(existingBillEntryDetails) && existingBillEntryDetails.length > 0) {
+                const sorted = [...existingBillEntryDetails].sort((a, b) => {
+                    const da = a?.entered_date ? new Date(a.entered_date).getTime() : 0;
+                    const db = b?.entered_date ? new Date(b.entered_date).getTime() : 0;
+                    return db - da;
+                });
+                return normalizeToYyyyMmDd(sorted?.[0]?.entered_date);
+            }
+            // Last fallback: use the computed enteredDates (if present)
+            return normalizeToYyyyMmDd(matchDetails?.enteredDates?.[0] || '');
+        };
+        const checkDateOnly = resolveCheckDateOnly();
+        const filteredByEditedDate = checkDateOnly
+            ? matchDetails.matchingExpenses.filter((e) => getExpenseDateOnly(e) === checkDateOnly)
+            : matchDetails.matchingExpenses;
+
+        if (!filteredByEditedDate || filteredByEditedDate.length === 0) {
+            alert('No matching expenses found for this bill')
+            return
+        }
+
+        setCheckFilteredExpenses(filteredByEditedDate)
         setShowCheckModal(true)
     }
 
@@ -3843,7 +4200,10 @@ const PendingBill = ({ username, userRoles = [] }) => {
     const isBillAlreadyPaid = (vendorIdToCheck, billNumberToCheck) => {
         if (!vendorIdToCheck || !billNumberToCheck) return false
         const normalizedBill = String(billNumberToCheck).trim()
-        for (const tracker of apiData) {
+        const checkTrackers = (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0)
+            ? allTrackerDataForChecks
+            : apiData;
+        for (const tracker of checkTrackers) {
             const trackerVendorId = tracker.vendor_id || tracker.vendorId
             if (trackerVendorId !== vendorIdToCheck) continue
             const verifications = tracker.billVerifications || []
@@ -4395,7 +4755,16 @@ const PendingBill = ({ username, userRoles = [] }) => {
             };
             const response = await axios.post(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/vendor-payments/tracker"), payload);
             alert(`Tracker created with ID: ${response.data.id}`);
-            window.location.reload();
+            await fetchTrackerData();
+            await fetchAllTrackerDataForChecks();
+            setFormData({
+                billArrivalDate: '',
+                vendorName: null,
+                vendorId: null,
+                noOfBills: '',
+                totalAmount: ''
+            });
+            setVendorId(null);
         } catch (error) {
             console.error("Error creating tracker:", error);
         }
@@ -4546,7 +4915,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             type="date"
                                             value={formData.billArrivalDate}
                                             onChange={(e) => handleInputChange('billArrivalDate', e.target.value)}
-                                            onKeyPress={handleKeyPress}
                                             className="w-[132px] h-[40px] px-2 py-1 border-2 border-[#BF9853] border-opacity-30 rounded-md text-xs focus:outline-none text-left"
                                         />
                                     </td>
@@ -4561,12 +4929,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                 isClearable
                                                 menuPortalTarget={document.body}
                                                 className="text-xs w-full"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        handleAddBill();
-                                                    }
-                                                }}
                                             />
                                         </div>
                                     </td>
@@ -4575,7 +4937,6 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                             type="number"
                                             value={formData.noOfBills}
                                             onChange={(e) => handleInputChange('noOfBills', e.target.value)}
-                                            onKeyPress={handleKeyPress}
                                             onWheel={(e) => e.target.blur()}
                                             className="w-[66px] h-[40px] px-2 py-1 border-2 border-[#BF9853] border-opacity-30 rounded-md text-xs focus:outline-none no-spinner text-left"
                                         />
@@ -5130,12 +5491,30 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                 <div className='flex gap-5'>
                                     <div>
                                         <label className="block text-sm font-semibold mb-2">Entered By</label>
-                                        <input
-                                            type="text"
-                                            value={username}
-                                            readOnly
-                                            className="w-[270px] h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm bg-gray-50"
-                                        />
+                                        {canOverrideEnteredBy ? (
+                                            <Select
+                                                options={getUserOptions()}
+                                                value={
+                                                    entryFormData.enteredBy
+                                                        ? { value: entryFormData.enteredBy, label: entryFormData.enteredBy }
+                                                        : (username ? { value: username, label: username } : null)
+                                                }
+                                                onChange={(selectedOption) =>
+                                                    handleEntryInputChange('enteredBy', selectedOption?.value || selectedOption?.label || null)
+                                                }
+                                                placeholder="Select"
+                                                className='w-[270px] h-[40px]'
+                                                styles={customStyles}
+                                                isClearable={false}
+                                            />
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={username}
+                                                readOnly
+                                                className="w-[270px] h-[45px] px-3 py-2 border-2 border-[#BF9853] border-opacity-20 rounded-lg text-sm bg-gray-50"
+                                            />
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold mb-2">Date</label>
@@ -5318,13 +5697,9 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                     className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                 >
                                                                     <option value="">Select</option>
-                                                                    <option value="Carry Forward">Carry Forward</option>
-                                                                    <option value="Cash">Cash</option>
-                                                                    <option value="Direct">Direct</option>
-                                                                    <option value="Net Banking">Net Banking</option>
-                                                                    <option value="Gpay">Gpay</option>
-                                                                    <option value="PhonePe">PhonePe</option>
-                                                                    <option value="Cheque">Cheque</option>
+                                                                    {paymentModeOptions.map((opt) => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
                                                                 </select>
                                                                 <div className="mt-1 px-6">
                                                                     <button className="text-[#E4572E] text-sm flex items-center gap-1"
@@ -5347,7 +5722,7 @@ const PendingBill = ({ username, userRoles = [] }) => {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        {(entry.mode === "Gpay" || entry.mode === "PhonePe" || entry.mode === "Net Banking" || entry.mode === "Cheque") && (
+                                                        {(entry.mode === "Gpay" || entry.mode === "GPay" || entry.mode === "PhonePe" || entry.mode === "Net Banking" || entry.mode === "Cheque") && (
                                                             <div className="mt-4 p-4 border border-[#BF9853] border-opacity-25 rounded-lg">
                                                                 <div className="space-y-4">
                                                                     {entry.mode === "Cheque" && (

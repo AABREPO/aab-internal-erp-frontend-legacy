@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from 'react';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import DateRangePickerModal from './DateRangePickerModal';
 import SelectVendorModal from './SelectVendorModal';
@@ -1189,159 +1189,113 @@ const History = ({ user } = {}) => {
       console.error('Error clearing filters from localStorage:', error);
     }
   };
-  const filteredPOs = purchaseOrders.filter(po => {
-    // Search query filter
-    if (searchQuery && searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const filteredPOs = useMemo(() => {
+    const queryRaw = deferredSearchQuery || '';
+    const query = queryRaw.trim().toLowerCase();
+    const hasQuery = Boolean(query);
 
-      // Helper function to parse date from various formats
-      const parseDate = (dateStr) => {
-        if (!dateStr) return null;
-        // Try DD/MM/YYYY format first
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const year = parseInt(parts[2], 10);
-            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-              return new Date(year, month, day);
+    const vendorFilter = (filters.vendorName || '').toLowerCase();
+    const clientFilter = (filters.clientName || '').toLowerCase();
+    const inchargeFilter = (filters.siteIncharge || '').toLowerCase();
+    const poNumberFilter = (filters.poNumber || '').toLowerCase();
+    const branchFilter = (filters.branch || '').toLowerCase();
+
+    const hasDateFilter = Boolean(filters.startDate || filters.endDate);
+    const startDateFilter = filters.startDate ? new Date(filters.startDate) : null;
+    const endDateFilter = filters.endDate ? new Date(filters.endDate) : null;
+    if (startDateFilter) startDateFilter.setHours(0, 0, 0, 0);
+    if (endDateFilter) endDateFilter.setHours(0, 0, 0, 0);
+
+    const parseDate = (dateStr) => {
+      if (!dateStr) return null;
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+            return new Date(year, month, day);
+          }
+        }
+      }
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const dateMatches = (poDate, targetDate) => {
+      if (!poDate || !targetDate) return false;
+      const po = new Date(poDate);
+      const target = new Date(targetDate);
+      po.setHours(0, 0, 0, 0);
+      target.setHours(0, 0, 0, 0);
+      return po.getTime() === target.getTime();
+    };
+
+    const queryParsedDate = hasQuery ? parseDate(query) : null;
+    const today = hasQuery && query === 'today' ? (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })() : null;
+    const yesterday = hasQuery && query === 'yesterday' ? (() => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0); return d; })() : null;
+
+    return purchaseOrders.filter((po) => {
+      if (hasQuery) {
+        if (query === 'paid') {
+          if (po.paymentStatus?.toLowerCase() !== 'paid') return false;
+        } else if (query === 'unpaid') {
+          if (po.paymentStatus?.toLowerCase() !== 'unpaid') return false;
+        } else if (today) {
+          const poDate = parseDate(po.date || po.createdAt);
+          if (!poDate || !dateMatches(poDate, today)) return false;
+        } else if (yesterday) {
+          const poDate = parseDate(po.date || po.createdAt);
+          if (!poDate || !dateMatches(poDate, yesterday)) return false;
+        } else {
+          let dateMatchFound = false;
+          if (queryParsedDate) {
+            const poDate = parseDate(po.date || po.createdAt);
+            if (poDate) {
+              const poDateObj = new Date(poDate);
+              const targetDateObj = new Date(queryParsedDate);
+              poDateObj.setHours(0, 0, 0, 0);
+              targetDateObj.setHours(0, 0, 0, 0);
+              dateMatchFound = poDateObj.getTime() === targetDateObj.getTime();
             }
           }
+          const matchesSearch =
+            dateMatchFound ||
+            po.poNumber?.toLowerCase().includes(query) ||
+            po.vendorName?.toLowerCase().includes(query) ||
+            po.projectName?.toLowerCase().includes(query) ||
+            po.date?.toLowerCase().includes(query) ||
+            po.projectBranch?.toLowerCase().includes(query) ||
+            po.projectIncharge?.toLowerCase().includes(query) ||
+            po.contact?.toLowerCase().includes(query) ||
+            po.created_by?.toLowerCase().includes(query) ||
+            po.paymentStatus?.toLowerCase().includes(query) ||
+            (po.eno && String(po.eno).includes(query));
+          if (!matchesSearch) return false;
         }
-        // Try standard date parsing
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          return date;
-        }
-        return null;
-      };
+      }
 
-      // Helper function to check if date matches
-      const dateMatches = (poDate, targetDate) => {
-        if (!poDate || !targetDate) return false;
-        const po = new Date(poDate);
-        const target = new Date(targetDate);
-        po.setHours(0, 0, 0, 0);
-        target.setHours(0, 0, 0, 0);
-        return po.getTime() === target.getTime();
-      };
+      if (vendorFilter && po.vendorName?.toLowerCase() !== vendorFilter) return false;
+      if (clientFilter && po.projectName?.toLowerCase() !== clientFilter) return false;
+      if (inchargeFilter && po.projectIncharge?.toLowerCase() !== inchargeFilter) return false;
+      if (poNumberFilter && !(po.poNumber || '').toLowerCase().includes(poNumberFilter)) return false;
+      if (branchFilter && po.projectBranch?.toLowerCase() !== branchFilter) return false;
 
-      // Check for "today" keyword
-      if (query === 'today') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const poDate = parseDate(po.date || po.createdAt);
-        if (!poDate || !dateMatches(poDate, today)) {
-          return false;
+      if (hasDateFilter) {
+        const poDate = new Date(po.createdAt || po.date || 0);
+        poDate.setHours(0, 0, 0, 0);
+        if (startDateFilter && endDateFilter) {
+          if (poDate < startDateFilter || poDate > endDateFilter) return false;
+        } else if (startDateFilter) {
+          if (poDate < startDateFilter) return false;
+        } else if (endDateFilter) {
+          if (poDate > endDateFilter) return false;
         }
       }
-      // Check for "yesterday" keyword
-      else if (query === 'yesterday') {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(0, 0, 0, 0);
-        const poDate = parseDate(po.date || po.createdAt);
-        if (!poDate || !dateMatches(poDate, yesterday)) {
-          return false;
-        }
-      }
-      // Check for "paid" keyword
-      else if (query === 'paid') {
-        if (po.paymentStatus?.toLowerCase() !== 'paid') {
-          return false;
-        }
-      }
-      // Check for "unpaid" keyword
-      else if (query === 'unpaid') {
-        if (po.paymentStatus?.toLowerCase() !== 'unpaid') {
-          return false;
-        }
-      }
-      // General search across multiple fields
-      else {
-        // First check if query matches date (try parsing as date)
-        const parsedDate = parseDate(query);
-        let dateMatchFound = false;
-        if (parsedDate) {
-          const poDate = parseDate(po.date || po.createdAt);
-          if (poDate) {
-            const poDateObj = new Date(poDate);
-            const targetDateObj = new Date(parsedDate);
-            poDateObj.setHours(0, 0, 0, 0);
-            targetDateObj.setHours(0, 0, 0, 0);
-            dateMatchFound = poDateObj.getTime() === targetDateObj.getTime();
-          }
-        }
-
-        // Check all searchable fields
-        const matchesSearch = (
-          dateMatchFound ||
-          po.poNumber?.toLowerCase().includes(query) ||
-          po.vendorName?.toLowerCase().includes(query) ||
-          po.projectName?.toLowerCase().includes(query) ||
-          po.date?.toLowerCase().includes(query) ||
-          po.projectBranch?.toLowerCase().includes(query) ||
-          po.projectIncharge?.toLowerCase().includes(query) ||
-          po.contact?.toLowerCase().includes(query) ||
-          po.created_by?.toLowerCase().includes(query) ||
-          po.paymentStatus?.toLowerCase().includes(query) ||
-          (po.eno && String(po.eno).includes(query))
-        );
-        if (!matchesSearch) return false;
-      }
-    }
-    // Filter by vendor name
-    if (filters.vendorName && po.vendorName?.toLowerCase() !== filters.vendorName.toLowerCase()) {
-      return false;
-    }
-    // Filter by client name (project name)
-    if (filters.clientName && po.projectName?.toLowerCase() !== filters.clientName.toLowerCase()) {
-      return false;
-    }
-    // Filter by site incharge (project incharge)
-    if (filters.siteIncharge && po.projectIncharge?.toLowerCase() !== filters.siteIncharge.toLowerCase()) {
-      return false;
-    }
-    // Filter by date range
-    if (filters.startDate || filters.endDate) {
-      const poDate = new Date(po.createdAt || po.date || 0);
-      poDate.setHours(0, 0, 0, 0); // Reset time to compare dates only
-      if (filters.startDate && filters.endDate) {
-        // Both start and end dates selected - check if PO date is within range
-        const startDate = new Date(filters.startDate);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(0, 0, 0, 0);
-        if (poDate < startDate || poDate > endDate) {
-          return false;
-        }
-      } else if (filters.startDate) {
-        // Only start date selected - check if PO date is on or after start date
-        const startDate = new Date(filters.startDate);
-        startDate.setHours(0, 0, 0, 0);
-        if (poDate < startDate) {
-          return false;
-        }
-      } else if (filters.endDate) {
-        // Only end date selected - check if PO date is on or before end date
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(0, 0, 0, 0);
-        if (poDate > endDate) {
-          return false;
-        }
-      }
-    }
-    // Filter by PO number
-    if (filters.poNumber && po.poNumber?.toLowerCase().includes(filters.poNumber.toLowerCase()) === false) {
-      return false;
-    }
-    // Filter by branch
-    if (filters.branch && po.projectBranch?.toLowerCase() !== filters.branch.toLowerCase()) {
-      return false;
-    }
-    return true;
-  });
+      return true;
+    });
+  }, [purchaseOrders, deferredSearchQuery, filters]);
   // Reset first card to expanded state on mount and when filtered list changes
   useEffect(() => {
     setIsFirstCardClosed(true);
@@ -1849,22 +1803,29 @@ const History = ({ user } = {}) => {
   };
   const hasActiveFilters = searchQuery || filters.vendorName || filters.clientName || filters.siteIncharge || filters.startDate || filters.endDate || filters.poNumber;
   // Use all available options from APIs for filter dropdowns
-  const uniqueVendors = [...new Set(allVendors.map(v => v.vendorName).filter(Boolean))].sort();
-  // Extract unique branches from projects
-  const uniqueBranches = [...new Set(allProjects.map(p => p.branch).filter(Boolean))].sort();
-  // Filter projects by selected branch
-  const filteredProjects = filters.branch
-    ? allProjects.filter(p => p.branch === filters.branch)
-    : allProjects;
-  const uniqueClients = [...new Set(filteredProjects.map(p => p.siteName || p.projectName).filter(Boolean))].sort();
-  const uniqueSiteIncharges = [...new Set([
-    ...allEmployees.map(e =>
-      e.employeeName || e.name || e.fullName || e.employee_name || ''
-    ),
-    ...allSupportStaff.map(s =>
-      s.support_staff_name || s.supportStaffName || ''
-    )
-  ].filter(Boolean))].sort();
+  const uniqueVendors = useMemo(
+    () => [...new Set(allVendors.map((v) => v.vendorName).filter(Boolean))].sort(),
+    [allVendors]
+  );
+  const uniqueBranches = useMemo(
+    () => [...new Set(allProjects.map((p) => p.branch).filter(Boolean))].sort(),
+    [allProjects]
+  );
+  const filteredProjects = useMemo(
+    () => (filters.branch ? allProjects.filter((p) => p.branch === filters.branch) : allProjects),
+    [allProjects, filters.branch]
+  );
+  const uniqueClients = useMemo(
+    () => [...new Set(filteredProjects.map((p) => p.siteName || p.projectName).filter(Boolean))].sort(),
+    [filteredProjects]
+  );
+  const uniqueSiteIncharges = useMemo(() => {
+    const names = [
+      ...allEmployees.map((e) => e.employeeName || e.name || e.fullName || e.employee_name || ''),
+      ...allSupportStaff.map((s) => s.support_staff_name || s.supportStaffName || ''),
+    ].filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [allEmployees, allSupportStaff]);
   return (
     <div className="flex flex-col min-h-[calc(100vh-96px-80px)] bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
       {/* Header Section - Sticky */}

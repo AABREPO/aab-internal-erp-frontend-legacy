@@ -669,7 +669,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       const staffAdvanceResult = await saveRes.json();
 
       // If payment details are provided and payment mode requires weekly payment bills
-      if (paymentDetails && ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(paymentDetails.paymentMode)) {
+      if (paymentDetails && ['GPay', 'Gpay', 'PhonePe', 'Net Banking', 'Cheque'].includes(paymentDetails.paymentMode)) {
         const weeklyPaymentBillPayload = {
           date: paymentDetails.date,
           created_at: new Date().toISOString(),
@@ -1105,7 +1105,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
 
     // Check if payment mode requires popup
     if ((formData.selectedType === 'Advance' || formData.selectedType === 'Refund') &&
-      ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
+      ['GPay', 'Gpay', 'PhonePe', 'Net Banking', 'Cheque'].includes(formData.paymentMode)) {
       // Store form data and show payment popup
       setPendingFormData({ ...formData });
       setPaymentPopupData(prev => ({
@@ -1860,7 +1860,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                     </div>
                   </div>
 
-                  {(paymentPopupData.paymentMode === "GPay" || paymentPopupData.paymentMode === "PhonePe" ||
+                  {(paymentPopupData.paymentMode === "GPay" || paymentPopupData.paymentMode === "Gpay" || paymentPopupData.paymentMode === "PhonePe" ||
                     paymentPopupData.paymentMode === "Net Banking" || paymentPopupData.paymentMode === "Cheque") && (
                       <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
                         <div className="space-y-4">

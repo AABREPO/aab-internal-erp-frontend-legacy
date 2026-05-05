@@ -88,7 +88,31 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     { value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
 
-  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+  const [backendPaymentModeOptions, setBackendPaymentModeOptions] = useState([]);
+  const finalPaymentModeOptions = backendPaymentModeOptions.length > 0 ? backendPaymentModeOptions : paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+
+  useEffect(() => {
+    const fetchPaymentModes = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          const options = Array.isArray(data)
+            ? data
+              .filter(mode => mode.modeOfPayment)
+              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
+            : [];
+          if (!options.some(option => option.value === 'Advance Transfer')) {
+            options.push({ value: 'Advance Transfer', label: 'Advance Transfer' });
+          }
+          setBackendPaymentModeOptions(options);
+        }
+      } catch (error) {
+        console.error('Error fetching payment modes:', error);
+      }
+    };
+    fetchPaymentModes();
+  }, []);
 
   useEffect(() => {
     const syncBranch = () => {
@@ -195,7 +219,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     const newPaymentMode = e.target.value;
     setPaymentMode(newPaymentMode);
     // Reset payment popup data when payment mode changes
-    if (!["GPay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
+    if (!["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
       setPaymentPopupData({
         chequeNo: "",
         chequeDate: "",
@@ -1097,9 +1121,8 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         throw new Error(`Failed to save loan: ${response.status}`);
       }
       const loanResult = await response.json();
-      console.log("✅ Loan saved successfully:", loanResult);
       // If payment mode is GPay, PhonePe, Net Banking, or Cheque, also save to weekly-payment-bills
-      if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+      if (selectedLoanType === "Loan" && ["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
         const weeklyPaymentBillPayload = {
           date: dateValue,
           created_at: new Date().toISOString(),
@@ -1402,7 +1425,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
     }
     // Check if we need to show payment details popup
-    if (selectedLoanType === "Loan" && ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+    if (selectedLoanType === "Loan" && ["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
       setShowReviewModal(false);
       setShowPaymentModal(true);
       return;
@@ -1882,7 +1905,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           const newPaymentMode = selected ? selected.value : '';
                           setPaymentMode(newPaymentMode);
                           // Reset payment popup data when payment mode changes
-                          if (!["GPay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
+                          if (!["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
                             setPaymentPopupData({
                               chequeNo: "",
                               chequeDate: "",
@@ -2143,7 +2166,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                     </div>
                   </div>
 
-                  {(paymentMode === "GPay" || paymentMode === "PhonePe" ||
+                  {(paymentMode === "GPay" || paymentMode === "Gpay" || paymentMode === "PhonePe" ||
                     paymentMode === "Net Banking" || paymentMode === "Cheque") && (
                       <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
                         <div className="space-y-4">
@@ -2324,7 +2347,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                                   const newPaymentMode = selected ? selected.value : '';
                                   setPaymentMode(newPaymentMode);
                                   // Reset payment popup data when payment mode changes
-                                  if (!["GPay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
+                                  if (!["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(newPaymentMode)) {
                                     setPaymentPopupData({
                                       chequeNo: "",
                                       chequeDate: "",

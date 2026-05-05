@@ -42,6 +42,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     }, []);
     const [selectedWeek, setSelectedWeek] = useState("");
     const [weeks, setWeeks] = useState([]);
+    const [lastWeekWithData, setLastWeekWithData] = useState(null);
     const [selectedDate, setSelectedDate] = useState(null);
     const [dailyExpenses, setDailyExpenses] = useState([]);
     const [refundPayments, setRefundPayments] = useState([]);
@@ -298,9 +299,28 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             try {
                 const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/active_weeks', withBranchParams());
                 const selectedYear = parseInt(year, 10);
+                const currentWeekNumber = getCurrentISOWeekNumber();
+                const currentWeekYear = getCurrentWeekYear();
+                // Determine "closed" weeks (status=true) for the selected year, like WeeklyPaymentHistory
+                let weeksWithData = new Set();
+                try {
+                    const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
+                    (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).forEach((payment) => {
+                        if (payment?.status !== true || !payment?.period_end_date) return;
+                        const paymentDate = new Date(payment.period_end_date);
+                        if (Number.isNaN(paymentDate.getTime())) return;
+                        const y = getWeekYear(paymentDate);
+                        if (y !== selectedYear) return;
+                        const wn = getISOWeekNumber(paymentDate);
+                        if (!Number.isFinite(wn)) return;
+                        weeksWithData.add(wn);
+                    });
+                } catch (error) {
+                    console.error('Error fetching payments for week filtering:', error);
+                }
 
                 // Filter and enrich weeks for the selected year
-                const enrichedWeeks = response.data
+                const enrichedWeeks = (Array.isArray(response.data) ? response.data : [])
                     .map((weekNumber) => {
                         // Calculate week dates for the selected year
                         const weekInfo = getStartAndEndDateOfWeek(weekNumber, selectedYear);
@@ -316,7 +336,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     })
                     .filter(week => week !== null); // Remove weeks that don't belong to selected year
 
-                setWeeks(enrichedWeeks);
+                // No future weeks in the dropdown for the current ISO week-year.
+                const filteredWeeks =
+                    selectedYear === currentWeekYear
+                        ? enrichedWeeks.filter((w) => Number(w.number) <= Number(currentWeekNumber))
+                        : enrichedWeeks;
+
+                // Match WeeklyPaymentHistory: newest week first (reverse order)
+                filteredWeeks.sort((a, b) => b.number - a.number);
+                const lastWeekWithDataValue = weeksWithData.size > 0 ? Math.max(...Array.from(weeksWithData)) : null;
+                setLastWeekWithData(lastWeekWithDataValue);
+                setWeeks(filteredWeeks);
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
             }
@@ -325,7 +355,12 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     }, [year, withBranchParams]);
     useEffect(() => {
         if (weeks.length > 0) {
-            setSelectedWeek(weeks[weeks.length - 1].number);
+            // Match WeeklyPaymentHistory: default to the last "closed" week if available, else newest in list
+            if (lastWeekWithData != null && weeks.some((w) => Number(w.number) === Number(lastWeekWithData))) {
+                setSelectedWeek(String(lastWeekWithData));
+            } else {
+                setSelectedWeek(String(weeks[0].number));
+            }
         } else {
             setSelectedWeek("");
             setSelectedDate(null);
@@ -334,7 +369,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             setExpenses([]);
             setPayments([]);
         }
-    }, [weeks]);
+    }, [weeks, lastWeekWithData]);
     // Find the most recent week (across all years) that has data with status === true
     useEffect(() => {
         const computeEditableWeek = async () => {

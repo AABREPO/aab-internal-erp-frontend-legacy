@@ -74,6 +74,15 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [userPermissions, setUserPermissions] = useState([]);
     const moduleName = "Expense Entry";
     const [paymentMode, setPaymentMode] = useState('');
+    const defaultPaymentModeOptions = [
+        { modeOfPayment: 'Cash' },
+        { modeOfPayment: 'GPay' },
+        { modeOfPayment: 'PhonePe' },
+        { modeOfPayment: 'Net Banking' },
+        { modeOfPayment: 'Cheque' }
+    ];
+    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -90,6 +99,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const [thirdInput, setThirdInput] = useState('');
     const [validityType, setValidityType] = useState('');
     const [serviceStartingDate, setServiceStartingDate] = useState('');
+    /** Bill Payments / Bill Refund — sent as `billArrivalDate` (yyyy-MM-dd) to expenses_form API */
+    const [billArrivalDate, setBillArrivalDate] = useState('');
     const [summaryBillTotal, setSummaryBillTotal] = useState(null);
     const [summaryBillRemaining, setSummaryBillRemaining] = useState(null);
     const summaryBillMode = summaryBillTotal != null && Number(summaryBillTotal) > 0;
@@ -123,6 +134,20 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         return () => {
             window.removeEventListener("branchSelectionChanged", syncBranch);
         };
+    }, []);
+    useEffect(() => {
+        const fetchPaymentModes = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setPaymentModeOptions(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('Error fetching payment modes:', error);
+            }
+        };
+        fetchPaymentModes();
     }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {
@@ -534,6 +559,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     if (prefillData.date) {
                         setDate(prefillData.date);
                     }
+                    const prefillBillArrival =
+                        prefillData.billArrivalDate ?? prefillData.bill_arrival_date ?? '';
+                    if (prefillBillArrival) {
+                        const s = String(prefillBillArrival).trim().slice(0, 10);
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) setBillArrivalDate(s);
+                    }
                     // Summary Bill flow: treat weekly bill amount as "total" and allow splitting into multiple entries.
                     const summaryTotalNum =
                         rawSummaryTotal != null && rawSummaryTotal !== "" && Number.isFinite(Number(rawSummaryTotal))
@@ -629,6 +660,102 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     if (!summaryTotalNum) {
                         localStorage.removeItem('expenseEntryPrefill');
                     }
+                    return;
+                }
+
+                // Claim / Weekly Payment / other account types (prefill)
+                if (prefillData.accountType === 'Claim') {
+                    const claimOpt = accountTypeOptions.find((opt) => opt.value === 'Claim');
+                    if (claimOpt) {
+                        setSelectedAccountType('Claim');
+                    }
+                    const vid = prefillData.vendorId ?? prefillData.vendor_id;
+                    const cid = prefillData.contractorId ?? prefillData.contractor_id;
+                    const vNameRaw = prefillData.vendorName ?? prefillData.vendor ?? prefillData.vendor_name;
+                    const cNameRaw = prefillData.contractorName ?? prefillData.contractor ?? prefillData.contractor_name;
+                    const hasVendorName = String(vNameRaw ?? "").trim() !== "";
+                    const hasContractorName = String(cNameRaw ?? "").trim() !== "";
+                    const needVendor =
+                        vid != null &&
+                        String(vid).trim() !== '' &&
+                        Number.isFinite(Number(vid)) &&
+                        Number(vid) > 0;
+                    const needContractor =
+                        cid != null &&
+                        String(cid).trim() !== '' &&
+                        Number.isFinite(Number(cid)) &&
+                        Number(cid) > 0;
+
+                    // Wait until party options are available when we need to prefill vendor/contractor.
+                    if (needVendor && !vendorOptionsLoaded) return;
+                    if (needContractor && !contractorOptionsLoaded) return;
+                    if (hasVendorName && !vendorOptionsLoaded) return;
+                    if (hasContractorName && !contractorOptionsLoaded) return;
+                    if ((needVendor || needContractor || hasVendorName || hasContractorName) && combinedOptions.length === 0) {
+                        return;
+                    }
+
+                    if (prefillData.siteName) {
+                        const siteOption = siteOptions.find(
+                            (opt) => String(opt.label).trim() === String(prefillData.siteName).trim()
+                        );
+                        if (siteOption) setSelectedSite(siteOption);
+                    }
+                    if (prefillData.date) setDate(prefillData.date);
+                    if (prefillData.amount != null && prefillData.amount !== '') setAmount(String(prefillData.amount));
+                    if (prefillData.fromWeeklyCashRegister) setPaymentMode('Cash');
+
+                    // Prefill party + category (same behavior as Bill Payments)
+                    let didApplyParty = false;
+                    if (needVendor) {
+                        const v = combinedOptions.find((o) => o.type === 'Vendor' && Number(o.id) === Number(vid));
+                        if (v) {
+                            setSelectedOption(v);
+                            setSelectedType('Vendor');
+                            const catOpt = findCategoryOptionByVendorField(v.category);
+                            if (catOpt) applyResolvedCategoryOption(catOpt);
+                            didApplyParty = true;
+                        }
+                    } else if (needContractor) {
+                        const c = combinedOptions.find((o) => o.type === 'Contractor' && Number(o.id) === Number(cid));
+                        if (c) {
+                            setSelectedOption(c);
+                            setSelectedType('Contractor');
+                            const catOpt = findCategoryOptionByVendorField(c.category);
+                            if (catOpt) applyResolvedCategoryOption(catOpt);
+                            didApplyParty = true;
+                        }
+                    } else {
+                        const normalized = (s) => String(s ?? "").trim().toLowerCase();
+                        const vName = normalized(vNameRaw);
+                        const cName = normalized(cNameRaw);
+                        if (vName) {
+                            const v = combinedOptions.find((o) => o.type === "Vendor" && normalized(o.label) === vName);
+                            if (v) {
+                                setSelectedOption(v);
+                                setSelectedType("Vendor");
+                                const catOpt = findCategoryOptionByVendorField(v.category);
+                                if (catOpt) applyResolvedCategoryOption(catOpt);
+                                didApplyParty = true;
+                            }
+                        } else if (cName) {
+                            const c = combinedOptions.find((o) => o.type === "Contractor" && normalized(o.label) === cName);
+                            if (c) {
+                                setSelectedOption(c);
+                                setSelectedType("Contractor");
+                                const catOpt = findCategoryOptionByVendorField(c.category);
+                                if (catOpt) applyResolvedCategoryOption(catOpt);
+                                didApplyParty = true;
+                            }
+                        }
+                    }
+
+                    // If we expected a party but couldn't match yet, keep prefill for a later rerender.
+                    if ((needVendor || needContractor || hasVendorName || hasContractorName) && !didApplyParty) {
+                        return;
+                    }
+
+                    localStorage.removeItem('expenseEntryPrefill');
                     return;
                 }
 
@@ -1217,6 +1344,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             alert('PDF file is required for Bill Refund.');
             return false;
         }
+        if ((selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && !String(billArrivalDate || '').trim()) {
+            alert('Please select Bill Arrival Date for Bill Payments and Bill Refund.');
+            return false;
+        }
         if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
             alert('PDF file is required for this account type.');
             return false;
@@ -1289,7 +1420,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     const submitExpenseData = async () => {
         if (
             (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') &&
-            ["GPay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
+            ["GPay", "Gpay","PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
         ) {
             setPaymentModalData({
                 date: date,
@@ -1370,7 +1501,6 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             const contractorId = selectedType === 'Contractor' && selectedOption ? (selectedOption.id || null) : null;
             const bodyData = {
                 accountType: selectedAccountType,
-                eno: eno,
                 date: date,
                 paymentMode: paymentMode,
                 siteName: selectedSite ? selectedSite.label : '',
@@ -1392,6 +1522,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 utilityValidityDays: thirdInput || '',
                 utilityValidityType: validityType || '',
                 serviceStartingDate: serviceStartingDate || '',
+                billArrivalDate:
+                    selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund'
+                        ? (String(billArrivalDate || '').trim() || '')
+                        : '',
                 branchId: activeBranchId,
                 enteredBy: username
             };
@@ -1511,7 +1645,6 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     toast.warn('Expense saved, but the weekly bill row could not be updated with the file link.');
                 }
             }
-            setEno(eno + 1);
             if (summaryBillMode) {
                 const entryAmt = parseFloat(String(amount).replace(/,/g, "")) || 0;
                 const prevRemaining = Number(summaryBillRemaining ?? summaryBillTotal ?? 0) || 0;
@@ -1617,6 +1750,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         setThirdInput('');
         setValidityType('');
         setServiceStartingDate('');
+        setBillArrivalDate('');
         setUtilityType('');
         setProjectData(null);
         setEbNumberOptions([]);
@@ -1637,6 +1771,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         }
         if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
             alert('PDF file is required for this account type.');
+            return;
+        }
+        if (selectedAccountType === 'Bill Payments' && !String(billArrivalDate || '').trim()) {
+            alert('Please select Bill Arrival Date for Bill Payments.');
             return;
         }
         setIsSubmitting(true);
@@ -1704,7 +1842,6 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             const contractorId = selectedType === 'Contractor' && selectedOption ? (selectedOption.id || null) : null;
             const expensesPayload = {
                 accountType: selectedAccountType,
-                eno: eno,
                 date: paymentModalData.date,
                 siteName: selectedSite ? selectedSite.label : '',
                 projectId: projectId,
@@ -1726,6 +1863,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                 utilityValidityDays: thirdInput || '',
                 utilityValidityType: validityType || '',
                 serviceStartingDate: serviceStartingDate || '',
+                billArrivalDate:
+                    selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund'
+                        ? (String(billArrivalDate || '').trim() || '')
+                        : '',
                 branchId: activeBranchId,
                 enteredBy: username
             };
@@ -1915,6 +2056,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     if (selectedType === 'Contractor' && selectedOption?.id) {
         reviewDetails.push({ label: 'Contractor ID', value: selectedOption.id });
     }
+    if (selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') {
+        reviewDetails.push({
+            label: 'Bill Arrival Date',
+            value: formatDateForReview(billArrivalDate) || billArrivalDate || '-',
+        });
+    }
     reviewDetails.push(
         { label: 'Quantity', value: quantity || '-' },
         { label: 'Amount', value: formattedAmount || '-' },
@@ -1987,7 +2134,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                             )}
                             <div className="flex mb-4 items-center gap-4">
                                 <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
-                                <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[182px]"
+                                <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] bg-white w-[182px]"
                                     value={selectedAccountType}
                                     onChange={(e) => {
                                         const selectedValue = e.target.value;
@@ -2120,11 +2267,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                                 className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
                                             >
                                                 <option value="">Select Payment Mode</option>
-                                                {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
-                                                <option value="GPay">GPay</option>
-                                                <option value="PhonePe">PhonePe</option>
-                                                <option value="Net Banking">Net Banking</option>
-                                                <option value="Cheque">Cheque</option>
+                                                {finalPaymentModeOptions
+                                                    .filter(mode => selectedAccountType !== 'Weekly Payment' || mode.modeOfPayment !== 'Cash')
+                                                    .map(mode => (
+                                                        <option key={mode.id || mode.modeOfPayment} value={mode.modeOfPayment}>
+                                                            {mode.modeOfPayment}
+                                                        </option>
+                                                    ))}
                                             </select>
                                         )}
                                     </div>
@@ -2279,6 +2428,21 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                         </div>
                                     )}
                                 </>
+                            )}
+                            {(selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && (
+                                <div className="flex gap-10 mb-3">
+                                    <div className="text-left">
+                                        <label className="text-md font-semibold mb-2 block">
+                                            Bill Arrival Date <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={billArrivalDate}
+                                            onChange={(e) => setBillArrivalDate(e.target.value)}
+                                            className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                        />
+                                    </div>
+                                </div>
                             )}
                             {/* Comments + Attach + Submit kept in left column so there is no empty gap next to the advance table */}
                             <div className="mt-6 text-left">
@@ -2687,11 +2851,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                                             className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                         >
                                                             <option value="">Select Payment Mode</option>
-                                                            {selectedAccountType !== 'Weekly Payment' && <option value="Cash">Cash</option>}
-                                                            <option value="GPay">GPay</option>
-                                                            <option value="PhonePe">PhonePe</option>
-                                                            <option value="Net Banking">Net Banking</option>
-                                                            <option value="Cheque">Cheque</option>
+                                                            {finalPaymentModeOptions
+                                                                .filter(mode => selectedAccountType !== 'Weekly Payment' || mode.modeOfPayment !== 'Cash')
+                                                                .map(mode => (
+                                                                    <option key={mode.id || mode.modeOfPayment} value={mode.modeOfPayment}>
+                                                                        {mode.modeOfPayment}
+                                                                    </option>
+                                                                ))}
                                                         </select>
                                                     )}
                                                 </div>
@@ -2777,6 +2943,19 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                                         </div>
                                                     )}
                                                 </>
+                                            )}
+                                            {(selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && (
+                                                <div>
+                                                    <label className="text-sm font-semibold mb-1 block">
+                                                        Bill Arrival Date <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        value={billArrivalDate}
+                                                        onChange={(e) => setBillArrivalDate(e.target.value)}
+                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                    />
+                                                </div>
                                             )}
                                             <div className="col-span-2">
                                                 <label className="text-sm font-semibold mb-1 block">Comments</label>
@@ -2901,7 +3080,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                         </div>
                                     </div>
                                 </div>
-                                {(paymentModalData.paymentMode === "GPay" || paymentModalData.paymentMode === "PhonePe" ||
+                                {(paymentModalData.paymentMode === "GPay" || paymentModalData.paymentMode === "PhonePe" || paymentModalData.paymentMode === "Gpay" ||
                                     paymentModalData.paymentMode === "Net Banking" || paymentModalData.paymentMode === "Cheque") && (
                                         <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
                                             <div className="space-y-4">

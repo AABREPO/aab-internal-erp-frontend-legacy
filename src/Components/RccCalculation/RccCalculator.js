@@ -210,50 +210,61 @@ const RccCalculator = () => {
                             const cementRate = parseFloat(values.cementRate || 0);
                             const sandRate = parseFloat(values.sandRate || 0);
                             const jallyRate = parseFloat(values.jallyRate || 0);
-                            const totalVolume = L * H * B;
-                            const cement = parseFloat(
-                                ((totalVolume / totalParts) * cementPart) * quantity
-                            );
-                            const sand = parseFloat(
-                                ((totalVolume / totalParts) * sandPart) * quantity
-                            );
-                            const jally = parseFloat(
-                                ((totalVolume / totalParts) * jallyPart) * quantity
-                            );
-                            const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
-                            const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
-                            const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
-                            const cementWithWastage = cement + cement * cementWastage;
-                            const sandWithWastage = sand + sand * sandWastage;
-                            const jallyWithWastage = jally + jally * jallyWastage;
-                            updatedTile.cementWastage = values.cementWastage;
-                            updatedTile.sandWastage = values.sandWastage;
-                            updatedTile.jallyWastage = values.jallyWastage;
-                            updatedTile.cement = cementWithWastage.toFixed(2);
-                            updatedTile.sand = sandWithWastage.toFixed(2);
-                            updatedTile.jally = jallyWithWastage.toFixed(2);
-                            updatedTile.totalValume = (
-                                parseFloat(updatedTile.cement) +
-                                parseFloat(updatedTile.sand) +
-                                parseFloat(updatedTile.jally)
-                            ).toFixed(2);
-                            const totalAmountCement = parseFloat(
-                                (updatedTile.cement * cementRate).toFixed(2)
-                            );
-                            const totalAmountSand = parseFloat(
-                                (updatedTile.sand * (sandRate / 100)).toFixed(2)
-                            );
-                            const totalAmountJally = parseFloat(
-                                (updatedTile.jally * (jallyRate / 100)).toFixed(2)
-                            );
-                            updatedTile.LabourAmount = parseFloat(
-                                (updatedTile.totalValume * (updatedTile.labourRate || 1)).toFixed(2)
-                            );
-                            updatedTile.totalAmountCft = parseFloat(
-                                (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2)
-                            );
-                            updatedTile.concreteTotalAmount =
-                                updatedTile.totalAmountCft + updatedTile.LabourAmount;
+                                if (L === 0 || H === 0 || B === 0) {
+                                    // If any dimension is missing, don't fill concrete quantities.
+                                    updatedTile.cement = "";
+                                    updatedTile.sand = "";
+                                    updatedTile.jally = "";
+                                    updatedTile.totalValume = "";
+                                    updatedTile.LabourAmount = "";
+                                    updatedTile.totalAmountCft = "";
+                                    updatedTile.concreteTotalAmount = "";
+                                } else {
+                                    const totalVolume = L * H * B;
+                                    const cement = parseFloat(
+                                        ((totalVolume / totalParts) * cementPart) * quantity
+                                    );
+                                    const sand = parseFloat(
+                                        ((totalVolume / totalParts) * sandPart) * quantity
+                                    );
+                                    const jally = parseFloat(
+                                        ((totalVolume / totalParts) * jallyPart) * quantity
+                                    );
+                                    const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
+                                    const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
+                                    const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
+                                    const cementWithWastage = cement + cement * cementWastage;
+                                    const sandWithWastage = sand + sand * sandWastage;
+                                    const jallyWithWastage = jally + jally * jallyWastage;
+                                    updatedTile.cementWastage = values.cementWastage;
+                                    updatedTile.sandWastage = values.sandWastage;
+                                    updatedTile.jallyWastage = values.jallyWastage;
+                                    updatedTile.cement = cementWithWastage.toFixed(2);
+                                    updatedTile.sand = sandWithWastage.toFixed(2);
+                                    updatedTile.jally = jallyWithWastage.toFixed(2);
+                                    updatedTile.totalValume = (
+                                        parseFloat(updatedTile.cement) +
+                                        parseFloat(updatedTile.sand) +
+                                        parseFloat(updatedTile.jally)
+                                    ).toFixed(2);
+                                    const totalAmountCement = parseFloat(
+                                        (updatedTile.cement * cementRate).toFixed(2)
+                                    );
+                                    const totalAmountSand = parseFloat(
+                                        (updatedTile.sand * (sandRate / 100)).toFixed(2)
+                                    );
+                                    const totalAmountJally = parseFloat(
+                                        (updatedTile.jally * (jallyRate / 100)).toFixed(2)
+                                    );
+                                    updatedTile.LabourAmount = parseFloat(
+                                        (updatedTile.totalValume * (updatedTile.labourRate || 1)).toFixed(2)
+                                    );
+                                    updatedTile.totalAmountCft = parseFloat(
+                                        (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2)
+                                    );
+                                    updatedTile.concreteTotalAmount =
+                                        updatedTile.totalAmountCft + updatedTile.LabourAmount;
+                                }
                         }
                     }
                     return updatedTile;
@@ -282,38 +293,49 @@ const RccCalculator = () => {
                             const cementRate = parseFloat(values.cementRate || 0);
                             const sandRate = parseFloat(values.sandRate || 0);
                             const jallyRate = parseFloat(values.jallyRate || 0);
-                            const totalVolume = L * H * B;
-                            const cement = parseFloat(((totalVolume / totalParts) * cementPart).toFixed(2));
-                            const sand = parseFloat(((totalVolume / totalParts) * sandPart).toFixed(2));
-                            const jally = parseFloat(((totalVolume / totalParts) * jallyPart).toFixed(2));
-                            const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
-                            const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
-                            const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
-                            const cementWastages = cement * cementWastage;
-                            const sandWastages = sand * sandWastage;
-                            const jallyWastages = jally * jallyWastage;
-                            const jallyWithWastage = jallyWastages + jally;
-                            const sandWithWastage = sandWastages + sand;
-                            const cementWithWastage = cementWastages + cement;
-                            updatedTile.cement = cementWithWastage.toFixed(2);
-                            updatedTile.sand = sandWithWastage.toFixed(2);
-                            updatedTile.jally = jallyWithWastage.toFixed(2);
-                            updatedTile.cementWastage = values.cementWastage;
-                            updatedTile.sandWastage = values.sandWastage;
-                            updatedTile.jallyWastage = values.jallyWastage;
-                            updatedTile.totalValume = (
-                                parseFloat(updatedTile.cement) +
-                                parseFloat(updatedTile.sand) +
-                                parseFloat(updatedTile.jally)
-                            ).toFixed(2);
-                            const totalAmountCement = parseFloat((updatedTile.cement * cementRate).toFixed(2));
-                            const totalAmountSand = parseFloat((updatedTile.sand * (sandRate / 100)).toFixed(2));
-                            const totalAmountJally = parseFloat((updatedTile.jally * (jallyRate / 100)).toFixed(2));
-                            updatedTile.LabourAmount = parseFloat((
-                                updatedTile.totalValume * (updatedTile.labourRate || 1)
-                            ).toFixed(2));
-                            updatedTile.totalAmountCft = parseFloat((totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2));
-                            updatedTile.concreteTotalAmount = updatedTile.totalAmountCft + updatedTile.LabourAmount;
+                            if (L === 0 || H === 0 || B === 0) {
+                                // If any dimension is missing, don't fill concrete quantities.
+                                updatedTile.cement = "";
+                                updatedTile.sand = "";
+                                updatedTile.jally = "";
+                                updatedTile.totalValume = "";
+                                updatedTile.LabourAmount = "";
+                                updatedTile.totalAmountCft = "";
+                                updatedTile.concreteTotalAmount = "";
+                            } else {
+                                const totalVolume = L * H * B;
+                                const cement = parseFloat(((totalVolume / totalParts) * cementPart).toFixed(2));
+                                const sand = parseFloat(((totalVolume / totalParts) * sandPart).toFixed(2));
+                                const jally = parseFloat(((totalVolume / totalParts) * jallyPart).toFixed(2));
+                                const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
+                                const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
+                                const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
+                                const cementWastages = cement * cementWastage;
+                                const sandWastages = sand * sandWastage;
+                                const jallyWastages = jally * jallyWastage;
+                                const jallyWithWastage = jallyWastages + jally;
+                                const sandWithWastage = sandWastages + sand;
+                                const cementWithWastage = cementWastages + cement;
+                                updatedTile.cement = cementWithWastage.toFixed(2);
+                                updatedTile.sand = sandWithWastage.toFixed(2);
+                                updatedTile.jally = jallyWithWastage.toFixed(2);
+                                updatedTile.cementWastage = values.cementWastage;
+                                updatedTile.sandWastage = values.sandWastage;
+                                updatedTile.jallyWastage = values.jallyWastage;
+                                updatedTile.totalValume = (
+                                    parseFloat(updatedTile.cement) +
+                                    parseFloat(updatedTile.sand) +
+                                    parseFloat(updatedTile.jally)
+                                ).toFixed(2);
+                                const totalAmountCement = parseFloat((updatedTile.cement * cementRate).toFixed(2));
+                                const totalAmountSand = parseFloat((updatedTile.sand * (sandRate / 100)).toFixed(2));
+                                const totalAmountJally = parseFloat((updatedTile.jally * (jallyRate / 100)).toFixed(2));
+                                updatedTile.LabourAmount = parseFloat((
+                                    updatedTile.totalValume * (updatedTile.labourRate || 1)
+                                ).toFixed(2));
+                                updatedTile.totalAmountCft = parseFloat((totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2));
+                                updatedTile.concreteTotalAmount = updatedTile.totalAmountCft + updatedTile.LabourAmount;
+                            }
                         }
                     }
                     return updatedTile;
@@ -344,37 +366,48 @@ const RccCalculator = () => {
                             const cementRate = parseFloat(updatedValues.cementRate || 0);
                             const sandRate = parseFloat(updatedValues.sandRate || 0);
                             const jallyRate = parseFloat(updatedValues.jallyRate || 0);
-                            const totalVolume = L * H * B;
-                            const qty = parseFloat(tile.quantity) || 1;
-                            const cement = parseFloat(
-                                ((totalVolume / totalParts) * cementPart) * qty
-                            );
-                            const sand = parseFloat(
-                                ((totalVolume / totalParts) * sandPart) * qty
-                            );
-                            const jally = parseFloat(
-                                ((totalVolume / totalParts) * jallyPart) * qty
-                            );
-                            const cementWastage = parseFloat(updatedValues.cementWastage || "0%") / 100;
-                            const sandWastage = parseFloat(updatedValues.sandWastage || "0%") / 100;
-                            const jallyWastage = parseFloat(updatedValues.jallyWastage || "0%") / 100;
-                            const cementWithWastage = cement + (cement * cementWastage);
-                            const sandWithWastage = sand + (sand * sandWastage);
-                            const jallyWithWastage = jally + (jally * jallyWastage);
-                            tile.cement = cementWithWastage.toFixed(2);
-                            tile.sand = sandWithWastage.toFixed(2);
-                            tile.jally = jallyWithWastage.toFixed(2);
-                            tile.totalValume = (
-                                parseFloat(tile.cement) +
-                                parseFloat(tile.sand) +
-                                parseFloat(tile.jally)
-                            ).toFixed(2);
-                            const totalAmountCement = parseFloat(((tile.cement / 1.25) * cementRate).toFixed(2));
-                            const totalAmountSand = parseFloat((tile.sand * (sandRate / 100)).toFixed(2));
-                            const totalAmountJally = parseFloat((tile.jally * (jallyRate / 100)).toFixed(2));
-                            tile.LabourAmount = parseFloat((tile.totalValume * (tile.labourRate || 1)).toFixed(2));
-                            tile.totalAmountCft = parseFloat((totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2));
-                            tile.concreteTotalAmount = tile.totalAmountCft + tile.LabourAmount;
+                            if (L === 0 || H === 0 || B === 0) {
+                                // If any dimension is missing, don't fill concrete quantities.
+                                tile.cement = "";
+                                tile.sand = "";
+                                tile.jally = "";
+                                tile.totalValume = "";
+                                tile.LabourAmount = "";
+                                tile.totalAmountCft = "";
+                                tile.concreteTotalAmount = "";
+                            } else {
+                                const totalVolume = L * H * B;
+                                const qty = parseFloat(tile.quantity) || 1;
+                                const cement = parseFloat(
+                                    ((totalVolume / totalParts) * cementPart) * qty
+                                );
+                                const sand = parseFloat(
+                                    ((totalVolume / totalParts) * sandPart) * qty
+                                );
+                                const jally = parseFloat(
+                                    ((totalVolume / totalParts) * jallyPart) * qty
+                                );
+                                const cementWastage = parseFloat(updatedValues.cementWastage || "0%") / 100;
+                                const sandWastage = parseFloat(updatedValues.sandWastage || "0%") / 100;
+                                const jallyWastage = parseFloat(updatedValues.jallyWastage || "0%") / 100;
+                                const cementWithWastage = cement + (cement * cementWastage);
+                                const sandWithWastage = sand + (sand * sandWastage);
+                                const jallyWithWastage = jally + (jally * jallyWastage);
+                                tile.cement = cementWithWastage.toFixed(2);
+                                tile.sand = sandWithWastage.toFixed(2);
+                                tile.jally = jallyWithWastage.toFixed(2);
+                                tile.totalValume = (
+                                    parseFloat(tile.cement) +
+                                    parseFloat(tile.sand) +
+                                    parseFloat(tile.jally)
+                                ).toFixed(2);
+                                const totalAmountCement = parseFloat(((tile.cement / 1.25) * cementRate).toFixed(2));
+                                const totalAmountSand = parseFloat((tile.sand * (sandRate / 100)).toFixed(2));
+                                const totalAmountJally = parseFloat((tile.jally * (jallyRate / 100)).toFixed(2));
+                                tile.LabourAmount = parseFloat((tile.totalValume * (tile.labourRate || 1)).toFixed(2));
+                                tile.totalAmountCft = parseFloat((totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2));
+                                tile.concreteTotalAmount = tile.totalAmountCft + tile.LabourAmount;
+                            }
                         }
                     }
                     return tile;
@@ -1277,14 +1310,16 @@ const RccCalculator = () => {
             const updatedFloors = [...prevFloors];
             const floor = updatedFloors[floorIndex];
             const tile = floor?.tiles?.[tileIndex];
-            if (!tile || !tile.size) return prevFloors;
+            if (!tile) return prevFloors;
             // Only custom behavior for Footing / Column
             if (floor.areaName === "FOOTING - SLOPED" || floor.areaName === "FOOTING" || floor.areaName === "FOOTING - BOX"|| floor.areaName === "FOOTING MAT" || floor.areaName === "FOOTING SIDE" || floor.areaName === "COLUMN") {
-                const parts = tile.size.split(/x/i).map((val) => val.trim());
-                const [length = "", breadth = ""] = parts;
-                tile.length = length || "";
-                tile.breadth = breadth || "";
-                return updatedFloors;
+                if (tile.size) {
+                    const parts = tile.size.split(/x/i).map((val) => val.trim());
+                    const [length = "", breadth = ""] = parts;
+                    tile.length = length || "";
+                    tile.breadth = breadth || "";
+                    return updatedFloors;
+                }
             }
             // Fallback to existing popup for other area types
             openLengthPopupScreen(floorIndex, tileIndex);
@@ -1511,20 +1546,33 @@ const RccCalculator = () => {
         const lengthInches = convertToInches(lengthVal);
         const breadthInches = convertToInches(breadthVal);
         const heightInches = convertToInches(heightVal);
-        let area = "0.00";
-        if (matchingBeam && matchingBeam.formula) {
-            if (lengthInches === 0 || breadthInches === 0 || heightInches === 0) {
-                area = "0.00";
-            } else {
-                let formula = matchingBeam.formula.replace(/L/g, lengthInches).replace(/B/g, breadthInches).replace(/H/g, heightInches).replace(/D/g, parseFloat(tile.deductionArea) || 0).replace(/x/gi, "*");
-                formula = formula.replace(/(\d+)\s*['"]/g, (_, inches) => `(${inches}/12)`).replace(/['"]/g, "");
-                try {
-                    area = (evaluate(formula, { length: lengthInches, breadth: breadthInches, height: heightInches }) * (parseFloat(tile.quantity) || 1)).toFixed(2);
-                } catch (e) { area = "0.00"; }
+        const missingAnyDim = lengthInches === 0 || breadthInches === 0 || heightInches === 0;
+
+        let area = "";
+        let totalArea = "";
+        let amount = "";
+
+        if (matchingBeam && matchingBeam.formula && !missingAnyDim) {
+            let formula = matchingBeam.formula
+                .replace(/L/g, lengthInches)
+                .replace(/B/g, breadthInches)
+                .replace(/H/g, heightInches)
+                .replace(/D/g, parseFloat(tile.deductionArea) || 0)
+                .replace(/x/gi, "*");
+            formula = formula.replace(/(\d+)\s*['"]/g, (_, inches) => `(${inches}/12)`).replace(/['"]/g, "");
+
+            try {
+                area = (evaluate(formula, { length: lengthInches, breadth: breadthInches, height: heightInches }) * (parseFloat(tile.quantity) || 1)).toFixed(2);
+            } catch (e) {
+                area = "";
+            }
+
+            if (area !== "") {
+                totalArea = (parseFloat(area) - (parseFloat(tile.deductionArea) || 0)).toFixed(2);
+                amount = (parseFloat(totalArea) * (parseFloat(tile.rate) || 0)).toFixed(2);
             }
         }
-        const totalArea = (parseFloat(area) - (parseFloat(tile.deductionArea) || 0)).toFixed(2);
-        const amount = (totalArea * (parseFloat(tile.rate) || 0)).toFixed(2);
+
         return { ...tile, area, totalArea, amount };
     };
     const updateFloorssWithLengthData = (floorIndex, tileIndex) => {
@@ -1545,15 +1593,14 @@ const RccCalculator = () => {
                         });
                         const selectedAreaName = floor.areaName;
                         const matchingBeam = beamData.find((beam) => beam.beamName === selectedAreaName);
-                        let area = 0;
+                        let area = "";
                         if (matchingBeam && matchingBeam.formula) {
                             const lengthInches = convertToInches(totalLength );
                             const breadthInches = convertToInches(tile.breadth);
                             const heightInches = convertToInches(tile.height);
                             const normalizedDeduction = parseFloat(tile.deductionArea) || 0;
-                            if (lengthInches === 0 || breadthInches === 0 || heightInches === 0) {
-                                area = "0.00";
-                            } else {
+                            const missingAnyDim = lengthInches === 0 || breadthInches === 0 || heightInches === 0;
+                            if (!missingAnyDim) {
                                 let formula = matchingBeam.formula
                                     .replace(/L/g, lengthInches)
                                     .replace(/B/g, breadthInches)
@@ -1569,20 +1616,20 @@ const RccCalculator = () => {
                                         height: heightInches || 0,
                                         deduction: normalizedDeduction || 0,
                                     });
-                                    area = isNaN(area) ? "0.00" : (area * tile.quantity).toFixed(2);
+                                    area = isNaN(area) ? "" : (area * tile.quantity).toFixed(2);
                                 } catch (error) {
                                     console.error("Error evaluating formula:", error);
-                                    area = "0.00";
+                                    area = "";
                                 }
                             }
                         } else {
-                            area = "0.00";
+                            area = "";
                         }
                         const deductionArea = parseFloat(tile.deductionArea) || 0;
-                        const totalArea = (parseFloat(area) - deductionArea).toFixed(2);
+                        const totalArea = area !== "" ? (parseFloat(area) - deductionArea).toFixed(2) : "";
                         const rate = parseFloat(tile.rate) || 0;
-                        const amount = (totalArea * rate).toFixed(2);
-                        let cement = 0, sand = 0, jally = 0, concreteTotalAmount = 0;
+                        const amount = totalArea !== "" ? (parseFloat(totalArea) * rate).toFixed(2) : "";
+                        let cement = 0, sand = 0, jally = 0, concreteTotalAmount = "";
                         if (tile.mix) {
                             const ratioMatch = tile.mix.match(/([\d.]+):([\d.]+):([\d.]+)/);
                             if (ratioMatch) {
@@ -1593,34 +1640,45 @@ const RccCalculator = () => {
                                 const L = convertToInches(totalLength );
                                 const H = convertToInches(tile.height);
                                 const B = convertToInches(tile.breadth);
+                                const missingAnyDimConcrete = L === 0 || H === 0 || B === 0;
                                 const cementRate = parseFloat(values.cementRate || 0);
                                 const sandRate = parseFloat(values.sandRate || 0);
                                 const jallyRate = parseFloat(values.jallyRate || 0);
-                                const totalVolume = L * H * B;
-                                cement = parseFloat(((totalVolume / totalParts) * cementPart).toFixed(2));
-                                sand = parseFloat(((totalVolume / totalParts) * sandPart).toFixed(2));
-                                jally = parseFloat(((totalVolume / totalParts) * jallyPart).toFixed(2));
-                                const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
-                                const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
-                                const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
-                                const cementWithWastage = cement + cement * cementWastage;
-                                const sandWithWastage = sand + sand * sandWastage;
-                                const jallyWithWastage = jally + jally * jallyWastage;
-                                const totalAmountCement = parseFloat((cementWithWastage * cementRate).toFixed(2));
-                                const totalAmountSand = parseFloat((sandWithWastage * (sandRate / 100)).toFixed(2));
-                                const totalAmountJally = parseFloat((jallyWithWastage * (jallyRate / 100)).toFixed(2));
-                                const totalValume = (cementWithWastage + sandWithWastage + jallyWithWastage).toFixed(2);
-                                const LabourAmount = (totalValume * (tile.labourRate || 1)).toFixed(2);
-                                concreteTotalAmount = totalAmountCement + totalAmountSand + totalAmountJally + parseFloat(LabourAmount);
-                                tile.cement = cementWithWastage.toFixed(2);
-                                tile.sand = sandWithWastage.toFixed(2);
-                                tile.jally = jallyWithWastage.toFixed(2);
-                                tile.cementWastage = values.cementWastage;
-                                tile.sandWastage = values.sandWastage;
-                                tile.jallyWastage = values.jallyWastage;
-                                tile.totalValume = totalValume;
-                                tile.LabourAmount = LabourAmount;
-                                tile.totalAmountCft = (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2);
+                                if (missingAnyDimConcrete) {
+                                    tile.cement = "";
+                                    tile.sand = "";
+                                    tile.jally = "";
+                                    tile.totalValume = "";
+                                    tile.LabourAmount = "";
+                                    tile.totalAmountCft = "";
+                                    concreteTotalAmount = "";
+                                } else {
+                                    const totalVolume = L * H * B;
+                                    cement = parseFloat(((totalVolume / totalParts) * cementPart).toFixed(2));
+                                    sand = parseFloat(((totalVolume / totalParts) * sandPart).toFixed(2));
+                                    jally = parseFloat(((totalVolume / totalParts) * jallyPart).toFixed(2));
+                                    const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
+                                    const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
+                                    const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
+                                    const cementWithWastage = cement + cement * cementWastage;
+                                    const sandWithWastage = sand + sand * sandWastage;
+                                    const jallyWithWastage = jally + jally * jallyWastage;
+                                    const totalAmountCement = parseFloat((cementWithWastage * cementRate).toFixed(2));
+                                    const totalAmountSand = parseFloat((sandWithWastage * (sandRate / 100)).toFixed(2));
+                                    const totalAmountJally = parseFloat((jallyWithWastage * (jallyRate / 100)).toFixed(2));
+                                    const totalValume = (cementWithWastage + sandWithWastage + jallyWithWastage).toFixed(2);
+                                    const LabourAmount = (totalValume * (tile.labourRate || 1)).toFixed(2);
+                                    concreteTotalAmount = totalAmountCement + totalAmountSand + totalAmountJally + parseFloat(LabourAmount);
+                                    tile.cement = cementWithWastage.toFixed(2);
+                                    tile.sand = sandWithWastage.toFixed(2);
+                                    tile.jally = jallyWithWastage.toFixed(2);
+                                    tile.cementWastage = values.cementWastage;
+                                    tile.sandWastage = values.sandWastage;
+                                    tile.jallyWastage = values.jallyWastage;
+                                    tile.totalValume = totalValume;
+                                    tile.LabourAmount = LabourAmount;
+                                    tile.totalAmountCft = (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2);
+                                }
                             }
                         }
                         return {
@@ -1728,15 +1786,20 @@ const RccCalculator = () => {
                     tile.area = areas * tile.quantity;
                 } catch (error) {
                     console.error("Error evaluating formula:", error);
-                    tile.area = "0.00";
+                    tile.area = "";
                 }
             } else {
-                tile.area = "0.00";
+                tile.area = "";
             }
-            const area = parseFloat(tile.area) || 0;
-            const totalArea = Math.max(area - normalizedDeduction, 0);
-            tile.totalArea = totalArea.toFixed(2);
-            tile.amount = (totalArea * parseFloat(tile.rate || commonRate)).toFixed(2);
+            const area = tile.area !== "" ? parseFloat(tile.area) : NaN;
+            if (isNaN(area)) {
+                tile.totalArea = "";
+                tile.amount = "";
+            } else {
+                const totalArea = Math.max(area - normalizedDeduction, 0);
+                tile.totalArea = totalArea.toFixed(2);
+                tile.amount = (totalArea * parseFloat(tile.rate || commonRate)).toFixed(2);
+            }
             setFloorss(updatedFloors);
         } catch (error) {
             console.error('Invalid calculation! Please check your input.', error);
@@ -2305,52 +2368,63 @@ const RccCalculator = () => {
                         const cementRate = parseFloat(values.cementRate || 0);
                         const sandRate = parseFloat(values.sandRate || 0);
                         const jallyRate = parseFloat(values.jallyRate || 0);
-                        const totalVolume = L * H * B;
-                        const cement = parseFloat(
-                            ((totalVolume / totalParts) * cementPart) * quantity
-                        );
-                        const sand = parseFloat(
-                            ((totalVolume / totalParts) * sandPart) * quantity
-                        );
-                        const jally = parseFloat(
-                            ((totalVolume / totalParts) * jallyPart) * quantity
-                        );
-                        const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
-                        const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
-                        const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
-                        const cementWastages = cement * cementWastage;
-                        const sandWastages = sand * sandWastage;
-                        const jallyWastages = jally * jallyWastage;
-                        const jallyWithWastage = jallyWastages + jally;
-                        const sandWithWastage = sandWastages + sand;
-                        const cementWithWastage = cementWastages + cement;
-                        tile.cementWastage = values.cementWastage;
-                        tile.sandWastage = values.sandWastage;
-                        tile.jallyWastage = values.jallyWastage;
-                        tile.cement = cementWithWastage.toFixed(2);
-                        tile.sand = sandWithWastage.toFixed(2);
-                        tile.jally = jallyWithWastage.toFixed(2);
-                        tile.totalValume = (
-                            parseFloat(tile.cement) +
-                            parseFloat(tile.sand) +
-                            parseFloat(tile.jally)
-                        ).toFixed(2);
-                        const totalAmountCement = parseFloat(
-                            (tile.cement * cementRate).toFixed(2)
-                        );
-                        const totalAmountSand = parseFloat(
-                            (tile.sand * (sandRate / 100)).toFixed(2)
-                        );
-                        const totalAmountJally = parseFloat(
-                            (tile.jally * (jallyRate / 100)).toFixed(2)
-                        );
-                        tile.LabourAmount = parseFloat(
-                            (tile.totalValume * (tile.labourRate || 1)).toFixed(2)
-                        );
-                        tile.totalAmountCft = parseFloat(
-                            (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2)
-                        );
-                        tile.concreteTotalAmount = tile.totalAmountCft + tile.LabourAmount;
+                        if (L === 0 || H === 0 || B === 0) {
+                            // If any dimension is missing, don't fill concrete quantities.
+                            tile.cement = "";
+                            tile.sand = "";
+                            tile.jally = "";
+                            tile.totalValume = "";
+                            tile.LabourAmount = "";
+                            tile.totalAmountCft = "";
+                            tile.concreteTotalAmount = "";
+                        } else {
+                            const totalVolume = L * H * B;
+                            const cement = parseFloat(
+                                ((totalVolume / totalParts) * cementPart) * quantity
+                            );
+                            const sand = parseFloat(
+                                ((totalVolume / totalParts) * sandPart) * quantity
+                            );
+                            const jally = parseFloat(
+                                ((totalVolume / totalParts) * jallyPart) * quantity
+                            );
+                            const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
+                            const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
+                            const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
+                            const cementWastages = cement * cementWastage;
+                            const sandWastages = sand * sandWastage;
+                            const jallyWastages = jally * jallyWastage;
+                            const jallyWithWastage = jallyWastages + jally;
+                            const sandWithWastage = sandWastages + sand;
+                            const cementWithWastage = cementWastages + cement;
+                            tile.cementWastage = values.cementWastage;
+                            tile.sandWastage = values.sandWastage;
+                            tile.jallyWastage = values.jallyWastage;
+                            tile.cement = cementWithWastage.toFixed(2);
+                            tile.sand = sandWithWastage.toFixed(2);
+                            tile.jally = jallyWithWastage.toFixed(2);
+                            tile.totalValume = (
+                                parseFloat(tile.cement) +
+                                parseFloat(tile.sand) +
+                                parseFloat(tile.jally)
+                            ).toFixed(2);
+                            const totalAmountCement = parseFloat(
+                                (tile.cement * cementRate).toFixed(2)
+                            );
+                            const totalAmountSand = parseFloat(
+                                (tile.sand * (sandRate / 100)).toFixed(2)
+                            );
+                            const totalAmountJally = parseFloat(
+                                (tile.jally * (jallyRate / 100)).toFixed(2)
+                            );
+                            tile.LabourAmount = parseFloat(
+                                (tile.totalValume * (tile.labourRate || 1)).toFixed(2)
+                            );
+                            tile.totalAmountCft = parseFloat(
+                                (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2)
+                            );
+                            tile.concreteTotalAmount = tile.totalAmountCft + tile.LabourAmount;
+                        }
                     }
                 }
             }
@@ -2363,25 +2437,9 @@ const RccCalculator = () => {
                     : ["", "", ""];
 
                 // Use beamData to map size parts to L, B, H
-                const mappedLbh = matchingBeam ? mapSizePartsToLbh(parts, matchingBeam) : null;
-                // Ensure size always drives L/B/H on size-change. Prefer beam mapping.
-                // Only fill missing values from raw parts when the beam actually uses that dimension (a, b, c).
-                const resolvedLbh = mappedLbh ? { ...mappedLbh } : null;
-                if (resolvedLbh && matchingBeam) {
-                    const a = (matchingBeam.a || "").trim();
-                    const b = (matchingBeam.b || "").trim();
-                    const c = (matchingBeam.c || "").trim();
-                    if (parts.length >= 3) {
-                        if (!resolvedLbh.length && a) resolvedLbh.length = parts[0] || "";
-                        if (!resolvedLbh.breadth && b) resolvedLbh.breadth = parts[1] || "";
-                        if (!resolvedLbh.height && c) resolvedLbh.height = parts[2] || "";
-                    } else {
-                        // 2-part size: only fill L and B from parts[0], parts[1]; never fill H from parts[1]
-                        if (!resolvedLbh.length && a) resolvedLbh.length = parts[0] || "";
-                        if (!resolvedLbh.breadth && b) resolvedLbh.breadth = parts[1] || (parts.length >= 1 ? parts[0] : "");
-                        // Height only when we have a 3rd part
-                    }
-                }
+                // Prefer beam mapping only. Do NOT apply extra fallback that can override blank dimensions.
+                // `mapSizePartsToLbh` already respects beam.a/beam.b/beam.c being "Blank".
+                const resolvedLbh = matchingBeam ? mapSizePartsToLbh(parts, matchingBeam) : null;
 
                 updatedFloors[floorIndex].tiles.forEach((t) => {
                     if (t.type === currentType &&
@@ -2432,52 +2490,63 @@ const RccCalculator = () => {
                             const cementRate = parseFloat(values.cementRate || 0);
                             const sandRate = parseFloat(values.sandRate || 0);
                             const jallyRate = parseFloat(values.jallyRate || 0);
-                            const totalVolume = Lval * Hval * Bval;
-                            const cement = parseFloat(
-                                ((totalVolume / totalParts) * cementPart) * quantity
-                            );
-                            const sand = parseFloat(
-                                ((totalVolume / totalParts) * sandPart) * quantity
-                            );
-                            const jally = parseFloat(
-                                ((totalVolume / totalParts) * jallyPart) * quantity
-                            );
-                            const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
-                            const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
-                            const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
-                            const cementWastages = cement * cementWastage;
-                            const sandWastages = sand * sandWastage;
-                            const jallyWastages = jally * jallyWastage;
-                            const jallyWithWastage = jallyWastages + jally;
-                            const sandWithWastage = sandWastages + sand;
-                            const cementWithWastage = cementWastages + cement;
-                            t.cementWastage = values.cementWastage;
-                            t.sandWastage = values.sandWastage;
-                            t.jallyWastage = values.jallyWastage;
-                            t.cement = cementWithWastage.toFixed(2);
-                            t.sand = sandWithWastage.toFixed(2);
-                            t.jally = jallyWithWastage.toFixed(2);
-                            t.totalValume = (
-                                parseFloat(t.cement) +
-                                parseFloat(t.sand) +
-                                parseFloat(t.jally)
-                            ).toFixed(2);
-                            const totalAmountCement = parseFloat(
-                                (t.cement * cementRate).toFixed(2)
-                            );
-                            const totalAmountSand = parseFloat(
-                                (t.sand * (sandRate / 100)).toFixed(2)
-                            );
-                            const totalAmountJally = parseFloat(
-                                (t.jally * (jallyRate / 100)).toFixed(2)
-                            );
-                            t.LabourAmount = parseFloat(
-                                (t.totalValume * (t.labourRate || 1)).toFixed(2)
-                            );
-                            t.totalAmountCft = parseFloat(
-                                (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2)
-                            );
-                            t.concreteTotalAmount = t.totalAmountCft + t.LabourAmount;
+                            if (Lval === 0 || Hval === 0 || Bval === 0) {
+                                // If any dimension is missing, don't fill concrete quantities.
+                                t.cement = "";
+                                t.sand = "";
+                                t.jally = "";
+                                t.totalValume = "";
+                                t.LabourAmount = "";
+                                t.totalAmountCft = "";
+                                t.concreteTotalAmount = "";
+                            } else {
+                                const totalVolume = Lval * Hval * Bval;
+                                const cement = parseFloat(
+                                    ((totalVolume / totalParts) * cementPart) * quantity
+                                );
+                                const sand = parseFloat(
+                                    ((totalVolume / totalParts) * sandPart) * quantity
+                                );
+                                const jally = parseFloat(
+                                    ((totalVolume / totalParts) * jallyPart) * quantity
+                                );
+                                const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
+                                const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
+                                const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
+                                const cementWastages = cement * cementWastage;
+                                const sandWastages = sand * sandWastage;
+                                const jallyWastages = jally * jallyWastage;
+                                const jallyWithWastage = jallyWastages + jally;
+                                const sandWithWastage = sandWastages + sand;
+                                const cementWithWastage = cementWastages + cement;
+                                t.cementWastage = values.cementWastage;
+                                t.sandWastage = values.sandWastage;
+                                t.jallyWastage = values.jallyWastage;
+                                t.cement = cementWithWastage.toFixed(2);
+                                t.sand = sandWithWastage.toFixed(2);
+                                t.jally = jallyWithWastage.toFixed(2);
+                                t.totalValume = (
+                                    parseFloat(t.cement) +
+                                    parseFloat(t.sand) +
+                                    parseFloat(t.jally)
+                                ).toFixed(2);
+                                const totalAmountCement = parseFloat(
+                                    (t.cement * cementRate).toFixed(2)
+                                );
+                                const totalAmountSand = parseFloat(
+                                    (t.sand * (sandRate / 100)).toFixed(2)
+                                );
+                                const totalAmountJally = parseFloat(
+                                    (t.jally * (jallyRate / 100)).toFixed(2)
+                                );
+                                t.LabourAmount = parseFloat(
+                                    (t.totalValume * (t.labourRate || 1)).toFixed(2)
+                                );
+                                t.totalAmountCft = parseFloat(
+                                    (totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2)
+                                );
+                                t.concreteTotalAmount = t.totalAmountCft + t.LabourAmount;
+                            }
                         }
                     }
                 });
@@ -2493,7 +2562,14 @@ const RccCalculator = () => {
             const L = convertToInches(tile.length);
             const H = convertToInches(tile.height);
             const B = convertToInches(tile.breadth);
-            const deduction = parseFloat(tile.deductionArea) || 0;
+            const missingAnyDim = L === 0 || H === 0 || B === 0;
+            if (missingAnyDim || !(matchingBeam && matchingBeam.formula)) {
+                tile.area = "";
+                tile.totalArea = "";
+                tile.amount = "";
+                tile.weight = "";
+            } else {
+                const deduction = parseFloat(tile.deductionArea) || 0;
                 let formula = matchingBeam?.formula || "";
                 let formulaWithValues = formula
                     .replace(/L/g, L)
@@ -2503,20 +2579,28 @@ const RccCalculator = () => {
                     .replace(/(\d+)\s*['"]/g, (_, inches) => (`${inches}` / 12))
                     .replace(/['"]/g, "");
                 try {
-                const baseArea = parseFloat(evaluate(formulaWithValues).toFixed(2)) || 0;
-                const qty = parseFloat(tile.quantity || "1") || 1;
-                tile.area = (baseArea * qty).toFixed(2);
+                    const baseArea = parseFloat(evaluate(formulaWithValues).toFixed(2)) || 0;
+                    const qty = parseFloat(tile.quantity || "1") || 1;
+                    tile.area = (baseArea * qty).toFixed(2);
                 } catch (error) {
                     console.error("Error calculating area:", error);
-                tile.area = "0.00";
+                    tile.area = "";
                 }
-            const totalArea = parseFloat(tile.area) - deduction;
-            tile.totalArea = Math.max(totalArea, 0).toFixed(2);
-            tile.amount = tile.rate ? (parseFloat(tile.rate) * tile.totalArea).toFixed(2) : "0.00";
-            const weightFactor = getSteelWeightGramsPerFoot(tile.type);
-            const weightInGrams = L * weightFactor;
-            tile.weight = formatWeightInKg(weightInGrams);
-            console.log("[Tile Weight] length(ft):", L, "| type:", tile.type, "| g/ft:", weightFactor, "| weightGrams:", weightInGrams.toFixed(2), "| result:", tile.weight);
+
+                if (tile.area !== "") {
+                    const totalArea = parseFloat(tile.area) - deduction;
+                    tile.totalArea = Math.max(totalArea, 0).toFixed(2);
+                    tile.amount = tile.rate ? (parseFloat(tile.rate) * tile.totalArea).toFixed(2) : "0.00";
+                } else {
+                    tile.totalArea = "";
+                    tile.amount = "";
+                }
+
+                const weightFactor = getSteelWeightGramsPerFoot(tile.type);
+                const weightInGrams = L * weightFactor;
+                tile.weight = formatWeightInKg(weightInGrams);
+                console.log("[Tile Weight] length(ft):", L, "| type:", tile.type, "| g/ft:", weightFactor, "| weightGrams:", weightInGrams.toFixed(2), "| result:", tile.weight);
+            }
             updatedFloors[floorIndex].totalAmount = updatedFloors[floorIndex].tiles
                 .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
                 .toFixed(2);
@@ -2723,7 +2807,7 @@ const RccCalculator = () => {
             const breadthInches = convertToInches(tile.breadth);
             const heightInches = convertToInches(tile.height);
             if (lengthInches === 0 || breadthInches === 0 || heightInches === 0) {
-                tile.area = "0.00";
+                tile.area = "";
             } else {
                 const normalizedDeduction = parseFloat(tile.deductionArea) || 0;
                 let formula = matchingBeam.formula
@@ -2741,20 +2825,25 @@ const RccCalculator = () => {
                         height: heightInches || 0,
                         deduction: normalizedDeduction || 0,
                     });
-                    tile.area = isNaN(areas) ? "0.00" : (areas * tile.quantity).toFixed(2);
+                    tile.area = isNaN(areas) ? "" : (areas * tile.quantity).toFixed(2);
                 } catch (error) {
                     console.error("Error evaluating formula:", error);
-                    tile.area = "0.00";
+                    tile.area = "";
                 }
             }
         } else {
-            tile.area = "0.00";
+            tile.area = "";
         }
-        const area = parseFloat(tile.area) || 0;
+        const area = tile.area !== "" ? parseFloat(tile.area) : NaN;
         const deductionArea = parseFloat(tile.deductionArea) || 0;
-        tile.totalArea = (area - deductionArea).toFixed(2);
-        const rate = parseFloat(tile.rate) || 0;
-        tile.amount = (tile.totalArea * rate).toFixed(2);
+        if (isNaN(area)) {
+            tile.totalArea = "";
+            tile.amount = "";
+        } else {
+            tile.totalArea = (area - deductionArea).toFixed(2);
+            const rate = parseFloat(tile.rate) || 0;
+            tile.amount = (parseFloat(tile.totalArea) * rate).toFixed(2);
+        }
         if (tile.mix) {
             const ratioMatch = tile.mix.match(/([\d.]+):([\d.]+):([\d.]+)/);
             if (ratioMatch) {
@@ -2768,38 +2857,49 @@ const RccCalculator = () => {
                 const cementRate = parseFloat(values.cementRate || 0);
                 const sandRate = parseFloat(values.sandRate || 0);
                 const jallyRate = parseFloat(values.jallyRate || 0);
-                const totalVolume = L * H * B;
-                const cement = parseFloat((((totalVolume / totalParts) * cementPart)) * tile.quantity);
-                const sand = parseFloat((((totalVolume / totalParts) * sandPart)) * tile.quantity);
-                const jally = parseFloat((((totalVolume / totalParts) * jallyPart)) * tile.quantity);
-                const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
-                const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
-                const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
-                const cementWastages = cement * cementWastage;
-                const sandWastages = sand * sandWastage;
-                const jallyWastages = jally * jallyWastage;
-                const jallyWithWastage = jallyWastages + jally;
-                const sandWithWastage = sandWastages + sand;
-                const cementWithWastage = cementWastages + cement;
-                tile.cement = cementWithWastage.toFixed(2);
-                tile.sand = sandWithWastage.toFixed(2);
-                tile.jally = jallyWithWastage.toFixed(2);
-                tile.cementWastage = values.cementWastage;
-                tile.sandWastage = values.sandWastage;
-                tile.jallyWastage = values.jallyWastage;
-                tile.totalValume = (
-                    parseFloat(tile.cement) +
-                    parseFloat(tile.sand) +
-                    parseFloat(tile.jally)
-                ).toFixed(2);
-                const totalAmountCement = parseFloat((tile.cement * cementRate).toFixed(2));
-                const totalAmountSand = parseFloat((tile.sand * (sandRate / 100)).toFixed(2));
-                const totalAmountJally = parseFloat((tile.jally * (jallyRate / 100)).toFixed(2));
-                tile.LabourAmount = parseFloat((
-                    tile.totalValume * (tile.labourRate || 1)
-                ).toFixed(2));
-                tile.totalAmountCft = parseFloat((totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2));
-                tile.concreteTotalAmount = tile.totalAmountCft + tile.LabourAmount;
+                if (L === 0 || H === 0 || B === 0) {
+                    // If any dimension is missing, don't fill concrete quantities.
+                    tile.cement = "";
+                    tile.sand = "";
+                    tile.jally = "";
+                    tile.totalValume = "";
+                    tile.LabourAmount = "";
+                    tile.totalAmountCft = "";
+                    tile.concreteTotalAmount = "";
+                } else {
+                    const totalVolume = L * H * B;
+                    const cement = parseFloat((((totalVolume / totalParts) * cementPart)) * tile.quantity);
+                    const sand = parseFloat((((totalVolume / totalParts) * sandPart)) * tile.quantity);
+                    const jally = parseFloat((((totalVolume / totalParts) * jallyPart)) * tile.quantity);
+                    const cementWastage = parseFloat(values.cementWastage || "0%") / 100;
+                    const sandWastage = parseFloat(values.sandWastage || "0%") / 100;
+                    const jallyWastage = parseFloat(values.jallyWastage || "0%") / 100;
+                    const cementWastages = cement * cementWastage;
+                    const sandWastages = sand * sandWastage;
+                    const jallyWastages = jally * jallyWastage;
+                    const jallyWithWastage = jallyWastages + jally;
+                    const sandWithWastage = sandWastages + sand;
+                    const cementWithWastage = cementWastages + cement;
+                    tile.cement = cementWithWastage.toFixed(2);
+                    tile.sand = sandWithWastage.toFixed(2);
+                    tile.jally = jallyWithWastage.toFixed(2);
+                    tile.cementWastage = values.cementWastage;
+                    tile.sandWastage = values.sandWastage;
+                    tile.jallyWastage = values.jallyWastage;
+                    tile.totalValume = (
+                        parseFloat(tile.cement) +
+                        parseFloat(tile.sand) +
+                        parseFloat(tile.jally)
+                    ).toFixed(2);
+                    const totalAmountCement = parseFloat((tile.cement * cementRate).toFixed(2));
+                    const totalAmountSand = parseFloat((tile.sand * (sandRate / 100)).toFixed(2));
+                    const totalAmountJally = parseFloat((tile.jally * (jallyRate / 100)).toFixed(2));
+                    tile.LabourAmount = parseFloat((
+                        tile.totalValume * (tile.labourRate || 1)
+                    ).toFixed(2));
+                    tile.totalAmountCft = parseFloat((totalAmountCement + totalAmountSand + totalAmountJally).toFixed(2));
+                    tile.concreteTotalAmount = tile.totalAmountCft + tile.LabourAmount;
+                }
             }
         }
         setFloorss(updatedFloors);
@@ -2836,15 +2936,20 @@ const RccCalculator = () => {
                         tile.area = (areas * tile.quantity).toFixed(2);
                     } catch (error) {
                         console.error("Error evaluating formula:", error);
-                        tile.area = "0.00";
+                        tile.area = "";
                     }
                 } else {
-                    tile.area = "0.00";
+                    tile.area = "";
                 }
-                const area = parseFloat(tile.area) || 0;
-                const totalArea = Math.max(area - normalizedDeduction, 0);
-                tile.totalArea = totalArea.toFixed(2);
-                tile.amount = (totalArea * parseFloat(newRate || 0)).toFixed(2);
+                if (tile.area === "") {
+                    tile.totalArea = "";
+                    tile.amount = "";
+                } else {
+                    const area = parseFloat(tile.area) || 0;
+                    const totalArea = Math.max(area - normalizedDeduction, 0);
+                    tile.totalArea = totalArea.toFixed(2);
+                    tile.amount = (totalArea * parseFloat(newRate || 0)).toFixed(2);
+                }
             });
         });
         setFloorss(updatedFloors);

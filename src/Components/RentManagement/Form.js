@@ -801,7 +801,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             });
             return;
         }
-        if (["Gpay", "PhonePe", "Net Banking", "Cheque"].includes(formPaymentMode)) {
+        if (["Gpay", "GPay", "PhonePe", "Net Banking", "Cheque"].includes(formPaymentMode)) {
             setWeeklyPaymentData({
                 date: paidOnDate,
                 amount: cleanedAmount,
@@ -1933,7 +1933,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                     </div>
                                 </div>
 
-                                {(weeklyPaymentData.paymentMode === "Gpay" || weeklyPaymentData.paymentMode === "PhonePe" ||
+                                {(weeklyPaymentData.paymentMode === "Gpay" || weeklyPaymentData.paymentMode === "GPay" || weeklyPaymentData.paymentMode === "PhonePe" ||
                                     weeklyPaymentData.paymentMode === "Net Banking" || weeklyPaymentData.paymentMode === "Cheque") && (
                                         <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
                                             <div className="space-y-4">

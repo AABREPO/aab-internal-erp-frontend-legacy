@@ -1088,12 +1088,14 @@ WITNESSES:
                 setRevisionCount(currentRevisionCount);
             }
             const pdfData = await generatePDF();
-            const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
             const date = new Date();
             const propertyDoorNo = doorNos.join("_");
             const filename = `${selectedProperty.value}_${propertyDoorNo}_R${currentRevisionCount}`;
             const formData = new FormData();
-            formData.append("files", pdfBlob);
+            // Match the working upload format used across the app (Tile/Paint calculators):
+            // backend expects: files (plural), folder, fileName
+            const pdfFile = new File([pdfData], `${filename}.pdf`, { type: 'application/pdf' });
+            formData.append("files", pdfFile, pdfFile.name);
             formData.append("folder", "FileUpload / Rental_Agreements");
             formData.append("fileName", filename);            
             const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {

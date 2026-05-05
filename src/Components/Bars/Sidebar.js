@@ -48,6 +48,15 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
   // Effect to set active menu and submenu based on current route
   useEffect(() => {
     const currentPath = location.pathname;
+    // Allow a Link to force which sidebar section stays open.
+    // Used when multiple menu items intentionally navigate to the same route.
+    const forcedMenu = location.state?.sidebarMenu;
+    const forcedSubmenu = location.state?.sidebarSubmenu;
+    if (forcedMenu) {
+      setActiveMenu(forcedMenu);
+      setActiveSubmenuItem(forcedSubmenu || '');
+      return;
+    }
 
     // Define route mappings
     const routeMappings = {
@@ -271,7 +280,9 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
         </div>
         {activeMenu === 'account' && (
           <div className="ml-6">
-            <Link to={hasAccessToModel('Vendor Payments Tracker') ? '/vendorPaymentsTracker' : '#'}
+            <Link
+              to={hasAccessToModel('Vendor Payments Tracker') ? '/tracker/pendingbill' : '#'}
+              state={{ sidebarMenu: 'account', sidebarSubmenu: 'Vendor Payments Tracker' }}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Vendor Payments Tracker' ? 'text-red-500' : ''}`}
               onClick={(e) => {
                 if (!hasAccessToModel('Vendor Payments Tracker')) {

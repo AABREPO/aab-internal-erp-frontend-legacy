@@ -9,262 +9,24 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
+import CustomDateField from './CustomDateField';
+import { Calendar } from 'lucide-react';
+import DateRangePicker from './DateRangePicker';
 Modal.setAppElement('#root');
+const EDIT_POPUP_UTILITY_TYPE_OPTIONS = [
+    { value: 'Electricity', label: 'Electricity' },
+    { value: 'Property', label: 'Property' },
+    { value: 'Water', label: 'Water' },
+    { value: 'Telecom', label: 'Telecom' },
+    { value: 'Subscription', label: 'Subscription' },
+];
+const EDIT_POPUP_VALIDITY_TYPE_OPTIONS = [
+    { value: 'Days', label: 'Days' },
+    { value: 'Month', label: 'Month' },
+    { value: 'Year', label: 'Year' },
+];
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
-// Date Range Picker Component
-const DateRangePicker = ({ startDate, endDate, onStartDateChange, onEndDateChange }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [tempStartDate, setTempStartDate] = useState(null);
-    const [tempEndDate, setTempEndDate] = useState(null);
-    const datePickerRef = useRef(null);
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        // If dateString is already in YYYY-MM-DD format, parse it directly
-        if (dateString.includes('-') && dateString.length === 10) {
-            const [year, month, day] = dateString.split('-');
-            return `${day}-${month}-${year}`;
-        }
-        // Otherwise, parse as Date object
-        const d = new Date(dateString);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
-    const getDisplayText = () => {
-        if (startDate && endDate) {
-            return `${formatDate(startDate)} to ${formatDate(endDate)}`;
-        } else if (startDate) {
-            return `${formatDate(startDate)} to ...`;
-        }
-        return 'Select Date';
-    };
-    const getDaysInMonth = (date) => {
-        return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-    };
-    const getFirstDayOfMonth = (date) => {
-        return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-    };
-    const formatDateToString = (year, month, day) => {
-        const monthStr = String(month + 1).padStart(2, '0');
-        const dayStr = String(day).padStart(2, '0');
-        return `${year}-${monthStr}-${dayStr}`;
-    };
-    const handleDateClick = (day, isCurrentMonth) => {
-        if (!isCurrentMonth) return;
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const dateString = formatDateToString(year, month, day);
-        if (!tempStartDate || (tempStartDate && tempEndDate)) {
-            setTempStartDate(dateString);
-            setTempEndDate(null);
-        } else if (tempStartDate && !tempEndDate) {
-            let finalStartDate = tempStartDate;
-            let finalEndDate = dateString;
-            if (dateString < tempStartDate) {
-                finalStartDate = dateString;
-                finalEndDate = tempStartDate;
-            }
-            setTempStartDate(finalStartDate);
-            setTempEndDate(finalEndDate);
-            // Auto-apply when both dates are selected
-            setTimeout(() => {
-                onStartDateChange(finalStartDate);
-                onEndDateChange(finalEndDate);
-                setIsOpen(false);
-            }, 0);
-        }
-    };
-    const handleDone = () => {
-        if (tempStartDate) {
-            onStartDateChange(tempStartDate);
-            if (tempEndDate) {
-                onEndDateChange(tempEndDate);
-            } else {
-                onEndDateChange('');
-            }
-        }
-        setIsOpen(false);
-    };
-    const handleCancel = () => {
-        setTempStartDate(startDate || null);
-        setTempEndDate(endDate || null);
-        setIsOpen(false);
-    };
-    const handleClear = () => {
-        setTempStartDate(null);
-        setTempEndDate(null);
-        onStartDateChange('');
-        onEndDateChange('');
-        setIsOpen(false);
-    };
-    const prevMonth = () => {
-        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-    };
-    const nextMonth = () => {
-        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-    };
-    const isDateInRange = (day, isCurrentMonth) => {
-        if (!tempStartDate || !isCurrentMonth) return false;
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const dateString = formatDateToString(year, month, day);
-        if (tempStartDate && tempEndDate) {
-            return dateString >= tempStartDate && dateString <= tempEndDate;
-        } else if (tempStartDate) {
-            return dateString === tempStartDate;
-        }
-        return false;
-    };
-    const isStartDate = (day, isCurrentMonth) => {
-        if (!tempStartDate || !isCurrentMonth) return false;
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const dateString = formatDateToString(year, month, day);
-        return dateString === tempStartDate;
-    };
-    const isEndDate = (day, isCurrentMonth) => {
-        if (!tempEndDate || !isCurrentMonth) return false;
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const dateString = formatDateToString(year, month, day);
-        return dateString === tempEndDate;
-    };
-    const daysInMonth = getDaysInMonth(currentMonth);
-    const firstDay = getFirstDayOfMonth(currentMonth);
-    const days = [];
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    // Previous month's trailing days
-    const prevMonthDays = getDaysInMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-    for (let i = firstDay - 1; i >= 0; i--) {
-        days.push({ day: prevMonthDays - i, isCurrentMonth: false });
-    }
-    // Current month's days
-    for (let i = 1; i <= daysInMonth; i++) {
-        days.push({ day: i, isCurrentMonth: true });
-    }
-    // Next month's leading days
-    const totalCells = 42; // 6 rows * 7 days
-    const remainingDays = totalCells - days.length;
-    for (let i = 1; i <= remainingDays; i++) {
-        days.push({ day: i, isCurrentMonth: false });
-    }
-    useEffect(() => {
-        if (isOpen) {
-            setTempStartDate(startDate || null);
-            setTempEndDate(endDate || null);
-        }
-    }, [isOpen, startDate, endDate]);
-    return (
-        <div className="relative" ref={datePickerRef}>
-            <input
-                type="text"
-                readOnly
-                value={getDisplayText()}
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3 py-2 text-xs bg-transparent focus:outline-none  cursor-pointer"
-                placeholder="Select Date Range"
-            />
-            {isOpen && (
-                <div className="absolute z-50 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4" style={{ minWidth: '320px' }}>
-                    <div className="flex items-center justify-between mb-4">
-                        <button
-                            onClick={prevMonth}
-                            className="p-1 hover:bg-gray-100 rounded"
-                            type="button"
-                        >
-                            <span className="text-lg">‹</span>
-                        </button>
-                        <h3 className="font-semibold text-base">
-                            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                        </h3>
-                        <button
-                            onClick={nextMonth}
-                            className="p-1 hover:bg-gray-100 rounded"
-                            type="button"
-                        >
-                            <span className="text-lg">›</span>
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 mb-2">
-                        {dayNames.map((day, idx) => (
-                            <div key={idx} className="text-center text-xs font-medium text-gray-600 py-1">
-                                {day}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-1">
-                        {days.map((dateObj, idx) => {
-                            const { day, isCurrentMonth } = dateObj;
-                            const inRange = isDateInRange(day, isCurrentMonth);
-                            const isStart = isStartDate(day, isCurrentMonth);
-                            const isEnd = isEndDate(day, isCurrentMonth);
-
-                            return (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => handleDateClick(day, isCurrentMonth)}
-                                    disabled={!isCurrentMonth}
-                                    className={`
-                                        py-2 text-sm rounded
-                                        ${!isCurrentMonth ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'}
-                                        ${isStart || isEnd ? 'bg-black text-white font-semibold' : ''}
-                                        ${inRange && !isStart && !isEnd ? 'bg-gray-200' : ''}
-                                        ${isCurrentMonth && !inRange && !isStart && !isEnd ? 'text-black' : ''}
-                                    `}
-                                >
-                                    {day}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <div className="flex justify-between mt-4 pt-4 border-t">
-                        <button
-                            onClick={handleClear}
-                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-                            type="button"
-                        >
-                            Clear
-                        </button>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleCancel}
-                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-                                type="button"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDone}
-                                className="px-4 py-2 text-sm font-semibold text-black hover:bg-gray-100 rounded"
-                                type="button"
-                            >
-                                Done
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-const TableViewExpense = ({ username, userRoles = [] }) => {
+const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
     const resolveActiveBranchId = useCallback(() => {
         try {
@@ -292,6 +54,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
     const [machineToolsCatalog, setMachineToolsCatalog] = useState([]);
     const [branchOptions, setBranchOptions] = useState([]);
+    const [sourceOptions, setSourceOptions] = useState([]);
+    const [branchFilterOptions, setBranchFilterOptions] = useState([]);
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
@@ -324,6 +88,12 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [selectedAccountType, setSelectedAccountType] = useState(() => {
         return localStorage.getItem('expenseFilter_accountType') || '';
     });
+    const [selectedSource, setSelectedSource] = useState(() => {
+        return localStorage.getItem('expenseFilter_source') || '';
+    });
+    const [selectedBranch, setSelectedBranch] = useState(() => {
+        return localStorage.getItem('expenseFilter_branch') || '';
+    });
     const [accountTypeOption, setAccountTypeOption] = useState([]);
     const [editAccountTypeOptions, setEditAccountTypeOptions] = useState([]);
     const [siteOption, setSiteOption] = useState([]);
@@ -332,11 +102,13 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const [categoryOption, setCategoryOption] = useState([]);
     const [machineToolsOption, setMachineToolsOption] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
+    const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
     const [sortField, setSortField] = useState('');
     const [sortDirection, setSortDirection] = useState('asc');
     const scrollRef = useRef(null);
+    const filterRowRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -451,6 +223,12 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     useEffect(() => {
         localStorage.setItem('expenseFilter_eno', selectedEno);
     }, [selectedEno]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_source', selectedSource);
+    }, [selectedSource]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_branch', selectedBranch);
+    }, [selectedBranch]);
     const [formData, setFormData] = useState({
         accountType: '',
         date: '',
@@ -473,7 +251,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         serviceStartingDate: '',
         projectId: '',
         vendorId: '',
-        contractorId: ''
+        contractorId: '',
+        billArrivalDate: ''
     });
     const [projectData, setProjectData] = useState(null);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
@@ -593,6 +372,29 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
     const pendingUpdateFormDataRef = useRef(null);
     const [userPermissions, setUserPermissions] = useState([]);
     const moduleName = "Expense Entry";
+    const defaultPaymentModeOptions = [
+        { modeOfPayment: 'Cash' },
+        { modeOfPayment: 'GPay' },
+        { modeOfPayment: 'PhonePe' },
+        { modeOfPayment: 'Net Banking' },
+        { modeOfPayment: 'Cheque' }
+    ];
+    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+    useEffect(() => {
+        const fetchPaymentModes = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setPaymentModeOptions(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('Error fetching payment modes:', error);
+            }
+        };
+        fetchPaymentModes();
+    }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -627,40 +429,46 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             window.removeEventListener("branchSelectionChanged", syncBranch);
         };
     }, [resolveActiveBranchId]);
-    useEffect(() => {
-        axios
-            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
-                params: activeBranchId ? { branchId: activeBranchId } : {},
-            })
-            .then((response) => {
-                const sortedExpenses = response.data.sort((a, b) => {
-                    const enoA = parseInt(a.eno, 10);
-                    const enoB = parseInt(b.eno, 10);
-                    return enoB - enoA;
-                });
-                setExpenses(sortedExpenses);
-                setFilteredExpenses(sortedExpenses);
-                const uniqueEnos = [...new Set(response.data.map(expense => expense.eno))];
-                const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-                const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
-                const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
-                const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
-                const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
-                const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
-                const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
-                const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
-                const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
-                setEnoOptions(uniqueEnos);
-                setAccountTypeOptions(uniqueAccountTypes);
-                setSiteOptions(siteOptions);
-                setVendorOptions(vendorOptions);
-                setContractorOptions(contractorOption);
-                setCategoryOptions(categoryOption);
-            })
-            .catch((error) => {
-                console.error('Error fetching expenses:', error);
-            });
+    const refetchExpenses = useCallback(async () => {
+        const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
+            params: activeBranchId ? { branchId: activeBranchId } : {},
+        });
+        const sortedExpenses = response.data.sort((a, b) => {
+            const enoA = parseInt(a.eno, 10);
+            const enoB = parseInt(b.eno, 10);
+            return enoB - enoA;
+        });
+        setExpenses(sortedExpenses);
+        setFilteredExpenses(sortedExpenses);
+        const uniqueEnos = [...new Set(response.data.map(expense => expense.eno))];
+        const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
+        const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
+        const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
+        const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
+        const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
+        const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
+        const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
+        const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
+        const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
+        setEnoOptions(uniqueEnos);
+        setAccountTypeOptions(uniqueAccountTypes);
+        setSiteOptions(siteOptions);
+        setVendorOptions(vendorOptions);
+        setContractorOptions(contractorOption);
+        setCategoryOptions(categoryOption);
     }, [activeBranchId]);
+    useEffect(() => {
+        refetchExpenses().catch((error) => {
+            console.error('Error fetching expenses:', error);
+        });
+    }, [refetchExpenses]);
+    const prevIsActiveRef = useRef(isActive);
+    useEffect(() => {
+        if (isActive && prevIsActiveRef.current === false) {
+            void refetchExpenses();
+        }
+        prevIsActiveRef.current = isActive;
+    }, [isActive, refetchExpenses]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -1011,6 +819,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
                 (selectedMachineTools ? String(expense.machineTools ?? '') === String(selectedMachineTools) : true) &&
+                (selectedSource ? expense.source === selectedSource : true) &&
+                (selectedBranch ? String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch) : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === 'Unknown' ?
                         (!expense.accountType || expense.accountType === '') :
@@ -1027,6 +837,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             selectedContractor,
             selectedCategory,
             selectedMachineTools,
+            selectedSource,
+            selectedBranch,
             selectedAccountType,
             startDate,
             endDate,
@@ -1043,6 +855,14 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
+        setSourceOptions(getOptions(filtered, "source"));
+        const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(Boolean))];
+        setBranchFilterOptions(
+            uniqueBranchIds.map(id => ({
+                value: String(id),
+                label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
+            }))
+        );
         const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter((v) => v != null && v !== ''))];
         setMachineToolsOptions(
             uniqueToolIds.map((id) => ({
@@ -1061,12 +881,15 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         selectedContractor,
         selectedCategory,
         selectedMachineTools,
+        selectedSource,
+        selectedBranch,
         selectedAccountType,
         startDate,
         endDate,
         selectedEno,
         expenses,
-        machineToolsIdToLabel
+        machineToolsIdToLabel,
+        branchOptions
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
@@ -1097,6 +920,35 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
+    };
+    const formatChipDateDMY = (dateString) => {
+        if (!dateString) return '';
+        const parts = String(dateString).split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+            const [y, m, d] = parts;
+            return `${d}-${m}-${y}`;
+        }
+        return String(dateString);
+    };
+    const getExpenseBillArrivalRaw = (e) => e?.billArrivalDate ?? e?.bill_arrival_date ?? '';
+    const expenseBillArrivalToInput = (e) => {
+        const raw = getExpenseBillArrivalRaw(e);
+        if (!raw) return '';
+        const s = String(raw).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+        const d = new Date(s);
+        return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+    };
+    const formatBillArrivalDisplay = (e) => {
+        const raw = getExpenseBillArrivalRaw(e);
+        if (!raw) return '—';
+        const head = String(raw).trim().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return formatChipDateDMY(head) || '—';
+        try {
+            return formatDateOnly(raw) || '—';
+        } catch {
+            return String(raw);
+        }
     };
     const handleSave = async (event) => {
         event.preventDefault();
@@ -1174,23 +1026,38 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         }
         try {
             await performUpdateAndWeeklyBills(updatedFormData);
+            await refetchExpenses();
             setModalIsOpen(false);
             setIsSubmitting(false);
             alert('Updated successfully!');
-            window.location.reload();
         } catch (error) {
             console.error('Error updating expense:', error);
             alert('Failed to update expense');
+            setIsSubmitting(false);
         }
     };
     const performUpdateAndWeeklyBills = async (updatedFormData, modalPaymentData = null) => {
+        const rawArrival = updatedFormData?.billArrivalDate ?? updatedFormData?.bill_arrival_date;
+        let billArrivalForApi = '';
+        if (rawArrival != null && String(rawArrival).trim() !== '') {
+            const s = String(rawArrival).trim();
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+                billArrivalForApi = s.slice(0, 10);
+            } else {
+                const d = new Date(s);
+                billArrivalForApi = Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+            }
+        }
+        const updatePayload = {
+            ...updatedFormData,
+            billArrivalDate: billArrivalForApi
+        };
         const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedFormData)
+            body: JSON.stringify(updatePayload)
         });
         if (!response.ok) throw new Error('Failed to update expense');
-        setExpenses(expenses.map(exp => (exp.id === editId ? { ...exp, ...updatedFormData } : exp)));
         const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
         const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
         if (isPaymentType && isNonCashPaymentMode && editId && !sentToWeeklyPaymentBillsRef.current.has(editId)) {
@@ -1242,11 +1109,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setIsSubmitting(true);
         try {
             await performUpdateAndWeeklyBills(updatedFormData, paymentModalData);
+            await refetchExpenses();
             setShowPaymentModal(false);
             setModalIsOpen(false);
             setIsSubmitting(false);
             alert('Updated successfully!');
-            window.location.reload();
         } catch (error) {
             console.error('Error updating expense:', error);
             alert('Failed to update expense');
@@ -1267,11 +1134,17 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             ...provided,
             borderWidth: '2px',
             lineHeight: '20px',
-            fontSize: '12px',
+            fontSize: '14px',
+            fontWeight: 'normal',
             height: '45px',
             borderRadius: '8px',
-            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+            padding: '0.15rem',
+            textAlign: 'left',
+            borderColor: 'rgba(191, 152, 83, 0.2)',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+            '&:hover': {
+                borderColor: 'rgba(191, 152, 83, 0.4)',
+            },
         }),
         clearIndicator: (provided) => ({
             ...provided,
@@ -1279,7 +1152,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         }),
         menu: (provided) => ({
             ...provided,
-            zIndex: 9999,
+            zIndex: 999,
             maxHeight: '300px',
         }),
         menuPortal: (provided) => ({
@@ -1290,36 +1163,47 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             ...provided,
             maxHeight: '250px',
             overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
         }),
         singleValue: (provided) => ({
             ...provided,
-            fontWeight: '400',
-            color: 'black',
-            textAlign: 'left',
+            color: '#111827',
+            fontWeight: 'normal',
+            marginRight: 0,
+        }),
+        valueContainer: (provided) => ({
+            ...provided,
+            paddingRight: '2px',
+        }),
+        indicatorsContainer: (provided) => ({
+            ...provided,
+            paddingLeft: '0px',
+        }),
+        dropdownIndicator: (provided) => ({
+            ...provided,
+            padding: '4px',
         }),
         option: (provided, state) => ({
             ...provided,
-            fontWeight: '300',
-            fontSize: '14px',
-            backgroundColor: state.isSelected
-                ? 'rgba(191, 152, 83, 0.3)'
-                : state.isFocused
-                    ? 'rgba(191, 152, 83, 0.1)'
-                    : 'white',
-            color: 'black',
             textAlign: 'left',
+            fontWeight: 'normal',
+            fontSize: '15px',
+            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+            color: 'black',
         }),
         input: (provided) => ({
             ...provided,
-            fontWeight: '300',
+            fontWeight: 'normal',
             color: 'black',
             textAlign: 'left',
         }),
         placeholder: (provided) => ({
             ...provided,
-            fontWeight: '500',
-            color: '#999',
+            color: '#d3d5db',
             textAlign: 'left',
+            fontWeight: 'bold',
         }),
         indicatorSeparator: (provided) => ({
             ...provided,
@@ -1339,6 +1223,31 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         } else if (sortField === 'machineTools') {
             aValue = String(getMachineToolsItemIdDisplay(a.machineTools) || '').toLowerCase();
             bValue = String(getMachineToolsItemIdDisplay(b.machineTools) || '').toLowerCase();
+        } else if (sortField === 'staff') {
+            const aLabourId = a.labourId || a.labour_id || a.labourID || a.labour_ID;
+            const aEmployeeId = a.employeeId || a.employee_id || a.employeeID || a.employee_ID;
+            const bLabourId = b.labourId || b.labour_id || b.labourID || b.labour_ID;
+            const bEmployeeId = b.employeeId || b.employee_id || b.employeeID || b.employee_ID;
+            aValue = aLabourId ?? aEmployeeId ?? '';
+            bValue = bLabourId ?? bEmployeeId ?? '';
+            const aNum = Number(aValue);
+            const bNum = Number(bValue);
+            if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                aValue = aNum;
+                bValue = bNum;
+            } else {
+                aValue = String(aValue || '').toLowerCase();
+                bValue = String(bValue || '').toLowerCase();
+            }
+        } else if (sortField === 'branch') {
+            aValue = String(branchOptions.find((br) => String(br.id) === String(a.branch_id ?? a.branchId ?? ''))?.branch || '').toLowerCase();
+            bValue = String(branchOptions.find((br) => String(br.id) === String(b.branch_id ?? b.branchId ?? ''))?.branch || '').toLowerCase();
+        } else if (sortField === 'billArrivalDate') {
+            aValue = String(a.billArrivalDate ?? a.bill_arrival_date ?? '').trim().slice(0, 10);
+            bValue = String(b.billArrivalDate ?? b.bill_arrival_date ?? '').trim().slice(0, 10);
+        } else if (sortField === 'quantity' || sortField === 'amount') {
+            aValue = Number(aValue) || 0;
+            bValue = Number(bValue) || 0;
         } else {
             aValue = String(aValue || '').toLowerCase();
             bValue = String(bValue || '').toLowerCase();
@@ -1492,7 +1401,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             serviceStartingDate: expense.serviceStartingDate || '',
             projectId: expense.projectId || '',
             vendorId: expense.vendorId || '',
-            contractorId: expense.contractorId || ''
+            contractorId: expense.contractorId || '',
+            billArrivalDate: expenseBillArrivalToInput(expense)
         });
         setModalIsOpen(true);
     };
@@ -1507,6 +1417,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         setSelectedCategory('');
         setSelectedMachineTools('');
         setSelectedAccountType('');
+        setSelectedSource('');
+        setSelectedBranch('');
         setStartDate('');
         setEndDate('');
         setSelectedEno('');
@@ -1520,6 +1432,8 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
         localStorage.removeItem('expenseFilter_category');
         localStorage.removeItem('expenseFilter_machineTools');
         localStorage.removeItem('expenseFilter_accountType');
+        localStorage.removeItem('expenseFilter_source');
+        localStorage.removeItem('expenseFilter_branch');
         localStorage.removeItem('expenseFilter_date');
         localStorage.removeItem('expenseFilter_startDate');
         localStorage.removeItem('expenseFilter_endDate');
@@ -1577,32 +1491,53 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
             <div>
 
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
-                    <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate
+                    <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || startDate || endDate || selectedEno
                         ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-                            <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
+                            <button
+                                className='pl-2'
+                                onClick={() => {
+                                    const willOpen = !showFilters;
+                                    setShowFilters(willOpen);
+                                    if (!willOpen) return;
+                                    const scroller = scrollRef.current;
+                                    if (!scroller) return;
+                                    if (scroller.scrollTop <= 0) return;
+                                    requestAnimationFrame(() => {
+                                        const h = filterRowRef.current?.offsetHeight || 0;
+                                        if (h > 0) scroller.scrollTop = scroller.scrollTop + h;
+                                    });
+                                }}
+                            >
                                 <img
                                     src={Filter}
                                     alt="Toggle Filter"
                                     className="w-7 h-7 border border-[#BF9853] rounded-md"
                                 />
                             </button>
-                            {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate) && (
+                            {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || startDate || endDate || selectedEno) && (
                                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
-                                    {startDate && (
+                                    {startDate && endDate ? (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Start Date: </span>
-                                            <span className="font-bold">{startDate}</span>
+                                            <span className="font-normal">Start date: </span>
+                                            <span className="font-bold">{startDate.split('-').reverse().join('-')}</span>
+                                            <span className="font-normal">, End date: </span>
+                                            <span className="font-bold">{endDate.split('-').reverse().join('-')}</span>
+                                            <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    ) : startDate ? (
+                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
+                                            <span className="font-normal">Start date: </span>
+                                            <span className="font-bold">{startDate.split('-').reverse().join('-')}</span>
                                             <button onClick={() => setStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
-                                    )}
-                                    {endDate && (
+                                    ) : endDate ? (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">End Date: </span>
-                                            <span className="font-bold">{endDate}</span>
+                                            <span className="font-normal">End date: </span>
+                                            <span className="font-bold">{endDate.split('-').reverse().join('-')}</span>
                                             <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
-                                    )}
+                                    ) : null}
                                     {selectedSiteName && (
                                         <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
                                             <span className="font-normal">Site Name: </span>
@@ -1645,6 +1580,27 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             <button onClick={() => setSelectedMachineTools('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
+                                    {selectedSource && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">Source From: </span>
+                                            <span className="font-bold">{selectedSource}</span>
+                                            <button onClick={() => setSelectedSource('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
+                                    {selectedBranch && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">Branch: </span>
+                                            <span className="font-bold">{getBranchName(selectedBranch) || selectedBranch}</span>
+                                            <button onClick={() => setSelectedBranch('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
+                                    {selectedEno && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">E.No: </span>
+                                            <span className="font-bold">{selectedEno}</span>
+                                            <button onClick={() => setSelectedEno('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                                        </span>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1666,7 +1622,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                             className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-fixed min-w-[1765px] w-full border-collapse">
+                            <table className="table-fixed min-w-[1885px] w-full border-collapse">
                                 <thead className="sticky top-0 z-20 bg-white ">
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
@@ -1681,11 +1637,15 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">
-                                            Staff
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
+                                            Staff {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
+                                            Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('amount')}>
+                                            Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
                                             Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -1698,23 +1658,47 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left">Source From</th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Branch</th>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
+                                            Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
+                                            Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
+                                            Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[60px] font-bold text-left">Edit</th>
                                         <th className="px-0.5 w-[50px] font-bold text-left">File</th>
                                     </tr>
                                     {showFilters && (
-                                        <tr className="bg-[#FAF6ED]">
-                                            <th className=" py-3">
-                                                <DateRangePicker
-                                                    startDate={startDate}
-                                                    endDate={endDate}
-                                                    onStartDateChange={setStartDate}
-                                                    onEndDateChange={setEndDate}
-                                                />
+                                        <tr ref={filterRowRef} className="bg-[#FAF6ED]">
+                                            <th className="py-3">
+                                                <div className="relative [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDateRangePicker(true)}
+                                                        className="w-full min-w-[140px] h-[45px] px-2 py-0 text-sm font-semibold bg-white text-left flex items-center gap-1"
+                                                    >
+                                                        <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${startDate && endDate ? 'text-black font-normal' : 'text-[#d3d5db] font-bold'}`}>
+                                                            {startDate ? (endDate ? `${startDate} – ${endDate}` : `From ${startDate}`) : 'Date'}
+                                                        </span>
+                                                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                                    </button>
+                                                    <DateRangePicker
+                                                        isOpen={showDateRangePicker}
+                                                        onClose={() => setShowDateRangePicker(false)}
+                                                        startDate={startDate}
+                                                        endDate={endDate}
+                                                        variant="dropdown"
+                                                        onApply={(from, to) => {
+                                                            setStartDate(from);
+                                                            setEndDate(to);
+                                                        }}
+                                                    />
+                                                </div>
                                             </th>
                                             <th className=" py-3">
                                                 <Select
@@ -1722,7 +1706,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     options={siteOptions}
                                                     value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
                                                     onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Search Site..."
+                                                    placeholder="Project Name"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1733,7 +1717,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     options={vendorOptions}
                                                     value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
                                                     onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Search Vendor"
+                                                    placeholder="Vendor"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1744,7 +1728,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     options={contractorOptions}
                                                     value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
                                                     onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Search Contractor"
+                                                    placeholder="Contractor"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1761,7 +1745,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     options={categoryOptions}
                                                     value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
                                                     onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Category..."
+                                                    placeholder="Category"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1783,15 +1767,45 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     options={machineToolsOptions}
                                                     value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Machine..."
+                                                    placeholder="MachineTools"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
                                             </th>
-                                            <th></th>
-                                            <th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={sourceOptions}
+                                                    value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
+                                                    onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="Source From"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
                                             </th>
-                                            <th></th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={branchFilterOptions}
+                                                    value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
+                                                    onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="Branch"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
+                                            </th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={enoOptions.map((eno) => ({ value: String(eno), label: String(eno) }))}
+                                                    value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
+                                                    onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="E.No"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
+                                            </th>
+                                            <th className="py-3" aria-label="Bill Arrival filter" />
                                             <th></th>
                                             <th></th>
                                         </tr>
@@ -1816,6 +1830,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left ">{expense.source}</td>
                                             <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
                                             <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
+                                            <td className="text-sm text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense.billArrivalDate)}</td>
                                             <td className=" py-1.5">
                                                 {userPermissions.includes("Edit") && (
                                                     <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
@@ -1920,36 +1935,87 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                             className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
                             overlayClassName="fixed inset-0 z-[9999]">
                             <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-                                <h2 className="text-xl font-bold mb-6 border-b-2">Edit Expense</h2>
+                                <h2 className="text-xl font-normal mb-6 border-b-2">Edit Expense</h2>
                                 <form className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Date</label>
-                                        <input
-                                            type="date"
-                                            name="date"
-                                            value={formData.date}
-                                            onChange={handleChange}
-                                            required
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                        <label className="block text-gray-500 font-normal text-left">Date</label>
+                                        <div className="mt-1">
+                                            <CustomDateField
+                                                value={formData.date}
+                                                onChange={(v) => {
+                                                    if (!v) return;
+                                                    setFormData((prev) => ({ ...prev, date: v }));
+                                                }}
+                                                placeholder="Select date"
+                                                alwaysOpenBelow
+                                                className="[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-normal"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-500 font-normal text-left">Account Type *</label>
+                                        <Select
+                                            name="accountType"
+                                            value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
+                                            onChange={(selectedOption) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    accountType: selectedOption?.value || '',
+                                                })
+                                            }
+                                            options={editAccountTypeOptions}
+                                            placeholder="Select"
+                                            isClearable
+                                            styles={{
+                                                control: (base, state) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                    borderWidth: '2px',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    color: '#6B7280',
+                                                    textAlign: 'left',
+                                                }),
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    textAlign: 'left',
+                                                    fontWeight: 'normal',
+                                                    fontSize: '15px',
+                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                    color: 'black',
+                                                }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                    fontWeight: 'normal',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
+                                            }}
+                                            menuPlacement="bottom"
+                                            menuPosition="absolute"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Account Type *</label>
-                                        <select
-                                            name="accountType"
-                                            value={formData.accountType}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
-                                            <option value="" disabled>--- Select ---</option>
-                                            {editAccountTypeOptions.map((option) => (
-                                                <option key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Site Name *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Site Name *</label>
                                         <Select
                                             name="siteName"
                                             value={siteOption.find(option => option.value === formData.siteName)}
@@ -1961,14 +2027,26 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 })
                                             }
                                             options={siteOption}
-                                            placeholder="--- Select Site ---"
+                                            placeholder="Select Site"
+                                            isClearable
                                             styles={{
-                                                control: (base) => ({
+                                                control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
                                                     padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    color: '#6B7280',
                                                     textAlign: 'left',
                                                 }),
                                                 option: (provided, state) => ({
@@ -1979,13 +2057,28 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                     color: 'black',
                                                 }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                    fontWeight: 'normal',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
                                             menuPlacement="bottom"
                                             menuPosition="absolute"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Vendor Name *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Vendor Name *</label>
                                         <Select
                                             name="vendor"
                                             options={vendorOption}
@@ -2004,6 +2097,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             styles={{
                                                 control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
@@ -2016,6 +2110,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 }),
                                                 placeholder: (base) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     color: '#6B7280',
                                                     textAlign: 'left',
                                                 }),
@@ -2030,17 +2125,24 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 singleValue: (base) => ({
                                                     ...base,
                                                     color: '#111827',
+                                                    fontWeight: 'normal',
                                                 }),
                                                 menu: (base) => ({
                                                     ...base,
                                                     zIndex: 999,
                                                 }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
-                                            placeholder="--- Select Vendor ---"
+                                            placeholder="Select Vendor"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Contractor Name *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Contractor Name *</label>
                                         <Select
                                             name="contractor"
                                             options={contractorOption}
@@ -2059,6 +2161,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             styles={{
                                                 control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
@@ -2071,6 +2174,7 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 }),
                                                 placeholder: (base) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     color: '#6B7280',
                                                     textAlign: 'left',
 
@@ -2086,27 +2190,34 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 singleValue: (base) => ({
                                                     ...base,
                                                     color: '#111827',
+                                                    fontWeight: 'normal',
                                                 }),
                                                 menu: (base) => ({
                                                     ...base,
                                                     zIndex: 999,
                                                 }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
-                                            placeholder="--- Select Contractor ---"
+                                            placeholder="Select Contractor"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Quantity *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Quantity *</label>
                                         <input
                                             type="text"
                                             name="quantity"
                                             value={formData.quantity}
                                             onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Category *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Category *</label>
                                         <Select
                                             name="category"
                                             value={categoryOption.find(option => option.value === formData.category)}
@@ -2114,14 +2225,26 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 setFormData({ ...formData, category: selectedOption?.value || '' })
                                             }
                                             options={categoryOption}
-                                            placeholder="--- Select Category ---"
+                                            placeholder="Select Category"
+                                            isClearable
                                             styles={{
-                                                control: (base) => ({
+                                                control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
                                                     padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    color: '#6B7280',
                                                     textAlign: 'left',
                                                 }),
                                                 option: (provided, state) => ({
@@ -2132,36 +2255,51 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                     backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                     color: 'black',
                                                 }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                    fontWeight: 'normal',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
                                             menuPlacement="bottom"
                                             menuPosition="absolute"
                                         />
                                     </div>
                                     <div className="relative">
-                                        <label className="block text-gray-500 font-semibold text-left">Amount *</label>
-                                        <span className="absolute top-9 left-3 mt-[2px] text-gray-600">₹</span>
+                                        <label className="block text-gray-500 font-normal text-left">Amount *</label>
+                                        <span className="absolute top-9 left-3 mt-[2px] text-gray-600 font-normal">₹</span>
                                         <input
                                             type="text"
                                             name="amount"
                                             value={formData.amount}
                                             onChange={handleChange}
-                                            className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                             onWheel={(e) => e.target.blur()}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Comments *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Comments *</label>
                                         <input
                                             type="text"
                                             name="comments"
                                             value={formData.comments}
                                             onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                         />
                                     </div>
                                     <div>
                                         <div className=' flex'>
-                                            <label className="block text-gray-500 font-semibold text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
+                                            <label className="block text-gray-500 font-normal text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
                                             {selectedFile && <span className="text-orange-600 ml-4">{selectedFile.name}</span>}
                                         </div>
                                         <input
@@ -2169,45 +2307,168 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                             name="billCopy"
                                             value={formData.billCopy}
                                             onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                         />
                                         <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
                                     </div>
+                                    {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Bill Arrival Date</label>
+                                            <input
+                                                type="date"
+                                                name="billArrivalDate"
+                                                value={formData.billArrivalDate || ''}
+                                                onChange={handleChange}
+                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                            />
+                                        </div>
+                                    )}
                                     {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills' || formData.accountType === 'Weekly Payment') && (
                                         <div>
-                                            <label className="block text-gray-500 font-semibold text-left">Payment Mode *</label>
-                                            <select
+                                            <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
+                                            <Select
                                                 name="paymentMode"
-                                                value={formData.paymentMode}
-                                                onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
-                                                <option value="">Select Payment Mode</option>
-                                                <option value="GPay">GPay</option>
-                                                <option value="PhonePe">PhonePe</option>
-                                                <option value="Net Banking">Net Banking</option>
-                                                <option value="Cheque">Cheque</option>
-                                            </select>
+                                                options={finalPaymentModeOptions.map((mode) => ({
+                                                    value: mode.modeOfPayment,
+                                                    label: mode.modeOfPayment,
+                                                }))}
+                                                value={
+                                                    finalPaymentModeOptions
+                                                        .map((mode) => ({
+                                                            value: mode.modeOfPayment,
+                                                            label: mode.modeOfPayment,
+                                                        }))
+                                                        .find((o) => o.value === formData.paymentMode) || null
+                                                }
+                                                onChange={(selectedOption) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        paymentMode: selectedOption?.value || '',
+                                                    })
+                                                }
+                                                placeholder="Select Payment Mode"
+                                                isClearable
+                                                maxMenuHeight={200}
+                                                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.25rem',
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 'normal',
+                                                    }),
+                                                    menuPortal: (base) => ({
+                                                        ...base,
+                                                        zIndex: 10001,
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                menuPlacement="bottom"
+                                                menuPosition="fixed"
+                                            />
                                         </div>
                                     )}
                                     {formData.accountType === 'Utility Bills' && (
                                         <>
                                             <div>
-                                                <label className="block text-gray-500 font-semibold text-left">Utility Type *</label>
-                                                <select
+                                                <label className="block text-gray-500 font-normal text-left">Utility Type *</label>
+                                                <Select
                                                     name="utilityType"
-                                                    value={formData.utilityType}
-                                                    onChange={handleChange}
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
-                                                    <option value="" disabled>--- Select ---</option>
-                                                    <option value="Electricity">Electricity</option>
-                                                    <option value="Property">Property</option>
-                                                    <option value="Water">Water</option>
-                                                    <option value="Telecom">Telecom</option>
-                                                    <option value="Subscription">Subscription</option>
-                                                </select>
+                                                    options={EDIT_POPUP_UTILITY_TYPE_OPTIONS}
+                                                    value={EDIT_POPUP_UTILITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityType) || null}
+                                                    onChange={(selectedOption) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            utilityType: selectedOption?.value || '',
+                                                        })
+                                                    }
+                                                    placeholder="--- Select ---"
+                                                    isClearable
+                                                    styles={{
+                                                        control: (base, state) => ({
+                                                            ...base,
+                                                            fontWeight: 'normal',
+                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                            borderWidth: '2px',
+                                                            borderRadius: '0.5rem',
+                                                            padding: '0.25rem',
+                                                            textAlign: 'left',
+                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                            '&:hover': {
+                                                                borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                            },
+                                                        }),
+                                                        placeholder: (base) => ({
+                                                            ...base,
+                                                            fontWeight: 'normal',
+                                                            color: '#6B7280',
+                                                            textAlign: 'left',
+                                                        }),
+                                                        option: (provided, state) => ({
+                                                            ...provided,
+                                                            textAlign: 'left',
+                                                            fontWeight: 'normal',
+                                                            fontSize: '15px',
+                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                            color: 'black',
+                                                        }),
+                                                        singleValue: (base) => ({
+                                                            ...base,
+                                                            color: '#111827',
+                                                            fontWeight: 'normal',
+                                                        }),
+                                                        menu: (base) => ({
+                                                            ...base,
+                                                            zIndex: 999,
+                                                        }),
+                                                        menuList: (base) => ({
+                                                            ...base,
+                                                            scrollbarWidth: 'none',
+                                                            msOverflowStyle: 'none',
+                                                            '&::-webkit-scrollbar': { display: 'none' },
+                                                        }),
+                                                    }}
+                                                    menuPlacement="bottom"
+                                                    menuPosition="absolute"
+                                                />
                                             </div>
                                             <div>
-                                                <label className="block text-gray-500 font-semibold text-left">
+                                                <label className="block text-gray-500 font-normal text-left">
                                                     {formData.utilityType === 'Electricity' ? 'EB Number' :
                                                         formData.utilityType === 'Property' ? 'Property Tax Number' :
                                                             formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
@@ -2224,37 +2485,31 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                         formData.utilityType === 'Property' ? 'Property Tax Number' :
                                                             formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
                                                     styles={{
-                                                        control: (base) => ({
-                                                            ...base,
-                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                            borderWidth: '2px',
-                                                            borderRadius: '0.5rem',
-                                                            padding: '0.25rem',
-                                                            textAlign: 'left',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...provided,
-                                                            textAlign: 'left',
+                                                        ...customStyles,
+                                                        singleValue: (provided) => ({
+                                                            ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
                                                             fontWeight: 'normal',
-                                                            fontSize: '15px',
-                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                            color: 'black',
                                                         }),
-                                                        menu: (base) => ({ ...base, zIndex: 9999 }),
+                                                        menuList: (base) => ({
+                                                            ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
+                                                            scrollbarWidth: 'none',
+                                                            msOverflowStyle: 'none',
+                                                            '&::-webkit-scrollbar': { display: 'none' },
+                                                        }),
                                                     }}
                                                     menuPlacement="bottom"
                                                     menuPosition="absolute"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-gray-500 font-semibold text-left">Months</label>
+                                                <label className="block text-gray-500 font-normal text-left">Months</label>
                                                 <input
                                                     type="month"
                                                     name="utilityForTheMonth"
                                                     value={formData.utilityForTheMonth}
                                                     onChange={handleChange}
                                                     placeholder="Enter months..."
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                                 />
                                             </div>
                                             {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
@@ -2262,44 +2517,93 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
 
                                                     {/* Validity */}
                                                     <div>
-                                                        <label className="block text-gray-500 font-semibold text-left">Validity</label>
+                                                        <label className="block text-gray-500 font-normal text-left">Validity</label>
                                                         <input
                                                             type="text"
                                                             name="utilityValidityDays"
                                                             value={formData.utilityValidityDays}
                                                             onChange={handleChange}
                                                             placeholder="Enter validity..."
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                                         />
                                                     </div>
 
                                                     {/* Validity Type */}
                                                     <div>
-                                                        <label className="block text-gray-500 font-semibold text-left">Validity Type</label>
-                                                        <select
+                                                        <label className="block text-gray-500 font-normal text-left">Validity Type</label>
+                                                        <Select
                                                             name="utilityValidityType"
-                                                            value={formData.utilityValidityType}
-                                                            onChange={handleChange}
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                                        >
-                                                            <option value="">--- Select ---</option>
-                                                            <option value="Days">Days</option>
-                                                            <option value="Month">Month</option>
-                                                            <option value="Year">Year</option>
-                                                        </select>
+                                                            options={EDIT_POPUP_VALIDITY_TYPE_OPTIONS}
+                                                            value={EDIT_POPUP_VALIDITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityValidityType) || null}
+                                                            onChange={(selectedOption) =>
+                                                                setFormData({
+                                                                    ...formData,
+                                                                    utilityValidityType: selectedOption?.value || '',
+                                                                })
+                                                            }
+                                                            placeholder="--- Select ---"
+                                                            isClearable
+                                                            styles={{
+                                                                control: (base, state) => ({
+                                                                    ...base,
+                                                                    fontWeight: 'normal',
+                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                    borderWidth: '2px',
+                                                                    borderRadius: '0.5rem',
+                                                                    padding: '0.25rem',
+                                                                    textAlign: 'left',
+                                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                    '&:hover': {
+                                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                    },
+                                                                }),
+                                                                placeholder: (base) => ({
+                                                                    ...base,
+                                                                    fontWeight: 'normal',
+                                                                    color: '#6B7280',
+                                                                    textAlign: 'left',
+                                                                }),
+                                                                option: (provided, state) => ({
+                                                                    ...provided,
+                                                                    textAlign: 'left',
+                                                                    fontWeight: 'normal',
+                                                                    fontSize: '15px',
+                                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                    color: 'black',
+                                                                }),
+                                                                singleValue: (base) => ({
+                                                                    ...base,
+                                                                    color: '#111827',
+                                                                    fontWeight: 'normal',
+                                                                }),
+                                                                menu: (base) => ({
+                                                                    ...base,
+                                                                    zIndex: 999,
+                                                                }),
+                                                                menuList: (base) => ({
+                                                                    ...base,
+                                                                    scrollbarWidth: 'none',
+                                                                    msOverflowStyle: 'none',
+                                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                                }),
+                                                            }}
+                                                            menuPlacement="bottom"
+                                                            menuPosition="absolute"
+                                                        />
                                                     </div>
 
                                                     {/* Service Start Date */}
                                                     {formData.utilityType === 'Telecom' && (
                                                         <div>
-                                                            <label className="block text-gray-500 font-semibold text-left">Service Start Date</label>
-                                                            <input
-                                                                type="date"
-                                                                name="serviceStartingDate"
-                                                                value={formData.serviceStartingDate}
-                                                                onChange={handleChange}
-                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                                            />
+                                                            <label className="block text-gray-500 font-normal text-left">Service Start Date</label>
+                                                            <div className="mt-1">
+                                                                <CustomDateField
+                                                                    value={formData.serviceStartingDate}
+                                                                    onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
+                                                                    placeholder="Service start date"
+                                                                    className="[&>button]:!font-normal"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     )}
 
@@ -2329,11 +2633,11 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                 <div className="grid grid-cols-3 gap-4">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                        <input
-                                                            type="date"
+                                                        <CustomDateField
                                                             value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                            readOnly
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full bg-gray-100"
+                                                            onChange={() => { }}
+                                                            disabled
+                                                            placeholder="Date"
                                                         />
                                                     </div>
                                                     <div>
@@ -2373,11 +2677,10 @@ const TableViewExpense = ({ username, userRoles = [] }) => {
                                                                 </div>
                                                                 <div>
                                                                     <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
-                                                                    <input
-                                                                        type="date"
+                                                                    <CustomDateField
                                                                         value={paymentModalData.chequeDate}
-                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                        onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
+                                                                        placeholder="Cheque date"
                                                                     />
                                                                 </div>
                                                             </div>

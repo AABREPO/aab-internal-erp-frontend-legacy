@@ -265,21 +265,24 @@ const PurchaseOrder = ({ username, userRoles = [] }) => {
             return 1;
         }
         try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/purchase_orders/getAll');
+            // Backend-supported optimized endpoint:
+            // GET /api/purchase_orders/countByVendor?vendorId=123  -> returns total count (Long)
+            // Next eno should be count + 1.
+            const response = await fetch(
+                `https://backendaab.in/demoAabuildersDash/api/purchase_orders/countByVendor?vendorId=${encodeURIComponent(String(vendorId))}`,
+                {
+                    method: "GET",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                }
+            );
             if (!response.ok) {
                 throw new Error('Failed to fetch purchase orders');
             }
-            const data = await response.json();
-            const normalizedVendorId = String(vendorId);
-            const vendorOrders = data.filter(order => String(order.vendor_id ?? order.vendorId) === normalizedVendorId);
-            if (!vendorOrders.length) {
-                return 1;
-            }
-            const latestEno = vendorOrders.reduce((maxValue, order) => {
-                const currentEno = getNumericEno(order);
-                return currentEno > maxValue ? currentEno : maxValue;
-            }, 0);
-            return latestEno + 1;
+            const raw = await response.text();
+            const count = Number(String(raw || '').trim());
+            if (!Number.isFinite(count) || count < 0) return 1;
+            return count + 1;
         } catch (error) {
             console.error('Failed to fetch last PO number:', error);
             return 1;

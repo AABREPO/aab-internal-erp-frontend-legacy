@@ -1,63 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PendingBill from './PendingBill';
 import BillDatabase from './BillDatabase';
 import BillStatement from './BillStatement';
 import MobileBillPaymentsTracker from '../../componentsMobile/BillPaymentsTracker/BillPaymentsTracker';
 import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
 
+const BILL_PAYMENTS_TAB_STORAGE_KEY = 'billPaymentsTrackerActiveTab';
+
+const isValidBillPaymentsTab = (tab, canAccessDatabase) => {
+    if (!tab || typeof tab !== 'string') return false;
+    if (tab === 'pendingbill' || tab === 'billstatement') return true;
+    if (tab === 'billdatabase') return !!canAccessDatabase;
+    return false;
+};
+
 const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
+    const canAccessDatabase = username === 'Mahalingam M' || username === 'Admin';
     const [activeTab, setActiveTab] = useState(() => {
-        const savedTab = localStorage.getItem('activePaintTab');
-        if (savedTab === 'billdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
-            return 'pendingbill';
+        let tab = localStorage.getItem(BILL_PAYMENTS_TAB_STORAGE_KEY);
+        if (!isValidBillPaymentsTab(tab, canAccessDatabase)) {
+            const legacy = localStorage.getItem('activePaintTab');
+            if (isValidBillPaymentsTab(legacy, canAccessDatabase)) {
+                tab = legacy;
+            } else {
+                tab = 'pendingbill';
+            }
         }
-        return savedTab || 'pendingbill';
+        return tab;
     });
     useEffect(() => {
-        if (activeTab === 'billdatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+        if (activeTab === 'billdatabase' && !canAccessDatabase) {
             setActiveTab('pendingbill');
         } else {
-            localStorage.setItem('activePaintTab', activeTab);
+            localStorage.setItem(BILL_PAYMENTS_TAB_STORAGE_KEY, activeTab);
         }
-    }, [activeTab, username]);
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'pendingbill':
-                return <PendingBill username={username} userRoles={userRoles} />;
-            case 'billdatabase':
-                return <BillDatabase username={username} userRoles={userRoles} />;
-            case 'billstatement':
-                return <BillStatement username={username} userRoles={userRoles} />;
-            default:
-                return <PendingBill username={username} userRoles={userRoles}/>;
-        }
-    };
+    }, [activeTab, username, canAccessDatabase]);
+    const statementEverOpenedRef = useRef(activeTab === 'billstatement');
+    const [statementMounted, setStatementMounted] = useState(() => activeTab === 'billstatement');
+    useEffect(() => {
+        if (activeTab !== 'billstatement') return;
+        if (statementEverOpenedRef.current) return;
+        statementEverOpenedRef.current = true;
+        setStatementMounted(true);
+    }, [activeTab]);
     return (
         <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
             <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'pendingbill' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('pendingbill')}
-                >
+                <h2 className={`link ${activeTab === 'pendingbill' ? 'active' : ''}`} onClick={() => setActiveTab('pendingbill')}>
                     Pending Bill
                 </h2>
-                {(username === 'Mahalingam M' || username === 'Admin') && (
-                    <h2
-                        className={`link ${activeTab === 'billdatabase' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('billdatabase')}
-                    >
+                {canAccessDatabase && (
+                    <h2 className={`link ${activeTab === 'billdatabase' ? 'active' : ''}`} onClick={() => setActiveTab('billdatabase')} >
                         Database
                     </h2>
                 )}
-                <h2
-                    className={`link ${activeTab === 'billstatement' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('billstatement')}
-                >
+                <h2 className={`link ${activeTab === 'billstatement' ? 'active' : ''}`} onClick={() => setActiveTab('billstatement')} >
                     Statement
                 </h2>
             </div>
             <div className="content">
-                {renderContent()}
+                <div className={activeTab === 'pendingbill' ? 'block' : 'hidden'}>
+                    <PendingBill
+                        username={username}
+                        userRoles={userRoles}
+                        billPaymentsTabActive={activeTab === 'pendingbill'}
+                    />
+                </div>
+                {canAccessDatabase && (
+                    <div className={activeTab === 'billdatabase' ? 'block' : 'hidden'}>
+                        <BillDatabase
+                            username={username}
+                            userRoles={userRoles}
+                            billPaymentsTabActive={activeTab === 'billdatabase'}
+                        />
+                    </div>
+                )}
+                {statementMounted && (
+                    <div className={activeTab === 'billstatement' ? 'block' : 'hidden'}>
+                        <BillStatement
+                            username={username}
+                            userRoles={userRoles}
+                            billPaymentsTabActive={activeTab === 'billstatement'}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     )

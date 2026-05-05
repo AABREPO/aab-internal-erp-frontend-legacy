@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
@@ -22,7 +22,7 @@ const getCurrentWeekYear = () => {
   return thursday.getFullYear();
 };
 
-const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
   const resolveActiveBranchId = useCallback(() => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -58,6 +58,10 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   const [contractorOptions, setContractorOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
   const [advanceData, setAdvanceData] = useState([]);
+  /** Master projects (`/api/projects`) — siteEngineerId keyed by project id / site no (same as MasterData). */
+  const [projectsFullList, setProjectsFullList] = useState([]);
+  /** Employee master — resolve siteEngineerId → display name (same API as MasterData). */
+  const [employeeDetailsList, setEmployeeDetailsList] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -71,6 +75,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [pdfExportModalOpen, setPdfExportModalOpen] = useState(false);
 
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
@@ -342,24 +347,91 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     };
   }, [resolveActiveBranchId]);
 
+  const fetchAdvanceData = useCallback(async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      setProgress(85);
+      const res = await fetch(buildBranchUrl("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll"));
+      const data = await res.json();
+      setAdvanceData(Array.isArray(data) ? data : []);
+      setProgress(100);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching advance data", err);
+      setError("Failed to load advance data");
+      setLoading(false);
+    }
+  }, [buildBranchUrl]);
+
   // Fetch Advance Data
   useEffect(() => {
-    const fetchData = async () => {
+    fetchAdvanceData();
+  }, [fetchAdvanceData]);
+
+  useEffect(() => {
+    if (refreshSignal === undefined) return;
+    fetchAdvanceData();
+  }, [refreshSignal, fetchAdvanceData]);
+
+  useEffect(() => {
+    const loadProjectAndEmployeeMasters = async () => {
       try {
-        setProgress(85);
-        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
-        const data = await res.json();
-        setAdvanceData(data);
-        setProgress(100);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching advance data", err);
-        setError("Failed to load advance data");
-        setLoading(false);
+        const [projRes, empRes] = await Promise.all([
+          fetch("https://backendaab.in/demoAabuilderDash/api/projects/getAll", {
+            method: "GET",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+          }),
+          fetch("https://backendaab.in/demoAabuildersDash/api/employee_details/getAll", {
+            method: "GET",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+          }),
+        ]);
+        if (projRes.ok) {
+          const d = await projRes.json();
+          setProjectsFullList(Array.isArray(d) ? d : []);
+        }
+        if (empRes.ok) {
+          const d = await empRes.json();
+          setEmployeeDetailsList(Array.isArray(d) ? d : []);
+        }
+      } catch (e) {
+        console.error("AdvanceReport: failed to load projects/employees for site engineer", e);
       }
     };
-    fetchData();
+    loadProjectAndEmployeeMasters();
   }, []);
+
+  const employeeIdToName = useMemo(() => {
+    const m = new Map();
+    (employeeDetailsList || []).forEach((emp) => {
+      const id = emp.id ?? emp.employee_id ?? emp.employeeId;
+      if (id == null || id === "") return;
+      const name =
+        emp.employee_name ??
+        emp.employeeName ??
+        emp.name ??
+        "";
+      m.set(String(id), String(name || `ID ${id}`));
+    });
+    return m;
+  }, [employeeDetailsList]);
+
+  const siteEngineerIdByProjectKeys = useMemo(() => {
+    const byProjectPk = new Map();
+    const bySiteNo = new Map();
+    (projectsFullList || []).forEach((p) => {
+      const seRaw = p.siteEngineerId ?? p.site_engineer_id ?? p.siteEngineer?.id;
+      if (seRaw == null || seRaw === "") return;
+      const seStr = String(seRaw).trim();
+      if (p.id != null && p.id !== "") byProjectPk.set(String(p.id), seStr);
+      const pid = p.projectId ?? p.project_id;
+      if (pid != null && String(pid).trim() !== "") bySiteNo.set(String(pid).trim(), seStr);
+    });
+    return { byProjectPk, bySiteNo };
+  }, [projectsFullList]);
 
   // ISO 8601 week number calculation
   // Week belongs to the year that contains the Thursday of that week
@@ -571,13 +643,63 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       setCurrentPage(currentPage - 1);
     }
   };
-  const handleExportPDF = () => {
+  const openPdfExportModal = () => {
     if (!filteredData.length) {
       alert("No data to export");
       return;
     }
+    setPdfExportModalOpen(true);
+  };
+
+  const getSiteEngineerForPdfRow = useCallback(
+    (row) => {
+      const direct =
+        row?.site_engineer ??
+        row?.siteEngineer ??
+        row?.engineer_name ??
+        row?.site_engineer_name ??
+        row?.project_engineer ??
+        "";
+      const directStr = String(direct ?? "").trim();
+      if (directStr) return directStr;
+
+      const rowSeId = row?.site_engineer_id ?? row?.siteEngineerId;
+      if (rowSeId != null && String(rowSeId).trim() !== "") {
+        const idStr = String(rowSeId).trim();
+        const fromEmp = employeeIdToName.get(idStr);
+        return fromEmp || idStr;
+      }
+
+      const site = siteOptions.find((s) => String(s.id) === String(row.project_id));
+      const siteNo = site?.sNo != null ? String(site.sNo).trim() : "";
+      let seId =
+        (siteNo && siteEngineerIdByProjectKeys.bySiteNo.get(siteNo)) ||
+        siteEngineerIdByProjectKeys.byProjectPk.get(String(row.project_id));
+
+      if (!seId && site?.label) {
+        const proj = (projectsFullList || []).find(
+          (p) => String(p.projectName || "").trim() === String(site.label || "").trim()
+        );
+        const fromProj = proj?.siteEngineerId ?? proj?.site_engineer_id ?? proj?.siteEngineer?.id;
+        if (fromProj != null && String(fromProj).trim() !== "") seId = String(fromProj).trim();
+      }
+
+      if (!seId) return "";
+      const name = employeeIdToName.get(String(seId));
+      return name || String(seId);
+    },
+    [siteOptions, employeeIdToName, siteEngineerIdByProjectKeys, projectsFullList]
+  );
+
+  const generateAdvanceReportPdf = (copyType) => {
+    setPdfExportModalOpen(false);
+    if (!filteredData.length) {
+      alert("No data to export");
+      return;
+    }
+    const isAccounts = copyType === "accounts";
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-    const columns = [
+    const columnsAccounts = [
       { header: "S.No", dataKey: "sno" },
       { header: "Date", dataKey: "date" },
       { header: "Contractor/Vendor", dataKey: "cv" },
@@ -591,6 +713,20 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       { header: "Description", dataKey: "description" },
       { header: "Attached file", dataKey: "file" },
     ];
+    const columnsSignature = [
+      { header: "S.No", dataKey: "sno" },
+      { header: "Date", dataKey: "date" },
+      { header: "Contractor/Vendor", dataKey: "cv" },
+      { header: "Project Name", dataKey: "project" },
+      { header: "Advance", dataKey: "advance" },
+      { header: "Bill Amount", dataKey: "bill" },
+      { header: "Refund Amount", dataKey: "refund" },
+      { header: "Transfer", dataKey: "transfer" },
+      { header: "Mode", dataKey: "mode" },
+      { header: "Site Engineer", dataKey: "siteEngineer" },
+      { header: "Sign", dataKey: "sign" },
+    ];
+    const columns = isAccounts ? columnsAccounts : columnsSignature;
     const normStr = v => (v ?? "").toString().trim().toLowerCase();
     function dateKey(val) {
       if (!val) return -Infinity;
@@ -612,9 +748,18 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     const totalAdvanceCash = sortedData
       .filter(row => normStr(row.type) === "advance" && normStr(row.payment_mode) === "cash")
       .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+    const reportStartTs = filteredData.length
+      ? Math.min(...filteredData.map((r) => new Date(r.date).getTime()))
+      : null;
+    const reportStartDate =
+      reportStartTs != null && Number.isFinite(reportStartTs) ? new Date(reportStartTs) : null;
+    const pdfMainWeekDisplay =
+      reportStartDate && !Number.isNaN(reportStartDate.getTime())
+        ? `${String(getISOWeekNumber(reportStartDate)).padStart(2, "0")} (${getWeekYear(reportStartDate)})`
+        : "-";
     const rows = sortedData.map((row, index) => {
       const d = new Date(dateKey(row.date));
-      return {
+      const base = {
         sno: index + 1,
         date: isNaN(d) ? "" : d.toLocaleDateString("en-GB"),
         cv:
@@ -625,16 +770,28 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         bill: row.bill_amount?.toLocaleString("en-IN") || "0",
         refund: row.refund_amount?.toLocaleString("en-IN") || "0",
         transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
-        type: row.type || "",
         mode: row.payment_mode || "",
-        description: row.description || "",
-        file: row.file_url ? "Yes" : "-",
+      };
+      if (isAccounts) {
+        return {
+          ...base,
+          type: row.type || "",
+          description: row.description || "",
+          file: row.file_url ? "Yes" : "-",
+        };
+      }
+      return {
+        ...base,
+        siteEngineer: getSiteEngineerForPdfRow(row),
+        sign: "",
       };
     });
     doc.autoTable({
       startY: 20,
       body: [
         [
+          { content: "Week", styles: { fontStyle: 'bold' } },
+          pdfMainWeekDisplay,
           { content: "Start Date", styles: { fontStyle: 'bold' } },
           fromDate,
           { content: "End Date", styles: { fontStyle: 'bold' } },
@@ -652,12 +809,14 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         lineWidth: 0.5,
       },
       columnStyles: {
-        0: { cellWidth: 110 },
-        1: { cellWidth: 140 },
-        2: { cellWidth: 110 },
-        3: { cellWidth: 140 },
-        4: { cellWidth: 140 },
-        5: { cellWidth: 103 },
+        0: { cellWidth: 40 },
+        1: { cellWidth: 90 },
+        2: { cellWidth: 88 },
+        3: { cellWidth: 106 },
+        4: { cellWidth: 88 },
+        5: { cellWidth: 106 },
+        6: { cellWidth: 120 },
+        7: { cellWidth: 104 },
       }
     });
     doc.autoTable({
@@ -671,7 +830,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         lineWidth: 0.5,
         lineColor: [0, 0, 0],
         fillColor: null,
-        minCellHeight: 20
+        minCellHeight: isAccounts ? 20 : 24
       },
       headStyles: {
         fillColor: null,
@@ -681,20 +840,34 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         lineColor: [0, 0, 0]
       },
       alternateRowStyles: { fillColor: null },
-      columnStyles: {
-        sno: { cellWidth: 28 },
-        date: { cellWidth: 50 },
-        cv: { cellWidth: 90 },
-        project: { cellWidth: 115 },
-        advance: { cellWidth: 45, halign: 'right' },
-        bill: { cellWidth: 40, halign: 'right' },
-        refund: { cellWidth: 40, halign: 'right' },
-        transfer: { cellWidth: 115 },
-        type: { cellWidth: 60 },
-        mode: { cellWidth: 50 },
-        description: { cellWidth: 75 },
-        file: { cellWidth: 35 },
-      }
+      columnStyles: isAccounts
+        ? {
+            sno: { cellWidth: 28 },
+            date: { cellWidth: 50 },
+            cv: { cellWidth: 90 },
+            project: { cellWidth: 115 },
+            advance: { cellWidth: 45, halign: 'right' },
+            bill: { cellWidth: 40, halign: 'right' },
+            refund: { cellWidth: 40, halign: 'right' },
+            transfer: { cellWidth: 115 },
+            type: { cellWidth: 60 },
+            mode: { cellWidth: 50 },
+            description: { cellWidth: 75 },
+            file: { cellWidth: 35 },
+          }
+        : {
+            sno: { cellWidth: 28 },
+            date: { cellWidth: 48 },
+            cv: { cellWidth: 88 },
+            project: { cellWidth: 125 },
+            advance: { cellWidth: 44, halign: 'right' },
+            bill: { cellWidth: 40, halign: 'right' },
+            refund: { cellWidth: 40, halign: 'right' },
+            transfer: { cellWidth: 100 },
+            mode: { cellWidth: 48 },
+            siteEngineer: { cellWidth: 110 },
+            sign: { cellWidth: 72},
+          }
     });
     if (week && year) {
       const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
@@ -728,6 +901,19 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           : "-";
         const totalBillAmount = sortedBillSettlement
           .reduce((sum, row) => sum + (parseFloat(row.bill_amount) || 0), 0);
+        const billSettlementStartTs = sortedBillSettlement.length
+          ? Math.min(...sortedBillSettlement.map((r) => {
+              return (r.timestamp ? new Date(r.timestamp) : new Date(r.date)).getTime();
+            }))
+          : null;
+        const billSettlementStartDate =
+          billSettlementStartTs != null && Number.isFinite(billSettlementStartTs)
+            ? new Date(billSettlementStartTs)
+            : null;
+        const pdfBillWeekDisplay =
+          billSettlementStartDate && !Number.isNaN(billSettlementStartDate.getTime())
+            ? `Week ${String(getISOWeekNumber(billSettlementStartDate)).padStart(2, "0")} (${getWeekYear(billSettlementStartDate)})`
+            : `Week ${String(selectedWeekNum).padStart(2, "0")} (${selectedYear})`;
         doc.addPage();
         const timestamp = new Date().toLocaleString("en-GB", {
           day: "2-digit",
@@ -745,6 +931,8 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
               { content: `Generated: ${timestamp}`, styles: { fontStyle: 'italic', fontSize: 8 } },
             ],
             [
+              { content: "Week", styles: { fontStyle: 'bold' } },
+              pdfBillWeekDisplay,
               { content: "Start Date", styles: { fontStyle: 'bold' } },
               billSettlementFromDate,
               { content: "End Date", styles: { fontStyle: 'bold' } },
@@ -762,18 +950,20 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             lineWidth: 0.5,
           },
           columnStyles: {
-            0: { cellWidth: 110 },
-            1: { cellWidth: 140 },
-            2: { cellWidth: 110 },
-            3: { cellWidth: 140 },
-            4: { cellWidth: 140 },
-            5: { cellWidth: 103 },
+            0: { cellWidth: 72 },
+            1: { cellWidth: 100 },
+            2: { cellWidth: 88 },
+            3: { cellWidth: 120 },
+            4: { cellWidth: 88 },
+            5: { cellWidth: 120 },
+            6: { cellWidth: 118 },
+            7: { cellWidth: 100 },
           }
         });
         const billSettlementRows = sortedBillSettlement.map((row, index) => {
           const rowDate = row.date ? new Date(row.date) : new Date(row.date);
           const formattedDate = isNaN(rowDate) ? "" : rowDate.toLocaleDateString("en-GB");
-          return {
+          const billBase = {
             sno: index + 1,
             date: formattedDate,
             cv:
@@ -784,10 +974,20 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             bill: row.bill_amount?.toLocaleString("en-IN") || "0",
             refund: row.refund_amount?.toLocaleString("en-IN") || "0",
             transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
-            type: row.type || "",
             mode: row.payment_mode || "",
-            description: row.description || "",
-            file: row.file_url ? "Yes" : "-",
+          };
+          if (isAccounts) {
+            return {
+              ...billBase,
+              type: row.type || "",
+              description: row.description || "",
+              file: row.file_url ? "Yes" : "-",
+            };
+          }
+          return {
+            ...billBase,
+            siteEngineer: getSiteEngineerForPdfRow(row),
+            sign: "",
           };
         });
         doc.autoTable({
@@ -801,7 +1001,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             lineWidth: 0.5,
             lineColor: [0, 0, 0],
             fillColor: null,
-            minCellHeight: 20
+            minCellHeight: isAccounts ? 20 : 24
           },
           headStyles: {
             fillColor: null,
@@ -811,25 +1011,40 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             lineColor: [0, 0, 0]
           },
           alternateRowStyles: { fillColor: null },
-          columnStyles: {
-            sno: { cellWidth: 28 },
-            date: { cellWidth: 100 },
-            cv: { cellWidth: 90 },
-            project: { cellWidth: 115 },
-            advance: { cellWidth: 45, halign: 'right' },
-            bill: { cellWidth: 40, halign: 'right' },
-            refund: { cellWidth: 40, halign: 'right' },
-            transfer: { cellWidth: 115 },
-            type: { cellWidth: 60 },
-            mode: { cellWidth: 50 },
-            description: { cellWidth: 75 },
-            file: { cellWidth: 35 },
-          }
+          columnStyles: isAccounts
+            ? {
+                sno: { cellWidth: 28 },
+                date: { cellWidth: 100 },
+                cv: { cellWidth: 90 },
+                project: { cellWidth: 115 },
+                advance: { cellWidth: 45, halign: 'right' },
+                bill: { cellWidth: 40, halign: 'right' },
+                refund: { cellWidth: 40, halign: 'right' },
+                transfer: { cellWidth: 115 },
+                type: { cellWidth: 60 },
+                mode: { cellWidth: 50 },
+                description: { cellWidth: 75 },
+                file: { cellWidth: 35 },
+              }
+            : {
+                sno: { cellWidth: 28 },
+                date: { cellWidth: 95 },
+                cv: { cellWidth: 88 },
+                project: { cellWidth: 115 },
+                advance: { cellWidth: 45, halign: 'right' },
+                bill: { cellWidth: 40, halign: 'right' },
+                refund: { cellWidth: 40, halign: 'right' },
+                transfer: { cellWidth: 105 },
+                mode: { cellWidth: 48 },
+                siteEngineer: { cellWidth: 100 },
+                sign: { cellWidth: 52, minCellHeight: 36 },
+              }
         });
       }
     }
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
-    doc.save(`AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.pdf`);
+    const copyLabel = isAccounts ? "AccountsCopy" : "SignatureCopy";
+    doc.save(`AdvanceReport_${copyLabel}_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.pdf`);
   };
   const handleExportExcel = () => {
     if (!filteredData.length) {
@@ -1008,25 +1223,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       `AdvanceReport_${fromDate.replace(/\//g, "-")}_to_${toDate.replace(/\//g, "-")}_${timestamp}.xlsx`
     );
   };
-  if (loading) {
-    return (
-      <div className='bg-[#FAF6ED]'>
-        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 sm:ml-6 lg:ml-10 flex flex-col items-center justify-center mx-auto'>
-          <div className="text-lg mb-4">Loading advance report...</div>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mb-4"></div>
-          <div className="text-sm text-gray-600">
-            Progress: {progress}%
-          </div>
-          <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
-            <div
-              className="bg-[#BF9853] h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Keep rendering the page while loading; data will populate once fetched.
   if (error) {
     return (
       <div className='bg-[#FAF6ED]'>
@@ -1165,7 +1362,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       </div>
       <div className='max-w-[1850px] rounded-md h-[650px] ml-10 mr-10 px-8 bg-white p-4'>
         <div className='space-x-6 flex justify-end'>
-          <button onClick={handleExportPDF} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
+          <button onClick={openPdfExportModal} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
           <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
           <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
         </div>
@@ -1370,6 +1567,49 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [] }) =>
           </div>
         )}
       </div>
+      {pdfExportModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setPdfExportModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-export-modal-title"
+          >
+            <h3 id="pdf-export-modal-title" className="text-lg font-bold text-gray-900 mb-2">
+              Export PDF
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">Which PDF do you want to generate?</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-4 rounded-md border-2 border-[#BF9853] text-[#BF9853] font-semibold hover:bg-[#BF9853] hover:text-white transition-colors"
+                onClick={() => generateAdvanceReportPdf("accounts")}
+              >
+                Accounts Copy
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-4 rounded-md border-2 border-[#BF9853] bg-[#BF9853] text-white font-semibold hover:opacity-90 transition-opacity"
+                onClick={() => generateAdvanceReportPdf("signature")}
+              >
+                Signature Copy
+              </button>
+            </div>
+            <button
+              type="button"
+              className="mt-4 w-full text-sm text-gray-500 hover:text-gray-800 py-2"
+              onClick={() => setPdfExportModalOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import AdvanceForm from './AdvancePortal';
 import { use } from 'react';
-const AdvanceSummary = () => {
+const AdvanceSummary = ({ refreshSignal }) => {
   const resolveActiveBranchId = useCallback(() => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -321,6 +321,11 @@ const AdvanceSummary = () => {
   useEffect(() => {
     fetchAdvanceFormData({ showLoader: true });
   }, [fetchAdvanceFormData]);
+
+  useEffect(() => {
+    if (refreshSignal === undefined) return;
+    fetchAdvanceFormData({ showLoader: false });
+  }, [refreshSignal, fetchAdvanceFormData]);
 
   const customStyles = {
     control: (provided, state) => ({
@@ -1583,25 +1588,7 @@ const AdvanceSummary = () => {
     document.body.removeChild(link);
   };
 
-  if (loading) {
-    return (
-      <body className='bg-[#FAF6ED]'>
-        <div className='bg-white w-full max-w-[1850px] h-[500px] rounded-md p-10 ml-4 sm:ml-6 lg:ml-10 flex flex-col items-center justify-center mx-auto'>
-          <div className="text-lg mb-4">Loading advance summary...</div>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#BF9853] mb-4"></div>
-          <div className="text-sm text-gray-600">
-            Progress: {progress}%
-          </div>
-          <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
-            <div
-              className="bg-[#BF9853] h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
-      </body>
-    );
-  }
+  // Keep rendering the page while loading; data will populate once fetched.
 
   if (error) {
     return (

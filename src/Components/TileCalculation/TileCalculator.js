@@ -4690,7 +4690,7 @@ const DesignTool = () => {
     };
     const getRevisionNumber = async (clientName) => {
         try {
-            const clientResponse = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/tile/all");
+            const clientResponse = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/tile/all');
             if (!clientResponse.ok) {
                 throw new Error("Failed to fetch calculations from the backend");
             }

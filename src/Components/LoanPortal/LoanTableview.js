@@ -153,7 +153,31 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     { id: 6, value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
 
-  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+  const [backendPaymentModeOptions, setBackendPaymentModeOptions] = useState([]);
+  const finalPaymentModeOptions = backendPaymentModeOptions.length > 0 ? backendPaymentModeOptions : paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+
+  useEffect(() => {
+    const fetchPaymentModes = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          const options = Array.isArray(data)
+            ? data
+              .filter(mode => mode.modeOfPayment)
+              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
+            : [];
+          if (!options.some(option => option.value === 'Advance Transfer')) {
+            options.push({ value: 'Advance Transfer', label: 'Advance Transfer' });
+          }
+          setBackendPaymentModeOptions(options);
+        }
+      } catch (error) {
+        console.error('Error fetching payment modes:', error);
+      }
+    };
+    fetchPaymentModes();
+  }, []);
 
   // Get unique Associate names from loanData for filter dropdown (only show what exists in table)
   const uniqueAssociateOptions = useMemo(() => {

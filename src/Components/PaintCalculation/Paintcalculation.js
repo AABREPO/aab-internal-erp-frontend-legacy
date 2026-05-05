@@ -1486,7 +1486,7 @@ const DesignTool = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('https://backendaab.in/demoAabuilderDash/api/tile/areaName');
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tile/areaName");
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -7587,8 +7587,11 @@ const DesignTool = () => {
             const summaryPdf = await generateSummaryPDF();
             const uploadPdf = async (pdf, name) => {
                 const singleFormData = new FormData();
+                // backend expects: files (plural), folder (required), fileName (optional prefix)
                 singleFormData.append("files", pdf, name);
-                const pdfUploadResponse = await fetch(`https://backendaab.in/demoAabuilderDash/googleUploader/paintPdfs`, {
+                singleFormData.append("folder", "FileUpload / Paint_Calculation");
+                singleFormData.append("fileName", name);
+                const pdfUploadResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/files/upload`, {
                     method: "POST",
                     body: singleFormData,
                 });

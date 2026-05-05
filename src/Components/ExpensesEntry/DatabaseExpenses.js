@@ -3,6 +3,7 @@ import { Calendar } from 'lucide-react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import DateRangePicker from './DateRangePicker';
+import CustomDateField from './CustomDateField';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
@@ -16,7 +17,7 @@ import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 
-const DatabaseExpenses = ({ username, userRoles = [] }) => {
+const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
     const resolveActiveBranchId = useCallback(() => {
         try {
@@ -54,6 +55,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [branchOptions, setBranchOptions] = useState([]);
+    const [sourceOptions, setSourceOptions] = useState([]);
+    const [branchFilterOptions, setBranchFilterOptions] = useState([]);
+    const [enteredByOptions, setEnteredByOptions] = useState([]);
     // Initialize filter states from localStorage or defaults
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
         return localStorage.getItem('expenseFilter_siteName') || '';
@@ -94,6 +98,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [selectedAccountType, setSelectedAccountType] = useState(() => {
         return localStorage.getItem('expenseFilter_accountType') || '';
     });
+    const [selectedSource, setSelectedSource] = useState(() => {
+        return localStorage.getItem('expenseFilter_source') || '';
+    });
+    const [selectedBranch, setSelectedBranch] = useState(() => {
+        return localStorage.getItem('expenseFilter_branch') || '';
+    });
+    const [selectedEnteredBy, setSelectedEnteredBy] = useState(() => {
+        return localStorage.getItem('expenseFilter_enteredBy') || '';
+    });
     const [showFilters, setShowFilters] = useState(false);
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -102,6 +115,29 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     const [sortDirection, setSortDirection] = useState('asc');
     const [userPermissions, setUserPermissions] = useState([]);
     const moduleName = "Expense Entry";
+    const defaultPaymentModeOptions = [
+        { modeOfPayment: 'Cash' },
+        { modeOfPayment: 'GPay' },
+        { modeOfPayment: 'PhonePe' },
+        { modeOfPayment: 'Net Banking' },
+        { modeOfPayment: 'Cheque' }
+    ];
+    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+    useEffect(() => {
+        const fetchPaymentModes = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
+                if (response.ok) {
+                    const data = await response.json();
+                    setPaymentModeOptions(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('Error fetching payment modes:', error);
+            }
+        };
+        fetchPaymentModes();
+    }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -124,6 +160,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }
     }, [userRoles]);
     const scrollRef = useRef(null);
+    const filterRowRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -243,6 +280,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     useEffect(() => {
         localStorage.setItem('expenseFilter_eno', selectedEno);
     }, [selectedEno]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_source', selectedSource);
+    }, [selectedSource]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_branch', selectedBranch);
+    }, [selectedBranch]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_enteredBy', selectedEnteredBy);
+    }, [selectedEnteredBy]);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState({
         chequeNo: '',
@@ -288,7 +334,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         serviceStartingDate: '',
         projectId: '',
         vendorId: '',
-        contractorId: ''
+        contractorId: '',
+        billArrivalDate: ''
     });
     const [projectData, setProjectData] = useState(null);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
@@ -298,11 +345,17 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             ...provided,
             borderWidth: '2px',
             lineHeight: '20px',
-            fontSize: '12px',
+            fontSize: '14px',
+            fontWeight: 'normal',
             height: '45px',
             borderRadius: '8px',
-            borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+            padding: '0.15rem',
+            textAlign: 'left',
+            borderColor: 'rgba(191, 152, 83, 0.2)',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+            '&:hover': {
+                borderColor: 'rgba(191, 152, 83, 0.4)',
+            },
         }),
         clearIndicator: (provided) => ({
             ...provided,
@@ -310,7 +363,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }),
         menu: (provided) => ({
             ...provided,
-            zIndex: 9999,
+            zIndex: 999,
             maxHeight: '300px',
         }),
         menuPortal: (provided) => ({
@@ -321,36 +374,47 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             ...provided,
             maxHeight: '250px',
             overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
         }),
         singleValue: (provided) => ({
             ...provided,
-            fontWeight: '400',
-            color: 'black',
-            textAlign: 'left',
+            color: '#111827',
+            fontWeight: 'normal',
+            marginRight: 0,
+        }),
+        valueContainer: (provided) => ({
+            ...provided,
+            paddingRight: '2px',
+        }),
+        indicatorsContainer: (provided) => ({
+            ...provided,
+            paddingLeft: '0px',
+        }),
+        dropdownIndicator: (provided) => ({
+            ...provided,
+            padding: '4px',
         }),
         option: (provided, state) => ({
             ...provided,
-            fontWeight: '300',
-            fontSize: '14px',
-            backgroundColor: state.isSelected
-                ? 'rgba(191, 152, 83, 0.3)'
-                : state.isFocused
-                    ? 'rgba(191, 152, 83, 0.1)'
-                    : 'white',
-            color: 'black',
             textAlign: 'left',
+            fontWeight: 'normal',
+            fontSize: '15px',
+            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+            color: 'black',
         }),
         input: (provided) => ({
             ...provided,
-            fontWeight: '300',
+            fontWeight: 'normal',
             color: 'black',
             textAlign: 'left',
         }),
         placeholder: (provided) => ({
             ...provided,
-            fontWeight: '500',
-            color: '#999',
+            color: '#d3d5db',
             textAlign: 'left',
+            fontWeight: 'bold',
         }),
         indicatorSeparator: (provided) => ({
             ...provided,
@@ -475,39 +539,44 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             window.removeEventListener("branchSelectionChanged", syncBranch);
         };
     }, [resolveActiveBranchId]);
-    useEffect(() => {
-        axios
-            .get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
-                params: activeBranchId ? { branchId: activeBranchId } : {},
-            })
-            .then((response) => {
-                const sortedExpenses = response.data.sort((a, b) => {
-                    const enoA = parseInt(a.eno, 10);
-                    const enoB = parseInt(b.eno, 10);
-                    return enoB - enoA;
-                });
-                setExpenses(sortedExpenses);
-                setFilteredExpenses(sortedExpenses);
-                const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-                const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
-                const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
-                const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
-                const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
-                const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
-                const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
-                const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
-                const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
-                // Set the unique dropdown options in state
-                setAccountTypeOptions(uniqueAccountTypes);
-                setSiteOptions(siteOptions);
-                setVendorOptions(vendorOptions);
-                setContractorOptions(contractorOption);
-                setCategoryOptions(categoryOption);
-            })
-            .catch((error) => {
-                console.error('Error fetching expenses:', error);
-            });
+    const refetchExpenses = useCallback(async () => {
+        const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
+            params: activeBranchId ? { branchId: activeBranchId } : {},
+        });
+        const sortedExpenses = response.data.sort((a, b) => {
+            const enoA = parseInt(a.eno, 10);
+            const enoB = parseInt(b.eno, 10);
+            return enoB - enoA;
+        });
+        setExpenses(sortedExpenses);
+        setFilteredExpenses(sortedExpenses);
+        const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
+        const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
+        const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
+        const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
+        const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
+        const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
+        const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
+        const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
+        const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
+        setAccountTypeOptions(uniqueAccountTypes);
+        setSiteOptions(siteOptions);
+        setVendorOptions(vendorOptions);
+        setContractorOptions(contractorOption);
+        setCategoryOptions(categoryOption);
     }, [activeBranchId]);
+    useEffect(() => {
+        refetchExpenses().catch((error) => {
+            console.error('Error fetching expenses:', error);
+        });
+    }, [refetchExpenses]);
+    const prevIsActiveRef = useRef(isActive);
+    useEffect(() => {
+        if (isActive && prevIsActiveRef.current === false) {
+            void refetchExpenses();
+        }
+        prevIsActiveRef.current = isActive;
+    }, [isActive, refetchExpenses]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -885,6 +954,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 (selectedContractor ? expense.contractor === selectedContractor : true) &&
                 (selectedCategory ? expense.category === selectedCategory : true) &&
                 (selectedMachineTools ? String(expense.machineTools ?? '') === String(selectedMachineTools) : true) &&
+                (selectedSource ? expense.source === selectedSource : true) &&
+                (selectedBranch ? String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch) : true) &&
+                (selectedEnteredBy ? (expense.enteredBy || 'Sivaprakasm') === selectedEnteredBy : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === 'Unknown' ?
                         (!expense.accountType || expense.accountType === '') :
@@ -908,6 +980,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
+        setSourceOptions(getOptions(filtered, "source"));
+        const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(Boolean))];
+        setBranchFilterOptions(
+            uniqueBranchIds.map(id => ({
+                value: String(id),
+                label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
+            }))
+        );
+        setEnteredByOptions([...new Set(filtered.map(item => item.enteredBy || 'Sivaprakasm').filter(Boolean))].map(val => ({ value: val, label: val })));
         const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter((v) => v != null && v !== ''))];
         setMachineToolsOptions(
             uniqueToolIds.map((id) => ({
@@ -921,7 +1002,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setAccountTypeOptions(getOptions(filtered, "accountType"));
         setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, expenses, machineToolsIdToLabel]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedBranch, selectedEnteredBy, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, expenses, machineToolsIdToLabel, branchOptions]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -945,6 +1026,16 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     };
     const handleFileChange = (e) => {
         setSelectedFile(e.target.files[0]);
+    };
+    const formatChipDateDMY = (dateString) => {
+        if (!dateString) return '';
+        // expected input: yyyy-MM-dd
+        const parts = String(dateString).split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+            const [y, m, d] = parts;
+            return `${d}-${m}-${y}`;
+        }
+        return String(dateString);
     };
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
@@ -1024,10 +1115,10 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }
         try {
             await performUpdateAndWeeklyBills(updatedFormData);
+            await refetchExpenses();
             setModalIsOpen(false);
             setIsSubmitting(false);
             alert('Updated successfully!');
-            window.location.reload();
         } catch (error) {
             console.error('Error updating expense:', error);
             alert('Failed to update expense');
@@ -1035,13 +1126,27 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         }
     };
     const performUpdateAndWeeklyBills = async (updatedFormData, modalPaymentData = null) => {
+        const rawArrival = updatedFormData?.billArrivalDate ?? updatedFormData?.bill_arrival_date;
+        let billArrivalForApi = '';
+        if (rawArrival != null && String(rawArrival).trim() !== '') {
+            const s = String(rawArrival).trim();
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+                billArrivalForApi = s.slice(0, 10);
+            } else {
+                const d = new Date(s);
+                billArrivalForApi = Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+            }
+        }
+        const updatePayload = {
+            ...updatedFormData,
+            billArrivalDate: billArrivalForApi
+        };
         const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedFormData)
+            body: JSON.stringify(updatePayload)
         });
         if (!response.ok) throw new Error('Failed to update expense');
-        setExpenses(expenses.map(exp => (exp.id === editId ? { ...exp, ...updatedFormData } : exp)));
         const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
         const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
         if (isPaymentType && isNonCashPaymentMode && editId && !sentToWeeklyPaymentBillsRef.current.has(editId)) {
@@ -1093,11 +1198,11 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setIsSubmitting(true);
         try {
             await performUpdateAndWeeklyBills(updatedFormData, paymentModalData);
+            await refetchExpenses();
             setShowPaymentModal(false);
             setModalIsOpen(false);
             setIsSubmitting(false);
             alert('Updated successfully!');
-            window.location.reload();
         } catch (error) {
             console.error('Error updating expense:', error);
             alert('Failed to update expense');
@@ -1132,6 +1237,31 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         } else if (sortField === 'machineTools') {
             aValue = String(getMachineToolsItemIdDisplay(a.machineTools) || '').toLowerCase();
             bValue = String(getMachineToolsItemIdDisplay(b.machineTools) || '').toLowerCase();
+        } else if (sortField === 'staff') {
+            const aLabourId = a.labourId || a.labour_id || a.labourID || a.labour_ID;
+            const aEmployeeId = a.employeeId || a.employee_id || a.employeeID || a.employee_ID;
+            const bLabourId = b.labourId || b.labour_id || b.labourID || b.labour_ID;
+            const bEmployeeId = b.employeeId || b.employee_id || b.employeeID || b.employee_ID;
+            aValue = aLabourId ?? aEmployeeId ?? '';
+            bValue = bLabourId ?? bEmployeeId ?? '';
+            const aNum = Number(aValue);
+            const bNum = Number(bValue);
+            if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                aValue = aNum;
+                bValue = bNum;
+            } else {
+                aValue = String(aValue || '').toLowerCase();
+                bValue = String(bValue || '').toLowerCase();
+            }
+        } else if (sortField === 'branch') {
+            aValue = String(getBranchName(a.branch_id ?? a.branchId ?? '') || '').toLowerCase();
+            bValue = String(getBranchName(b.branch_id ?? b.branchId ?? '') || '').toLowerCase();
+        } else if (sortField === 'billArrivalDate') {
+            aValue = String(getExpenseBillArrivalRaw(a) || '').slice(0, 10);
+            bValue = String(getExpenseBillArrivalRaw(b) || '').slice(0, 10);
+        } else if (sortField === 'quantity' || sortField === 'amount') {
+            aValue = Number(aValue) || 0;
+            bValue = Number(bValue) || 0;
         } else {
             aValue = String(aValue || '').toLowerCase();
             bValue = String(bValue || '').toLowerCase();
@@ -1260,6 +1390,26 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
     };
     const getBranchName = (id) =>
         branchOptions.find(b => String(b.id) === String(id))?.branch || "";
+    const getExpenseBillArrivalRaw = (e) => e?.billArrivalDate ?? e?.bill_arrival_date ?? '';
+    const expenseBillArrivalToInput = (e) => {
+        const raw = getExpenseBillArrivalRaw(e);
+        if (!raw) return '';
+        const s = String(raw).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+        const d = new Date(s);
+        return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+    };
+    const formatBillArrivalDisplay = (e) => {
+        const raw = getExpenseBillArrivalRaw(e);
+        if (!raw) return '—';
+        const head = String(raw).trim().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return formatChipDateDMY(head) || '—';
+        try {
+            return formatDateOnly(raw) || '—';
+        } catch {
+            return String(raw);
+        }
+    };
     const handleEditClick = (expense) => {
         setEditId(expense.id);
         setFormData({
@@ -1273,7 +1423,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
             serviceStartingDate: expense.serviceStartingDate || '',
             projectId: expense.projectId || '',
             vendorId: expense.vendorId || '',
-            contractorId: expense.contractorId || ''
+            contractorId: expense.contractorId || '',
+            billArrivalDate: expenseBillArrivalToInput(expense)
         });
         setModalIsOpen(true);
     };
@@ -1288,7 +1439,11 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 );
                 if (response.ok) {
                     alert('Expenses deleted successfully!!!');
-                    window.location.reload();
+                    try {
+                        await refetchExpenses();
+                    } catch (err) {
+                        console.error('Error refetching expenses:', err);
+                    }
                 } else {
                     alert('Failed to delete expense');
                 }
@@ -1318,6 +1473,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         setSelectedCategory('');
         setSelectedMachineTools('');
         setSelectedAccountType('');
+        setSelectedSource('');
+        setSelectedBranch('');
+        setSelectedEnteredBy('');
         setSelectedDate('');
         setStartDate('');
         setEndDate('');
@@ -1335,6 +1493,9 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
         localStorage.removeItem('expenseFilter_category');
         localStorage.removeItem('expenseFilter_machineTools');
         localStorage.removeItem('expenseFilter_accountType');
+        localStorage.removeItem('expenseFilter_source');
+        localStorage.removeItem('expenseFilter_branch');
+        localStorage.removeItem('expenseFilter_enteredBy');
         localStorage.removeItem('expenseFilter_date');
         localStorage.removeItem('expenseFilter_startDate');
         localStorage.removeItem('expenseFilter_endDate');
@@ -1426,29 +1587,29 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
 
                 {Object.keys(accountTypeSummary).length > 0 && (
                     <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
-                        <div className="flex flex-wrap gap-5 items-end">
+                        <div className="flex flex-wrap gap-5 items-end text-left">
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <div className="relative w-[168px]">
-                                    <input
-                                        type="date"
+                                <div className="w-[168px]">
+                                    <CustomDateField
                                         value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                        onChange={setStartDate}
+                                        placeholder="dd/mm/yyyy"
+                                        alwaysOpenBelow
+                                        className={`[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!startDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-bold' : ''}`}
                                     />
-                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <div className="relative w-[168px]">
-                                    <input
-                                        type="date"
+                                <div className="w-[168px]">
+                                    <CustomDateField
                                         value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                        onChange={setEndDate}
+                                        placeholder="dd/mm/yyyy"
+                                        alwaysOpenBelow
+                                        className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!endDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-bold' : ''}`}
                                     />
-                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 </div>
                             </div>
                             {Object.entries(accountTypeSummary)
@@ -1483,29 +1644,29 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 )}
                 {Object.keys(accountTypeSummary).length === 0 && (
                     <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
-                        <div className="flex flex-wrap gap-5 items-end">
+                        <div className="flex flex-wrap gap-5 items-end text-left">
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <div className="relative w-[168px]">
-                                    <input
-                                        type="date"
+                                <div className="w-[168px]">
+                                    <CustomDateField
                                         value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                        onChange={setStartDate}
+                                        placeholder="dd/mm/yyyy"
+                                        alwaysOpenBelow
+                                        className={`[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!startDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-bold' : ''}`}
                                     />
-                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <div className="relative w-[168px]">
-                                    <input
-                                        type="date"
+                                <div className="w-[168px]">
+                                    <CustomDateField
                                         value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2 pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                        onChange={setEndDate}
+                                        placeholder="dd/mm/yyyy"
+                                        alwaysOpenBelow
+                                        className={`[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!endDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-bold' : ''}`}
                                     />
-                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 </div>
                             </div>
                         </div>
@@ -1513,52 +1674,66 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                 )}
                 <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
                     <div
-                        className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate || timestampStartDate || timestampEndDate
+                        className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
                             ? 'flex-col sm:flex-row sm:justify-between'
                             : 'flex-row justify-between items-center'
                             } mb-3 gap-2`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-                            <button className='pl-2' onClick={() => setShowFilters(!showFilters)}>
+                            <button
+                                className='pl-2'
+                                onClick={() => {
+                                    const willOpen = !showFilters;
+                                    setShowFilters(willOpen);
+                                    if (!willOpen) return;
+                                    const scroller = scrollRef.current;
+                                    if (!scroller) return;
+                                    if (scroller.scrollTop <= 0) return;
+                                    requestAnimationFrame(() => {
+                                        const h = filterRowRef.current?.offsetHeight || 0;
+                                        if (h > 0) scroller.scrollTop = scroller.scrollTop + h;
+                                    });
+                                }}
+                            >
                                 <img
                                     src={Filter}
                                     alt="Toggle Filter"
                                     className="w-7 h-7 border border-[#BF9853] rounded-md"
                                 />
                             </button>
-                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || startDate || endDate || timestampStartDate || timestampEndDate) && (
+                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
                                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                                     {timestampStartDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Timestamp: </span>
-                                            <span className="font-bold">{timestampStartDate}{timestampEndDate ? ` – ${timestampEndDate}` : ' onwards'}</span>
+                                            <span className="font-bold">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
                                             <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {timestampEndDate && !timestampStartDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Timestamp until: </span>
-                                            <span className="font-bold">{timestampEndDate}</span>
+                                            <span className="font-bold">{formatChipDateDMY(timestampEndDate)}</span>
                                             <button onClick={() => setTimestampEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {startDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Start Date: </span>
-                                            <span className="font-bold">{startDate}</span>
+                                            <span className="font-bold">{formatChipDateDMY(startDate)}</span>
                                             <button onClick={() => setStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {endDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">End Date: </span>
-                                            <span className="font-bold">{endDate}</span>
+                                            <span className="font-bold">{formatChipDateDMY(endDate)}</span>
                                             <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
                                     {selectedDate && (
                                         <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
                                             <span className="font-normal">Date: </span>
-                                            <span className="font-bold">{selectedDate}</span>
+                                            <span className="font-bold">{formatChipDateDMY(selectedDate)}</span>
                                             <button onClick={() => setSelectedDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
                                         </span>
                                     )}
@@ -1604,6 +1779,34 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             <button onClick={() => setSelectedMachineTools('')} className="text-[#BF9853] text-2xl ml-1">×</button>
                                         </span>
                                     )}
+                                    {selectedSource && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">Source From: </span>
+                                            <span className="font-bold">{selectedSource}</span>
+                                            <button onClick={() => setSelectedSource('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
+                                    {selectedBranch && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">Branch: </span>
+                                            <span className="font-bold">{getBranchName(selectedBranch) || selectedBranch}</span>
+                                            <button onClick={() => setSelectedBranch('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
+                                    {selectedEnteredBy && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">Entered By: </span>
+                                            <span className="font-bold">{selectedEnteredBy}</span>
+                                            <button onClick={() => setSelectedEnteredBy('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
+                                    {selectedEno && (
+                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
+                                            <span className="font-normal">E.No: </span>
+                                            <span className="font-bold">{selectedEno}</span>
+                                            <button onClick={() => setSelectedEno('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1627,13 +1830,13 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}>
-                            <table className="table-fixed  min-w-[1765px] w-full border-collapse">
+                            <table className="table-fixed  min-w-[1885px] w-full border-collapse">
                                 <thead className="sticky top-0 z-10 bg-white ">
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="px-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('timestamp')}>
                                             Time stamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="pt-2 w-32 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
+                                        <th className="pt-2 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
                                             Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
@@ -1645,9 +1848,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Staff</th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Quantity</th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Amount</th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
+                                            Staff {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
+                                            Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('amount')}>
+                                            Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
                                             Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -1660,41 +1869,60 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                         <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left">Source From</th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left">Branch</th>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
+                                            Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
+                                            Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('enteredBy')}>
                                             Entered By {sortField === 'enteredBy' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
+                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
+                                            Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
                                         <th className="px-0.5 w-[120px] font-bold text-left">Activity</th>
                                         <th className="px-0.5 w-[50px] font-bold text-left">File</th>
                                     </tr>
                                     {showFilters && (
-                                        <tr className="bg-[#FAF6ED]">
-                                            <th className="py-3 px-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowDateRangePicker(true)}
-                                                    className="w-full min-w-[140px] px-2 py-2 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200 hover:bg-[#FAF6ED] text-left flex items-center justify-between"
-                                                >
-                                                    <span className="text-gray-700 truncate">
-                                                        {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Timestamp...'}
-                                                    </span>
-                                                    <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                </button>
+                                        <tr ref={filterRowRef} className="bg-[#FAF6ED]">
+                                            <th className="py-3">
+                                                <div className="relative [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDateRangePicker(true)}
+                                                        className="w-full min-w-[140px] h-[45px] px-2 py-0 text-sm font-semibold bg-white text-left flex items-center gap-1"
+                                                    >
+                                                        <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${timestampStartDate && timestampEndDate ? 'text-black font-normal' : 'text-[#d3d5db] font-bold'}`}>
+                                                            {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Time stamp'}
+                                                        </span>
+                                                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                                    </button>
+                                                    <DateRangePicker
+                                                        isOpen={showDateRangePicker}
+                                                        onClose={() => setShowDateRangePicker(false)}
+                                                        startDate={timestampStartDate}
+                                                        endDate={timestampEndDate}
+                                                        variant="dropdown"
+                                                        onApply={(from, to) => {
+                                                            setTimestampStartDate(from);
+                                                            setTimestampEndDate(to);
+                                                        }}
+                                                    />
+                                                </div>
                                             </th>
                                             <th className="py-3">
-                                                <div className="relative">
-                                                    <input
-                                                        type="date"
+                                                <div className="min-w-[100px]">
+                                                    <CustomDateField
                                                         value={selectedDate}
-                                                        onChange={(e) => setSelectedDate(e.target.value)}
-                                                        className="w-full px-1.5 py-2 pr-8 text-sm rounded-lg border-2 border-[#BF9853] font-normal border-opacity-30 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent transition-all duration-200 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                                        placeholder="Search Date..."
+                                                        onChange={setSelectedDate}
+                                                        placeholder="dd/mm/yyyy"
+                                                        alwaysOpenBelow
+                                                        className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedDate ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-bold'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
                                                     />
-                                                    <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                 </div>
                                             </th>
                                             <th className="py-3">
@@ -1703,7 +1931,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     options={siteOptions}
                                                     value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
                                                     onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Site..."
+                                                    placeholder="Project Name"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1732,7 +1960,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             </th>
                                             <th></th>
                                             <th></th>
-                                            <th className="text-base text-left font-bold py-3">
+                                            <th className="text-base text-right font-bold py-3">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
@@ -1742,7 +1970,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     options={categoryOptions}
                                                     value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
                                                     onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Category..."
+                                                    placeholder="Category"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1753,7 +1981,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     options={accountTypeOptions}
                                                     value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
                                                     onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="A/CType"
+                                                    placeholder="A/C Type"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1764,16 +1992,56 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     options={machineToolsOptions}
                                                     value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Machine..."
+                                                    placeholder="MachineTools"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
                                             </th>
-                                            <th></th>
-                                            <th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={sourceOptions}
+                                                    value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
+                                                    onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="SourceFrom"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
                                             </th>
-                                            <th></th>
-                                            <th></th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={branchFilterOptions}
+                                                    value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
+                                                    onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="Branch"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
+                                            </th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={enteredByOptions}
+                                                    value={selectedEnteredBy ? { value: selectedEnteredBy, label: selectedEnteredBy } : null}
+                                                    onChange={(selectedOption) => setSelectedEnteredBy(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="Entered By"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
+                                            </th>
+                                            <th className="py-3">
+                                                <Select
+                                                    className="w-full"
+                                                    options={enoOptions.map((eno) => ({ value: String(eno), label: String(eno) }))}
+                                                    value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
+                                                    onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
+                                                    placeholder="E.No"
+                                                    menuPlacement="bottom"
+                                                    styles={customStyles}
+                                                />
+                                            </th>
+                                            <th className="py-3" aria-label="Bill Arrival filter" />
                                             <th></th>
                                             <th></th>
                                         </tr>
@@ -1789,7 +2057,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayStaffName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
-                                            <td className="text-sm text-right pr-5">
+                                            <td className="text-sm text-right">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
@@ -1799,7 +2067,8 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             <td className=" text-sm text-left ">{expense.source}</td>
                                             <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
                                             <td className=" text-sm text-left ">{expense.enteredBy || 'Sivaprakasm'}</td>
-                                            <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
+                                            <td className=" text-sm text-right pl-3 ">{expense.eno}</td>
+                                            <td className="text-sm text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense)}</td>
                                             <td className=" flex w-[100px] justify-between py-2">
                                                 <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
                                                     <img
@@ -1911,35 +2180,88 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                             contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
                             overlayClassName="fixed inset-0 z-[9999]">
                             <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-                                <h2 className="text-xl font-bold mb-6 border-b-2">Edit Expense</h2>
+                                <h2 className="text-xl font-normal mb-6 border-b-2">Edit Expense</h2>
                                 <form className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Date</label>
-                                        <div className="relative mt-1">
-                                            <input type="date" name="date" value={formData.date} onChange={handleChange}
-                                                required
-                                                className="block w-full p-2 pr-9 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                        <label className="block text-gray-500 font-normal text-left">Date</label>
+                                        <div className="mt-1">
+                                            <CustomDateField
+                                                value={formData.date}
+                                                onChange={(v) => {
+                                                    // Keep existing behavior: prevent clearing the main date field
+                                                    if (!v) return;
+                                                    setFormData((prev) => ({ ...prev, date: v }));
+                                                }}
+                                                placeholder="Select date"
+                                                alwaysOpenBelow
+                                                className="[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-normal"
                                             />
-                                            <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Account Type *</label>
-                                        <select
+                                        <label className="block text-gray-500 font-normal text-left">Account Type *</label>
+                                        <Select
                                             name="accountType"
-                                            value={formData.accountType}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
-                                            <option value="" disabled>--- Select ---</option>
-                                            {editAccountTypeOptions.map((option) => (
-                                                <option key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
+                                            onChange={(selectedOption) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    accountType: selectedOption?.value || '',
+                                                })
+                                            }
+                                            options={editAccountTypeOptions}
+                                            placeholder="Select"
+                                            isClearable
+                                            styles={{
+                                                control: (base, state) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                    borderWidth: '2px',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    color: '#6B7280',
+                                                    textAlign: 'left',
+                                                }),
+                                                option: (provided, state) => ({
+                                                    ...provided,
+                                                    textAlign: 'left',
+                                                    fontWeight: 'normal',
+                                                    fontSize: '15px',
+                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                    color: 'black',
+                                                }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                    fontWeight: 'normal',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
+                                            }}
+                                            menuPlacement="bottom"
+                                            menuPosition="absolute"
+                                        />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Site Name *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Site Name *</label>
                                         <Select
                                             name="siteName"
                                             value={siteOption.find(option => option.value === formData.siteName)}
@@ -1951,14 +2273,26 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 })
                                             }
                                             options={siteOption}
-                                            placeholder="--- Select Site ---"
+                                            placeholder="Select Site"
+                                            isClearable
                                             styles={{
-                                                control: (base) => ({
+                                                control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
                                                     padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    color: '#6B7280',
                                                     textAlign: 'left',
                                                 }),
                                                 option: (provided, state) => ({
@@ -1969,13 +2303,28 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                     color: 'black',
                                                 }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                    fontWeight: 'normal',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
                                             menuPlacement="bottom"
                                             menuPosition="absolute"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Vendor Name *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Vendor Name *</label>
                                         <Select
                                             name="vendor"
                                             options={vendorOption}
@@ -1994,6 +2343,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             styles={{
                                                 control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
@@ -2006,6 +2356,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 }),
                                                 placeholder: (base) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     color: '#6B7280',
                                                     textAlign: 'left',
                                                 }),
@@ -2020,17 +2371,24 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 singleValue: (base) => ({
                                                     ...base,
                                                     color: '#111827',
+                                                    fontWeight: 'normal',
                                                 }),
                                                 menu: (base) => ({
                                                     ...base,
                                                     zIndex: 999,
                                                 }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
-                                            placeholder="--- Select Vendor ---"
+                                            placeholder="Select Vendor"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Contractor Name *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Contractor Name *</label>
                                         <Select
                                             name="contractor"
                                             options={contractorOption}
@@ -2049,6 +2407,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                             styles={{
                                                 control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
@@ -2061,6 +2420,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 }),
                                                 placeholder: (base) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     color: '#6B7280',
                                                     textAlign: 'left',
 
@@ -2076,34 +2436,53 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 singleValue: (base) => ({
                                                     ...base,
                                                     color: '#111827',
+                                                    fontWeight: 'normal',
                                                 }),
                                                 menu: (base) => ({
                                                     ...base,
                                                     zIndex: 999,
                                                 }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
-                                            placeholder="--- Select Contractor ---"
+                                            placeholder="Select Contractor"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Quantity *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Quantity *</label>
                                         <input type="text" name="quantity" value={formData.quantity} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Category *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Category *</label>
                                         <Select name="category" value={categoryOption.find(option => option.value === formData.category)}
                                             onChange={(selectedOption) => setFormData({ ...formData, category: selectedOption?.value || '' })}
                                             options={categoryOption}
-                                            placeholder="--- Select Category ---"
+                                            placeholder="Select Category"
+                                            isClearable
                                             styles={{
-                                                control: (base) => ({
+                                                control: (base, state) => ({
                                                     ...base,
+                                                    fontWeight: 'normal',
                                                     borderColor: 'rgba(191, 152, 83, 0.2)',
                                                     borderWidth: '2px',
                                                     borderRadius: '0.5rem',
                                                     padding: '0.25rem',
+                                                    textAlign: 'left',
+                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                    '&:hover': {
+                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                    },
+                                                }),
+                                                placeholder: (base) => ({
+                                                    ...base,
+                                                    fontWeight: 'normal',
+                                                    color: '#6B7280',
                                                     textAlign: 'left',
                                                 }),
                                                 option: (provided, state) => ({
@@ -2114,61 +2493,152 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                     color: 'black',
                                                 }),
+                                                singleValue: (base) => ({
+                                                    ...base,
+                                                    color: '#111827',
+                                                    fontWeight: 'normal',
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 999,
+                                                }),
+                                                menuList: (base) => ({
+                                                    ...base,
+                                                    scrollbarWidth: 'none',
+                                                    msOverflowStyle: 'none',
+                                                    '&::-webkit-scrollbar': { display: 'none' },
+                                                }),
                                             }}
                                             menuPlacement="bottom"
                                             menuPosition="absolute"
                                         />
                                     </div>
                                     <div className="relative">
-                                        <label className="block text-gray-500 font-semibold text-left">Amount *</label>
-                                        <span className="absolute top-9 left-3 mt-[2px] text-gray-600">₹</span>
+                                        <label className="block text-gray-500 font-normal text-left">Amount *</label>
+                                        <span className="absolute top-9 left-3 mt-[2px] text-gray-600 font-normal">₹</span>
                                         <input type="text" name="amount" value={formData.amount} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                             onWheel={(e) => e.target.blur()}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-gray-500 font-semibold text-left">Comments *</label>
+                                        <label className="block text-gray-500 font-normal text-left">Comments *</label>
                                         <input type="text" name="comments" value={formData.comments} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                         />
                                     </div>
                                     <div>
                                         <div className=' flex'>
-                                            <label className="block text-gray-500 font-semibold text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
+                                            <label className="block text-gray-500 font-normal text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
                                             {selectedFile && <span className="text-orange-600 ml-4">{selectedFile.name}</span>}
                                         </div>
                                         <input type="text" name="billCopy" value={formData.billCopy} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                         />
                                         <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
                                     </div>
+                                    {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Bill Arrival Date</label>
+                                            <input
+                                                type="date"
+                                                name="billArrivalDate"
+                                                value={formData.billArrivalDate || ''}
+                                                onChange={handleChange}
+                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                            />
+                                        </div>
+                                    )}
                                     {/* Conditional fields based on Account Type */}
                                     {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills' || formData.accountType === 'Weekly Payment') && (
                                         <div>
-                                            <label className="block text-gray-500 font-semibold text-left">Payment Mode *</label>
-                                            <select
+                                            <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
+                                            <Select
                                                 name="paymentMode"
-                                                value={formData.paymentMode}
-                                                onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
-                                                <option value="">Select Payment Mode</option>
-                                                <option value="GPay">GPay</option>
-                                                <option value="PhonePe">PhonePe</option>
-                                                <option value="Net Banking">Net Banking</option>
-                                                <option value="Cheque">Cheque</option>
-                                            </select>
+                                                options={finalPaymentModeOptions.map((mode) => ({
+                                                    value: mode.modeOfPayment,
+                                                    label: mode.modeOfPayment,
+                                                }))}
+                                                value={
+                                                    finalPaymentModeOptions
+                                                        .map((mode) => ({
+                                                            value: mode.modeOfPayment,
+                                                            label: mode.modeOfPayment,
+                                                        }))
+                                                        .find((o) => o.value === formData.paymentMode) || null
+                                                }
+                                                onChange={(selectedOption) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        paymentMode: selectedOption?.value || '',
+                                                    })
+                                                }
+                                                placeholder="Select Payment Mode"
+                                                isClearable
+                                                maxMenuHeight={200}
+                                                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.25rem',
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 'normal',
+                                                    }),
+                                                    menuPortal: (base) => ({
+                                                        ...base,
+                                                        zIndex: 10001,
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                menuPlacement="bottom"
+                                                menuPosition="fixed"
+                                            />
                                         </div>
                                     )}
                                     {formData.accountType === 'Utility Bills' && (
                                         <>
                                             <div>
-                                                <label className="block text-gray-500 font-semibold text-left">Utility Type *</label>
+                                                <label className="block text-gray-500 font-normal text-left">Utility Type *</label>
                                                 <select
                                                     name="utilityType"
                                                     value={formData.utilityType}
                                                     onChange={handleChange}
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none">
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal">
                                                     <option value="" disabled>--- Select ---</option>
                                                     <option value="Electricity">Electricity</option>
                                                     <option value="Property">Property</option>
@@ -2178,7 +2648,7 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-gray-500 font-semibold text-left">
+                                                <label className="block text-gray-500 font-normal text-left">
                                                     {formData.utilityType === 'Electricity' ? 'EB Number' :
                                                         formData.utilityType === 'Property' ? 'Property Tax Number' :
                                                             formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
@@ -2194,20 +2664,32 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     placeholder={`Select ${formData.utilityType === 'Electricity' ? 'EB Number' :
                                                         formData.utilityType === 'Property' ? 'Property Tax Number' :
                                                             formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
-                                                    styles={customStyles}
+                                                    styles={{
+                                                        ...customStyles,
+                                                        singleValue: (provided) => ({
+                                                            ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
+                                                            fontWeight: 'normal',
+                                                        }),
+                                                        menuList: (base) => ({
+                                                            ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
+                                                            scrollbarWidth: 'none',
+                                                            msOverflowStyle: 'none',
+                                                            '&::-webkit-scrollbar': { display: 'none' },
+                                                        }),
+                                                    }}
                                                     menuPlacement="bottom"
                                                     menuPosition="absolute"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-gray-500 font-semibold text-left">Months</label>
+                                                <label className="block text-gray-500 font-normal text-left">Months</label>
                                                 <input
                                                     type="month"
                                                     name="utilityForTheMonth"
                                                     value={formData.utilityForTheMonth}
                                                     onChange={handleChange}
                                                     placeholder="Enter months..."
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                                 />
                                             </div>
                                             {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
@@ -2215,25 +2697,25 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
 
                                                     {/* Validity */}
                                                     <div>
-                                                        <label className="block text-gray-500 font-semibold text-left">Validity</label>
+                                                        <label className="block text-gray-500 font-normal text-left">Validity</label>
                                                         <input
                                                             type="text"
                                                             name="utilityValidityDays"
                                                             value={formData.utilityValidityDays}
                                                             onChange={handleChange}
                                                             placeholder="Enter validity..."
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                                         />
                                                     </div>
 
                                                     {/* Validity Type */}
                                                     <div>
-                                                        <label className="block text-gray-500 font-semibold text-left">Validity Type</label>
+                                                        <label className="block text-gray-500 font-normal text-left">Validity Type</label>
                                                         <select
                                                             name="utilityValidityType"
                                                             value={formData.utilityValidityType}
                                                             onChange={handleChange}
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
+                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
                                                         >
                                                             <option value="">--- Select ---</option>
                                                             <option value="Days">Days</option>
@@ -2245,14 +2727,15 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                     {/* Service Start Date */}
                                                     {formData.utilityType === 'Telecom' && (
                                                         <div>
-                                                            <label className="block text-gray-500 font-semibold text-left">Service Start Date</label>
-                                                            <input
-                                                                type="date"
-                                                                name="serviceStartingDate"
-                                                                value={formData.serviceStartingDate}
-                                                                onChange={handleChange}
-                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none"
-                                                            />
+                                                            <label className="block text-gray-500 font-normal text-left">Service Start Date</label>
+                                                            <div className="mt-1">
+                                                                <CustomDateField
+                                                                    value={formData.serviceStartingDate}
+                                                                    onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
+                                                                    placeholder="Service start date"
+                                                                    className="[&>button]:!font-normal"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     )}
 
@@ -2283,15 +2766,12 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                 <div className="grid grid-cols-3 gap-4">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                        <div className="relative">
-                                                            <input
-                                                                type="date"
-                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full bg-gray-100 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                                            />
-                                                            <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                        </div>
+                                                        <CustomDateField
+                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
+                                                            onChange={() => { }}
+                                                            disabled
+                                                            placeholder="Date"
+                                                        />
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
@@ -2330,15 +2810,11 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                                                                 </div>
                                                                 <div>
                                                                     <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
-                                                                    <div className="relative">
-                                                                        <input
-                                                                            type="date"
-                                                                            value={paymentModalData.chequeDate}
-                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 pr-9 rounded-lg w-full focus:outline-none [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-2 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                                                        />
-                                                                        <Calendar className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                                    </div>
+                                                                    <CustomDateField
+                                                                        value={paymentModalData.chequeDate}
+                                                                        onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
+                                                                        placeholder="Cheque date"
+                                                                    />
                                                                 </div>
                                                             </div>
                                                         )}
@@ -2397,16 +2873,6 @@ const DatabaseExpenses = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
             </div>
-            <DateRangePicker
-                isOpen={showDateRangePicker}
-                onClose={() => setShowDateRangePicker(false)}
-                startDate={timestampStartDate}
-                endDate={timestampEndDate}
-                onApply={(from, to) => {
-                    setTimestampStartDate(from);
-                    setTimestampEndDate(to);
-                }}
-            />
         </body>
     );
 };

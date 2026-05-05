@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 // BillDatabase component - displays fully paid bills (verified + entered + fully paid with tick)
-const BillDatabase = ({ username, userRoles = [] }) => {
+const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
     const [apiData, setApiData] = useState([])
     // Modal states (match PendingBill style popups)
     const [showModal, setShowModal] = useState(false)
@@ -57,19 +57,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const [numberInputLocked, setNumberInputLocked] = useState(false)
     const [hasStartedEditing, setHasStartedEditing] = useState(false)
     const [previousEntryNumbers, setPreviousEntryNumbers] = useState({})
-    const [paymentEntries, setPaymentEntries] = useState([
-        {
-            id: 1,
-            date: '',
-            amount: '',
-            mode: '',
-            attachedFile: null,
-            chequeNo: '',
-            chequeDate: '',
-            transactionNumber: '',
-            accountNumber: ''
-        }
-    ])
+    const [paymentEntries, setPaymentEntries] = useState([])
     const [additionalFields, setAdditionalFields] = useState([])
     const [billData, setBillData] = useState([])
     const [serialNumber, setSerialNumber] = useState(1)
@@ -793,23 +781,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 return sum + amount + carryForwardAmount;
             }, 0);
             totalDiscount = existingPayments.reduce((sum, p) => sum + (parseFloat(p.discount_amount) || 0), 0)
-            // Pre-fill entries from existing payments
-            const mapped = existingPayments.map((p, idx) => ({
-                id: p.id || idx + 1,
-                date: p.date || '',
-                amount: p.amount || '',
-                amountDisplay: p.amount ? formatIndianCurrency(parseFloat(p.amount)) : '',
-                mode: p.vendor_bill_payment_mode || p.mode || '',
-                attachedFile: null,
-                chequeNo: p.cheque_number || p.cheque_no || '',
-                chequeDate: p.cheque_date || '',
-                transactionNumber: p.transaction_number || '',
-                accountNumber: p.account_number || ''
-            }))
-            setPaymentEntries(mapped)
-        } else {
-            setPaymentEntries([{ id: Date.now(), date: '', amount: '', amountDisplay: '', mode: '', attachedFile: null, chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' }])
         }
+        // Database payment modal is view-only; entries are not edited here (use Pending Bill to add payments)
+        setPaymentEntries([])
         setReceivedAmount(received)
         setDiscount(totalDiscount)
         setDiscountSubmitted(totalDiscount > 0)
@@ -1392,7 +1366,21 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             return
         }
         const billId = selectedEntryBill.id
-        const matchDetails = expenseMatchDetails[billId]
+        let matchDetails = expenseMatchDetails[billId]
+        // Lazy-load matching expenses only when user clicks Check (same as PendingBill.js)
+        // Compute + use results immediately (avoid relying on async state timing).
+        if (!matchDetails) {
+            try {
+                const [billEntries, expenses] = await Promise.all([
+                    fetchAllBillEntries(),
+                    fetchExpensesData()
+                ])
+                const result = calculateExpenseMatchStatus(expenses || [], billEntries || [])
+                matchDetails = result?.matchDetailsMap?.[billId] || null
+            } catch {
+                matchDetails = null
+            }
+        }
 
         if (!matchDetails || !matchDetails.matchingExpenses || matchDetails.matchingExpenses.length === 0) {
             alert('No matching expenses found for this bill')
@@ -1488,20 +1476,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     const handlePaymentCancel = () => {
         setShowPaymentModal(false)
         setSelectedPaymentBill(null)
-        setPaymentEntries([
-            {
-                id: 1,
-                date: '',
-                amount: '',
-                amountDisplay: '',
-                mode: '',
-                attachedFile: null,
-                chequeNo: '',
-                chequeDate: '',
-                transactionNumber: '',
-                accountNumber: ''
-            }
-        ])
+        setPaymentEntries([])
         setExistingPaymentDetails(null)
         setLoadingPaymentDetails(false)
         setDiscount(0)
@@ -2270,9 +2245,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     // Fetch tracker data
     const fetchTrackerData = async () => {
         setLoading(true);
-        setPaymentStatusesLoaded(false); // Reset so we show verified bills first, then re-check conditions
+        setError(null)
         try {
-            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers", {
+            // Mirror mobile Database.jsx exactly (non-paged endpoint)
+            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/enriched/paid", {
                 method: "GET",
                 credentials: "include",
                 headers: {
@@ -2283,8 +2259,16 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 throw new Error(`Network response was not ok: ${response.statusText}`);
             }
             try {
-                const data = await response.json();
-                setApiData(data);
+                // Same parsing style as mobile to avoid odd backend payload issues
+                const text = await response.text();
+                let data = []
+                try {
+                    data = JSON.parse(text)
+                } catch (e) {
+                    data = []
+                }
+                setApiData(Array.isArray(data) ? data : []); // keep backend order exactly
+                setPaymentStatusesLoaded(true)
             } catch (parseError) {
                 console.warn("Detected circular reference in API response. This needs to be fixed in the backend.");
                 setError("Invalid data format received from server");
@@ -2311,9 +2295,12 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 throw new Error(`Network response was not ok: ${response.statusText}`);
             }
             const data = await response.json();
-            setAllBillEntries(data);
+            const rows = Array.isArray(data) ? data : []
+            setAllBillEntries(rows);
+            return rows
         } catch (error) {
             console.error("Error fetching bill entries:", error);
+            return []
         }
     };
 
@@ -2331,13 +2318,17 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                 throw new Error(`Network response was not ok: ${response.statusText}`);
             }
             const data = await response.json();
-            setExpensesData(data);
+            const rows = Array.isArray(data) ? data : []
+            setExpensesData(rows);
+            return rows
         } catch (error) {
             console.error("Error fetching expenses data:", error);
+            return []
         }
     };
 
-    // Calculate expense match status for bills (ported from PendingBill). Returns { matchStatus, matchDetails } so callers can use without waiting for state.
+    // Calculate expense match status for bills (ported from PendingBill).
+    // Returns maps immediately so callers can use without waiting for async state.
     const calculateExpenseMatchStatus = (expenses, billEntries = allBillEntries) => {
         const matchStatus = {};
         const matchDetails = {};
@@ -2406,10 +2397,11 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         });
         setExpenseMatchStatus(matchStatus);
         setExpenseMatchDetails(prev => ({ ...prev, ...matchDetails }));
-        return { matchStatus, matchDetails };
+        return { matchStatusMap: matchStatus, matchDetailsMap: matchDetails };
     };
     // Get bill verification status
     const getBillVerificationStatus = (item) => {
+        if (item?.verification_status) return item.verification_status
         if (!item.billVerifications || item.billVerifications.length === 0) {
             return 'Verify'
         }
@@ -2429,6 +2421,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     }
     // Get entry status text
     const getEntryStatusText = (item) => {
+        if (item?.entry_status) return item.entry_status
         const matchStatus = expenseMatchStatus[item.id];
         const baseStatus = item.entry_status || 'Entry';
         if (matchStatus === 'complete_match') {
@@ -2501,6 +2494,8 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             return 'px-4 py-1.5 rounded-full text-sm font-semibold bg-[#E2F9E1] border cursor-pointer transition-all duration-200'
         } else if (status === 'Verified') {
             return 'px-5 py-1.5 rounded-full text-sm p-2 font-semibold border  cursor-pointer transition-all duration-200'
+        } else if (status === '✓ Entered') {
+            return 'px-6 py-2 rounded-full text-sm font-semibold bg-[#E2F9E1] border cursor-pointer transition-all duration-200 hover:bg-green-200'
         } else if (status === 'Entered') {
             return 'px-6 py-2 rounded-full text-sm font-semibold bg-[#FFD39E] border  cursor-pointer transition-all duration-200'
         } else if (status === '✓ Paid') {
@@ -2623,7 +2618,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
         // Filter by payment status
         if (filters.paymentStatus) {
             filteredData = filteredData.filter(item => {
-                const paymentStatus = paymentStatuses[item.id] || 'To Pay';
+                const paymentStatus = item.payment_status || '✓ Paid';
                 switch (filters.paymentStatus) {
                     case 'to-pay':
                         return paymentStatus === 'To Pay';
@@ -2738,7 +2733,11 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                     extraBills: '0',
                     totalAmount: ''
                 })
-                window.location.reload()
+                // Show loading in table immediately, then refetch in background
+                setLoading(true)
+                setTimeout(() => {
+                    fetchTrackerData()
+                }, 0)
             }
         } catch (error) {
             console.error('Error updating tracker details:', error)
@@ -2783,11 +2782,20 @@ const BillDatabase = ({ username, userRoles = [] }) => {
             alert(`An error occurred while deleting the tracker: ${error.message}`);
         }
     }
-    // Same load pattern as PendingBill.js: fetch tracker + expenses together; table shows when tracker returns; then bill entries when apiData is set; condition check when all data is ready.
+    // Mirror mobile Database.jsx: load once from `/trackers/enriched/paid` (also prefetches when tab is mounted hidden)
     useEffect(() => {
         fetchTrackerData();
-        fetchExpensesData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    const billPaymentsTabActivePrevRef = useRef(undefined);
+    useEffect(() => {
+        const prev = billPaymentsTabActivePrevRef.current;
+        billPaymentsTabActivePrevRef.current = billPaymentsTabActive;
+        if (!billPaymentsTabActive) return;
+        if (prev === false) {
+            fetchTrackerData();
+        }
+    }, [billPaymentsTabActive]);
     useEffect(() => {
         fetchVendorNames();
         fetchContractorNames();
@@ -2798,11 +2806,7 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         fetchUserList();
     }, []);
-    useEffect(() => {
-        if (apiData.length > 0) {
-            fetchAllBillEntries();
-        }
-    }, [apiData]);
+    // NOTE: We intentionally do NOT fetch expenses/bill-entries/payment-statuses for the list view.
     // Fetch account details
     const fetchAccountDetails = async () => {
         try {
@@ -2857,21 +2861,8 @@ const BillDatabase = ({ username, userRoles = [] }) => {
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions]);
     }, [vendorOptions, contractorOptions]);
-    // Same as PendingBill: one condition check when apiData, expensesData, allBillEntries are ready
-    useEffect(() => {
-        if (apiData.length > 0 && expensesData.length > 0 && allBillEntries.length > 0) {
-            calculateExpenseMatchStatus(expensesData, allBillEntries);
-        }
-    }, [apiData, expensesData, allBillEntries]);
-    // Same as PendingBill: fetch all payment statuses in parallel when apiData is set
-    useEffect(() => {
-        if (apiData.length === 0) return;
-        loadPaymentStatuses();
-    }, [apiData]);
-    // Show verified bills immediately; once payment statuses are loaded, filter to fully paid only
-    const baseData = paymentStatusesLoaded
-        ? apiData.filter(isFullyFinished)
-        : apiData.filter((item) => getBillVerificationStatus(item) === '✓ Verified');
+    // Backend already returns only fully-paid enriched rows for the list.
+    const baseData = apiData;
     const filteredData = getFilteredData(baseData);
     const sortedData = applySorting(filteredData);
     return (
@@ -3129,10 +3120,10 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                         </td>
                                         <td className=" py-3 text-left pr-4 text-sm border-b border-gray-100">
                                             <button
-                                                className={`${getButtonClass(paymentStatuses[item.id] || (paymentStatusesLoaded ? 'To Pay' : '...'))}`}
+                                                className={`${getButtonClass(item.payment_status || '✓ Paid')}`}
                                                 onClick={() => handlePaymentClick(item)}
                                             >
-                                                {paymentStatusesLoaded ? (paymentStatuses[item.id] || 'To Pay') : 'Checking...'}
+                                                {item.payment_status || '✓ Paid'}
                                             </button>
                                         </td>
                                         <td className="px-2 py-3 text-left text-sm border-b border-gray-100">
@@ -3557,155 +3548,19 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                         </div>
                         <div className="flex-1 overflow-hidden">
                             <div className="flex gap-10 h-full">
-                                <div className="flex-1 flex flex-col">
+                                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
                                     {loadingPaymentDetails && (
                                         <div className="px-6 py-4 text-center">
                                             <div className="text-sm text-gray-500">Loading existing payment details...</div>
                                         </div>
                                     )}
-                                    {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
-                                        <>
-                                            <div className="flex-1 overflow-y-auto p-4">
-                                                {paymentEntries.map((entry, index) => {
-                                                    const existingPaymentCount = existingPaymentDetails?.length || 0;
-                                                    const paymentNumber = existingPaymentCount + index + 1;
-                                                    return (
-                                                        <div key={entry.id} className="text-left p- shadow-lg rounded-lg">
-                                                            <div className="mb-2">
-                                                                <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
-                                                            </div>
-                                                            <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-50' : ''}`}>
-                                                                <div className="flex-1">
-                                                                    <label className="block font-semibold mb-1 text-sm">Date</label>
-                                                                    <input
-                                                                        type="date"
-                                                                        value={entry.date}
-                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'date', e.target.value)}
-                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                        className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex-1">
-                                                                    <label className="block font-semibold mb-1 text-sm">Amount</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Enter Amount"
-                                                                        value={entry.amountDisplay || ''}
-                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
-                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                        className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex-1">
-                                                                    <label className="block font-semibold mb-1 text-sm">Mode</label>
-                                                                    <select
-                                                                        value={entry.mode}
-                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'mode', e.target.value)}
-                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                        className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                    >
-                                                                        <option value="">Select</option>
-                                                                        <option value="Cash">Cash</option>
-                                                                        <option value="Direct">Direct</option>
-                                                                        <option value="Net Banking">Net Banking</option>
-                                                                        <option value="Gpay">Gpay</option>
-                                                                        <option value="PhonePe">PhonePe</option>
-                                                                        <option value="Cheque">Cheque</option>
-                                                                    </select>
-                                                                    <div className="mt-1 px-6">
-                                                                        <button className="text-[#E4572E] text-sm flex items-center gap-1"
-                                                                            onClick={() => document.getElementById(`file-input-${entry.id}`).click()}
-                                                                        >
-                                                                            Attach file
-                                                                        </button>
-                                                                        <input
-                                                                            id={`file-input-${entry.id}`}
-                                                                            type="file"
-                                                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
-                                                                            className="hidden"
-                                                                            onChange={(e) => handleFileAttachment(entry.id, e.target.files[0])}
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            {(entry.mode === "Gpay" || entry.mode === "PhonePe" || entry.mode === "Net Banking" || entry.mode === "Cheque") && (
-                                                                <div className="mt-4 p-4 border border-[#BF9853] border-opacity-25 rounded-lg">
-                                                                    <div className="space-y-4">
-                                                                        {entry.mode === "Cheque" && (
-                                                                            <div className="grid grid-cols-2 gap-4">
-                                                                                <div>
-                                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
-                                                                                    <input
-                                                                                        type="text"
-                                                                                        value={entry.chequeNo}
-                                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeNo', e.target.value)}
-                                                                                        placeholder="Enter cheque number"
-                                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                        className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                                    />
-                                                                                </div>
-                                                                                <div>
-                                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
-                                                                                    <input
-                                                                                        type="date"
-                                                                                        value={entry.chequeDate}
-                                                                                        onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeDate', e.target.value)}
-                                                                                        disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                        className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="grid grid-cols-2 gap-4">
-                                                                            <div>
-                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={entry.transactionNumber}
-                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'transactionNumber', e.target.value)}
-                                                                                    placeholder="Enter transaction number"
-                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                                />
-                                                                            </div>
-                                                                            <div>
-                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                                                                                <select
-                                                                                    value={entry.accountNumber}
-                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'accountNumber', e.target.value)}
-                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                                                                >
-                                                                                    <option value="">Select Account</option>
-                                                                                    {accountDetails.map((account) => (
-                                                                                        <option key={account.id} value={account.account_number}>
-                                                                                            {account.account_number}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
-                                                    <div className="flex py-3">
-                                                        <button
-                                                            onClick={handleAddPaymentEntry}
-                                                            className="text-[#E4572E] text-sm font-semibold border-dashed border-b-2 border-[#BF9853] cursor-pointer hover:text-[#c44a26] transition-colors duration-200 flex items-center gap-1"
-                                                        >
-                                                            <span className="text-red-500">+</span> Add on
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
+                                    {!loadingPaymentDetails && (!existingPaymentDetails || existingPaymentDetails.length === 0) && (
+                                        <div className="px-6 py-10 text-center text-sm text-gray-500">
+                                            No payment records for this bill.
+                                        </div>
                                     )}
                                     {existingPaymentDetails && existingPaymentDetails.length > 0 && (
-                                        <div className="p-w pl-4 overflow-auto h-[700px] mb-2">
+                                        <div className="pl-4 pr-4 pb-4 mb-2">
                                             <h4 className="text-sm font-semibold text-gray-700 mt-2">Previous Payment Details:</h4>
                                             <div className="space-y-4">
                                                 {[...existingPaymentDetails].reverse().map((payment, index) => {
@@ -3836,18 +3691,13 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex justify-end gap-3 bg-white mb-4">
-                                        <button className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium"
+                                    <div className="flex justify-end gap-3 bg-white mb-4 px-4">
+                                        <button
+                                            type="button"
+                                            className="px-6 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium hover:bg-[#FAF6ED] transition-colors"
                                             onClick={handlePaymentCancel}
                                         >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            className={`px-4 py-2 rounded-lg font-medium ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'text-white bg-[#BF9853]'}`}
-                                            onClick={handlePaymentSubmit}
-                                            disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                        >
-                                            {paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'Fully Paid' : 'Submit'}
+                                            Close
                                         </button>
                                     </div>
                                 </div>
@@ -3953,9 +3803,9 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={useCarryForward}
-                                                                    onChange={(e) => setUseCarryForward(e.target.checked)}
-                                                                    disabled={carryForwardAmount <= 0 || paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className="w-4 h-4 cursor-pointer"
+                                                                    disabled
+                                                                    title="View only — add or adjust payments from Pending Bill"
+                                                                    className="w-4 h-4 cursor-not-allowed opacity-60"
                                                                 />
                                                             </div>
                                                             <span className={`font-semibold ${useCarryForward ? 'text-green-600' : ''}`}>
@@ -3976,27 +3826,11 @@ const BillDatabase = ({ username, userRoles = [] }) => {
                                                                         ? ''
                                                                         : discount.toLocaleString('en-IN')
                                                                 }
-                                                                onChange={(e) => {
-                                                                    if (!discountSubmitted) {
-                                                                        const rawValue = e.target.value.replace(/,/g, '').replace(/\D/g, '');
-                                                                        const newDiscount = Number(rawValue) || 0;
-                                                                        setDiscount(newDiscount);
-                                                                    }
-                                                                }}
-                                                                onKeyDown={(e) => {
-                                                                    if (!discountSubmitted && e.key === 'Backspace' && discount === 0) {
-                                                                        setDiscount('');
-                                                                    }
-                                                                }}
-                                                                disabled={discountSubmitted}
-                                                                className={`w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded focus:outline-none ${discountSubmitted ? 'bg-gray-100 cursor-not-allowed' : ''
-                                                                    }`}
+                                                                readOnly
+                                                                tabIndex={-1}
+                                                                className="w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded bg-gray-50 cursor-default"
                                                                 placeholder="0"
-                                                                title={
-                                                                    discountSubmitted
-                                                                        ? 'Discount already applied in previous payment'
-                                                                        : 'Enter discount amount'
-                                                                }
+                                                                title="View only — discount is shown from saved payments"
                                                             />
                                                         </div>
                                                         <hr className="border-gray-300" />

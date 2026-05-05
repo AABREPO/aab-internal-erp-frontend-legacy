@@ -8,6 +8,11 @@ import StatementMobile from './Statement';
 import Kebab from '../Images/Kebab.svg';
 import { useNavigate } from 'react-router-dom';
 
+const BILL_PAYMENTS_TAB_STORAGE_KEY = 'billPaymentsTrackerActiveTab';
+
+const isValidBillPaymentsMobileTab = (tab) =>
+	tab === 'pendingbill' || tab === 'billdatabase' || tab === 'billstatement';
+
 const MobileTabs = ({ activeTab = 'pendingbill', onTabChange }) => {
 	const tabsContainerRef = useRef(null);
 	const activeTabRef = useRef(null);
@@ -215,11 +220,16 @@ const MobileBillPaymentsTracker = ({ user, onLogout }) => {
 		}
 	};
 	const [activeTab, setActiveTab] = useState(() => {
-		const saved = localStorage.getItem('activePaintTab');
-		return saved || 'pendingbill';
+		let tab = localStorage.getItem(BILL_PAYMENTS_TAB_STORAGE_KEY);
+		if (!isValidBillPaymentsMobileTab(tab)) {
+			const legacy = localStorage.getItem('activePaintTab');
+			if (isValidBillPaymentsMobileTab(legacy)) tab = legacy;
+			else tab = 'pendingbill';
+		}
+		return tab;
 	});
 	useEffect(() => {
-		localStorage.setItem('activePaintTab', activeTab);
+		localStorage.setItem(BILL_PAYMENTS_TAB_STORAGE_KEY, activeTab);
 	}, [activeTab]);
 	return (
 		<div className="w-full flex justify-center bg-white" style={{ fontFamily: "'Manrope', sans-serif" }}>

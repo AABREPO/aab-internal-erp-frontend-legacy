@@ -33,6 +33,17 @@ function cleanUrl(url) {
     return cleanedUrl;
 }
 const History = ({ username, userRoles = [], viewMode = 'default' }) => {
+    const resolveEnteredBy = () => {
+        const propUsername = typeof username === 'string' ? username.trim() : '';
+        if (propUsername) return propUsername;
+        try {
+          const user = JSON.parse(localStorage.getItem("user") || "{}");
+          return user?.name || user?.username || user?.userName || '';
+        } catch {
+          return '';
+        }
+      };
+      const enteredBy = resolveEnteredBy();
     const normalizedUsername = username?.trim();
     const canEditDelete = normalizedUsername === 'Admin' || normalizedUsername === 'Mahalingam M';
     const isExpensesEntryUploadOnly = viewMode === 'expenses-entry-upload';
@@ -537,7 +548,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         }
     };
     const handleFileUploadClick = (row) => {
-        if (row.type === 'Bill Payment') {
+        if (row.type === 'Bill Payment' || row.type === 'Claim') {
             const project = siteOptions.find((opt) => Number(opt.id) === Number(row.project_id));
             const resolvedSiteName = project?.label ?? '';
             const isSummaryBillProject = String(resolvedSiteName).trim() === "Summary Bill";
@@ -562,10 +573,12 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 (rawCid != null && !Number.isNaN(Number(rawCid)) ? getContractorName(Number(rawCid)) : "") ??
                 "";
             const prefill = {
-                accountType: 'Bill Payments',
+                accountType: row.type === 'Claim' ? 'Claim' : 'Bill Payments',
                 siteName,
                 amount: row.amount,
                 date: dateStr,
+                client_id: row.client_id ?? row.clientId ?? "",
+                client_name: row.client_name ?? row.clientName ?? "",
                 vendorId:
                     rawVid != null && String(rawVid).trim() !== '' && !Number.isNaN(Number(rawVid))
                         ? Number(rawVid)
@@ -635,6 +648,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 sessionStorage.setItem("paymentMode", JSON.stringify("Cash"));
                 sessionStorage.removeItem("description");
                 if (dateStr) sessionStorage.setItem("cashRegisterBillSettlementDate", JSON.stringify(dateStr));
+                // used by AdvancePortal popup to update this weekly expense row with uploaded bill URL
+                sessionStorage.setItem("advancePortalWeeklyExpenseIdForBillCopyUrl", JSON.stringify(row.id));
             } catch {
                 // ignore
             }
@@ -1001,9 +1016,13 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
     useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]); }, [vendorOptions, contractorOptions, employeeOptions]);
 
     const siteOptionsForNewEntry = useMemo(() => {
-        return (siteOptions || []).filter(
-            (opt) => String(opt?.label || opt?.value || "").trim() !== "Multi-Project Batch"
-        );
+        const hiddenPredefinedIds = new Set([1, 2, 3, 4, 5, 6, 8, 9, 10, 11]);
+        return (siteOptions || []).filter((opt) => {
+            if (String(opt?.label || opt?.value || "").trim() === "Multi-Project Batch") return false;
+            const idNum = Number(opt?.id);
+            if (Number.isFinite(idNum) && hiddenPredefinedIds.has(idNum)) return false;
+            return true;
+        });
     }, [siteOptions]);
     useEffect(() => {
         const predefinedSiteOptions = [
@@ -1149,8 +1168,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                     const weekYear = getWeekYear(weekStartDate);
                     const hasData = weeksWithData.has(weekNum);
                     const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
-                    const isFutureWeek = weekEndDate > new Date();
-                    if (hasData || (weekYear === selectedYear && (isCurrentWeek || isFutureWeek))) {
+                    // Only include weeks up to current week (no future weeks). Keep weeks that already have data.
+                    if (hasData || (weekYear === selectedYear && isCurrentWeek)) {
                         allWeeks.push(weekInfo);
                     }
                 }
@@ -1604,7 +1623,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             const expensePayloadToSave = {
                 ...pendingLoanData.expensePayload,
                 loan_portal_id: loanResponse?.id || loanResponse?.loanPortalId || null,
-                enteredBy: username,
+                entered_by: enteredBy,
             };
 
             const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/update/save", {
@@ -1878,7 +1897,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             description: "",
             file_url: "",
             branch_id: activeBranchId ?? null,
-            enteredBy: username,
+            entered_by: enteredBy,
         };
         const saveResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/save", {
             method: "POST",
@@ -1971,7 +1990,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             staff_advance_portal_id: null,
             loan_portal_id: null,
             branch_id: activeBranchId,
-            enteredBy: username,
+            entered_by: enteredBy,
         };
         try {
             if (newExpense.type === "Loan") {
@@ -2028,7 +2047,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                         description: "",
                         file_url: null,
                         branch_id: activeBranchId ?? null,
-                        enteredBy: username,
+                        entered_by: enteredBy,
                     };
                     const staffAdvanceResponse = await fetch(
                         "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -2100,7 +2119,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 period_start_date: new Date().toISOString().split("T")[0],
                 period_end_date: new Date().toISOString().split("T")[0],
                 branch_id: activeBranchId,
-                enteredBy: username,
+                entered_by: enteredBy,
             };
             try {
                 const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payments-received/update/save", {
@@ -2363,7 +2382,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         };
         drawHeader(doc, "WEEKLY PAYMENT REPORT");
         const expensesHeaders = [["SNO", "Date", "Party", "Project Name", "Type", "Amount", "AC", "C", ""]];
-        const pdfFilteredExpenses = expenses.filter(row => row.type === "Bill Payment" || row.type === "Wage");
+        const pdfFilteredExpenses = expenses.filter(row => row.type === "Bill Payment" || row.type === "Wage" || row.type === "Bill Settlement");
         const expensesData = pdfFilteredExpenses.map((row, idx) => [
             String(idx + 1 || ""),
             String(row.date ? formatDateOnly(row.date) : ""),
@@ -2749,7 +2768,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             });
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         }
-        const excludedTypes = ["Bill Payment", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus"];
+        const excludedTypes = ["Bill Payment", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus", "Bill Settlement"];
         const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];
         otherExpenseTypes.forEach((expenseType) => {
             const typeEntries = expenses.filter(e => e.type === expenseType);
@@ -3048,7 +3067,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                             description: "",
                             file_url: null,
                             branch_id: activeBranchId ?? null,
-                            enteredBy: username,
+                            entered_by: enteredBy,
                         };
                         const staffAdvanceResponse = await fetch(
                             "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -3081,7 +3100,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 type_id: getWeeklyExpenseTypeId(row.type),
             };
             const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/edit/${row.id}?username=${encodeURIComponent(
-                username
+                enteredBy
             )}`,
                 {
                     method: "PUT",
@@ -3158,7 +3177,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
                 type_id: getWeeklyReceivedTypeId(row.type),
             };
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(username)}`, {
+            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/payments-received/update/${row.id}?username=${encodeURIComponent(enteredBy)}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -4022,7 +4041,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                     ) : (
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
-                                                                <span className={row.type === "Claim" && !row.send_to_expenses_entry ? "text-red-500" : ""}>{row.type}</span>
+                                                                <span>{row.type}</span>
 
                                                                 {!isExpensesEntryUploadOnly && (
                                                                     <button
@@ -4745,19 +4764,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                 </div>
                             </div>
                         )}
-                        <div className="flex justify-between items-center mt-6">
-                            {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && !currentProjectAdvanceRow.send_to_expenses_entry && (
-                                <button
-                                    onClick={() => {
-                                        setSelectedCategory(null);
-                                        setIsConfirmingCategory(false);
-                                        setShowCategoryPopup(true);
-                                    }}
-                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                                >
-                                    Add To Expense Entry
-                                </button>
-                            )}
+                        <div className="flex justify-end items-center mt-6">
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => {
@@ -4815,7 +4822,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             payment_mode: paymentPopupData.paymentMode,
                                                             not_allow_to_edit: true,
                                                             branch_id: activeBranchId ?? null,
-                                                            enteredBy: username,
+                                                            source: "Cash Register",
+                                                            entered_by: enteredBy,
                                                         };
                                                         const advanceResponse = await fetch(
                                                             "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
@@ -4864,7 +4872,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             labour_id: 0,
                                                             not_allow_to_edit: true,
                                                             branch_id: activeBranchId ?? null,
-                                                            enteredBy: username,
+                                                            entered_by: enteredBy,
+                                                            source: "Cash Register",
                                                         };
                                                         const staffAdvanceResponse = await fetch(
                                                             "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -4904,7 +4913,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                     transaction_number: paymentPopupData.transactionNumber || null,
                                                     account_number: paymentPopupData.accountNumber || null,
                                                     branch_id: activeBranchId ?? null,
-                                                    enteredBy: username,
+                                                    entered_by: enteredBy,
+                                                    source: "Cash Register",
                                                 };
                                                 const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
                                                     method: "POST",
@@ -5284,7 +5294,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                             source: "Cash Register",
                                             billCopyUrl: cleanUrl(currentProjectAdvanceRow.bill_copy_url || ''),
                                             branchId: activeBranchId ?? null,
-                                            enteredBy: username,
+                                            enteredBy: enteredBy,
                                         };
                                         const expensesFormResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/save', {
                                             method: 'POST',

@@ -9,7 +9,7 @@ import jsPDF from 'jspdf';
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
 
-const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
+const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWeeklyExpensesSave = false }) => {
     const predefinedSiteOptions = [
         { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
         { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
@@ -509,6 +509,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
         if (prefillDataStr && siteOptions.length > 0 && accountTypeOptions.length > 0) {
             try {
                 const prefillData = JSON.parse(prefillDataStr);
+                // Always capture weeklyExpenseId for bill-copy-url sync (Bill Payments / Claim / etc).
+                if (prefillData.weeklyExpenseId != null && prefillData.weeklyExpenseId !== '') {
+                    const wid = Number(prefillData.weeklyExpenseId);
+                    if (Number.isFinite(wid)) {
+                        setWeeklyExpenseIdForBillCopyUrl(wid);
+                    }
+                }
 
                 if (prefillData.accountType === 'Bill Payments') {
                     const vid = prefillData.vendorId ?? prefillData.vendor_id;
@@ -634,12 +641,6 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     if (prefillData.fromWeeklyCashRegister) {
                         setBillPaymentsCashRegisterPrefill(true);
                         setPaymentMode('Cash');
-                    }
-                    if (prefillData.weeklyExpenseId != null && prefillData.weeklyExpenseId !== '') {
-                        const wid = Number(prefillData.weeklyExpenseId);
-                        if (Number.isFinite(wid)) {
-                            setWeeklyExpenseIdForBillCopyUrl(wid);
-                        }
                     }
                     if (didApplyParty) {
                         billPaymentsPrefillAttemptsRef.current = 0;
@@ -1344,10 +1345,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             alert('PDF file is required for Bill Refund.');
             return false;
         }
-        if ((selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && !String(billArrivalDate || '').trim()) {
-            alert('Please select Bill Arrival Date for Bill Payments and Bill Refund.');
-            return false;
-        }
+        // Bill Arrival Date is optional for Bill Payments / Bill Refund
         if ((selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments') && !selectedFile) {
             alert('PDF file is required for this account type.');
             return false;
@@ -1593,7 +1591,8 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     console.error('Could not verify saved data:', verifyError);
                 }
             }
-            if (paymentMode === 'Cash' && expensesId && selectedAccountType !== 'Bill Payments') {
+            // When opened from Cash Register file-upload flows, we must NOT create a weekly-expenses row here.
+            if (!disableWeeklyExpensesSave && paymentMode === 'Cash' && expensesId && selectedAccountType !== 'Bill Payments') {
                 let vendorId = null;
                 let contractorId = null;
                 if (selectedType === 'Vendor' && selectedOption) {
@@ -1773,10 +1772,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
             alert('PDF file is required for this account type.');
             return;
         }
-        if (selectedAccountType === 'Bill Payments' && !String(billArrivalDate || '').trim()) {
-            alert('Please select Bill Arrival Date for Bill Payments.');
-            return;
-        }
+        // Bill Arrival Date is optional for Bill Payments
         setIsSubmitting(true);
         try {
             let pdfUrl = '';
@@ -2082,7 +2078,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
     }, []);
 
     return (
-        <div className={embedded ? '' : 'bg-[#FAF6ED] min-h-screen'}>
+        <div className={embedded ? '' : 'bg-[#FAF6ED]  px-6'}>
             <style jsx>{`
                 input:hover, select:hover {
                     border-color: rgba(191, 152, 83, 0.2) !important;
@@ -2092,10 +2088,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                     outline: none !important;
                 }
             `}</style>
-            <div className={`${embedded ? '' : 'mx-auto'} p-6 pb-10 bg-white rounded-lg shadow-lg w-full max-w-[1824px]`}>
+            <div className={`p-6 pb-20 bg-white rounded shadow-lg w-full `}>
                 <form onSubmit={handleFormSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-1">
                             {summaryBillMode && (
                                 <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                                     <div className="text-sm font-semibold text-orange-800">
@@ -2132,56 +2128,61 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                     </div>
                                 </div>
                             )}
-                            <div className="flex mb-4 items-center gap-4">
-                                <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
-                                <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] bg-white w-[182px]"
-                                    value={selectedAccountType}
-                                    onChange={(e) => {
-                                        const selectedValue = e.target.value;
-                                        setSelectedAccountType(selectedValue);
-                                        const selectedOption = accountTypeOptions.find(option => option.value === selectedValue);
-                                        if (selectedOption) {
-                                            console.log("Selected ID:", selectedOption.id);
-                                        }
-                                    }}>
-                                    <option value="" disabled>--- Select ---</option>
-                                    {accountTypeOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className='text-left flex gap-4'>
-                                <div>
-                                    <label className="text-md font-semibold block mb-1">Date <span className="text-red-500">*</span></label>
+                            <div className='flex gap-10 mb-3 flex-wrap items-start'>
+                                <div className='text-left'>
+                                    <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
+                                    <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] bg-white w-[290px]"
+                                        value={selectedAccountType}
+                                        onChange={(e) => {
+                                            const selectedValue = e.target.value;
+                                            setSelectedAccountType(selectedValue);
+                                            const selectedOption = accountTypeOptions.find(option => option.value === selectedValue);
+                                            if (selectedOption) {
+                                                console.log("Selected ID:", selectedOption.id);
+                                            }
+                                        }}>
+                                        <option value="" disabled>--- Select ---</option>
+                                        {accountTypeOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {selectedAccountType === 'Utility Bills' && (
+                                        <div className='mt-3 w-[290px]'>
+                                            <h4 className="text-base font-semibold mb-2">Utility Type <span className="text-red-500">*</span></h4>
+                                            <Select
+                                                options={[
+                                                    { value: 'Electricity', label: 'Electricity' },
+                                                    { value: 'Property', label: 'Property' },
+                                                    { value: 'Water', label: 'Water' },
+                                                    { value: 'Telecom', label: 'Telecom' },
+                                                    { value: 'Subscription', label: 'Subscription' },
+                                                ]}
+                                                value={utilityType ? { value: utilityType, label: utilityType } : null}
+                                                onChange={(selectedOption) => setUtilityType(selectedOption ? selectedOption.value : '')}
+                                                placeholder="--- Select ---"
+                                                styles={customStyles}
+                                                isSearchable={false}
+                                                className="custom-select rounded-lg w-[290px] h-[45px]"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className='text-left'>
+                                    <label className="text-md font-semibold mb-2 block">Date <span className="text-red-500">*</span></label>
                                     <input
                                         type="date"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
-                                        className="border-2 border-[#BF9853] w-[168px] h-[45px] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20]"
+                                        className="border-2 border-[#BF9853] w-[290px] h-[45px] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20]"
                                     />
                                 </div>
-                                {selectedAccountType === 'Utility Bills' && (
-                                    <div className='text-left lg:ml-[145px] md:ml-[-70px]'>
-                                        <h4 className="text-base font-semibold mb-2 ">Utility Type <span className="text-red-500">*</span></h4>
-                                        <select
-                                            className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[182px]"
-                                            value={utilityType}
-                                            onChange={(e) => setUtilityType(e.target.value)}
-                                        >
-                                            <option value="" disabled>--- Select ---</option>
-                                            <option value="Electricity">Electricity</option>
-                                            <option value="Property">Property</option>
-                                            <option value="Water">Water</option>
-                                            <option value="Telecom">Telecom</option>
-                                            <option value="Subscription">Subscription</option>
-                                        </select>
-                                    </div>
-                                )}
                             </div>
                         </div>
-                        <div>
+                        <div className="md:col-start-1 md:row-start-2">
                             <div className='flex gap-10 mb-3'>
                                 <div className='text-left'>
                                     <label className="text-md font-semibold mb-2  block">Project Name <span className="text-red-500">*</span></label>
@@ -2433,7 +2434,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                 <div className="flex gap-10 mb-3">
                                     <div className="text-left">
                                         <label className="text-md font-semibold mb-2 block">
-                                            Bill Arrival Date <span className="text-red-500">*</span>
+                                            Bill Arrival Date
                                         </label>
                                         <input
                                             type="date"
@@ -2486,7 +2487,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                         </div>
                         {/* Advance history table for selected project and vendor/contractor (same logic as Advance Portal) */}
                         {embedded ? null : (
-                        <div className="hidden lg:flex flex-col items-stretch -ml-[120px]">
+                        <div className="hidden lg:flex flex-col items-stretch -ml-[120px] lg:col-start-2 lg:row-start-1">
                             <div className="flex items-center mb-2">
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-base font-semibold text-[#E4572E]">Advance </h2>
@@ -2497,7 +2498,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                         className="border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs"
                                     />
                                 </div>
-                                <div className="flex flex-wrap gap-3 ml-44">
+                                <div className="flex flex-wrap gap-4 ml-4">
                                     <span className="text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm">Export PDF</span>
                                     <span className="text-[#007233] font-semibold hover:underline cursor-pointer text-sm">Export XL</span>
                                     <span className="text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm">Print</span>
@@ -2505,14 +2506,14 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                             </div>
                             <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full max-w-[640px]">
                                 <div className="overflow-x-auto max-h-[430px] overflow-y-auto thin-scrollbar w-full">
-                                    <table className="w-full">
+                                    <table className="w-auto table-auto border-collapse">
                                         <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                                             <tr>
-                                                <th className="px-4 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
-                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Advance</th>
-                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Bill</th>
-                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
-                                                <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
+                                                <th className="pl-4 pr-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
+                                                <th className="pl-0 pr-5 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Advance</th>
+                                                <th className="pl-0 pr-5 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Bill</th>
+                                                <th className="pl-0 pr-6 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
+                                                <th className="pl-0 pr-4 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -2581,13 +2582,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                                     }
                                                     return (
                                                         <tr key={index} className="border-t hover:bg-gray-50">
-                                                            <td className="px-4 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
+                                                            <td className="pl-4 pr-6 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
                                                                 {entryDate ? new Date(entryDate).toLocaleDateString('en-GB') : ''}
                                                             </td>
-                                                            <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
+                                                            <td className="pl-0 pr-5 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
                                                                 {advanceAmount}
                                                             </td>
-                                                            <td className="px-2 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
+                                                            <td className="pl-0 pr-5 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
                                                                 {billAmount && file_url ? (
                                                                     <a
                                                                         href={file_url}
@@ -2601,10 +2602,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                                                     billAmount
                                                                 )}
                                                             </td>
-                                                            <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
+                                                            <td className="pl-0 pr-6 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
                                                                 {transferOrRefund}
                                                             </td>
-                                                            <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
+                                                            <td className="pl-0 pr-4 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
                                                                 {payment_mode || ''}
                                                             </td>
                                                         </tr>
@@ -2947,7 +2948,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess }) => {
                                             {(selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && (
                                                 <div>
                                                     <label className="text-sm font-semibold mb-1 block">
-                                                        Bill Arrival Date <span className="text-red-500">*</span>
+                                                        Bill Arrival Date
                                                     </label>
                                                     <input
                                                         type="date"

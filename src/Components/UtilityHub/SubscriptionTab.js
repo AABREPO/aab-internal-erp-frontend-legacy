@@ -51,7 +51,9 @@ const customSelectStyles = {
   placeholder: (provided) => ({
     ...provided,
     color: '#9CA3AF'
-  })
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 100000 }),
+  menu: (base) => ({ ...base, zIndex: 100000 })
 };
 
 const toLower = (value) => (value ? value.toString().toLowerCase() : '');
@@ -84,6 +86,8 @@ const formatAmount = (value) => {
 const SubscriptionTab = () => {
   const [filters, setFilters] = useState({
     year: new Date().getFullYear().toString(),
+    month: monthLabels[new Date().getMonth()],
+    paymentStatus: '',
     provider: '',
     serviceNumber: '',
     registered: '',
@@ -109,6 +113,14 @@ const SubscriptionTab = () => {
   });
   const [selectedRowData, setSelectedRowData] = useState(null);
   const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
+  const paymentStatusOptions = [
+    { value: 'Paid', label: 'Paid' },
+    { value: 'Unpaid', label: 'Unpaid' }
+  ];
+  const selectPortalProps = {
+    menuPortalTarget: document.body,
+    menuPosition: 'fixed'
+  };
 
   useEffect(() => {
     const fetchSubscriptionData = async () => {
@@ -243,6 +255,24 @@ const SubscriptionTab = () => {
     const purposeFilter = toLower(filters.purpose);
     const projectNameFilter = toLower(filters.projectName);
 
+    const matchesPaymentFilters = (detail) => {
+      const selectedMonth = filters.month;
+      const selectedStatus = filters.paymentStatus;
+      if (!selectedMonth && !selectedStatus) return true;
+
+      const evaluateMonth = (month) => {
+        const paymentData = getPaymentData(detail.serviceNumber, month, detail.utilitySubscriptionId);
+        const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+        const isUnpaid = paymentData.amount === '0';
+        if (selectedStatus === 'Paid') return isPaid;
+        if (selectedStatus === 'Unpaid') return isUnpaid;
+        return true;
+      };
+
+      if (selectedMonth) return evaluateMonth(selectedMonth);
+      return monthLabels.some((m) => evaluateMonth(m));
+    };
+
     const filtered = projects.reduce((acc, project) => {
       if (selectedCategory && project.projectCategory !== selectedCategory) {
         return acc;
@@ -281,6 +311,10 @@ const SubscriptionTab = () => {
           if (paymentYear !== filters.year) {
             return false;
           }
+        }
+
+        if (!matchesPaymentFilters(detail)) {
+          return false;
         }
 
         return true;
@@ -367,9 +401,7 @@ const SubscriptionTab = () => {
       freqData.subscriptionFrequencyNo ?? freqData.SubscriptionFrequencyNo ?? freqData.subscription_frequency_no ?? 0,
       10
     );
-    if (!frequency || Number.isNaN(frequency) || frequency <= 0) {
-      return true;
-    }
+    if (Number.isNaN(frequency) || frequency < 0) return true;
 
     const startMonthKey =
       freqData.startingMonthOfSubscriptionFrequency ??
@@ -389,6 +421,8 @@ const SubscriptionTab = () => {
     const currentMonth = parseInt(month, 10);
     const currentYear = parseInt(year, 10);
     const monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+    // Frequency 0 means: from starting month onwards, no payment required (show "-")
+    if (frequency === 0) return monthsSinceStart < 0;
     return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
   };
 
@@ -739,9 +773,9 @@ const SubscriptionTab = () => {
 
   return (
     <div className="bg-[#FAF6ED] rounded-lg shadow-sm">
-      <div className="bg-white rounded-md mb-5 h-[128px] ml-5 mr-5">
+      <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
         <div className="p-6">
-          <div className="flex text-left gap-4">
+          <div className="grid grid-cols-5 gap-4 text-left">
             <div>
               <label className="block font-semibold mb-1">Year</label>
               <Select
@@ -754,7 +788,37 @@ const SubscriptionTab = () => {
                 onChange={(selectedOption) => handleFilterChange('year', selectedOption)}
                 placeholder="Select Year"
                 isClearable
+                isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Month</label>
+              <Select
+                options={monthLabels.map((m) => ({ value: m, label: m }))}
+                value={filters.month ? { value: filters.month, label: filters.month } : null}
+                onChange={(selectedOption) => handleFilterChange('month', selectedOption)}
+                placeholder="Select Month"
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+                {...selectPortalProps}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Payment Status</label>
+              <Select
+                options={paymentStatusOptions}
+                value={filters.paymentStatus ? { value: filters.paymentStatus, label: filters.paymentStatus } : null}
+                onChange={(selectedOption) => handleFilterChange('paymentStatus', selectedOption)}
+                placeholder="Select Status"
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -768,6 +832,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -781,6 +846,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -794,6 +860,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -807,6 +874,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -820,6 +888,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -833,6 +902,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>
@@ -846,6 +916,7 @@ const SubscriptionTab = () => {
                 isClearable
                 isSearchable
                 styles={customSelectStyles}
+                {...selectPortalProps}
                 className="w-full"
               />
             </div>

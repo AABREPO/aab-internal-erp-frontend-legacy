@@ -962,35 +962,7 @@ const InputData = ({ username, userRoles = [] }) => {
     };
     fetchTenants();
   }, []);
-  useEffect(() => {
-    const fetchTenantsWithShop = async () => {
-      try {
-        const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenantShop/getAll');
-        const updatedTenants = response.data
-        setTenantList(updatedTenants);
-        const usedShopsArray = updatedTenants.flatMap((tenant) =>
-          tenant.property?.flatMap((prop) =>
-            prop.shops?.map((shop) => shop.shopNo).filter(Boolean)
-          ) || []
-        );
-        const usedShops = new Set(usedShopsArray.map(s => String(s)));
-        setUsedShopNos(usedShops);
-        const shopsWithClosureArray = updatedTenants.flatMap((tenant) =>
-          tenant.property?.flatMap((prop) =>
-            prop.shops
-              ?.filter((shop) => shop.shopNo && shop.shopClosureDate)
-              .map((shop) => shop.shopNo)
-              .filter(Boolean)
-          ) || []
-        );
-        const shopsWithClosure = new Set(shopsWithClosureArray.map(s => String(s)));
-        setShopsWithClosureDate(shopsWithClosure);
-      } catch (error) {
-        console.error('Error fetching tenants:', error);
-      }
-    };
-    fetchTenantsWithShop();
-  }, []);
+  
   useEffect(() => {
     const fetchTenantLinkWithShop = async () => {
       try {
@@ -1018,27 +990,6 @@ const InputData = ({ username, userRoles = [] }) => {
       } catch (error) {
         console.error("Error deleting all Properties:", error);
         alert("An error occurred while deleting all Properties.");
-      }
-    } else {
-      console.log("Deletion cancelled.");
-    }
-  };
-  const handleAllTenantWithShop = async () => {
-    const confirmed = window.confirm("Are you sure you want to delete all Tenants ?");
-    if (confirmed) {
-      try {
-        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/tenantShop/deleteAll", {
-          method: "DELETE",
-        });
-        if (response.ok) {
-          alert("All Tenants have been deleted successfully.");
-        } else {
-          console.error("Failed to delete all Tenants. Status:", response.status);
-          alert("Error deleting the Tenants. Please try again.");
-        }
-      } catch (error) {
-        console.error("Error deleting all Tenants:", error);
-        alert("An error occurred while deleting all Tenants.");
       }
     } else {
       console.log("Deletion cancelled.");
@@ -1222,28 +1173,6 @@ const InputData = ({ username, userRoles = [] }) => {
       } catch (error) {
         console.error("Error:", error);
         alert("An error occurred while deleting the Properties.");
-      }
-    } else {
-      console.log("Cancelled");
-    }
-  };
-  const handleTenantDelete = async (id) => {
-    const confirmed = window.confirm("Are you sure you want to delete This Tenant?");
-    if (confirmed) {
-      try {
-        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenantShop/delete/${id}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          alert("Tenants are deleted successfully!!!");
-          window.location.reload();
-        } else {
-          console.error("Failed to delete the Tenant name. Status:", response.status);
-          alert("Error deleting the Tenant name. Please try again.");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        alert("An error occurred while deleting the Tenant Name.");
       }
     } else {
       console.log("Cancelled");
@@ -1586,105 +1515,6 @@ const InputData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   }
-  const handleEditTenantSubmit = async (e) => {
-    e.preventDefault(); // prevent page reload
-    const cleanedData = {
-      ...editformData,
-      property: editformData.property.map(p => ({
-        ...p,
-        shops: p.shops.map(shop => ({
-          ...shop,
-          monthlyRent: shop.monthlyRent != null ? shop.monthlyRent.toString().replace(/[^0-9]/g, '') : '',
-          advanceAmount: shop.advanceAmount != null ? shop.advanceAmount.toString().replace(/[^0-9]/g, '') : ''
-        }))
-      }))
-    };
-    try {
-      const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/tenantShop/edit/${selectedTenantNameId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(cleanedData),
-      });
-      if (response.ok) {
-        const result = await response.json();
-        // Optional: close modal, refresh list, show toast, etc.
-        closeAccount1Types();
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        console.error('Edit failed:', error);
-        alert("Update failed. Please check the data.");
-      }
-    } catch (err) {
-      console.error('Network error:', err);
-      alert("Network error. Please try again.");
-    }
-  };
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const payload = {
-      tenantName: formData.tenantName,
-      fullName: formData.fullName,
-      tenantFatherName: formData.tenantFatherName,
-      age: formData.age,
-      mobileNumber: formData.mobileNumber,
-      tenantAddress: formData.tenantAddress,
-      property: formData.properties.map((prop) => ({
-        propertyName: prop.propertyName,
-        shops: prop.shops.map((shop) => ({
-          shopNo: shop.shopNo,
-          propertyType: shop.propertyType,
-          floorName: shop.floorName,
-          monthlyRent: shop.monthlyRent,
-          advanceAmount: shop.advanceAmount,
-          doorNo: shop.doorNo,
-          startingDate: shop.startingDate,
-        }))
-      }))
-    };
-    const updatedTenants = [{
-      tenantName: formData.tenantName,
-      tenantDetailsList: [
-        {
-          tenantFullName: formData.fullName,
-          tenantFatherName: formData.tenantFatherName,
-          tenantMobile: formData.mobileNumber,
-          tenantAge: parseInt(formData.age),
-          tenantAddress: formData.tenantAddress,
-          aadhaarFile: ""
-        }
-      ]
-    }];
-    try {
-      const tenantGroupRes = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant-groups/bulk-save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedTenants),
-      });
-      if (!tenantGroupRes.ok) {
-        throw new Error('Failed to save tenant group');
-      }
-      const tenantShopRes = await fetch('https://backendaab.in/demoAabuildersDash/api/tenantShop/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!tenantShopRes.ok) {
-        throw new Error('Failed to save tenant shop');
-      }
-      const result = await tenantShopRes.json();
-      window.location.reload();
-    } catch (error) {
-      console.error('Submission Error:', error);
-    }
-  };
-
   const filteredPaymentMode = paymentMode.filter((item) =>
     item.modeOfPayment.toLowerCase().includes(paymentModeSearch.toLowerCase())
   );

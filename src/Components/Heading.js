@@ -39,7 +39,7 @@ const Heading = ({ username, userRoles = [] }) => {
 
     return (
         <div className="bg-[#FAF6ED]">
-            <div className="topbar-title gap-[] w-[400px] sm:w-[580px] lg:w-[1050px] overflow-x-auto no-scrollbar py-3">
+            <div className="topbar-title expense-entry-tabs w-fit max-w-full overflow-x-auto no-scrollbar pt-4 pb-[12px] pr-4">
                 <h2 className={`link whitespace-nowrap ${activeTab === 'expense-entry' ? 'active' : ''}`}
                     onClick={() => setActiveTab('expense-entry')}>
                     Form

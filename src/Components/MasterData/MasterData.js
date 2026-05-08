@@ -110,6 +110,15 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [supportStaffName, setSupportStaffName] = useState('');
   const [supportStaffMobileNumber, setSupportStaffMobileNumber] = useState('');
 
+  // Property Type
+  const [propertyTypes, setPropertyTypes] = useState([]);
+  const [propertyTypeSearch, setPropertyTypeSearch] = useState('');
+  const [propertyType, setPropertyType] = useState('');
+  const [isPropertyTypeOpen, setIsPropertyTypeOpen] = useState(false);
+  const [isPropertyTypeEditOpen, setIsPropertyTypeEditOpen] = useState(false);
+  const [selectedPropertyTypeId, setSelectedPropertyTypeId] = useState(null);
+  const [editPropertyType, setEditPropertyType] = useState('');
+
   // State for Contractor Names
   const [isContractorNameOpens, setContractorNameOpens] = useState(false);
   const [contractorNameSearch, setContractorNameSearch] = useState("");
@@ -464,7 +473,8 @@ const MasterData = ({ username, userRoles = [] }) => {
     { id: 'labours-list', name: 'Labours List', description: 'Manage labour information' },
     { id: 'Account Details', name: 'Account Details', description: 'Manage account information' },
     { id: 'bank-account-type', name: 'Bank Account Type', description: 'Manage bank account types' },
-    { id: 'support-staff-name', name: 'Support Staff Name', description: 'Manage Support Staff Names' }
+    { id: 'support-staff-name', name: 'Support Staff Name', description: 'Manage Support Staff Names' },
+    { id: 'property-type', name: 'Property Type', description: 'Manage property types' }
   ];
   const [vendorQrImageFile, setVendorQrImageFile] = useState(null);
   const [vendorQrImagePreview, setVendorQrImagePreview] = useState(null);
@@ -647,6 +657,11 @@ const MasterData = ({ username, userRoles = [] }) => {
   const closeEbServiceLink = () => setIsEbServiceLinkOpen(false);
   const openSupportStaffName = () => setIsSupportStaffNameOpen(true);
   const closeSupportStaffName = () => setIsSupportStaffNameOpen(false);
+  const openPropertyType = () => setIsPropertyTypeOpen(true);
+  const closePropertyType = () => {
+    setIsPropertyTypeOpen(false);
+    setPropertyType('');
+  };
   const openProjectManagement = () => {
     // Generate next project ID
     const generateNextProjectId = () => {
@@ -877,6 +892,21 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
+  const fetchPropertyTypes = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/property_types/getAll');
+      if (response.ok) {
+        const data = await response.json();
+        setPropertyTypes(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Failed to fetch property types:', response.status);
+        setPropertyTypes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching property types:', error);
+      setPropertyTypes([]);
+    }
+  };
   const fetchProjects = async () => {
     try {
       const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
@@ -903,6 +933,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       fetchBankAccountTypes(),
       fetchEbServiceLinks(),
       fetchSupportStaffNameList(),
+      fetchPropertyTypes(),
       fetchProjects(),
     ]);
   };
@@ -1775,6 +1806,11 @@ const MasterData = ({ username, userRoles = [] }) => {
     setEditSupportStaffMobileNumber(item.mobile_number || '');
     setIsSupportStaffNameEditOpen(true);
   };
+  const handleEditPropertyType = (item) => {
+    setSelectedPropertyTypeId(item.id);
+    setEditPropertyType(item.propertyType || '');
+    setIsPropertyTypeEditOpen(true);
+  };
   const handleEditEbServiceLink = (item) => {
     setSelectedEbServiceLinkId(item.id);
     setEditProjectId(item.project_id?.toString() || '');
@@ -2325,6 +2361,24 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
     }
   };
+
+  const handleDeletePropertyType = async (id) => {
+    if (window.confirm('Are you sure you want to delete this property type?')) {
+      try {
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/property_types/delete/${id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setMessage('Property type deleted successfully!');
+          void refetchAllMasterData();
+        } else {
+          setMessage('Failed to delete property type.');
+        }
+      } catch (error) {
+        console.error('Error deleting property type:', error);
+      }
+    }
+  };
   // Filter functions
   const filteredVendorNames = vendorNames.filter((item) =>
     item.vendorName.toLowerCase().includes(vendorNameSearch.toLowerCase())
@@ -2355,6 +2409,9 @@ const MasterData = ({ username, userRoles = [] }) => {
   );
   const filteredSupportStaffNameList = supportStaffNameList.filter((item) =>
     item.support_staff_name.toLowerCase().includes(supportStaffSearch.toLowerCase())
+  );
+  const filteredPropertyTypes = propertyTypes.filter((item) =>
+    (item.propertyType || '').toLowerCase().includes(propertyTypeSearch.toLowerCase())
   );
   const filteredAccountDetails = accountDetails.filter((item) =>
     (item.account_holder_name || '').toLowerCase().includes(accountDetailsSearch.toLowerCase()) ||
@@ -3256,7 +3313,6 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else {
       sheetName = 'EB Service Links';
     }
-
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     const fileName = `${sheetName}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
@@ -3294,8 +3350,8 @@ const MasterData = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[500px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                <table className="table-auto w-[300px]">
+              <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-auto w-[350px]">
                   <tbody>
                     {masterTableData.map((table, index) => (
                       <tr
@@ -4074,6 +4130,70 @@ const MasterData = ({ username, userRoles = [] }) => {
                                   )}
                                   {hasDeletePermission && (
                                     <button onClick={() => handleDeleteSupportStaffName(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                      <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {table.id === 'property-type' && (
+                <div>
+                  <div className="flex items-center mb-2 lg:mt-0 mt-3">
+                    <input
+                      type="text"
+                      className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
+                      placeholder="Search Property Type.."
+                      value={propertyTypeSearch}
+                      onChange={(e) => setPropertyTypeSearch(e.target.value)}
+                    />
+                    <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
+                      <img src={search} alt='search' className=' w-5 h-5' />
+                    </button>
+                    <button
+                      className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
+                      onClick={() => handleAddClick(openPropertyType)}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+                    <div className="bg-[#FAF6ED]">
+                      <table className="table-auto lg:w-72">
+                        <thead className='bg-[#FAF6ED]'>
+                          <tr className="border-b">
+                            <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
+                            <th className="p-2 text-left lg:w-72 text-xl font-bold">Property Type</th>
+                          </tr>
+                        </thead>
+                      </table>
+                    </div>
+                    <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                      <table className="table-auto lg:w-full w-full">
+                        <tbody>
+                          {filteredPropertyTypes.map((item) => (
+                            <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
+                              <td className="p-2 text-left font-semibold">
+                                {(propertyTypes.findIndex(e => e.id === item.id) + 1).toString().padStart(2, '0')}
+                              </td>
+                              <td className="p-2 text-left group flex font-semibold">
+                                <div className="flex flex-grow">
+                                  {item.propertyType || ''}
+                                </div>
+                                <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  {hasEditPermission && (
+                                    <button onClick={() => handleEditPropertyType(item)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                      <img src={edit} alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasDeletePermission && (
+                                    <button onClick={() => handleDeletePropertyType(item.id)} className="text-red-600 hover:text-red-800" title="Delete">
                                       <img src={deleteIcon} alt="Delete" className="w-4 h-4" />
                                     </button>
                                   )}
@@ -6229,6 +6349,106 @@ const MasterData = ({ username, userRoles = [] }) => {
                   Update
                 </button>
                 <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsSupportStaffNameEditOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isPropertyTypeOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[30rem] min-h-[260px] max-h-[90vh] overflow-y-auto px-2 py-2">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={closePropertyType}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/property_types/save', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ propertyType: propertyType }),
+                });
+                if (response.ok) {
+                  setMessage('Property type saved successfully!');
+                  closePropertyType();
+                  void refetchAllMasterData();
+                } else {
+                  setMessage('Failed to save property type.');
+                }
+              } catch (error) {
+                console.error('Error saving property type:', error);
+              }
+            }}>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-56">Property Type</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Property Type"
+                  value={propertyType}
+                  onChange={(e) => setPropertyType(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex justify-end mr-5 space-x-2 mt-4 ">
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                  Submit
+                </button>
+                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closePropertyType}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isPropertyTypeEditOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 overflow-y-auto z-40">
+          <div className="bg-white rounded-md w-full max-w-[30rem] min-h-[260px] max-h-[90vh] overflow-y-auto px-2 py-2">
+            <div>
+              <button className="text-red-500 ml-[95%]" onClick={() => setIsPropertyTypeEditOpen(false)}>
+                <img src={cross} alt='cross' className='w-5 h-5' />
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/property_types/edit/${selectedPropertyTypeId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ propertyType: editPropertyType }),
+                });
+                if (response.ok) {
+                  setMessage('Property type updated successfully!');
+                  setIsPropertyTypeEditOpen(false);
+                  void refetchAllMasterData();
+                } else {
+                  setMessage('Failed to update property type.');
+                }
+              } catch (error) {
+                console.error('Error updating property type:', error);
+              }
+            }}>
+              <div className="mb-4">
+                <label className="block text-lg font-medium mb-2 -ml-56">Property Type</label>
+                <input
+                  type="text"
+                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                  placeholder="Enter Property Type"
+                  value={editPropertyType}
+                  onChange={(e) => setEditPropertyType(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex justify-end mr-5 space-x-2 mt-4 ">
+                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                  Update
+                </button>
+                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={() => setIsPropertyTypeEditOpen(false)}>
                   Cancel
                 </button>
               </div>

@@ -5246,6 +5246,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                disableWeeklyExpensesSave
                                 onSuccess={async () => {
                                     setShowBillExpenseEntryModal(false);
                                     localStorage.removeItem('expenseEntryPrefill');

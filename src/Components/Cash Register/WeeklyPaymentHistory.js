@@ -5025,6 +5025,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                disableWeeklyExpensesSave
                                 onSuccess={() => {
                                     setShowBillExpenseEntryModal(false);
                                     localStorage.removeItem('expenseEntryPrefill');

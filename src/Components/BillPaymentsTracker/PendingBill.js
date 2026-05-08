@@ -114,6 +114,9 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
     const expensesCacheRef = useRef(null)
     const billEntriesCacheRef = useRef(null)
     const matchComputeInFlightRef = useRef({})
+    const allTrackerChecksPromiseRef = useRef(null)
+    const vendorTrackersCacheRef = useRef(new Map())
+    const vendorTrackersPromiseRef = useRef(new Map())
     const [billEntryDates, setBillEntryDates] = useState({})
     const [allBillEntries, setAllBillEntries] = useState([])
     const [formData, setFormData] = useState({
@@ -312,12 +315,64 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             } catch (e) {
                 data = []
             }
-            setAllTrackerDataForChecks(Array.isArray(data) ? data : []);
+            const rows = Array.isArray(data) ? data : []
+            setAllTrackerDataForChecks(rows);
+            return rows
         } catch (error) {
             console.error("Error fetching full tracker data for checks:", error);
             setAllTrackerDataForChecks([]);
+            return []
         }
     };
+
+    const ensureAllTrackerDataForChecksLoaded = async () => {
+        if (Array.isArray(allTrackerDataForChecks) && allTrackerDataForChecks.length > 0) {
+            return allTrackerDataForChecks
+        }
+        if (allTrackerChecksPromiseRef.current) {
+            return await allTrackerChecksPromiseRef.current
+        }
+        allTrackerChecksPromiseRef.current = fetchAllTrackerDataForChecks()
+        try {
+            return await allTrackerChecksPromiseRef.current
+        } finally {
+            allTrackerChecksPromiseRef.current = null
+        }
+    }
+
+    const fetchVendorTrackersWithBills = async (vendorId) => {
+        const vId = String(vendorId ?? '').trim()
+        if (!vId) return []
+        try {
+            const res = await window.fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-payments/vendor/${encodeURIComponent(vId)}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+            })
+            if (!res.ok) return []
+            const data = await res.json().catch(() => [])
+            return Array.isArray(data) ? data : []
+        } catch {
+            return []
+        }
+    }
+
+    const ensureVendorTrackersLoaded = async (vendorId) => {
+        const vId = String(vendorId ?? '').trim()
+        if (!vId) return []
+        const cached = vendorTrackersCacheRef.current.get(vId)
+        if (Array.isArray(cached) && cached.length > 0) return cached
+        const inflight = vendorTrackersPromiseRef.current.get(vId)
+        if (inflight) return await inflight
+        const p = fetchVendorTrackersWithBills(vId).then((rows) => {
+            vendorTrackersCacheRef.current.set(vId, Array.isArray(rows) ? rows : [])
+            return Array.isArray(rows) ? rows : []
+        }).finally(() => {
+            vendorTrackersPromiseRef.current.delete(vId)
+        })
+        vendorTrackersPromiseRef.current.set(vId, p)
+        return await p
+    }
     const fetchAllBillEntries = async () => {
         try {
             const response = await fetch("https://backendaab.in/demoAabuildersDash/api/bill-entry/getAll", {
@@ -662,6 +717,25 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
     };
     // NOTE: Do not submit on Enter for dropdown/date/noOfBills.
     // We only submit when the user is in the Amount input and presses Enter.
+    const fetchPreviousTrackerMaxBillNumber = async (vendorId, vendorPaymentsTrackerId) => {
+        if (vendorId == null || vendorPaymentsTrackerId == null) return null;
+        try {
+            const url = new URL('https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/previous/max-bill-number');
+            url.searchParams.set('vendorId', String(vendorId));
+            url.searchParams.set('vendorPaymentsTrackerId', String(vendorPaymentsTrackerId));
+            const res = await fetch(url.toString(), {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) return null;
+            const data = await res.json().catch(() => null);
+            const maxBill = data?.max_bill_number ?? data?.maxBillNumber ?? null;
+            return maxBill ? String(maxBill).trim() : null;
+        } catch {
+            return null;
+        }
+    };
     const getLastBillNumberForVendor = (vendorId, currentBill = null) => {
         // "Last PO" here means: for THIS vendor, take the PREVIOUS tracker entry's last/max bill number
         // relative to the current entry (not the overall max from the BillDatabase/paid list).
@@ -853,11 +927,20 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         setRangeEnd('')
         setCheckedBills({}) // Reset checked bills state for new verification
         setExtraCheckedBills({}) // Reset extra checked bills state for new verification
-        // Fetch and set last PO from the previous entry of this vendor (not the current entry)
-        const vendorId = bill.vendorId || bill.vendor_id
-        const lastBillNumber = getLastBillNumberForVendor(vendorId, bill)
-        setLastPaidPO(lastBillNumber || '')
+        // Prefer backend API: previous tracker max bill_number
+        setLastPaidPO('')
         setShowModal(true)
+        const vendorId = bill.vendorId || bill.vendor_id
+        const trackerId = bill.id || bill.bill_id
+        fetchPreviousTrackerMaxBillNumber(vendorId, trackerId).then((maxBill) => {
+            if (maxBill) {
+                setLastPaidPO(maxBill)
+                return
+            }
+            // Fallback to legacy frontend logic if API fails/returns null
+            const lastBillNumber = getLastBillNumberForVendor(vendorId, bill)
+            setLastPaidPO(lastBillNumber || '')
+        })
     }
     const handlePoNumberChange = (index, value) => {
         const numericValue = value.replace(/[^0-9]/g, '')
@@ -1773,6 +1856,11 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 alert('Vendor ID not found')
                 return
             }
+
+            // Use vendor-scoped backend endpoint so we don't rely on multiple datasets.
+            // This ALSO ensures we wait for the vendor tracker list before validating.
+            const trackersForDuplicateCheck = await ensureVendorTrackersLoaded(vendorId)
+
             const purchaseOrdersSource = Array.isArray(purchaseOrders) && purchaseOrders.length > 0
                 ? purchaseOrders
                 : await fetchPurchaseOrders()
@@ -1783,8 +1871,6 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 .map(po => normalizeValue(po.eno || po.po_number || po.purchase_order_number))
                 .filter(Boolean)
             const vendorENOsKeySet = new Set(vendorENOs.map((v) => normalizeBillKey(v)).filter(Boolean));
-            console.log('vendorPurchaseOrders:', vendorPurchaseOrders)
-            console.log('vendorENOs:', vendorENOs)
             const newValidationResults = {}
             const newExtraValidationResults = {}
             const duplicateNumbers = []
@@ -1847,33 +1933,25 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                     console.log('Decision: No PO selected, marking as verified')
                 } else if (trimmedBillNumber) {
                     let isAlreadyEntered = false
-                    const checkTrackers = getTrackersForDuplicateCheck();
-                    for (const tracker of checkTrackers) {
-                        if (tracker.id !== currentTrackerId) { // Skip current tracker
-                            const trackerVendorId = normalizeValue(tracker.vendor_id || tracker.vendorId)
-                            if (trackerVendorId === vendorId) { // Same vendor
-                                const verifications =
-                                    tracker.billVerifications ||
-                                    tracker.bill_verifications ||
-                                    tracker.billVerification ||
-                                    tracker.bill_verification ||
-                                    [];
-                                for (const verification of verifications) {
-                                    const existingBill = normalizeValue(verification.bill_number || verification.billNumber)
-                                    const existingBillKey = normalizeBillKey(existingBill)
-                                    if (existingBill && existingBill !== 'NO_PO' && existingBillKey && trimmedBillKey && existingBillKey === trimmedBillKey) {
-                                        console.log('Duplicate found in tracker:', {
-                                            trackerId: tracker.id,
-                                            trackerVendorId,
-                                            verification
-                                        })
-                                        isAlreadyEntered = true
-                                        break
-                                    }
-                                }
-                                if (isAlreadyEntered) break
+                    for (const tracker of trackersForDuplicateCheck) {
+                        const trackerId = tracker?.id ?? tracker?.bill_id ?? tracker?.tracker_id
+                        if (String(trackerId ?? '') === String(currentTrackerId ?? '')) continue // Skip current tracker
+                        const verifications =
+                            tracker?.billVerifications ||
+                            tracker?.bill_verifications ||
+                            tracker?.billVerification ||
+                            tracker?.bill_verification ||
+                            [];
+                        for (const verification of verifications || []) {
+                            const existingBill = normalizeValue(verification?.bill_number || verification?.billNumber)
+                            const existingBillKey = normalizeBillKey(existingBill)
+                            if (existingBill && existingBill !== 'NO_PO' && existingBillKey && trimmedBillKey && existingBillKey === trimmedBillKey) {
+                                console.log('Duplicate found in tracker:', { trackerId, verification })
+                                isAlreadyEntered = true
+                                break
                             }
                         }
+                        if (isAlreadyEntered) break
                     }
                     if (isAlreadyEntered) {
                         isMatched = false
@@ -1922,33 +2000,25 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                         console.log('Decision: No PO selected, marking as verified')
                     } else if (trimmedBillNumber) {
                         let isAlreadyEntered = false
-                        const checkTrackers = getTrackersForDuplicateCheck();
-                        for (const tracker of checkTrackers) {
-                            if (tracker.id !== currentTrackerId) {
-                                const trackerVendorId = normalizeValue(tracker.vendor_id || tracker.vendorId)
-                                if (trackerVendorId === vendorId) {
-                                    const verifications =
-                                        tracker.billVerifications ||
-                                        tracker.bill_verifications ||
-                                        tracker.billVerification ||
-                                        tracker.bill_verification ||
-                                        [];
-                                    for (const verification of verifications) {
-                                        const existingBill = normalizeValue(verification.bill_number || verification.billNumber)
-                                        const existingBillKey = normalizeBillKey(existingBill)
-                                        if (existingBill && existingBill !== 'NO_PO' && existingBillKey && trimmedBillKey && existingBillKey === trimmedBillKey) {
-                                            console.log('Duplicate found in tracker:', {
-                                                trackerId: tracker.id,
-                                                trackerVendorId,
-                                                verification
-                                            })
-                                            isAlreadyEntered = true
-                                            break
-                                        }
-                                    }
-                                    if (isAlreadyEntered) break
+                        for (const tracker of trackersForDuplicateCheck) {
+                            const trackerId = tracker?.id ?? tracker?.bill_id ?? tracker?.tracker_id
+                            if (String(trackerId ?? '') === String(currentTrackerId ?? '')) continue
+                            const verifications =
+                                tracker?.billVerifications ||
+                                tracker?.bill_verifications ||
+                                tracker?.billVerification ||
+                                tracker?.bill_verification ||
+                                [];
+                            for (const verification of verifications) {
+                                const existingBill = normalizeValue(verification?.bill_number || verification?.billNumber)
+                                const existingBillKey = normalizeBillKey(existingBill)
+                                if (existingBill && existingBill !== 'NO_PO' && existingBillKey && trimmedBillKey && existingBillKey === trimmedBillKey) {
+                                    console.log('Duplicate found in tracker:', { trackerId, verification })
+                                    isAlreadyEntered = true
+                                    break
                                 }
                             }
+                            if (isAlreadyEntered) break
                         }
                         if (isAlreadyEntered) {
                             isMatched = false

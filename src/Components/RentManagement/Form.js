@@ -3,7 +3,35 @@ import Attach from '../Images/Attachfile.svg';
 import Select from 'react-select';
 import Swal from 'sweetalert2';
 import axios from 'axios';
+import CustomMonthField from "../ExpensesEntry/CustomMonthField";
 const Form = ({ embedded = false, onSuccess } = {}) => {
+    const resolveActiveBranchId = () => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId");
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+            const resolved = Number(selectedBranchId || fallbackBranchId);
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+        } catch {
+            return null;
+        }
+    };
+    const resolveEnteredBy = () => {
+        try {
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            return (
+                user?.username ||
+                user?.userName ||
+                user?.name ||
+                user?.employeeName ||
+                localStorage.getItem("username") ||
+                localStorage.getItem("userName") ||
+                ""
+            );
+        } catch {
+            return localStorage.getItem("username") || localStorage.getItem("userName") || "";
+        }
+    };
     const [selectedRentType, setSelectedRentType] = useState("Rent");
     const getPreviousMonth = () => {
         const now = new Date();
@@ -349,6 +377,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             if (response.ok) {
                 const data = await response.json();
                 setRentHistoryData(data);
+                console.log(data);
             } else {
                 console.error('Error fetching rent history data');
             }
@@ -430,24 +459,29 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     };
 
     const calculatePendingRentUpToDate = (endDate) => {
-        if (!formTenantName || !formShopNo || !startingDate || rentHistoryData.length === 0) {
+        if (!formTenantName || !formShopNo) {
             return 0;
         }
         const calculationEndDate = closureDate || endDate;
+        const tenantInfo = shopInfoMap[formShopNo];
+        const formShopNoId = tenantInfo?.shopNoId ?? null;
         const tenantShopMapping = buildTenantShopMapping();
-        const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id =>
-            tenantShopMapping[id].shopNo === formShopNo &&
-            tenantShopMapping[id].tenantName === formTenantName
-        );
-        if (matchingTenantShopIds.length === 0) {
-            return 0;
+        const tenantShopInfo = formShopNoId != null ? (tenantShopMapping[formShopNoId.toString()] || {}) : {};
+
+        const normalizeHistoryShopNoId = (history) =>
+            history?.shopNoId ?? history?.tenantWithShopNoId ?? null;
+
+        // IMPORTANT: Pending rent must be calculated for the specific tenant-link (`shopNoId`),
+        // not for all historical tenants with the same shopNo + tenantName.
+        let shopRentHistory = [];
+        if (formShopNoId != null && Array.isArray(rentHistoryData) && rentHistoryData.length) {
+            shopRentHistory = rentHistoryData.filter(history => {
+                const hid = normalizeHistoryShopNoId(history);
+                return hid != null && hid.toString() === formShopNoId.toString();
+            });
         }
-        let shopRentHistory = rentHistoryData.filter(history =>
-            matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
-        );
+
         if (shopRentHistory.length === 0) {
-            const fallbackTenantShopId = matchingTenantShopIds[0];
-            const tenantShopInfo = tenantShopMapping[fallbackTenantShopId] || {};
             const shopInfo = shopInfoMap[formShopNo] || {};
             const fallbackMonthlyRent = parseFloat(tenantShopInfo.monthlyRent || shopInfo.monthlyRent || 0);
             const fallbackStartDate = tenantShopInfo.startingDate || startingDate;
@@ -456,7 +490,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 if (!isNaN(fallbackStart.getTime())) {
                     const fallbackMonth = `${fallbackStart.getFullYear()}-${(fallbackStart.getMonth() + 1).toString().padStart(2, '0')}`;
                     shopRentHistory = [{
-                        tenantWithShopNoId: fallbackTenantShopId,
+                        shopNoId: formShopNoId,
                         rentAmount: fallbackMonthlyRent,
                         startingMonthForThisRent: fallbackMonth
                     }];
@@ -466,28 +500,45 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         if (shopRentHistory.length === 0) {
             return 0;
         }
-        const sortedRentHistory = shopRentHistory.sort((a, b) => new Date(a.startingMonthForThisRent) - new Date(b.startingMonthForThisRent));
-        const start = new Date(startingDate);
+        const sortedRentHistory = shopRentHistory
+            .slice()
+            .sort((a, b) => new Date(`${normalizeMonthFormat(a.startingMonthForThisRent)}-01`) - new Date(`${normalizeMonthFormat(b.startingMonthForThisRent)}-01`));
+
+        const tenantStartDateRaw = tenantShopInfo.startingDate || startingDate;
+        const tenantStartDate = tenantStartDateRaw ? new Date(tenantStartDateRaw) : null;
+        const firstHistoryMonth = normalizeMonthFormat(sortedRentHistory[0]?.startingMonthForThisRent);
+        const firstHistoryMonthDate = firstHistoryMonth ? new Date(`${firstHistoryMonth}-01`) : null;
+        if (!tenantStartDate || isNaN(tenantStartDate.getTime())) {
+            return 0;
+        }
+
+        // Start from the later of tenant start month and first rent-history month.
+        const startMonthDate = new Date(tenantStartDate.getFullYear(), tenantStartDate.getMonth(), 1);
+        const start = (firstHistoryMonthDate && !isNaN(firstHistoryMonthDate.getTime()) && firstHistoryMonthDate > startMonthDate)
+            ? firstHistoryMonthDate
+            : startMonthDate;
         const end = new Date(calculationEndDate);
         
-        const allFormsForTenantShop = rentalFormsData.filter(form =>
-            form.tenantName === formTenantName && form.shopNo === formShopNo
-        );
+        const formsMatchingTenantShop = rentalFormsData.filter(form => {
+            const matchesShopLink = formShopNoId != null && form.shopNoId != null && form.shopNoId.toString() === formShopNoId.toString();
+            const matchesFallback = form.tenantName === formTenantName && form.shopNo === formShopNo;
+            return matchesShopLink || matchesFallback;
+        });
         let totalPendingRent = 0;
         let currentDate = new Date(start.getFullYear(), start.getMonth(), 1);
         while (currentDate <= end) {
             const year = currentDate.getFullYear();
             const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
             const currentMonth = `${year}-${month}`;
-            const monthName = currentDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
             
             let monthlyRentDue = 0;
             for (let i = 0; i < sortedRentHistory.length; i++) {
                 const historyEntry = sortedRentHistory[i];
-                const historyStartDate = new Date(historyEntry.startingMonthForThisRent);
+                const historyStartMonth = normalizeMonthFormat(historyEntry.startingMonthForThisRent);
+                const historyStartDate = historyStartMonth ? new Date(`${historyStartMonth}-01`) : new Date(NaN);
                 if (historyStartDate <= currentDate) {
                     if (i === sortedRentHistory.length - 1 ||
-                        new Date(sortedRentHistory[i + 1].startingMonthForThisRent) > currentDate) {
+                        new Date(`${normalizeMonthFormat(sortedRentHistory[i + 1].startingMonthForThisRent)}-01`) > currentDate) {
                         monthlyRentDue = parseFloat(historyEntry.rentAmount || 0);
                         break;
                     }
@@ -498,18 +549,15 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 continue;
             }
             
-            const formsMatchingTenantShop = rentalFormsData.filter(form =>
-                form.tenantName === formTenantName && form.shopNo === formShopNo
-            );
-            
             const formsMatchingMonth = formsMatchingTenantShop.filter(form => {
                 const normalizedFormMonth = normalizeMonthFormat(form.forTheMonthOf);
                 return normalizedFormMonth === currentMonth;
             });
             const allRentPayments = rentalFormsData.filter(form => {
                 const normalizedFormMonth = normalizeMonthFormat(form.forTheMonthOf);
-                return form.tenantName === formTenantName &&
-                    form.shopNo === formShopNo &&
+                const matchesShopLink = formShopNoId != null && form.shopNoId != null && form.shopNoId.toString() === formShopNoId.toString();
+                const matchesFallback = form.tenantName === formTenantName && form.shopNo === formShopNo;
+                return (matchesShopLink || matchesFallback) &&
                     normalizedFormMonth === currentMonth &&
                     (form.formType === "Rent" || form.formType === "Pending Rent");
             });
@@ -517,9 +565,13 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 !(form.formType === "Rent" || form.formType === "Pending Rent")
             );            
             const originalMonthlyRentDue = monthlyRentDue;
-            if (currentDate.getFullYear() === start.getFullYear() && currentDate.getMonth() === start.getMonth()) {
+            if (
+                tenantStartDate &&
+                currentDate.getFullYear() === tenantStartDate.getFullYear() &&
+                currentDate.getMonth() === tenantStartDate.getMonth()
+            ) {
                 const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-                const startDay = start.getDate();
+                const startDay = tenantStartDate.getDate();
                 const rentPerDay = monthlyRentDue / totalDays;
                 const proRatedDays = totalDays - startDay + 1;
                 monthlyRentDue = Math.floor((rentPerDay * proRatedDays) / 10) * 10;
@@ -559,19 +611,17 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             });
         }
         const tenantShopMapping = buildTenantShopMapping();
-        const matchingTenantShopIds = Object.keys(tenantShopMapping).filter(id =>
-            tenantShopMapping[id].shopNo === formShopNo &&
-            tenantShopMapping[id].tenantName === formTenantName
-        );
-        if (matchingTenantShopIds.length === 0) {
+        if (!formShopNoId) {
             return 0;
         }
-        let shopRentHistory = rentHistoryData.filter(history =>
-            matchingTenantShopIds.includes(history.tenantWithShopNoId.toString())
-        );
+        const normalizeHistoryShopNoId = (history) =>
+            history?.shopNoId ?? history?.tenantWithShopNoId ?? null;
+        let shopRentHistory = rentHistoryData.filter(history => {
+            const hid = normalizeHistoryShopNoId(history);
+            return hid != null && hid.toString() === formShopNoId.toString();
+        });
         if (shopRentHistory.length === 0) {
-            const fallbackTenantShopId = matchingTenantShopIds[0];
-            const tenantShopInfo = tenantShopMapping[fallbackTenantShopId] || {};
+            const tenantShopInfo = tenantShopMapping[formShopNoId.toString()] || {};
             const shopInfo = shopInfoMap[formShopNo] || {};
             const fallbackMonthlyRent = parseFloat(tenantShopInfo.monthlyRent || shopInfo.monthlyRent || 0);
             const fallbackStartDate = tenantShopInfo.startingDate || startingDate;
@@ -580,7 +630,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 if (!isNaN(fallbackStart.getTime())) {
                     const fallbackMonth = `${fallbackStart.getFullYear()}-${(fallbackStart.getMonth() + 1).toString().padStart(2, '0')}`;
                     shopRentHistory = [{
-                        tenantWithShopNoId: fallbackTenantShopId,
+                        shopNoId: formShopNoId,
                         rentAmount: fallbackMonthlyRent,
                         startingMonthForThisRent: fallbackMonth
                     }];
@@ -590,7 +640,9 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         if (shopRentHistory.length === 0) {
             return 0;
         }
-        const sortedRentHistory = shopRentHistory.sort((a, b) => new Date(a.startingMonthForThisRent) - new Date(b.startingMonthForThisRent));
+        const sortedRentHistory = shopRentHistory
+            .slice()
+            .sort((a, b) => new Date(`${normalizeMonthFormat(a.startingMonthForThisRent)}-01`) - new Date(`${normalizeMonthFormat(b.startingMonthForThisRent)}-01`));
         const endDate = shopClosureDate || new Date().toISOString().split('T')[0];
         const infoStartDate = startingDate ? new Date(startingDate) : null;
         const earliestHistoryStart = sortedRentHistory.length
@@ -857,6 +909,8 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         setShowWeeklyPaymentPopup(false);
         try {
             const submittedFormIds = await submitRentalForm();
+            const activeBranchId = resolveActiveBranchId();
+            const enteredBy = resolveEnteredBy();
             const isShopClosureWithRefund = selectedRentType === "Shop Closure" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
             const isRefundPayment = selectedRentType === "Refund" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
             const isRefundFlow = isShopClosureWithRefund || isRefundPayment;
@@ -872,6 +926,14 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 });
                 setIsSubmitting(false);
                 throw new Error("rent_management_id is required but was not found");
+            }
+            const tenantInfo = shopInfoMap[formShopNo] || {};
+            let correctTenantNameId = tenantInfo?.tenantNameId || null;
+            if (selectedRentType === "Pending Rent" && selectedTenantId) {
+                const selectedTenant = tenantShopData.find(t => t.id === selectedTenantId);
+                if (selectedTenant) {
+                    correctTenantNameId = selectedTenant.id;
+                }
             }
             const weeklyPaymentBillPayload = {
                 date: formattedWeeklyDate,
@@ -894,8 +956,10 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 transaction_number: weeklyPaymentData.transactionNumber || null,
                 account_number: weeklyPaymentData.accountNumber || null,
                 rent_management_id: rentManagementId,
-                tenant_id: selectedTenantId || null,
+                tenant_id: correctTenantNameId || null,
                 tenant_complex_name: shopInfoMap[formShopNo]?.projectReferenceName || null,
+                branch_id: activeBranchId,
+                entered_by: enteredBy || null,
             };
             const weeklyPaymentBillResponse = await fetch(
                 "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
@@ -1870,11 +1934,12 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 {(selectedRentType === "Rent" || selectedRentType === "Pending Rent") && (
                     <div className="w-full lg:w-auto">
                         <label className="block font-semibold mb-2 text-sm sm:text-base">For The Month of</label>
-                        <input
-                            type="month"
+                        <CustomMonthField
                             value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-full sm:w-[170px] h-[45px]"
+                            onChange={(v) => setSelectedMonth(v)}
+                            placeholder="Select month"
+                            className="w-full sm:w-[170px]"
+                            alwaysOpenBelow
                         />
                     </div>
                 )}

@@ -7,12 +7,14 @@ import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 const ElectricityTab = ({ username, userRoles = [] }) => {
     const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false);
     const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null);
     const [filters, setFilters] = useState({
         year: new Date().getFullYear().toString(),
-        month: '',
+        month: MONTH_LABELS[new Date().getMonth()],
         paymentStatus: '',
         vendor: '',
         service: '',
@@ -20,7 +22,8 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         shop: '',
         projectName: '',
         projectType: '',
-        tenant: ''
+        tenant: '',
+        occupancyStatus: ''
     });
     const [projects, setProjects] = useState([]);
     const [electricityPayments, setElectricityPayments] = useState([]);
@@ -32,6 +35,8 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     const [showHideModal, setShowHideModal] = useState(false);
     const [hiddenProjects, setHiddenProjects] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
+    const [tenantShopData, setTenantShopData] = useState([]);
+    const [tenantOptions, setTenantOptions] = useState([]);
     const [showActivityModal, setShowActivityModal] = useState(false);
     const [activityFormData, setActivityFormData] = useState({
         electricityFrequency: '',
@@ -39,10 +44,14 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     });
     const [selectedRowData, setSelectedRowData] = useState(null);
     const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
-    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthLabels = MONTH_LABELS;
     const paymentStatusOptions = [
         { value: 'Paid', label: 'Paid' },
         { value: 'Unpaid', label: 'Unpaid' }
+    ];
+    const occupancyStatusOptions = [
+        { value: 'occupied', label: 'Occupied Shop' },
+        { value: 'vacated', label: 'Vacated Shop' }
     ];
     useEffect(() => {
         const fetchProjects = async () => {
@@ -81,6 +90,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         const fetchFrequencyHistory = async () => {
             try {
                 const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll');
+                console.log('[ElectricityTab] frequency-history/getAll response:', response.data);
                 setFrequencyHistory(response.data || []);
             } catch (error) {
                 console.error('Error fetching frequency history:', error);
@@ -113,6 +123,33 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         };
         fetchVendorNames();
     }, []);
+
+    useEffect(() => {
+        const fetchTenants = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+                if (!response.ok) return;
+                const data = await response.json();
+                const tenants = Array.isArray(data) ? data : [];
+                setTenantShopData(tenants);
+                const opts = Array.from(
+                    new Set(
+                        tenants
+                            .map(t => (t?.tenantName || '').toString().trim())
+                            .filter(Boolean)
+                    )
+                )
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(name => ({ value: name, label: name }));
+                setTenantOptions(opts);
+            } catch (e) {
+                console.error('Error fetching tenants:', e);
+            }
+        };
+        if (projects.length > 0) {
+            fetchTenants();
+        }
+    }, [projects]);
     useEffect(() => {
         const toLower = (value) => (value ? value.toString().toLowerCase() : '');
         const vendorFilter = toLower(filters.vendor);
@@ -122,6 +159,66 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         const serviceFilter = toLower(filters.service);
         const tenantFilter = toLower(filters.tenant);
         const projectNameFilter = toLower(filters.projectName);
+        const occupancyFilter = toLower(filters.occupancyStatus);
+        const selectedYearForFilters = filters.year || new Date().getFullYear().toString();
+        const monthMap = {
+            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+            'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
+            'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        const selectedMonthNumber = filters.month ? monthMap[filters.month] : null;
+        const selectedYearMonthForFilters = selectedMonthNumber ? `${selectedYearForFilters}-${selectedMonthNumber}` : null;
+        const getPaymentVendorValue = (payment) => toLower(
+            payment?.vendorName ??
+            payment?.vendor ??
+            payment?.vendor_name ??
+            payment?.vendorNameLabel ??
+            payment?.party ??
+            ''
+        );
+        const propertyMatchesVendorFromPayments = (property) => {
+            if (!vendorFilter) return true;
+            const ebNo = property?.ebNo;
+            if (!ebNo) return false;
+            const paymentsForService = electricityPayments.filter(p => p?.utilityTypeNumber === ebNo);
+            const scopedPayments = selectedYearMonthForFilters
+                ? paymentsForService.filter(p => p?.utilityForTheMonth === selectedYearMonthForFilters)
+                : paymentsForService.filter(p => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${selectedYearForFilters}-`));
+            return scopedPayments.some(p => getPaymentVendorValue(p).includes(vendorFilter));
+        };
+
+        // Tenant ↔ Shop link lookup (same source as RentManagement Dashboard)
+        const tenantLinksByPropertyId = new Map();
+        if (Array.isArray(tenantShopData) && tenantShopData.length) {
+            tenantShopData.forEach(tenant => {
+                const tName = (tenant?.tenantName || '').toString();
+                (tenant?.shopNos || []).forEach(shop => {
+                    const propertyId = shop?.shopNoId;
+                    if (!propertyId) return;
+                    if (!tenantLinksByPropertyId.has(propertyId)) tenantLinksByPropertyId.set(propertyId, []);
+                    tenantLinksByPropertyId.get(propertyId).push({
+                        tenantName: tName,
+                        shopClosureDate: shop?.shopClosureDate || null
+                    });
+                });
+            });
+        }
+        const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(propertyId) || [];
+        const matchesTenantFromLinks = (propertyId) => {
+            if (!tenantFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            if (!links.length) return false;
+            return links.some(l => toLower(l.tenantName).includes(tenantFilter));
+        };
+        const matchesOccupancyFromLinks = (propertyId) => {
+            if (!occupancyFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            const hasActive = links.some(l => !l.shopClosureDate);
+            const hasVacated = links.some(l => !!l.shopClosureDate);
+            if (occupancyFilter === 'occupied') return hasActive;
+            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
+            return true;
+        };
 
         const filtered = projects.reduce((acc, project) => {
             if (selectedCategory && project.projectCategory !== selectedCategory) {
@@ -148,24 +245,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
                     return false;
                 }
-                if (tenantFilter) {
-                    const tenantValue = toLower(
-                        property.tenantName ||
-                        property.tenant ||
-                        (property.tenantDetails && property.tenantDetails.tenantName)
-                    );
-                    if (!tenantValue || !tenantValue.includes(tenantFilter)) {
-                        return false;
-                    }
-                }
+                if (!matchesTenantFromLinks(property.id)) return false;
+                if (!matchesOccupancyFromLinks(property.id)) return false;
                 if (vendorFilter) {
-                    const vendorValue = toLower(
-                        property.vendorName ||
-                        property.vendor ||
-                        project.vendorName ||
-                        project.vendor
-                    );
-                    if (!vendorValue || !vendorValue.includes(vendorFilter)) {
+                    // Vendor is stored on each electricity payment record (expenses_form API),
+                    // so filter by matching payments for this EB No (optionally scoped to selected month/year).
+                    if (!propertyMatchesVendorFromPayments(property)) {
                         return false;
                     }
                 }
@@ -259,25 +344,51 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return found;
     };
     const shouldPayInMonth = (propertyId, month, year) => {
-        const freqData = getFrequencyData(propertyId);
-        if (!freqData || !freqData.electricityFrequencyNo || !freqData.startingMonthOfElectricityFrequency) {
-            console.log(`No frequency data found for property ${propertyId}, assuming monthly payment`);
-            return true; 
+        if (!propertyId) return true;
+        if (!frequencyHistory || frequencyHistory.length === 0) return true;
+
+        const records = frequencyHistory.filter(
+            (f) => f.projectNamePropertyDetailsId === propertyId && f.startingMonthOfElectricityFrequency
+        );
+        if (records.length === 0) return true;
+
+        const currentYear = parseInt(year, 10);
+        const currentMonth = parseInt(month, 10);
+        if (Number.isNaN(currentYear) || Number.isNaN(currentMonth)) return true;
+
+        const currentVal = currentYear * 12 + currentMonth;
+        const sorted = records.slice().sort((a, b) => {
+            const [aY, aM] = a.startingMonthOfElectricityFrequency.split('-').map(Number);
+            const [bY, bM] = b.startingMonthOfElectricityFrequency.split('-').map(Number);
+            return aY * 12 + aM - (bY * 12 + bM);
+        });
+
+        let active = null;
+        for (const rec of sorted) {
+            const [rY, rM] = rec.startingMonthOfElectricityFrequency.split('-').map(Number);
+            const recVal = rY * 12 + rM;
+            if (recVal <= currentVal) active = rec;
+            else break;
         }
-        const frequency = parseInt(freqData.electricityFrequencyNo);
+        const activeFreqMissing = active?.electricityFrequencyNo === undefined || active?.electricityFrequencyNo === null;
+        if (!active || activeFreqMissing || !active.startingMonthOfElectricityFrequency) return true;
+
+        const frequency = parseInt(active.electricityFrequencyNo, 10);
+        if (Number.isNaN(frequency)) return true;
+
+        // If frequency is 0 from its starting month, we should show "-" from that month onwards.
         if (frequency === 0) {
-            console.log(`Frequency is 0 for property ${propertyId}, no payment required`);
             return false;
         }
-        const startingMonth = freqData.startingMonthOfElectricityFrequency;
-        const [startYearStr, startMonthStr] = startingMonth.split('-');
-        const startYear = parseInt(startYearStr);
-        const startMonth = parseInt(startMonthStr);
-        const currentMonth = parseInt(month);
-        const currentYear = parseInt(year);
+
+        const [startYear, startMonth] = active.startingMonthOfElectricityFrequency.split('-').map(Number);
         const monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
-        const shouldPay = monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
-        return shouldPay;
+        if (monthsSinceStart >= 0) {
+            console.log(
+                `[ElectricityTab] property=${propertyId} month=${month}/${year} activeFrequency=${frequency} start=${active.startingMonthOfElectricityFrequency} monthsSinceStart=${monthsSinceStart}`
+            );
+        }
+        return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
     };
     const getPaymentData = (ebNo, month, propertyId) => {
         const selectedYear = filters.year || new Date().getFullYear().toString();
@@ -289,17 +400,6 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         const monthNumber = monthMap[month];
         if (!monthNumber) return { amount: '-', date: null };
         const yearMonth = `${selectedYear}-${monthNumber}`;
-        const payment = electricityPayments.find(p =>
-            p.utilityTypeNumber === ebNo &&
-            p.utilityForTheMonth === yearMonth
-        );
-        if (payment) {
-            return {
-                amount: payment.amount || '0',
-                date: payment.date || null,
-                billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
-            };
-        }
         const getActiveFrequencyData = (propertyId, year, monthNumber) => {
             if (!frequencyHistory || frequencyHistory.length === 0) return null;
             const records = frequencyHistory.filter(
@@ -322,21 +422,54 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                     break;
                 }
             }
+            if (propertyId === 80) {
+                console.log('[ElectricityTab] propertyId=80 frequency records(sorted):', sorted);
+                console.log('[ElectricityTab] propertyId=80 selected active frequency:', active, 'for', `${year}-${monthNumber}`);
+            }
             return active;
         };
         const freqData = getActiveFrequencyData(propertyId, parseInt(selectedYear), parseInt(monthNumber));
-        if (!freqData || !freqData.electricityFrequencyNo || !freqData.startingMonthOfElectricityFrequency) {
+        const freqMissing = freqData?.electricityFrequencyNo === undefined || freqData?.electricityFrequencyNo === null;
+        if (!freqData || freqMissing || !freqData.startingMonthOfElectricityFrequency) {
+            const payment = electricityPayments.find(p =>
+                p.utilityTypeNumber === ebNo &&
+                p.utilityForTheMonth === yearMonth
+            );
+            if (payment) {
+                return {
+                    amount: payment.amount || '0',
+                    date: payment.date || null,
+                    billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
+                };
+            }
             return { amount: '0', date: null };
         }
-        const frequency = parseInt(freqData.electricityFrequencyNo);
-        if (frequency === 0) {
-            return { amount: '-', date: null, isNotRequired: true };
-        }        
+        const frequency = parseInt(freqData.electricityFrequencyNo, 10);
         const startingMonth = freqData.startingMonthOfElectricityFrequency.trim();
         const [startYear, startMonth] = startingMonth.split('-').map(Number);
         const currentMonth = parseInt(monthNumber);
         const currentYear = parseInt(selectedYear);
         const monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+        // Frequency 0 means: from starting month onwards, ignore even existing "0" payments and show "-"
+        if (frequency === 0 && monthsSinceStart >= 0) {
+            console.log(
+                `[ElectricityTab] getPaymentData: property=${propertyId} ebNo=${ebNo} ym=${yearMonth} frequency=0 start=${startingMonth} -> "-" (override payments)`
+            );
+            return { amount: '-', date: null, isNotRequired: true };
+        }
+
+        const payment = electricityPayments.find(p =>
+            p.utilityTypeNumber === ebNo &&
+            p.utilityForTheMonth === yearMonth
+        );
+        if (payment) {
+            return {
+                amount: payment.amount || '0',
+                date: payment.date || null,
+                billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
+            };
+        }
+
         const shouldPay = monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
         
         if (shouldPay) {
@@ -410,6 +543,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         pid: project.projectId || '-',
                         projectName: project.projectName || '-',
                         category: property.projectType || project.projectCategory || '-',
+                        shopNo: property.shopNo || '-',
                         doorNo: property.doorNo || '-',
                         phase: property.ebNoPhase ? `Phase ${property.ebNoPhase.replace('P', '')}` : '-',
                         serviceNo: property.ebNo || '-'
@@ -436,12 +570,13 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         doc.setFontSize(14);
         doc.text('Electricity Projects Overview', 14, 20);
 
-        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Door No', 'Phase', 'Service No', ...monthLabels, 'Unpaid'];
+        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'Door No', 'Phase', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map(row => [
             row.slNo,
             row.pid,
             row.projectName,
             row.category,
+            row.shopNo,
             row.doorNo,
             row.phase,
             row.serviceNo,
@@ -578,6 +713,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                     try {
                         const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/frequency-history/getAll');
                         setFrequencyHistory(response.data || []);
+                        console.log(response.data);
                     } catch (error) {
                         console.error('Error fetching frequency history:', error);
                     }
@@ -822,10 +958,28 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Tenant</label>
                             <Select
-                                options={[]}
+                                options={tenantOptions}
                                 value={filters.tenant ? { value: filters.tenant, label: filters.tenant } : null}
                                 onChange={(selectedOption) => handleFilterChange('tenant', selectedOption)}
                                 placeholder="Select Tenant"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Occupancy Status</label>
+                            <Select
+                                options={occupancyStatusOptions}
+                                value={filters.occupancyStatus ? { value: filters.occupancyStatus, label: occupancyStatusOptions.find(o => o.value === filters.occupancyStatus)?.label || filters.occupancyStatus } : null}
+                                onChange={(selectedOption) => handleFilterChange('occupancyStatus', selectedOption)}
+                                placeholder="Select Status"
                                 isClearable
                                 isSearchable
                                 menuPortalTarget={document.body}
@@ -1171,11 +1325,23 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 </div>
                                 <div className='pl-5'>
                                      {(() => {
-                                         const allFrequencyData = frequencyHistory.filter(freq => 
-                                             freq.projectNamePropertyDetailsId === selectedRowData.property.id &&
-                                             freq.electricityFrequencyNo &&
-                                             freq.startingMonthOfElectricityFrequency
-                                         );
+                                         const propertyId = selectedRowData?.property?.id;
+                                         const propertyIdStr = propertyId !== undefined && propertyId !== null ? String(propertyId) : null;
+                                         const allFrequencyData = frequencyHistory
+                                             .filter((freq) => {
+                                                 const freqPropertyId = freq?.projectNamePropertyDetailsId;
+                                                 const freqPropertyIdStr =
+                                                     freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
+                                                 // NOTE: electricityFrequencyNo can be 0 — still valid and should show in history.
+                                                 const hasFreq = freq?.electricityFrequencyNo !== undefined && freq?.electricityFrequencyNo !== null;
+                                                 const hasStart = !!freq?.startingMonthOfElectricityFrequency;
+                                                 return !!propertyIdStr && freqPropertyIdStr === propertyIdStr && hasFreq && hasStart;
+                                             })
+                                             .sort((a, b) => {
+                                                 const aKey = String(a.startingMonthOfElectricityFrequency || '');
+                                                 const bKey = String(b.startingMonthOfElectricityFrequency || '');
+                                                 return aKey.localeCompare(bKey);
+                                             });
                                          const submittedData = submittedFrequencyData[selectedRowData.property.id];
                                          if (submittedData?.electricityFrequency && submittedData?.electricityStartingMonth) {
                                              allFrequencyData.push({
@@ -1183,6 +1349,20 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                  startingMonthOfElectricityFrequency: submittedData.electricityStartingMonth
                                              });
                                          }
+                                         // Dedupe: backend refresh + optimistic push can show duplicates until reload
+                                         const dedupedFrequencyData = Array.from(
+                                             new Map(
+                                                 allFrequencyData.map((row) => {
+                                                     const freqVal = row?.electricityFrequencyNo;
+                                                     const startVal = String(row?.startingMonthOfElectricityFrequency || '').trim();
+                                                     return [`${startVal}__${freqVal}`, row];
+                                                 })
+                                             ).values()
+                                         ).sort((a, b) => {
+                                             const aKey = String(a.startingMonthOfElectricityFrequency || '');
+                                             const bKey = String(b.startingMonthOfElectricityFrequency || '');
+                                             return aKey.localeCompare(bKey);
+                                         });
                                          if (allFrequencyData.length > 0) {
                                              return (
                                                  <div className="mt-2">
@@ -1194,7 +1374,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                              </tr>
                                                          </thead>
                                                          <tbody>
-                                                             {allFrequencyData.map((freqData, index) => (
+                                                             {dedupedFrequencyData.map((freqData, index) => (
                                                                  <tr key={index}>
                                                                      <td className="border border-gray-300 px-2 py-1 text-xs">{freqData.electricityFrequencyNo}</td>
                                                                      <td className="border border-gray-300 px-2 py-1 text-xs">{new Date(freqData.startingMonthOfElectricityFrequency + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>

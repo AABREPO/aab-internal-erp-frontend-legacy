@@ -217,7 +217,7 @@ const MasterDataHeader = ({
       onMenuClick={onMenuClick}
     >
       <MasterDataTabs onMasterDataClick={onDrillBack} />
-      <div className="flex-shrink-0 flex w-full min-h-0 items-center justify-between border-b border-[#E0E0E0] pt-[8px] pb-[8px] bg-white">
+      <div className="flex-shrink-0 flex w-full min-h-0 items-center justify-between border-b border-[#E0E0E0] pt-[8px] pb-[8px]  bg-white">
         {showDrillBackDownload ? (
           <>
             <button
@@ -231,7 +231,7 @@ const MasterDataHeader = ({
               </svg>
               <span>Back</span>
             </button>
-            <button type="button" onClick={onDrillDownload} className="text-[12px] font-medium text-black">
+            <button type="button" onClick={onDrillDownload} className="text-[12px] font-semibold text-black">
               Download
             </button>
           </>

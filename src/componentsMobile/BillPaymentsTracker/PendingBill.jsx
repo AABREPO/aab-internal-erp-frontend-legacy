@@ -546,6 +546,43 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 		return entryStatus === 'Entered' || entryStatus === '✓ Entered';
 	};
 
+	const fetchPreviousTrackerMaxBillNumber = async (vendorId, vendorPaymentsTrackerId) => {
+		if (vendorId == null || vendorPaymentsTrackerId == null) return null;
+		try {
+			const url = new URL('https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/previous/max-bill-number');
+			url.searchParams.set('vendorId', String(vendorId));
+			url.searchParams.set('vendorPaymentsTrackerId', String(vendorPaymentsTrackerId));
+			const res = await window.fetch(url.toString(), {
+				method: 'GET',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
+			});
+			if (!res.ok) return null;
+			const data = await res.json().catch(() => null);
+			const maxBill = data?.max_bill_number ?? data?.maxBillNumber ?? null;
+			return maxBill ? String(maxBill).trim() : null;
+		} catch {
+			return null;
+		}
+	};
+
+	const fetchVendorTrackersWithBills = async (vendorId) => {
+		const vId = String(vendorId ?? '').trim();
+		if (!vId) return [];
+		try {
+			const res = await window.fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-payments/vendor/${encodeURIComponent(vId)}`, {
+				method: 'GET',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
+			});
+			if (!res.ok) return [];
+			const data = await res.json().catch(() => []);
+			return Array.isArray(data) ? data : [];
+		} catch {
+			return [];
+		}
+	};
+
 	const openVerifyModal = (bill) => {
 		setSelectedVerifyBill(bill || null);
 		const noOfBills = Number(bill?.no_of_bills ?? bill?.noOfBills ?? 0) || 0;
@@ -577,10 +614,18 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 		setPoValidation({});
 		setRangeStart('');
 		setRangeEnd('');
-		// Desktop behavior: Last PO comes from the previous verified entry for this vendor (not max purchase order ENO).
+		// Prefer backend API: previous tracker max bill_number (fallback to history-based logic)
+		setLastPoNumber(null);
 		const vendorId = bill?.vendor_id ?? bill?.vendorId ?? null;
-		const lastFromHistory = getLastBillNumberForVendor(vendorId, bill);
-		setLastPoNumber(lastFromHistory || null);
+		const trackerId = bill?.id ?? bill?.bill_id ?? null;
+		fetchPreviousTrackerMaxBillNumber(vendorId, trackerId).then((maxBill) => {
+			if (maxBill) {
+				setLastPoNumber(maxBill);
+				return;
+			}
+			const lastFromHistory = getLastBillNumberForVendor(vendorId, bill);
+			setLastPoNumber(lastFromHistory || null);
+		});
 		pushOverlayHistoryState('verify');
 		setShowVerifyModal(true);
 		setActiveFullScreen('verify');
@@ -846,8 +891,20 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 			// If Last PO wasn't available during openVerifyModal (apiData not loaded yet), compute now.
 			setLastPoNumber((prev) => {
 				if (prev != null && String(prev).trim() !== '') return prev;
-				const lastFromHistory = getLastBillNumberForVendor(vendorId, selectedVerifyBill);
-				return lastFromHistory || null;
+				const trackerId = selectedVerifyBill?.id ?? selectedVerifyBill?.bill_id ?? null;
+				fetchPreviousTrackerMaxBillNumber(vendorId, trackerId).then((maxBill) => {
+					if (!mounted) return;
+					if (maxBill) {
+						setLastPoNumber(maxBill);
+						return;
+					}
+					setLastPoNumber((p2) => {
+						if (p2 != null && String(p2).trim() !== '') return p2;
+						const lastFromHistory = getLastBillNumberForVendor(vendorId, selectedVerifyBill);
+						return lastFromHistory || null;
+					});
+				});
+				return prev;
 			});
 		})();
 		return () => { mounted = false; };
@@ -888,27 +945,8 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 				return;
 			}
 
-			// Ensure paid/enriched dataset is loaded so "Already Entered" checks BOTH sources.
-			let paidTrackersForChecks = Array.isArray(allTrackerDataForChecks) ? allTrackerDataForChecks : [];
-			if (paidTrackersForChecks.length === 0) {
-				paidTrackersForChecks = await fetchAllTrackerDataForChecks();
-			}
-			const trackersForDuplicateCheck = (() => {
-				const merged = [
-					...(Array.isArray(paidTrackersForChecks) ? paidTrackersForChecks : []),
-					...(Array.isArray(apiData) ? apiData : [])
-				];
-				const seen = new Set();
-				const unique = [];
-				for (const t of merged) {
-					const id = t?.id ?? t?.bill_id ?? t?.tracker_id;
-					const key = id != null ? String(id) : `idx-${unique.length}`;
-					if (seen.has(key)) continue;
-					seen.add(key);
-					unique.push(t);
-				}
-				return unique;
-			})();
+			// Use vendor-scoped backend endpoint so we don't rely on multiple datasets.
+			const trackersForDuplicateCheck = await fetchVendorTrackersWithBills(vendorId);
 
 			// Match desktop PendingBill.js: validate against the FULL purchase orders list.
 			// (Using a vendor-filtered cache can be stale / mismatched on mobile timing.)
@@ -967,10 +1005,8 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 					const trimmedBillNumber = normalizeValue(billNumber);
 					const trimmedBillKey = normalizeBillKey(trimmedBillNumber);
 					for (const tracker of trackersForDuplicateCheck) {
-						const tid = tracker?.id ?? tracker?.bill_id;
-						if (tid === currentTrackerId) continue;
-						const trackerVendorId = normalizeValue(tracker?.vendor_id ?? tracker?.vendorId);
-						if (trackerVendorId !== vendorId) continue;
+						const tid = tracker?.id ?? tracker?.bill_id ?? tracker?.tracker_id;
+						if (String(tid ?? '') === String(currentTrackerId ?? '')) continue;
 						const verifications =
 							tracker?.billVerifications ||
 							tracker?.bill_verifications ||

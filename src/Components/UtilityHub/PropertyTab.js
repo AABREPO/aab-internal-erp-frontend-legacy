@@ -3,16 +3,21 @@ import axios from 'axios';
 import Select from 'react-select';
 import edit from '../Images/Edit.svg';
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 const PropertyTab = ({ username, userRoles = [] }) => {
     const [filters, setFilters] = useState({
         year: new Date().getFullYear().toString(),
+        month: MONTH_LABELS[new Date().getMonth()],
+        paymentStatus: '',
         vendor: '',
         service: '',
         doorNo: '',
         shop: '',
         projectName: '',
         projectType: '',
-        tenant: ''
+        tenant: '',
+        occupancyStatus: ''
     });
 
     const [projects, setProjects] = useState([]);
@@ -25,6 +30,8 @@ const PropertyTab = ({ username, userRoles = [] }) => {
     const [showHideModal, setShowHideModal] = useState(false);
     const [hiddenProjects, setHiddenProjects] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
+    const [tenantShopData, setTenantShopData] = useState([]);
+    const [tenantOptions, setTenantOptions] = useState([]);
     const [showActivityModal, setShowActivityModal] = useState(false);
     const [activityFormData, setActivityFormData] = useState({
         propertyTaxFrequency: '',
@@ -32,6 +39,15 @@ const PropertyTab = ({ username, userRoles = [] }) => {
     });
     const [selectedRowData, setSelectedRowData] = useState(null);
     const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
+    const monthLabels = MONTH_LABELS;
+    const paymentStatusOptions = [
+        { value: 'Paid', label: 'Paid' },
+        { value: 'Unpaid', label: 'Unpaid' }
+    ];
+    const occupancyStatusOptions = [
+        { value: 'occupied', label: 'Occupied Shop' },
+        { value: 'vacated', label: 'Vacated Shop' }
+    ];
 
     // Fetch projects data
     useEffect(() => {
@@ -119,7 +135,59 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         fetchVendorNames();
     }, []);
 
-    // Apply filters
+    useEffect(() => {
+        const fetchTenants = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+                if (!response.ok) return;
+                const data = await response.json();
+                const tenants = Array.isArray(data) ? data : [];
+                setTenantShopData(tenants);
+                const opts = Array.from(
+                    new Set(
+                        tenants
+                            .map(t => (t?.tenantName || '').toString().trim())
+                            .filter(Boolean)
+                    )
+                )
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(name => ({ value: name, label: name }));
+                setTenantOptions(opts);
+            } catch (e) {
+                console.error('Error fetching tenants:', e);
+            }
+        };
+        if (projects.length > 0) {
+            fetchTenants();
+        }
+    }, [projects]);
+
+    const matchesPaymentFilters = (property) => {
+        const selectedMonth = filters.month;
+        const selectedStatus = filters.paymentStatus;
+
+        if (!selectedMonth && !selectedStatus) {
+            return true;
+        }
+
+        const evaluateMonth = (month) => {
+            const paymentData = getPaymentData(property.propertyTaxNo, month, property.id);
+            const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+            const isUnpaid = paymentData.amount === '0';
+
+            if (selectedStatus === 'Paid') return isPaid;
+            if (selectedStatus === 'Unpaid') return isUnpaid;
+            return true;
+        };
+
+        if (selectedMonth) {
+            return evaluateMonth(selectedMonth);
+        }
+
+        return monthLabels.some((month) => evaluateMonth(month));
+    };
+
+    // Apply filters (match ElectricityTab behavior)
     useEffect(() => {
         const toLower = (value) => (value ? value.toString().toLowerCase() : '');
         const vendorFilter = toLower(filters.vendor);
@@ -129,6 +197,68 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         const serviceFilter = toLower(filters.service);
         const tenantFilter = toLower(filters.tenant);
         const projectNameFilter = toLower(filters.projectName);
+        const occupancyFilter = toLower(filters.occupancyStatus);
+        const selectedYearForFilters = filters.year || new Date().getFullYear().toString();
+        const monthMap = {
+            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+            'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
+            'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        const selectedMonthNumber = filters.month ? monthMap[filters.month] : null;
+        const selectedYearMonthForFilters = selectedMonthNumber ? `${selectedYearForFilters}-${selectedMonthNumber}` : null;
+
+        const getPaymentVendorValue = (payment) => toLower(
+            payment?.vendorName ??
+            payment?.vendor ??
+            payment?.vendor_name ??
+            payment?.vendorNameLabel ??
+            payment?.party ??
+            ''
+        );
+
+        const propertyMatchesVendorFromPayments = (property) => {
+            if (!vendorFilter) return true;
+            const serviceNo = property?.propertyTaxNo;
+            if (!serviceNo) return false;
+            const paymentsForService = propertyTaxPayments.filter(p => p?.utilityTypeNumber === serviceNo);
+            const scopedPayments = selectedYearMonthForFilters
+                ? paymentsForService.filter(p => p?.utilityForTheMonth === selectedYearMonthForFilters)
+                : paymentsForService.filter(p => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${selectedYearForFilters}-`));
+            return scopedPayments.some(p => getPaymentVendorValue(p).includes(vendorFilter));
+        };
+
+        // Tenant ↔ Shop link lookup
+        const tenantLinksByPropertyId = new Map();
+        if (Array.isArray(tenantShopData) && tenantShopData.length) {
+            tenantShopData.forEach(tenant => {
+                const tName = (tenant?.tenantName || '').toString();
+                (tenant?.shopNos || []).forEach(shop => {
+                    const propertyId = shop?.shopNoId;
+                    if (!propertyId) return;
+                    if (!tenantLinksByPropertyId.has(propertyId)) tenantLinksByPropertyId.set(propertyId, []);
+                    tenantLinksByPropertyId.get(propertyId).push({
+                        tenantName: tName,
+                        shopClosureDate: shop?.shopClosureDate || null
+                    });
+                });
+            });
+        }
+        const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(propertyId) || [];
+        const matchesTenantFromLinks = (propertyId) => {
+            if (!tenantFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            if (!links.length) return false;
+            return links.some(l => toLower(l.tenantName).includes(tenantFilter));
+        };
+        const matchesOccupancyFromLinks = (propertyId) => {
+            if (!occupancyFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            const hasActive = links.some(l => !l.shopClosureDate);
+            const hasVacated = links.some(l => !!l.shopClosureDate);
+            if (occupancyFilter === 'occupied') return hasActive;
+            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
+            return true;
+        };
 
         const filtered = projects.reduce((acc, project) => {
             if (selectedCategory && project.projectCategory !== selectedCategory) {
@@ -155,27 +285,15 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                 if (serviceFilter && !toLower(property.propertyTaxNo).includes(serviceFilter)) {
                     return false;
                 }
-                if (tenantFilter) {
-                    const tenantValue = toLower(
-                        property.tenantName ||
-                        property.tenant ||
-                        (property.tenantDetails && property.tenantDetails.tenantName)
-                    );
-                    if (!tenantValue || !tenantValue.includes(tenantFilter)) {
-                        return false;
-                    }
+                if (vendorFilter && !propertyMatchesVendorFromPayments(property)) {
+                    return false;
                 }
-                if (vendorFilter) {
-                    const vendorValue = toLower(
-                        property.vendorName ||
-                        property.vendor ||
-                        project.vendorName ||
-                        project.vendor
-                    );
-                    if (!vendorValue || !vendorValue.includes(vendorFilter)) {
-                        return false;
-                    }
+                if (!matchesPaymentFilters(property)) {
+                    return false;
                 }
+                const propertyId = property?.id ?? property?.propertyId ?? property?.projectNamePropertyDetailsId;
+                if (!matchesTenantFromLinks(propertyId)) return false;
+                if (!matchesOccupancyFromLinks(propertyId)) return false;
                 return true;
             });
 
@@ -191,10 +309,8 @@ const PropertyTab = ({ username, userRoles = [] }) => {
             return acc;
         }, []);
 
-        // Note: Year filter is handled in the getPaymentData function
-        // We show all projects but filter payment data by year
         setFilteredProjects(filtered);
-    }, [filters, projects, selectedCategory, propertyTaxPayments]);
+    }, [filters, projects, selectedCategory, propertyTaxPayments, frequencyHistory, tenantShopData]);
 
     const handleFilterChange = (filterType, selectedOption) => {
         setFilters(prev => ({
@@ -272,36 +388,55 @@ const PropertyTab = ({ username, userRoles = [] }) => {
 
     // Determine if a month needs payment based on frequency
     const shouldPayInMonth = (propertyId, month, year) => {
-        const freqData = getFrequencyData(propertyId);
-        console.log(`Checking frequency for property ${propertyId}:`, freqData);
+        if (!propertyId) return true;
+        if (!frequencyHistory || frequencyHistory.length === 0) return true;
 
-        const hasFrequency = freqData && (freqData.propertyTaxFrequencyNo || freqData.propertyFrequencyNo);
-        const hasStartMonth = freqData && (freqData.startingMonthOfPropertyTaxFrequency || freqData.startingMonthOfPropertyFrequency);
+        const propertyIdStr = String(propertyId);
+        const records = frequencyHistory.filter((f) => {
+            const freqPropertyId = f?.projectNamePropertyDetailsId;
+            const freqPropertyIdStr = freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
+            return (
+                freqPropertyIdStr === propertyIdStr &&
+                (f.startingMonthOfPropertyTaxFrequency || f.startingMonthOfPropertyFrequency)
+            );
+        });
+        if (records.length === 0) return true;
 
-        if (!hasFrequency || !hasStartMonth) {
-            console.log(`No frequency data found for property ${propertyId}, assuming monthly payment`);
-            return true; // If no frequency data, assume monthly payment
+        const currentYear = parseInt(year, 10);
+        const currentMonth = parseInt(month, 10);
+        if (Number.isNaN(currentYear) || Number.isNaN(currentMonth)) return true;
+
+        const currentVal = currentYear * 12 + currentMonth;
+        const sorted = records.slice().sort((a, b) => {
+            const [aY, aM] = (a.startingMonthOfPropertyTaxFrequency || a.startingMonthOfPropertyFrequency).split('-').map(Number);
+            const [bY, bM] = (b.startingMonthOfPropertyTaxFrequency || b.startingMonthOfPropertyFrequency).split('-').map(Number);
+            return aY * 12 + aM - (bY * 12 + bM);
+        });
+
+        let active = null;
+        for (const rec of sorted) {
+            const [rY, rM] = (rec.startingMonthOfPropertyTaxFrequency || rec.startingMonthOfPropertyFrequency).split('-').map(Number);
+            const recVal = rY * 12 + rM;
+            if (recVal <= currentVal) active = rec;
+            else break;
         }
+        if (!active) return true;
 
-        const frequency = parseInt(freqData.propertyTaxFrequencyNo || freqData.propertyFrequencyNo);
-        const startingMonth = (freqData.startingMonthOfPropertyTaxFrequency || freqData.startingMonthOfPropertyFrequency);
+        const activeFreqRaw = active.propertyTaxFrequencyNo ?? active.propertyFrequencyNo;
+        const activeFreqMissing = activeFreqRaw === undefined || activeFreqRaw === null;
+        const activeStart = active.startingMonthOfPropertyTaxFrequency || active.startingMonthOfPropertyFrequency;
+        if (activeFreqMissing || !activeStart) return true;
 
-        // Parse starting month (format: YYYY-MM)
-        const [startYearStr, startMonthStr] = startingMonth.split('-');
-        const startYear = parseInt(startYearStr);
-        const startMonth = parseInt(startMonthStr);
+        const frequency = parseInt(activeFreqRaw, 10);
+        if (Number.isNaN(frequency) || frequency < 0) return true;
 
-        // Calculate months since starting month
-        const currentMonth = parseInt(month);
-        const currentYear = parseInt(year);
+        const [startYear, startMonth] = String(activeStart).trim().split('-').map(Number);
         const monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
 
-        const shouldPay = monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
-        console.log(`Property ${propertyId}: Month ${month}/${year}, Start ${startYear}/${startMonth}, Months since start: ${monthsSinceStart}, Frequency: ${frequency}, Should pay: ${shouldPay}`);
+        // Frequency 0 means: from starting month onwards, no payment required (show "-")
+        if (frequency === 0) return monthsSinceStart < 0;
 
-        // Check if current month is a payment month based on frequency
-        // Include the starting month (monthsSinceStart === 0) and then every frequency months
-        return shouldPay;
+        return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
     };
 
     // Check if payment is made for a specific propertyTaxNo and month
@@ -324,27 +459,19 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         if (!monthNumber) return { amount: '-', date: null };
 
         const yearMonth = `${selectedYear}-${monthNumber}`;
-        const payment = propertyTaxPayments.find(p =>
-            p.utilityTypeNumber === propertyTaxNo &&
-            p.utilityForTheMonth === yearMonth
-        );
-
-        // ✅ If payment exists, show it
-        if (payment) {
-            return {
-                amount: payment.amount || '0',
-                date: payment.date || null,
-                billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
-            };
-        }
-
         // ✅ Helper: find the active frequency record for this month
         const getActiveFrequencyData = (propertyId, year, monthNumber) => {
             if (!frequencyHistory || frequencyHistory.length === 0) return null;
 
-            const records = frequencyHistory.filter(
-                f => f.projectNamePropertyDetailsId === propertyId && (f.startingMonthOfPropertyTaxFrequency || f.startingMonthOfPropertyFrequency)
-            );
+            const propertyIdStr = String(propertyId);
+            const records = frequencyHistory.filter((f) => {
+                const freqPropertyId = f?.projectNamePropertyDetailsId;
+                const freqPropertyIdStr = freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
+                return (
+                    freqPropertyIdStr === propertyIdStr &&
+                    (f.startingMonthOfPropertyTaxFrequency || f.startingMonthOfPropertyFrequency)
+                );
+            });
 
             if (records.length === 0) return null;
 
@@ -374,11 +501,24 @@ const PropertyTab = ({ username, userRoles = [] }) => {
 
         // ✅ Get the correct frequency record
         const freqData = getActiveFrequencyData(propertyId, parseInt(selectedYear), parseInt(monthNumber));
-        if (!freqData || !(freqData.propertyTaxFrequencyNo || freqData.propertyFrequencyNo) || !(freqData.startingMonthOfPropertyTaxFrequency || freqData.startingMonthOfPropertyFrequency)) {
+        const freqValue = freqData?.propertyTaxFrequencyNo ?? freqData?.propertyFrequencyNo;
+        const freqMissing = freqValue === undefined || freqValue === null;
+        if (!freqData || freqMissing || !(freqData.startingMonthOfPropertyTaxFrequency || freqData.startingMonthOfPropertyFrequency)) {
+            const payment = propertyTaxPayments.find(p =>
+                p.utilityTypeNumber === propertyTaxNo &&
+                p.utilityForTheMonth === yearMonth
+            );
+            if (payment) {
+                return {
+                    amount: payment.amount || '0',
+                    date: payment.date || null,
+                    billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
+                };
+            }
             return { amount: '0', date: null }; // Default: monthly
         }
 
-        const frequency = parseInt(freqData.propertyTaxFrequencyNo || freqData.propertyFrequencyNo);
+        const frequency = parseInt(freqValue, 10);
         const startingMonth = (freqData.startingMonthOfPropertyTaxFrequency || freqData.startingMonthOfPropertyFrequency).trim();
 
         // Parse YYYY-MM safely
@@ -398,6 +538,26 @@ const PropertyTab = ({ username, userRoles = [] }) => {
 
         // ✅ Calculate months since start
         const monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+
+        // ✅ Frequency 0 means: from starting month onwards, not required ("-")
+        if (frequency === 0 && monthsSinceStart >= 0) {
+            console.log(
+                `[PropertyTab] getPaymentData: property=${propertyId} service=${propertyTaxNo} ym=${yearMonth} frequency=0 start=${startingMonth} -> "-" (override payments)`
+            );
+            return { amount: '-', date: null, isNotRequired: true };
+        }
+
+        const payment = propertyTaxPayments.find(p =>
+            p.utilityTypeNumber === propertyTaxNo &&
+            p.utilityForTheMonth === yearMonth
+        );
+        if (payment) {
+            return {
+                amount: payment.amount || '0',
+                date: payment.date || null,
+                billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
+            };
+        }
 
         // ✅ Include starting month as payable
         const shouldPay = monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
@@ -503,16 +663,17 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         }
         try {
             // Prepare frequency history data
+            // Property tab should save to Property frequency fields
             const frequencyHistoryData = {
                 projectNamePropertyDetailsId: selectedRowData.property.id, // Property ID from the selected row
-                propertyTaxFrequencyNo: parseInt(activityFormData.propertyTaxFrequency),
-                startingMonthOfPropertyTaxFrequency: activityFormData.propertyTaxStartingMonth,
-                electricityFrequencyNo: null, // Not needed for property tax tab
-                startingMonthOfElectricityFrequency: null, // Not needed for property tax tab
-                propertyFrequencyNo: null, // Not applicable for property tax tab
-                startingMonthOfPropertyFrequency: null, // Not applicable for property tax tab
-                waterFrequencyNo: null, // Not applicable for property tax tab
-                startingMonthOfWaterFrequency: null // Not applicable for property tax tab
+                propertyFrequencyNo: parseInt(activityFormData.propertyTaxFrequency, 10),
+                startingMonthOfPropertyFrequency: activityFormData.propertyTaxStartingMonth,
+                electricityFrequencyNo: null,
+                startingMonthOfElectricityFrequency: null,
+                propertyTaxFrequencyNo: null,
+                startingMonthOfPropertyTaxFrequency: null,
+                waterFrequencyNo: null,
+                startingMonthOfWaterFrequency: null
             };
             // Send data to frequency history API
             const response = await axios.post('https://backendaab.in/demoAabuilderDash/api/frequency-history/save', frequencyHistoryData);
@@ -522,8 +683,8 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                 setSubmittedFrequencyData(prev => ({
                     ...prev,
                     [selectedRowData.property.id]: {
-                        propertyTaxFrequency: activityFormData.propertyTaxFrequency,
-                        propertyTaxStartingMonth: activityFormData.propertyTaxStartingMonth
+                        propertyFrequency: activityFormData.propertyTaxFrequency,
+                        propertyStartingMonth: activityFormData.propertyTaxStartingMonth
                     }
                 }));
 
@@ -538,7 +699,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                 };
                 fetchFrequencyHistory();
 
-                alert('Property Tax frequency history saved successfully!');
+                alert('Property frequency history saved successfully!');
                 setShowActivityModal(false);
                 setSelectedRowData(null);
                 setActivityFormData({
@@ -555,23 +716,26 @@ const PropertyTab = ({ username, userRoles = [] }) => {
     const clearFilters = () => {
         setFilters({
             year: '',
+            month: '',
+            paymentStatus: '',
             vendor: '',
             service: '',
             doorNo: '',
             shop: '',
             projectName: '',
             projectType: '',
-            tenant: ''
+            tenant: '',
+            occupancyStatus: ''
         });
         setSelectedCategory(''); // Also clear category filter
     };
 
     return (
         <div className="bg-[#FAF6ED] rounded-lg shadow-sm">
-            {/* Filter Section */}
-            <div className="bg-white rounded-md mb-5 h-[128px] ml-5 mr-5">
+            <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
-                    <div className="flex text-left gap-4">
+                    {/* 10 filters -> grid of 5 columns naturally renders them as 2 rows */}
+                    <div className="grid grid-cols-5 gap-4 text-left">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -584,7 +748,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 onChange={(selectedOption) => handleFilterChange('year', selectedOption)}
                                 placeholder="Select Year"
                                 isClearable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -597,7 +766,48 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Vendor"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Month</label>
+                            <Select
+                                options={monthLabels.map(month => ({ value: month, label: month }))}
+                                value={filters.month ? { value: filters.month, label: filters.month } : null}
+                                onChange={(selectedOption) => handleFilterChange('month', selectedOption)}
+                                placeholder="Select Month"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Payment Status</label>
+                            <Select
+                                options={paymentStatusOptions}
+                                value={filters.paymentStatus ? { value: filters.paymentStatus, label: filters.paymentStatus } : null}
+                                onChange={(selectedOption) => handleFilterChange('paymentStatus', selectedOption)}
+                                placeholder="Select Status"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -610,7 +820,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Service No"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -623,7 +838,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Door No"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -636,7 +856,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Shop"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -649,7 +874,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Project"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -662,20 +892,48 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 placeholder="Select Project Type"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
                         <div>
                             <label className="block font-semibold mb-1">Tenant</label>
                             <Select
-                                options={[]}
+                                options={tenantOptions}
                                 value={filters.tenant ? { value: filters.tenant, label: filters.tenant } : null}
                                 onChange={(selectedOption) => handleFilterChange('tenant', selectedOption)}
                                 placeholder="Select Tenant"
                                 isClearable
                                 isSearchable
-                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Occupancy Status</label>
+                            <Select
+                                options={occupancyStatusOptions}
+                                value={filters.occupancyStatus ? { value: filters.occupancyStatus, label: occupancyStatusOptions.find(o => o.value === filters.occupancyStatus)?.label || filters.occupancyStatus } : null}
+                                onChange={(selectedOption) => handleFilterChange('occupancyStatus', selectedOption)}
+                                placeholder="Select Status"
+                                isClearable
+                                isSearchable
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{
+                                    ...customSelectStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
                                 className="w-full"
                             />
                         </div>
@@ -734,48 +992,49 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="border-l-8 border-l-[#BF9853] rounded-lg">
                         <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
+                            <div className="overflow-y-auto h-[480px] min-w-max">
+                            <table className="w-full border-collapse table-auto">
+                                <thead className="sticky top-0 z-10">
                                     <tr className="bg-[#FAF6ED]">
-                                        <td className=" px-4 py-2 text-left font-semibold">Sl.No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">PID</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Project Name</td>
-                                        <td className=" px-4 py-2 text-left font-semibold"></td>
-                                        <td className=" px-4 py-2 text-left font-semibold">D.No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Property No</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Jan</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Feb</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Mar</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Apr</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">May</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">June</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">July</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Aug</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Sep</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Oct</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Nov</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Dec</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Unpaid</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Activity</td>
-                                        <td className=" px-4 py-2 text-left font-semibold">Hide</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sl.No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">PID</td>
+                                        <td className="px-4 py-2 text-left font-semibold">Project Name</td>
+                                        <td className="px-4 py-2 text-left font-semibold"></td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">D.No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Property No</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Jan</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Feb</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Mar</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Apr</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">May</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">June</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">July</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Aug</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sep</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Oct</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Nov</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Dec</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Unpaid</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Activity</td>
+                                        <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Hide</td>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4">
+                                            <td colSpan="20" className="text-center py-4">
                                                 Loading...
                                             </td>
                                         </tr>
                                     ) : error ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4 text-red-500">
+                                            <td colSpan="20" className="text-center py-4 text-red-500">
                                                 {error}
                                             </td>
                                         </tr>
                                     ) : filteredProjects.length === 0 ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4">
+                                            <td colSpan="20" className="text-center py-4">
                                                 No projects found with property tax connections
                                             </td>
                                         </tr>
@@ -800,7 +1059,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                                                     {property.projectType || project.projectCategory || '-'}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2">{property.doorNo || '-'}</td>
+                                                            <td className="px-4 py-2 whitespace-nowrap">{property.doorNo || '-'}</td>
                                                             <td className="px-4 py-2 text-left">{property.propertyTaxNo}</td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
                                                                 const paymentData = getPaymentData(property.propertyTaxNo, month, property.id);
@@ -860,6 +1119,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                     )}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -969,20 +1229,46 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                 <div className='pl-5'>
                                      {(() => {
                                          // Get all frequency data for this Service No (property ID)
-                                         const allFrequencyData = frequencyHistory.filter(freq => 
-                                             freq.projectNamePropertyDetailsId === selectedRowData.property.id &&
-                                             (freq.propertyTaxFrequencyNo || freq.propertyFrequencyNo) &&
-                                             (freq.startingMonthOfPropertyTaxFrequency || freq.startingMonthOfPropertyFrequency)
-                                         );
+                                         const propertyId = selectedRowData?.property?.id;
+                                         const propertyIdStr = propertyId !== undefined && propertyId !== null ? String(propertyId) : null;
+                                         const allFrequencyData = frequencyHistory
+                                             .filter((freq) => {
+                                                 const freqPropertyId = freq?.projectNamePropertyDetailsId;
+                                                 const freqPropertyIdStr =
+                                                     freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
+                                                 const freqRaw = freq?.propertyTaxFrequencyNo ?? freq?.propertyFrequencyNo;
+                                                 const hasFreq = freqRaw !== undefined && freqRaw !== null; // allow 0
+                                                 const hasStart = !!(freq?.startingMonthOfPropertyTaxFrequency || freq?.startingMonthOfPropertyFrequency);
+                                                 return !!propertyIdStr && freqPropertyIdStr === propertyIdStr && hasFreq && hasStart;
+                                             })
+                                             .sort((a, b) => {
+                                                 const aKey = String(a.startingMonthOfPropertyTaxFrequency || a.startingMonthOfPropertyFrequency || '');
+                                                 const bKey = String(b.startingMonthOfPropertyTaxFrequency || b.startingMonthOfPropertyFrequency || '');
+                                                 return aKey.localeCompare(bKey);
+                                             });
 
                                          // Add submitted data if available
                                          const submittedData = submittedFrequencyData[selectedRowData.property.id];
-                                         if (submittedData?.propertyTaxFrequency && submittedData?.propertyTaxStartingMonth) {
+                                         if (submittedData?.propertyFrequency && submittedData?.propertyStartingMonth) {
                                              allFrequencyData.push({
-                                                 propertyTaxFrequencyNo: submittedData.propertyTaxFrequency,
-                                                 startingMonthOfPropertyTaxFrequency: submittedData.propertyTaxStartingMonth
+                                                 propertyFrequencyNo: submittedData.propertyFrequency,
+                                                 startingMonthOfPropertyFrequency: submittedData.propertyStartingMonth
                                              });
                                          }
+                                         // Dedupe: backend refresh + optimistic push can show duplicates until reload
+                                         const dedupedFrequencyData = Array.from(
+                                             new Map(
+                                                 allFrequencyData.map((row) => {
+                                                     const freqVal = row?.propertyTaxFrequencyNo ?? row?.propertyFrequencyNo;
+                                                     const startVal = String(row?.startingMonthOfPropertyTaxFrequency || row?.startingMonthOfPropertyFrequency || '').trim();
+                                                     return [`${startVal}__${freqVal}`, row];
+                                                 })
+                                             ).values()
+                                         ).sort((a, b) => {
+                                             const aKey = String(a.startingMonthOfPropertyTaxFrequency || a.startingMonthOfPropertyFrequency || '');
+                                             const bKey = String(b.startingMonthOfPropertyTaxFrequency || b.startingMonthOfPropertyFrequency || '');
+                                             return aKey.localeCompare(bKey);
+                                         });
 
                                          if (allFrequencyData.length > 0) {
     return (
@@ -995,7 +1281,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                                              </tr>
                                                          </thead>
                                                          <tbody>
-                                                             {allFrequencyData.map((freqData, index) => (
+                                                             {dedupedFrequencyData.map((freqData, index) => (
                                                                  <tr key={index}>
                                                                      <td className="border border-gray-300 px-2 py-1 text-xs">{freqData.propertyTaxFrequencyNo || freqData.propertyFrequencyNo}</td>
                                                                      <td className="border border-gray-300 px-2 py-1 text-xs">{new Date(((freqData.startingMonthOfPropertyTaxFrequency || freqData.startingMonthOfPropertyFrequency)) + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>

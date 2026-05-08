@@ -24,7 +24,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         shop: '',
         projectName: '',
         projectType: '',
-        tenant: ''
+        tenant: '',
+        occupancyStatus: ''
     });
     const [projects, setProjects] = useState([]);
     const [telecomPayments, setTelecomPayments] = useState([]);
@@ -36,6 +37,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
     const [showHideModal, setShowHideModal] = useState(false);
     const [hiddenProjects, setHiddenProjects] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
+    const [tenantShopData, setTenantShopData] = useState([]);
+    const [tenantOptions, setTenantOptions] = useState([]);
     const [showActivityModal, setShowActivityModal] = useState(false);
     const [activityFormData, setActivityFormData] = useState({
         telecomFrequency: '',
@@ -48,6 +51,10 @@ const TelecomTab = ({ username, userRoles = [] }) => {
     const paymentStatusOptions = [
         { value: 'Paid', label: 'Paid' },
         { value: 'Unpaid', label: 'Unpaid' }
+    ];
+    const occupancyStatusOptions = [
+        { value: 'occupied', label: 'Occupied Shop' },
+        { value: 'vacated', label: 'Vacated Shop' }
     ];
 
     const openTelecomExpenseEntry = (serviceNumber, project) => {
@@ -209,6 +216,33 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         fetchFrequencyHistory();
     }, []);
 
+    useEffect(() => {
+        const fetchTenants = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+                if (!response.ok) return;
+                const data = await response.json();
+                const tenants = Array.isArray(data) ? data : [];
+                setTenantShopData(tenants);
+                const opts = Array.from(
+                    new Set(
+                        tenants
+                            .map(t => (t?.tenantName || '').toString().trim())
+                            .filter(Boolean)
+                    )
+                )
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(name => ({ value: name, label: name }));
+                setTenantOptions(opts);
+            } catch (e) {
+                console.error('Error fetching tenants:', e);
+            }
+        };
+        if (projects.length > 0) {
+            fetchTenants();
+        }
+    }, [projects]);
+
     const filteredFrequencyHistory = useMemo(() => frequencyHistory || [], [frequencyHistory]);
 
     useEffect(() => {
@@ -220,6 +254,40 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         const serviceFilter = toLower(filters.service);
         const tenantFilter = toLower(filters.tenant);
         const projectNameFilter = toLower(filters.projectName);
+        const occupancyFilter = toLower(filters.occupancyStatus);
+
+        // Tenant ↔ Shop link lookup (same as ElectricityTab)
+        const tenantLinksByPropertyId = new Map();
+        if (Array.isArray(tenantShopData) && tenantShopData.length) {
+            tenantShopData.forEach(tenant => {
+                const tName = (tenant?.tenantName || '').toString();
+                (tenant?.shopNos || []).forEach(shop => {
+                    const propertyId = shop?.shopNoId;
+                    if (!propertyId) return;
+                    if (!tenantLinksByPropertyId.has(propertyId)) tenantLinksByPropertyId.set(propertyId, []);
+                    tenantLinksByPropertyId.get(propertyId).push({
+                        tenantName: tName,
+                        shopClosureDate: shop?.shopClosureDate || null
+                    });
+                });
+            });
+        }
+        const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(propertyId) || [];
+        const matchesTenantFromLinks = (propertyId) => {
+            if (!tenantFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            if (!links.length) return false;
+            return links.some(l => toLower(l.tenantName).includes(tenantFilter));
+        };
+        const matchesOccupancyFromLinks = (propertyId) => {
+            if (!occupancyFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            const hasActive = links.some(l => !l.shopClosureDate);
+            const hasVacated = links.some(l => !!l.shopClosureDate);
+            if (occupancyFilter === 'occupied') return hasActive;
+            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
+            return true;
+        };
 
         const filtered = projects.reduce((acc, project) => {
             if (selectedCategory && project.projectCategory !== selectedCategory) {
@@ -247,12 +315,9 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                 if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
                     return false;
                 }
-                if (tenantFilter) {
-                    const tenantValue = toLower(property.tenantName);
-                    if (!tenantValue || !tenantValue.includes(tenantFilter)) {
-                        return false;
-                    }
-                }
+                const propertyId = property?.id ?? property?.propertyId ?? property?.projectNamePropertyDetailsId;
+                if (!matchesTenantFromLinks(propertyId)) return false;
+                if (!matchesOccupancyFromLinks(propertyId)) return false;
                 if (vendorFilter) {
                     const vendorValue = toLower(property.vendorName);
                     if (!vendorValue || !vendorValue.includes(vendorFilter)) {
@@ -280,7 +345,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         }, []);
 
         setFilteredProjects(filtered);
-    }, [filters, projects, selectedCategory]);
+    }, [filters, projects, selectedCategory, tenantShopData]);
 
     const handleFilterChange = (filterType, selectedOption) => {
         setFilters(prev => ({
@@ -394,9 +459,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         if (Number.isNaN(parsedFrequency)) {
             return true;
         }
-        if (parsedFrequency === 0) {
-            return false;
-        }
         const monthKey = typeof startingMonth === 'string' ? startingMonth.trim() : startingMonth;
         if (!monthKey) return true;
         const [startYearStr, startMonthStr] = monthKey.split('-');
@@ -408,6 +470,10 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         const currentMonth = parseInt(month, 10);
         const currentYear = parseInt(year, 10);
         const monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+        // Frequency 0 means: from starting month onwards, no payment required (show "-")
+        if (parsedFrequency === 0) {
+            return monthsSinceStart < 0;
+        }
         return monthsSinceStart >= 0 && monthsSinceStart % parsedFrequency === 0;
     };
 
@@ -1134,10 +1200,24 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Tenant</label>
                             <Select
-                                options={[]}
+                                options={tenantOptions}
                                 value={filters.tenant ? { value: filters.tenant, label: filters.tenant } : null}
                                 onChange={(selectedOption) => handleFilterChange('tenant', selectedOption)}
                                 placeholder="Select Tenant"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                {...selectPortalProps}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Occupancy Status</label>
+                            <Select
+                                options={occupancyStatusOptions}
+                                value={filters.occupancyStatus ? { value: filters.occupancyStatus, label: occupancyStatusOptions.find(o => o.value === filters.occupancyStatus)?.label || filters.occupancyStatus } : null}
+                                onChange={(selectedOption) => handleFilterChange('occupancyStatus', selectedOption)}
+                                placeholder="Select Status"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}

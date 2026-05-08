@@ -21,6 +21,7 @@ const Dashboard = () => {
     const [editRent, setEditRent] = useState('');
     const [editStartingMonth, setEditStartingMonth] = useState('');
     const [tableData, setTableData] = useState([]);
+    const [vacatedTableData, setVacatedTableData] = useState([]);
     const [selectedShop, setSelectedShop] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [showEditPopup, setShowEditPopup] = useState(false);
@@ -491,7 +492,29 @@ const Dashboard = () => {
                 refundDetailsMap[key].push(`${paidOn} - ₹${amount.toLocaleString()}`);
             }
         });
-        const finalTableData = [];
+        const shopOrder = allShops
+            .filter(s => s.isBase)
+            .map(s => s.shopNo)
+            .filter(Boolean);
+        const seenOrder = new Set();
+        const orderedShopNos = shopOrder.filter(no => {
+            if (seenOrder.has(no)) return false;
+            seenOrder.add(no);
+            return true;
+        });
+
+        const activeRowByShopNo = {};
+        const latestVacatedRowByShopNo = {};
+        const allVacatedRowsByShopNo = {};
+        const vacantRowByShopNo = {};
+
+        const getRowClosureTime = (row) => {
+            if (!row?.shopClosureDate) return -1;
+            const d = new Date(row.shopClosureDate);
+            const t = d.getTime();
+            return Number.isFinite(t) ? t : -1;
+        };
+
         shopsForTable.forEach((shop) => {
             const months = groupedRentals[shop.tenantKey] || createMonthBuckets();
             const rentDetails = rentHistoryMap[shop.tenantKey] || createMonthBuckets();
@@ -528,7 +551,6 @@ const Dashboard = () => {
             }
             const wasActiveThisYear = hadRentPaymentsThisYear || vacatedThisYear;
             const row = {
-                shNo: finalTableData.length + 1,
                 shopNo: shop.shopNo,
                 tenantName: shop.active ? shop.tenantName : "Vacant",
                 doorNo: shop.doorNo,
@@ -545,41 +567,93 @@ const Dashboard = () => {
                 shopClosureDate: shop.active ? null : shopClosureDate || null,
                 shouldCollectAdvance: shop.shouldCollectAdvance ?? (shopInfoMap[shop.shopNo]?.shouldCollectAdvance ?? true)
             };
-            const hasAnotherActiveTenant = shopsForTable.some(
-                s => s.shopNo === shop.shopNo && s.active
-            );            
-            if (!shop.active && wasActiveThisYear) {
-                // Show vacated tenant with their history for this year
-                finalTableData.push({
-                    ...row,
-                    tenantName: shop.tenantName || 'Vacated', 
-                    vacated: true,
-                    advance: remainingAdvance, 
-                    advanceDetails: advanceDetails, 
-                    advanceAdjustmentDetails: advanceAdjustmentDetails, 
-                    shopClosureDetails: shopClosureDetails, 
-                    refundDetails: refundDetails 
-                });
-                // Only add vacant row if no new tenant has taken over
-                if (!hasAnotherActiveTenant) {
-                    finalTableData.push({
-                        ...row,
-                        tenantName: 'Vacant',
-                        advance: null,
-                        advanceDetails: [],
-                        months: createMonthBuckets(),
-                        rentDetails: createMonthBuckets(),
-                        vacated: false
-                    });
+
+            if (shop.active) {
+                // Only keep one active tenant row per shopNo
+                if (!activeRowByShopNo[shop.shopNo]) {
+                    activeRowByShopNo[shop.shopNo] = row;
                 }
-            } else if (!shop.active && !wasActiveThisYear && hasAnotherActiveTenant) {
-                // Skip old inactive tenant entries when there's already an active tenant
-                // This prevents showing duplicate "Vacant" entries for shops that have been re-allocated
-            } else {
-                finalTableData.push(row);
+                return;
+            }
+
+            if (wasActiveThisYear) {
+                // Keep only the latest vacated tenant per shopNo (prevents duplicates)
+                const vacatedRow = {
+                    ...row,
+                    tenantName: shop.tenantName || 'Vacated',
+                    vacated: true,
+                    advance: remainingAdvance,
+                    advanceDetails: advanceDetails,
+                    advanceAdjustmentDetails: advanceAdjustmentDetails,
+                    shopClosureDetails: shopClosureDetails,
+                    refundDetails: refundDetails
+                };
+                if (!allVacatedRowsByShopNo[shop.shopNo]) {
+                    allVacatedRowsByShopNo[shop.shopNo] = [];
+                }
+                allVacatedRowsByShopNo[shop.shopNo].push(vacatedRow);
+                const existing = latestVacatedRowByShopNo[shop.shopNo];
+                const existingTime = getRowClosureTime(existing);
+                const candidateTime = getRowClosureTime(vacatedRow);
+                if (!existing || candidateTime > existingTime) {
+                    latestVacatedRowByShopNo[shop.shopNo] = vacatedRow;
+                }
+            }
+
+            // Prepare a single vacant row per shopNo (shown only when there is no active tenant)
+            if (!vacantRowByShopNo[shop.shopNo]) {
+                vacantRowByShopNo[shop.shopNo] = {
+                    ...row,
+                    tenantName: 'Vacant',
+                    advance: null,
+                    advanceDetails: [],
+                    advanceAdjustmentDetails: [],
+                    shopClosureDetails: [],
+                    refundDetails: [],
+                    months: createMonthBuckets(),
+                    rentDetails: createMonthBuckets(),
+                    vacated: false,
+                    shopClosureDate: null
+                };
             }
         });
-        setTableData(finalTableData);
+
+        const finalTableData = [];
+        const allShopNos = orderedShopNos.length
+            ? orderedShopNos
+            : Array.from(new Set(shopsForTable.map(s => s.shopNo).filter(Boolean)));
+
+        allShopNos.forEach((shopNo) => {
+            const activeRow = activeRowByShopNo[shopNo];
+            if (activeRow) {
+                finalTableData.push(activeRow);
+                return;
+            }
+            const vacatedRow = latestVacatedRowByShopNo[shopNo];
+            if (vacatedRow) {
+                finalTableData.push(vacatedRow);
+            }
+            const vacantRow = vacantRowByShopNo[shopNo];
+            if (vacantRow) {
+                finalTableData.push(vacantRow);
+            }
+        });
+
+        // Add S.No after final assembly
+        setTableData(finalTableData.map((r, idx) => ({ ...r, shNo: idx + 1 })));
+
+        // For "Vacated Shop" filter, show ALL vacated tenants per shop (no de-dupe)
+        const vacatedOnly = [];
+        allShopNos.forEach((shopNo) => {
+            const rows = allVacatedRowsByShopNo[shopNo] || [];
+            if (!rows.length) return;
+            // Show latest vacated first within the shop
+            rows
+                .slice()
+                .sort((a, b) => getRowClosureTime(b) - getRowClosureTime(a))
+                .forEach(r => vacatedOnly.push(r));
+        });
+        setVacatedTableData(vacatedOnly.map((r, idx) => ({ ...r, shNo: idx + 1 })));
     }, [rentForms, tenantShopData, projects, selectedYear, shopNoIdToShopNoMap]);
     const formatINR = (value) => {
         const numericValue = value.replace(/[^0-9]/g, '');
@@ -606,7 +680,7 @@ const Dashboard = () => {
             if (updateResponse.ok) {
                 if (editRent && editStartingMonth) {
                     const rentHistoryData = {
-                        tenantWithShopNoId: shopId,
+                        shopNoId: shopId,
                         rentAmount: editRent,
                         startingMonthForThisRent: editStartingMonth
                     };
@@ -638,7 +712,8 @@ const Dashboard = () => {
         }
     };
     const filteredTableData = useMemo(() => {
-        return tableData.filter((shop) => {
+        const sourceData = selectedOccupancyStatus === 'vacated' ? vacatedTableData : tableData;
+        return sourceData.filter((shop) => {
             const matchesShopNo = selectedShopNo ? shop.shopNo === selectedShopNo : true;
             const matchesTenantName = selectedTenantName ? shop.tenantName === selectedTenantName : true;
             const matchesDoorNo = selectedDoorNo ? shop.doorNo === selectedDoorNo : true;
@@ -646,6 +721,11 @@ const Dashboard = () => {
             const isVacant = shop.tenantName === 'Vacant';
             const isVacated = shop.vacated;
             const isOccupied = !isVacant && !isVacated;
+
+            // When filtering by Paid/Unpaid, do not include vacated tenants.
+            // Vacated entries have a closure date and shouldn't be considered for month payment status filters/reports.
+            if (paymentStatus !== '' && isVacated) return false;
+
             let matchesOccupancyStatus = true;
             if (selectedOccupancyStatus) {
                 if (selectedOccupancyStatus === 'vacant') {
@@ -665,7 +745,9 @@ const Dashboard = () => {
                 } else if (paymentStatus === 'unpaid') {
                     const startingDate = shop.startingDate ? new Date(shop.startingDate) : null;
                     const selectedMonthDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), 1);
-                    const hasStarted = startingDate ? startingDate <= selectedMonthDate : true;
+                    // If startingDate is missing, we don't consider any month "started"
+                    // (so we shouldn't show/filter unpaid "0" months for that tenant).
+                    const hasStarted = startingDate ? startingDate <= selectedMonthDate : false;
                     matchesMonthStatus = totalAmount === 0 && hasStarted;
                 }
             }
@@ -673,6 +755,7 @@ const Dashboard = () => {
         });
     }, [
         tableData,
+        vacatedTableData,
         selectedShopNo,
         selectedTenantName,
         selectedDoorNo,
@@ -759,6 +842,7 @@ const Dashboard = () => {
                     selectedYear > now.getFullYear() ||
                     (selectedYear === now.getFullYear() && i >= now.getMonth());
                 const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                const hasKnownStart = !!shopStartDate;
                 const shopClosureDate = shop.shopClosureDate ? new Date(shop.shopClosureDate) : null;
                 const isBeforeStart = shopStartDate
                     ? (selectedYear < shopStartDate.getFullYear() ||
@@ -772,6 +856,7 @@ const Dashboard = () => {
                 if (isVacant || isBeforeStart || isAfterClosure) return "-";
                 if (totalAmount > 0) return totalAmount.toLocaleString();
                 if (isFutureMonth) return "-";
+                if (!hasKnownStart) return "-";
                 return "0";
             });
             const unpaidCount = isVacant
@@ -1308,6 +1393,7 @@ const Dashboard = () => {
                                             const totalAmount = amounts.reduce((a, b) => a + b, 0);
                                             const hoverText = shop.rentDetails?.[i]?.join('\n') || "";
                                             const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                                            const hasKnownStart = !!shopStartDate;
                                             const shopClosureDate = shop.shopClosureDate ? new Date(shop.shopClosureDate) : null;
                                             const isBeforeStart = shopStartDate
                                                 ? (selectedYear < shopStartDate.getFullYear() ||
@@ -1324,6 +1410,8 @@ const Dashboard = () => {
                                                     ) : totalAmount > 0 ? (
                                                         <span className="text-green-600 font-semibold">{totalAmount.toLocaleString()}</span>
                                                     ) : isFutureMonth ? (
+                                                        <span className="text-gray-400 font-medium">-</span>
+                                                    ) : !hasKnownStart ? (
                                                         <span className="text-gray-400 font-medium">-</span>
                                                     ) : (
                                                         <button
@@ -1347,9 +1435,10 @@ const Dashboard = () => {
                                                         (selectedYear === now.getFullYear() && i < now.getMonth());
                                                     const total = arr.reduce((a, b) => a + b, 0);
                                                     const shopStartDate = shop.startingDate ? new Date(shop.startingDate) : null;
+                                                    const hasKnownStart = !!shopStartDate;
                                                     const currentMonthDate = new Date(`${selectedYear}-${String(i + 1).padStart(2, '0')}-01`);
                                                     const isBeforeStart = shopStartDate ? currentMonthDate < shopStartDate : false;
-                                                    return isPastMonth && total === 0 && !isBeforeStart;
+                                                    return isPastMonth && total === 0 && hasKnownStart && !isBeforeStart;
                                                 }).length.toString().padStart(2, '0')}
                                         </td>
                                         <td className="px-4 py-2 items-center text-center ">

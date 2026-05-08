@@ -414,7 +414,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             ...provided,
             color: '#d3d5db',
             textAlign: 'left',
-            fontWeight: 'bold',
+            fontWeight: 'normal',
         }),
         indicatorSeparator: (provided) => ({
             ...provided,
@@ -1582,11 +1582,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         doc.save(`Filtered_Expenses_${dateStr}.pdf`);
     };
     return (
-        <body className=' bg-[#FAF6ED]'>
+        <body className=' bg-[#FAF6ED] px-6'>
             <div>
 
                 {Object.keys(accountTypeSummary).length > 0 && (
-                    <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
+                    <div className="w-full p-6 bg-white shadow-lg mb-4">
                         <div className="flex flex-wrap gap-5 items-end text-left">
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
@@ -1643,7 +1643,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     </div>
                 )}
                 {Object.keys(accountTypeSummary).length === 0 && (
-                    <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg mb-4">
+                    <div className="w-full p-6 pb-10 bg-white shadow-lg mb-4">
                         <div className="flex flex-wrap gap-5 items-end text-left">
                             <div>
                                 <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
@@ -1672,7 +1672,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                         </div>
                     </div>
                 )}
-                <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
+                <div className="w-full p-6 bg-white shadow-lg overflow-x-auto">
                     <div
                         className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
                             ? 'flex-col sm:flex-row sm:justify-between'

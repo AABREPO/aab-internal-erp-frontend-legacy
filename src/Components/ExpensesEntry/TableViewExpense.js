@@ -1135,8 +1135,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             borderWidth: '2px',
             lineHeight: '20px',
             fontSize: '14px',
-            fontWeight: 'normal',
-            height: '45px',
+            fontWeight: 100,
+            minHeight: '41px',
+            height: '41px',
             borderRadius: '8px',
             padding: '0.15rem',
             textAlign: 'left',
@@ -1170,12 +1171,23 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         singleValue: (provided) => ({
             ...provided,
             color: '#111827',
-            fontWeight: 'normal',
+            fontWeight: 400,
             marginRight: 0,
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            color: '#d3d5db',
+            textAlign: 'left',
+            fontWeight: 'normal',
+        }),
+        input: (provided) => ({
+            ...provided,
+            fontWeight: 400,
         }),
         valueContainer: (provided) => ({
             ...provided,
             paddingRight: '2px',
+            fontWeight: 400,
         }),
         indicatorsContainer: (provided) => ({
             ...provided,
@@ -1203,7 +1215,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             ...provided,
             color: '#d3d5db',
             textAlign: 'left',
-            fontWeight: 'bold',
+            fontWeight: 'normal',
         }),
         indicatorSeparator: (provided) => ({
             ...provided,
@@ -1487,15 +1499,15 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         document.body.removeChild(link);
     };
     return (
-        <body className=' bg-[#FAF6ED]'>
+        <body className=' bg-[#FAF6ED] px-6'>
             <div>
 
-                <div className="w-full max-w-[1860px] mx-auto p-4 bg-white shadow-lg overflow-x-auto">
+                <div className="w-full p-6 pb-10 bg-white shadow-lg overflow-x-auto">
                     <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || startDate || endDate || selectedEno
                         ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-3 gap-2`}>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
                             <button
-                                className='pl-2'
+                                className='w-9 h-9 border border-[#BF9853] rounded-md flex items-center justify-center text-[#BF9853]'
                                 onClick={() => {
                                     const willOpen = !showFilters;
                                     setShowFilters(willOpen);
@@ -1512,7 +1524,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                 <img
                                     src={Filter}
                                     alt="Toggle Filter"
-                                    className="w-7 h-7 border border-[#BF9853] rounded-md"
+                                    className="w-5 h-5 object-contain"
                                 />
                             </button>
                             {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || startDate || endDate || selectedEno) && (
@@ -1622,9 +1634,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                             className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-fixed min-w-[1885px] w-full border-collapse">
+                            <table className="table-fixed min-w-[1885px] w-full border-collapse [&_th]:!pr-[20px] [&_td]:!pr-[20px] [&_th:not(:first-child)]:!pl-[20px] [&_td:not(:first-child)]:!pl-[20px] [&_th:last-child]:!pr-[40px] [&_td:last-child]:!pr-[40px] [&_th]:!text-sm [&_th]:!font-medium [&_td]:!font-medium">
                                 <thead className="sticky top-0 z-20 bg-white ">
-                                    <tr className="bg-[#FAF6ED]">
+                                    <tr className="h-[56px] bg-[#FAF6ED] [&>th]:!py-0 [&>th]:align-middle">
                                         <th className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
                                             Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -1643,10 +1655,10 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                         <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
                                             Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('amount')}>
+                                        <th className="px-0.5 w-[150px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none " onClick={() => handleSort('amount')}>
                                             Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
+                                        <th className="px-0.5 w-[260px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
                                             Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
@@ -1674,15 +1686,15 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                         <th className="px-0.5 w-[50px] font-bold text-left">File</th>
                                     </tr>
                                     {showFilters && (
-                                        <tr ref={filterRowRef} className="bg-[#FAF6ED]">
+                                        <tr ref={filterRowRef} className="h-[56px] bg-[#FAF6ED] [&_th]:!py-[7px]">
                                             <th className="py-3">
                                                 <div className="relative [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowDateRangePicker(true)}
-                                                        className="w-full min-w-[140px] h-[45px] px-2 py-0 text-sm font-semibold bg-white text-left flex items-center gap-1"
+                                                        className="w-full min-w-[140px] h-[41px] px-2 py-0 text-sm !font-normal bg-white text-left flex items-center gap-1"
                                                     >
-                                                        <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${startDate && endDate ? 'text-black font-normal' : 'text-[#d3d5db] font-bold'}`}>
+                                                        <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${startDate && endDate ? 'text-black font-medium' : 'text-[#d3d5db] !font-normal'}`}>
                                                             {startDate ? (endDate ? `${startDate} – ${endDate}` : `From ${startDate}`) : 'Date'}
                                                         </span>
                                                         <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -1735,7 +1747,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                             </th>
                                             <th></th>
                                             <th></th>
-                                            <th className="text-base text-left font-bold py-3">
+                                            <th className="text-sm text-right font-medium py-3 w-[150px] !pr-5 whitespace-nowrap">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
                                             <th></th>
@@ -1778,7 +1790,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     options={sourceOptions}
                                                     value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
                                                     onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Source From"
+                                                    placeholder="SourceFrom"
                                                     menuPlacement="bottom"
                                                     styles={customStyles}
                                                 />
@@ -1813,17 +1825,17 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                 </thead>
                                 <tbody>
                                     {currentItems.map((expense, index) => (
-                                        <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                                        <tr key={expense.id} className="h-[48px] odd:bg-white even:bg-[#FAF6ED]">
                                             <td className=" text-sm text-left pl-3 w-32 ">{formatDateOnly(expense.date)}</td>
                                             <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
                                             <td className=" text-sm text-left ">{getDisplayStaffName(expense)}</td>
                                             <td className=" text-sm text-left ">{expense.quantity}</td>
-                                            <td className="text-sm text-right pr-5 ">
+                                            <td className="text-sm text-right w-[120px]">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
+                                            <td className="text-sm text-left w-[260px] max-w-[260px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
                                             <td className=" text-sm text-left ">{expense.category}</td>
                                             <td className=" text-sm text-left ">{expense.accountType}</td>
                                             <td className=" text-sm text-left ">{getMachineToolsItemIdDisplay(expense.machineTools)}</td>

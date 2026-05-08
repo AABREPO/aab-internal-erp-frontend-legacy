@@ -3190,7 +3190,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8] ${bankNameFormMode === 'edit' && !uploadFileRowShowsSaveIcon
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${bankNameFormMode === 'edit' && !uploadFileRowShowsSaveIcon
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -3237,7 +3237,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${bankTypeFormMode === 'edit' && !uploadFileRowShowsSaveIcon
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${bankTypeFormMode === 'edit' && !uploadFileRowShowsSaveIcon
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -3284,7 +3284,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${bankLocationFormMode === 'edit' && !uploadFileRowShowsSaveIcon
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${bankLocationFormMode === 'edit' && !uploadFileRowShowsSaveIcon
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -3419,7 +3419,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${contractorFormMode === 'edit' && (isContractorViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${contractorFormMode === 'edit' && (isContractorViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -3773,7 +3773,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${categoryFormMode === 'edit' && (isCategoryViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${categoryFormMode === 'edit' && (isCategoryViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -3924,7 +3924,7 @@ const MasterData = ({ user, onLogout }) => {
 
   const renderAddEmployeeView = () => (
     <>
-      <div className="bg-white  mt-[8px]">
+      <div className="bg-white mt-[6px]">
         <div className="flex items-center justify-between text-[12px] font-medium text-black">
           <button type="button" onClick={() => setIsEmployeeAadhaarModalOpen(true)}>
             Aadhaar Upload
@@ -4340,7 +4340,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${accountFormMode === 'edit' && (isAccountViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${accountFormMode === 'edit' && (isAccountViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -4528,7 +4528,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${labourFormMode === 'edit' && (isLabourViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${labourFormMode === 'edit' && (isLabourViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -4693,7 +4693,7 @@ const MasterData = ({ user, onLogout }) => {
                 </div>
               </div>
               {renderInput({
-                label: 'Wage',
+                label: 'Wage Amount',
                 required: true,
                 placeholder: '',
                 value: labourForm.labourSalary,
@@ -4838,7 +4838,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 pb-[18px] mt-[8px] ${vendorFormMode === 'edit' && (isVendorViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+        className={`w-full px-0 pt-0 pb-[18px] mt-[6px] ${vendorFormMode === 'edit' && (isVendorViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -5252,7 +5252,7 @@ const MasterData = ({ user, onLogout }) => {
       </div>
 
       <div
-        className={`w-full px-0 pt-0 mt-[8px] ${projectFormMode === 'edit' && (isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
+        className={`w-full px-0 pt-0 mt-[6px] ${projectFormMode === 'edit' && (isProjectViewOnly || !canEditMasterData || !uploadFileRowShowsSaveIcon)
           ? '[&_input]:bg-[#EDEDED] [&_select]:bg-[#EDEDED] [&_textarea]:bg-[#EDEDED] [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none'
           : ''
           }`}
@@ -5346,7 +5346,7 @@ const MasterData = ({ user, onLogout }) => {
                       : false,
                   onChange: (e) => setProjectForm((s) => ({ ...s, projectName: e.target.value })),
                   labelRight: (
-                    <span className="shrink-0 inline-flex items-center gap-[8px]">
+                    <span className="min-w-0 flex-1 inline-flex items-center justify-end gap-[6px]">
                       <button
                         type="button"
                         className="text-[12px] font-medium text-black"
@@ -5364,7 +5364,7 @@ const MasterData = ({ user, onLogout }) => {
                         <button
                           type="button"
                           aria-label="Clear Project Incharge"
-                          className="inline-flex h-[18px] w-[18px] items-center justify-center text-[16px] leading-none text-[#7A7A7A]"
+                          className="inline-flex h-[18px] w-[8px] items-center justify-end text-[18px] leading-none text-[#7A7A7A]"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -6205,6 +6205,7 @@ const MasterData = ({ user, onLogout }) => {
         options={PROJECT_TYPE_OPTIONS}
         fieldName="Project Type"
         showStarIcon={false}
+        preserveOrder
       />
 
       <SelectVendorModal
@@ -6351,7 +6352,7 @@ const MasterData = ({ user, onLogout }) => {
 
       return (
         <>
-          <div className="px-[2px] mt-[8px]">
+          <div className="mt-[6px]">
             <div className="flex items-center gap-[10px]">
               <div className="relative flex-1">
                 <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
@@ -6400,7 +6401,7 @@ const MasterData = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="px-[2px] mt-[8px]">
+          <div className="px-[2px] mt-[6px]">
             <div className="space-y-0">
               {renderBankDetailsAccordion('bank-name', 'Bank Name', renderSimpleList(bankNameList, 'bank-name'))}
               {renderBankDetailsAccordion(
@@ -6424,7 +6425,7 @@ const MasterData = ({ user, onLogout }) => {
         className="flex flex-col overflow-hidden"
         style={{ height: 'calc(100vh - 126px - 60px - 18px - env(safe-area-inset-bottom, 0px))' }}
       >
-        <div className="shrink-0 px-[2px] mt-[8px]">
+        <div className="shrink-0 mt-[6px]">
           <div className="flex items-center gap-[10px]">
             <div className="relative flex-1">
               <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
@@ -6600,7 +6601,7 @@ const MasterData = ({ user, onLogout }) => {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 items-start px-[2px] pt-[12px] pb-[4px]">
+        <div className="flex min-h-0 flex-1 items-start px-[2px] pt-[6px] pb-[4px]">
           <div className="flex max-h-full w-full flex-col overflow-hidden rounded-[14px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)]">
             <div className="h-[32px] border-b border-[#EFEFEF] bg-[#F8F8F8] px-[14px]">
               <div className="flex w-full min-w-0 items-center justify-between gap-[8px]">
@@ -7003,7 +7004,7 @@ const MasterData = ({ user, onLogout }) => {
       className="flex flex-col overflow-hidden"
       style={{ height: 'calc(100vh - 126px - 60px - 18px - env(safe-area-inset-bottom, 0px))' }}
     >
-      <div className="shrink-0 px-[2px] mt-[8px]">
+      <div className="shrink-0 mt-[6px]">
         <div className="flex items-center gap-[10px]">
           <div className="relative flex-1">
             <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
@@ -7068,12 +7069,12 @@ const MasterData = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-start px-[2px] mt-[8px] pb-[4px]">
+      <div className="flex min-h-0 flex-1 items-start px-[2px] mt-[6px] pb-[4px]">
         <div className="flex max-h-full w-full flex-col overflow-hidden rounded-[10px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)]">
           <div className="h-[32px] border-b border-[#EFEFEF] bg-[#F8F8F8] px-[14px]">
-            <div className="flex items-center">
+            <div className="flex items-center gap-[4px]">
               <span className="w-[28px]" />
-              <div className="flex items-center gap-[6px]">
+              <div className="flex items-center">
                 <span className="text-[14px] font-semibold text-black">Project Name</span>
                 <button
                   type="button"
@@ -7818,7 +7819,7 @@ const MasterData = ({ user, onLogout }) => {
               minHeight: 'calc(100vh - 126px - 60px - 18px - env(safe-area-inset-bottom, 0px))'
             }}
           >
-            <div className=" shrink-0 mt-[8px]">
+            <div className=" shrink-0 mt-[6px]">
               <div className="relative">
                 <span className="pointer-events-none absolute left-[15px] top-1/2 -translate-y-1/2 text-[#9CA3AF]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -7836,7 +7837,7 @@ const MasterData = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto pt-2">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto pt-[6px]">
               <div className="w-full rounded-[14px] bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.08)] overflow-hidden">
                 {filteredItems.map((item, index) => (
                   <button

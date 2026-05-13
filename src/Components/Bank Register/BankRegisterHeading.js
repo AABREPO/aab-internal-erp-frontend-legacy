@@ -29,7 +29,7 @@ const BankRegisterHeading = ({ username, userRoles = [] }) => {
         }
     };
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen bank-register-heading-scope">
+        <div className="bg-[#FAF6ED] w-full bank-register-heading-scope">
             <style>{`
               /* Align tab row start with page content without affecting other screens */
               .bank-register-heading-scope .topbar-title .link {

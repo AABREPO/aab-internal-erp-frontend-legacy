@@ -10,6 +10,11 @@ import BackArrow from '../Images/BAck Icon.svg'
 import Star from '../Images/Star.svg'
 import Search from '../Images/Search.png'
 import Close from '../Images/close.png'
+import {
+	postBankRegisterLogSave,
+	bankRegisterLogSaveUrlMatchingRequest,
+	isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const Chip = ({ label, tone = 'neutral', onClick, disabled = false }) => {
 	const toneStyles =
@@ -1617,6 +1622,18 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 				bill_url: billUrl,
 				branch_id: activeBranchId
 			};
+			const trackerSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save");
+			if (isPaymentModeRequiringBankRegisterLog(paymentForm.mode)) {
+				await postBankRegisterLogSave(
+					bankRegisterLogSaveUrlMatchingRequest(trackerSaveUrl),
+					"Bill Payments Tracker (Mobile)",
+					{
+						bill_payment_mode: paymentForm.mode,
+						amount: amountNum,
+						entered_by: username,
+					}
+				);
+			}
 			const res = await fetchWithBranch("https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save", {
 				method: "POST",
 				credentials: "include",

@@ -11,6 +11,7 @@ const EntryChecking = () => {
     const [totalAmount, setTotalAmount] = useState(0);
     const [expenses, setExpenses] = useState([]);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
+    const [branchOptions, setBranchOptions] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
     const [contractorOptions, setContractorOptions] = useState([]);
     const [projectNameOptions, setProjectNameOptions] = useState([]);
@@ -128,6 +129,24 @@ const EntryChecking = () => {
             });
     }, []);
     useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!response.ok) throw new Error('Failed to fetch branches');
+                const data = await response.json();
+                setBranchOptions(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error('Error fetching branches:', error);
+                setBranchOptions([]);
+            }
+        };
+        fetchBranches();
+    }, []);
+    useEffect(() => {
         const filtered = expenses.filter(expense => {
             const expenseDate = new Date(expense.date).toISOString().slice(0, 10);
             return (
@@ -155,6 +174,8 @@ const EntryChecking = () => {
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
     };
+    const getBranchName = (id) =>
+        branchOptions.find(b => String(b.id) === String(id))?.branch || "";
     const clearFilters = () => {
         setSelectedSiteName('');
         setSelectedVendor('');
@@ -209,8 +230,8 @@ const EntryChecking = () => {
         doc.text(`Total Amount: ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, yPosition);        
         autoTable(doc, {
             startY: yPosition + 10,
-            head: [['Time Stamp', 'Date', 'E.No', 'Project Name', 'Vendor', 'Contractor', 
-                   'A/C Type', 'Quantity', 'Amount', 'Comments', 'Category']],
+            head: [['Time Stamp', 'Date', 'E.No', 'Project Name', 'Vendor', 'Contractor',
+                   'A/C Type', 'Branch', 'Quantity', 'Amount', 'Comments', 'Category']],
             body: filteredExpenses.map(exp => [
                 formatDate(exp.timestamp),
                 formatDateOnly(exp.date),
@@ -219,6 +240,7 @@ const EntryChecking = () => {
                 exp.vendor,
                 exp.contractor,
                 exp.accountType,
+                getBranchName(exp.branch_id ?? exp.branchId ?? '') || '',
                 exp.quantity,
                 Number(exp.amount).toLocaleString('en-IN'),
                 exp.comments,
@@ -436,7 +458,7 @@ const EntryChecking = () => {
                             className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[620px] overflow-scroll select-none"
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-fixed  min-w-[1765px] w-screen border-collapse">
+                            <table className="table-fixed  min-w-[1965px] w-screen border-collapse">
                                 <thead>
                                     <tr className="bg-[#FAF6ED]">
                                         <th className="px-2 w-[240px] font-bold text-left">Time stamp</th>
@@ -446,6 +468,7 @@ const EntryChecking = () => {
                                         <th className="px-2 w-[220px] font-bold text-left">Vendor</th>
                                         <th className="px-2 w-[220px] font-bold text-left">Contractor</th>
                                         <th className="px-2 w-[220px] font-bold text-left">A/C Type</th>
+                                        <th className="px-2 w-[200px] font-bold text-left">Branch</th>
                                         <th className="px-2 w-[120px] font-bold text-left">Quantity</th>
                                         <th className="px-2 w-[120px] font-bold text-left">Amount</th>
                                         <th className="px-2 w-[120px] font-bold text-left">Comments</th>
@@ -463,6 +486,7 @@ const EntryChecking = () => {
                                             <td className="px-2 text-left font-semibold">{expense.vendor}</td>
                                             <td className="px-2 text-left font-semibold">{expense.contractor}</td>
                                             <td className="px-2 text-left font-semibold">{expense.accountType}</td>
+                                            <td className="px-2 text-left font-semibold">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
                                             <td className="px-2 text-left font-semibold">{expense.quantity}</td>
                                             <td className="text-sm text-left pl-2 font-semibold">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

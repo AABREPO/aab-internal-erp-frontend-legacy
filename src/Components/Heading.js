@@ -14,7 +14,7 @@ const getInitialExpenseTab = (username) => {
         return 'expense-entry';
     }
     const savedTab = localStorage.getItem('activeTab');
-    if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+    if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin' && username !== 'Marimuthu A')) {
         return 'expense-entry';
     }
     return savedTab || 'expense-entry';
@@ -23,7 +23,7 @@ const getInitialExpenseTab = (username) => {
 const Heading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => getInitialExpenseTab(username));
     const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialExpenseTab(username)]));
-    const isAdminExpense = username === 'Mahalingam M' || username === 'Admin';
+    const isAdminExpense = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
 
     useEffect(() => {
         if (activeTab === 'database' && !isAdminExpense) {

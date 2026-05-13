@@ -938,6 +938,46 @@ const MasterData = ({ username, userRoles = [] }) => {
     ]);
   };
 
+  const refetchCurrentTableData = async () => {
+    switch (selectedTable) {
+      case 'project-management':
+        await Promise.all([fetchProjects(), fetchSiteNames()]);
+        return;
+      case 'vendor-names':
+        await fetchVendorNames();
+        return;
+      case 'contractor-names':
+        await fetchContractorNames();
+        return;
+      case 'categories':
+        await fetchCategories();
+        return;
+      case 'machine-tools':
+        await fetchMachinTools();
+        return;
+      case 'employee-details':
+        await Promise.all([fetchEmployeeList(), fetchUsernames()]);
+        return;
+      case 'labours-list':
+        await fetchLaboursList();
+        return;
+      case 'Account Details':
+        await fetchAccountDetails();
+        return;
+      case 'bank-account-type':
+        await fetchBankAccountTypes();
+        return;
+      case 'support-staff-name':
+        await fetchSupportStaffNameList();
+        return;
+      case 'property-type':
+        await fetchPropertyTypes();
+        return;
+      default:
+        await refetchAllMasterData();
+    }
+  };
+
   useEffect(() => {
     void refetchAllMasterData();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount load + explicit refetch after mutations
@@ -1094,7 +1134,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         setMessage('Site name saved successfully!');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1140,7 +1180,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       }
       const result = await response.json();
       setMessage("Vendor saved successfully!");
-      void refetchAllMasterData();
+      void refetchCurrentTableData();
       // Reset form fields or close modal
       setVendorName("");
       setVendorAccountHolderName("");
@@ -1208,7 +1248,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setContractorQrImagePreview(null);
         closeContractorNames();
         fetchContractorNames(); // Refresh the list
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       } else {
         const errorData = await response.text();
         setMessage('Error saving contractor: ' + errorData);
@@ -1230,7 +1270,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Category saved successfully!');
         setCategory('');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1248,7 +1288,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Machine tool saved successfully!');
         setMachineTool('');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1257,16 +1297,10 @@ const MasterData = ({ username, userRoles = [] }) => {
   // Function to upload Aadhaar PDF to Google Drive
   const uploadAadhaarPdfToGoogleDrive = async (file, employeeName) => {
     try {
-      console.log('Starting Aadhaar PDF upload for:', employeeName);
-      console.log('File details:', file);
-
       const formData = new FormData();
       const finalName = `${employeeName}_Aadhaar_${new Date().toISOString().split('T')[0]}`;
       formData.append('file', file);
       formData.append('file_name', finalName);
-
-      console.log('Uploading with filename:', finalName);
-
       const uploadResponse = await fetch("https://backendaab.in/demoAabuilderDash/expenses/googleUploader/uploadToGoogleDrive", {
         method: "POST",
         body: formData,
@@ -1373,7 +1407,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setAadhaarPdfFile(null);
         setAadhaarImageUrl('');
         setIsSiteEngineer(false);
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       } else {
         console.error('Save request failed:', response.status, response.statusText);
         alert('Failed to save employee data. Please try again.');
@@ -1396,7 +1430,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setMessage('Labour details saved successfully!');
         setLabourName('');
         setLabourSalary('');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1439,7 +1473,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setAccountType('');
         setQrImage(null);
         setQrImagePreview(null);
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1457,7 +1491,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Bank Account Type saved successfully!');
         setBankAccountType('');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1482,7 +1516,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setSelectedProject(null);
         setDoorNo('');
         setEbServiceNo('');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1504,7 +1538,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setMessage('Support Staff Name saved successfully!');
         setSupportStaffName('');
         setSupportStaffMobileNumber('');
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -1575,7 +1609,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
         setMessage('Project saved successfully!');
         closeProjectManagement();
-        fetchProjects();
+        void refetchCurrentTableData();
       } else {
         const errorText = await response.text();
         console.error('Error response:', errorText);
@@ -1894,7 +1928,7 @@ const MasterData = ({ username, userRoles = [] }) => {
             }
           }
           setMessage('Project deleted successfully!');
-          fetchProjects();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -1958,7 +1992,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         }
         setMessage('Project updated successfully!');
         setIsProjectEditOpen(false);
-        fetchProjects();
+        void refetchCurrentTableData();
       } else {
         const errorText = await response.text();
         console.error('Error response:', errorText);
@@ -2036,7 +2070,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Site name deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2051,7 +2085,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Vendor name deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2066,7 +2100,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('All vendor names deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2091,7 +2125,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setMessage(result);
         setVendorBulkUploadFile(null);
         setIsVendorBulkUploadOpen(false);
-        void refetchAllMasterData();
+        void refetchCurrentTableData();
       } else {
         setMessage(`Upload failed: ${result}`);
       }
@@ -2233,7 +2267,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Contractor name deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2248,7 +2282,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Category deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2263,7 +2297,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Machine tool deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2278,7 +2312,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Employee data deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2293,7 +2327,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Labour data deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2308,7 +2342,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Account details deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2323,7 +2357,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Bank Account Type deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2339,7 +2373,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('EB Service Link deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2354,7 +2388,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Support staff name deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         }
       } catch (error) {
         console.error('Error:', error);
@@ -2370,7 +2404,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           setMessage('Property type deleted successfully!');
-          void refetchAllMasterData();
+          void refetchCurrentTableData();
         } else {
           setMessage('Failed to delete property type.');
         }
@@ -4883,7 +4917,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                             Add Image
                           </button>
                         </div>
-                        <div className="mb-4 mt-4 flex items-center gap-2">                          
+                        <div className="mb-4 mt-4 flex items-center gap-2">
                           <label htmlFor="isSiteEngineerAdd" className="text-sm font-medium text-gray-700">
                             Project Incharge
                           </label>
@@ -5168,7 +5202,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   if (response.ok) {
                     setMessage('Site name updated successfully!');
                     setIsEditSiteNameOpen(false);
-                    void refetchAllMasterData();
+                    void refetchCurrentTableData();
                   }
                 } catch (error) {
                   console.error('Error:', error);
@@ -5255,7 +5289,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           const result = await response.json();
                           setMessage('Vendor name updated successfully!');
                           setIsVendorEditOpen(false);
-                          void refetchAllMasterData();
+                          void refetchCurrentTableData();
                         } else {
                           const errorText = await response.text();
                           setMessage(`Error: ${response.status} - ${errorText}`);
@@ -5633,7 +5667,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                           body: formData,
                         });
                         if (response.ok) {
-                          void refetchAllMasterData();
+                          void refetchCurrentTableData();
                           setMessage('Contractor name updated successfully!');
                           setIsContractorEditOpen(false);
                           fetchContractorNames(); // Refresh the list
@@ -5949,7 +5983,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   if (response.ok) {
                     setMessage('Category updated successfully!');
                     setIsCategoriesEditOpen(false);
-                    void refetchAllMasterData();
+                    void refetchCurrentTableData();
                   }
                 } catch (error) {
                   console.error('Error:', error);
@@ -5999,7 +6033,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   if (response.ok) {
                     setMessage('Machine tool updated successfully!');
                     setIsMachineToolsEditOpen(false);
-                    void refetchAllMasterData();
+                    void refetchCurrentTableData();
                   }
                 } catch (error) {
                   console.error('Error:', error);
@@ -6082,7 +6116,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   if (response.ok) {
                     setMessage('Bank Account Type updated successfully!');
                     setIsBankAccountTypeEditOpen(false);
-                    void refetchAllMasterData();
+                    void refetchCurrentTableData();
                   }
                 } catch (error) {
                   console.error('Error:', error);
@@ -6197,7 +6231,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   });
                   if (response.ok) {
                     setMessage('EB Service Link updated successfully!');
-                    void refetchAllMasterData();
+                    void refetchCurrentTableData();
                   }
                 } catch (error) {
                   console.error('Error:', error);
@@ -6316,7 +6350,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                 if (response.ok) {
                   setMessage('Support Staff Name updated successfully!');
                   setIsSupportStaffNameEditOpen(false);
-                  void refetchAllMasterData();
+                  void refetchCurrentTableData();
                 }
               } catch (error) {
                 console.error('Error:', error);
@@ -6375,7 +6409,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                 if (response.ok) {
                   setMessage('Property type saved successfully!');
                   closePropertyType();
-                  void refetchAllMasterData();
+                  void refetchCurrentTableData();
                 } else {
                   setMessage('Failed to save property type.');
                 }
@@ -6425,7 +6459,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                 if (response.ok) {
                   setMessage('Property type updated successfully!');
                   setIsPropertyTypeEditOpen(false);
-                  void refetchAllMasterData();
+                  void refetchCurrentTableData();
                 } else {
                   setMessage('Failed to update property type.');
                 }
@@ -6646,24 +6680,20 @@ const MasterData = ({ username, userRoles = [] }) => {
                     </div>
                     <div className="">
                       <label className="block mb-1 text-lg font-medium">Project Type</label>
-                      <select
-                        value={detail.projectType}
-                        onChange={(e) => handleNewDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
+                      <select value={detail.projectType} onChange={(e) =>handleNewDetailChange(index, 'projectType', e.target.value)}
+                        className="w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Type</option>
-                        <option value="Shop">Shop</option>
-                        <option value="House">House</option>
-                        <option value="Land">Land</option>
-                        <option value="Office">Office</option>
-                        <option value="Construction">Construction</option>
+                        {propertyTypes.map((item, idx) => (
+                          <option key={item.id || idx} value={item.propertyType} >
+                            {item.propertyType}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
                       <label className="block mb-1 text-lg font-medium">Floor Name</label>
-                      <select
-                        value={detail.floorName}
-                        onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
+                      <select value={detail.floorName} onChange={(e) => handleNewDetailChange(index, 'floorName', e.target.value)}
                         className="w-36  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Floor</option>
@@ -6685,8 +6715,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <div>
                       <label className="block mb-1 text-lg font-medium">Door No</label>
                       <input
-                        type="text"
-                        value={detail.doorNo}
+                        type="text" value={detail.doorNo}
                         onChange={(e) => handleNewDetailChange(index, 'doorNo', e.target.value)}
                         placeholder="Door No"
                         className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
@@ -6695,8 +6724,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <div>
                       <label className="block mb-1 text-lg font-medium">Area</label>
                       <input
-                        type="text"
-                        value={detail.area}
+                        type="text" value={detail.area}
                         onChange={(e) => handleNewDetailChange(index, 'area', e.target.value)}
                         placeholder="Area"
                         className="w-28  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
@@ -6707,8 +6735,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                         <label className='text-lg font-medium '>EB.NO</label>
                         <div className="relative inline-flex bg-gray-200 rounded-lg p-0.5">
                           <button
-                            type="button"
-                            onClick={() => handleNewDetailChange(index, 'ebNoPhase', '1P')}
+                            type="button" onClick={() => handleNewDetailChange(index, 'ebNoPhase', '1P')}
                             className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${(detail.ebNoPhase || '1P') === '1P'
                               ? 'bg-[#BF9853] text-white shadow-sm'
                               : 'text-gray-600 hover:text-gray-800'
@@ -6729,8 +6756,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       </div>
                       <div className="flex">
                         <input
-                          type='text'
-                          value={detail.ebNo}
+                          type='text' value={detail.ebNo}
                           onChange={(e) => handleNewDetailChange(index, 'ebNo', e.target.value)}
                           placeholder='EB NO'
                           className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
@@ -6741,8 +6767,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <label className='block mb-1 text-lg font-medium '>Property Tax No</label>
                       <div className="flex">
                         <input
-                          type='text'
-                          value={detail.propertyTaxNo}
+                          type='text' value={detail.propertyTaxNo}
                           onChange={(e) => handleNewDetailChange(index, 'propertyTaxNo', e.target.value)}
                           placeholder='Property Tax No'
                           className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
@@ -6753,8 +6778,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <label className='block mb-1 text-lg font-medium '>Water Tax No</label>
                       <div className="flex">
                         <input
-                          type='text'
-                          value={detail.waterTaxNo}
+                          type='text' value={detail.waterTaxNo}
                           onChange={(e) => handleNewDetailChange(index, 'waterTaxNo', e.target.value)}
                           placeholder='Water Tax No'
                           className='w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none'
@@ -6975,15 +6999,20 @@ const MasterData = ({ username, userRoles = [] }) => {
                       <label className="block mb-1 text-lg font-medium">Project Type</label>
                       <select
                         value={detail.projectType}
-                        onChange={(e) => handleEditDetailChange(index, 'projectType', e.target.value)}
-                        className="w-40  border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
+                        onChange={(e) =>
+                          handleEditDetailChange(index, 'projectType', e.target.value)
+                        }
+                        className="w-40 border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14"
                       >
                         <option value="">Select Type</option>
-                        <option value="Shop">Shop</option>
-                        <option value="House">House</option>
-                        <option value="Land">Land</option>
-                        <option value="Office">Office</option>
-                        <option value="Construction">Construction</option>
+                        {propertyTypes.map((item, idx) => (
+                          <option
+                            key={item.id || idx}
+                            value={item.propertyType}
+                          >
+                            {item.propertyType}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -7182,7 +7211,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                     if (response.ok) {
                       setMessage('Employee data updated successfully!');
                       setIsEditEmployeeDataOpen(false);
-                      void refetchAllMasterData();
+                      void refetchCurrentTableData();
                     } else {
                       console.error('Update request failed:', response.status, response.statusText);
                       alert('Failed to update employee data. Please try again.');
@@ -7625,7 +7654,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                 if (response.ok) {
                   setMessage('Labour data updated successfully!');
                   setIsEditLaboursListDataOpen(false);
-                  void refetchAllMasterData();
+                  void refetchCurrentTableData();
                 }
               } catch (error) {
                 console.error('Error:', error);
@@ -7703,7 +7732,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                       if (response.ok) {
                         setMessage('Account details updated successfully!');
                         setIsAccountDetailsEditOpen(false);
-                        void refetchAllMasterData();
+                        void refetchCurrentTableData();
                       }
                     } catch (error) {
                       console.error('Error:', error);

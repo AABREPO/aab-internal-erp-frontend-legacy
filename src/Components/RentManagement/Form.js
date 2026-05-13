@@ -3,6 +3,11 @@ import Attach from '../Images/Attachfile.svg';
 import Select from 'react-select';
 import Swal from 'sweetalert2';
 import axios from 'axios';
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import CustomMonthField from "../ExpensesEntry/CustomMonthField";
 const Form = ({ embedded = false, onSuccess } = {}) => {
     const resolveActiveBranchId = () => {
@@ -908,9 +913,22 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         setIsSubmitting(true);
         setShowWeeklyPaymentPopup(false);
         try {
+            const enteredBy = resolveEnteredBy();
+            if (isPaymentModeRequiringBankRegisterLog(weeklyPaymentData.paymentMode)) {
+                await postBankRegisterLogSave(
+                    bankRegisterLogSaveUrlMatchingRequest(
+                        "https://backendaab.in/demoAabuildersDash/api/rental_forms/save"
+                    ),
+                    "Rent Management",
+                    {
+                        bill_payment_mode: weeklyPaymentData.paymentMode,
+                        amount: weeklyPaymentData.amount,
+                        entered_by: enteredBy,
+                    }
+                );
+            }
             const submittedFormIds = await submitRentalForm();
             const activeBranchId = resolveActiveBranchId();
-            const enteredBy = resolveEnteredBy();
             const isShopClosureWithRefund = selectedRentType === "Shop Closure" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
             const isRefundPayment = selectedRentType === "Refund" && weeklyPaymentData.amount && parseFloat(weeklyPaymentData.amount) > 0;
             const isRefundFlow = isShopClosureWithRefund || isRefundPayment;

@@ -11,6 +11,11 @@ import download from '../Images/file_download.png'
 import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import Change from '../Images/dropdownchange.png';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
@@ -5061,6 +5066,23 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                     onClick={async () => {
                                         try {
                                             if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                                if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
+                                                    let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
+                                                    if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                        mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
+                                                    } else if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                        mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
+                                                    }
+                                                    await postBankRegisterLogSave(
+                                                        bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
+                                                        "Cash Register — Weekly Payment",
+                                                        {
+                                                            bill_payment_mode: paymentPopupData.paymentMode,
+                                                            amount: paymentPopupData.amount,
+                                                            entered_by: enteredBy,
+                                                        }
+                                                    );
+                                                }
                                                 let advancePortalId = null;
                                                 let staffAdvancePortalId = null;
                                                 if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {

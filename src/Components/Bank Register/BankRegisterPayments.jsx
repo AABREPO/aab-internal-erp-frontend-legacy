@@ -329,7 +329,6 @@ const FilterChips = ({filter, onClear, onClearAll}) => {
   );
 };
 
-// ---------- Expense Register ----------
 const SortIcon = ({dir}) => {
   if(!dir) return <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#a59c8a" strokeWidth="2" style={{flexShrink:0,opacity:0.5}}><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>;
   return dir==="asc"
@@ -354,9 +353,638 @@ const SortableTh = ({label, sortKey, sortBy, sortDir, onSort, align, noBottomBor
   );
 };
 
+/** Click-drag scroll (same behaviour as Bank Reconciliation table). */
+const useTableDragScroll = () => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.pageX - e.currentTarget.offsetLeft);
+    setStartY(e.pageY - e.currentTarget.offsetTop);
+    setScrollLeft(e.currentTarget.scrollLeft);
+    setScrollTop(e.currentTarget.scrollTop);
+  };
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - e.currentTarget.offsetLeft;
+    const y = e.pageY - e.currentTarget.offsetTop;
+    const walkX = (x - startX) * 2;
+    const walkY = (y - startY) * 2;
+    e.currentTarget.scrollLeft = scrollLeft - walkX;
+    e.currentTarget.scrollTop = scrollTop - walkY;
+  };
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    setIsDragging(true);
+    setStartX(touch.pageX - e.currentTarget.offsetLeft);
+    setStartY(touch.pageY - e.currentTarget.offsetTop);
+    setScrollLeft(e.currentTarget.scrollLeft);
+    setScrollTop(e.currentTarget.scrollTop);
+  };
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    const x = touch.pageX - e.currentTarget.offsetLeft;
+    const y = touch.pageY - e.currentTarget.offsetTop;
+    const walkX = (x - startX) * 2;
+    const walkY = (y - startY) * 2;
+    e.currentTarget.scrollLeft = scrollLeft - walkX;
+    e.currentTarget.scrollTop = scrollTop - walkY;
+  };
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  return {
+    onMouseDown: handleMouseDown,
+    onMouseLeave: handleMouseLeave,
+    onMouseUp: handleMouseUp,
+    onMouseMove: handleMouseMove,
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+  };
+};
+
+// ---------- Merged ledger (debit expenses + credit income) ----------
+const MergedBankLedger = ({
+  expenseRows,
+  incomeRows,
+  totalExpense,
+  totalIncome,
+  onAddExp,
+  onEditExp,
+  onDeleteExp,
+  onAddInc,
+  onEditInc,
+  onDeleteInc,
+  onFilter,
+  onToggleMatchExp,
+  onToggleMatchInc,
+  onToggleAllMerged,
+  filter,
+  onSetFilter,
+  onClearFilter,
+  onClearAll,
+  activeFilterCount,
+  reconcileMode,
+  filterOpen,
+  allRowsForFilters,
+  ledgerKind,
+  onLedgerKindChange,
+}) => {
+  const [ledgerSearch, setLedgerSearch] = useState("");
+  const [sortBy, setSortBy] = useState("date");
+  const [sortDir, setSortDir] = useState("desc");
+  const [expBtnHover, setExpBtnHover] = useState(false);
+  const [incBtnHover, setIncBtnHover] = useState(false);
+  const dragScroll = useTableDragScroll();
+
+  const filterRows = allRowsForFilters || expenseRows;
+  const dateFilterISO = filter.date || "";
+  const unique = (arr) =>
+    Array.from(
+      new Set(
+        arr
+          .map((v) => String(v ?? "").trim())
+          .filter((v) => Boolean(v) && v !== "-")
+      )
+    );
+  const projectOptions = useMemo(() => unique(filterRows.map((r) => r.project)).sort(), [filterRows]);
+  const partyOptions = useMemo(() => unique(filterRows.map((r) => r.party)).sort(), [filterRows]);
+  const purposeOptions = useMemo(() => unique(filterRows.map((r) => r.type)).sort(), [filterRows]);
+  const chequeOptions = useMemo(() => unique(filterRows.map((r) => r.chequeNo).filter((v) => v && v !== "-")).sort(), [filterRows]);
+  const partyTypeOptions = useMemo(() => unique(filterRows.map((r) => r.partyType)).sort(), [filterRows]);
+  const modeOptions = useMemo(() => unique(filterRows.map((r) => r.mode)).sort(), [filterRows]);
+  const selectStyles = useMemo(
+    () => ({
+      control: (base) => ({
+        ...base,
+        minHeight: 45,
+        height: "auto",
+        borderRadius: 8,
+        borderColor: "var(--line)",
+        boxShadow: "none",
+        backgroundColor: "#fff",
+        textAlign: "left",
+        fontWeight: 400,
+      }),
+      valueContainer: (base) => ({ ...base, padding: "4px 8px", flexWrap: "nowrap" }),
+      input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 13 }),
+      indicatorsContainer: (base) => ({ ...base, height: 45 }),
+      dropdownIndicator: (base) => ({ ...base, padding: 6 }),
+      indicatorSeparator: () => ({ display: "none" }),
+      clearIndicator: (base) => ({ ...base, padding: 0 }),
+      menu: (base) => ({ ...base, zIndex: 80 }),
+      option: (base) => ({ ...base, fontSize: 13, textAlign: "left" }),
+      placeholder: (base) => ({ ...base, fontSize: 13, fontWeight: 400, color: "var(--ink-2)" }),
+      singleValue: (base) => ({
+        ...base,
+        fontSize: 13,
+        fontWeight: 400,
+        color: "var(--ink-2)",
+        textAlign: "left",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }),
+      menuList: (base) => ({
+        ...base,
+        textAlign: "left",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        "::-webkit-scrollbar": { display: "none" },
+      }),
+    }),
+    []
+  );
+  const toSelectOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
+  const getSelected = (value) => (value ? { value, label: value } : null);
+
+  const mergedBase = useMemo(() => {
+    const deb = expenseRows.map((r) => {
+      const creditSide = r.type === "Rent Payment" && r.rent_management_id;
+      return {
+        ...r,
+        _source: "expense",
+        _entry: creditSide ? "credit" : "debit",
+      };
+    });
+    const cr = incomeRows.map((r) => ({
+      ...r,
+      _source: "income",
+      _entry: "credit",
+      project: "—",
+      party: r.receivedFrom && String(r.receivedFrom).trim() ? r.receivedFrom : "—",
+      partyType: "—",
+      type: r.description && String(r.description).trim() ? r.description : "Bank credit",
+      mode: r.mode && String(r.mode).trim() ? r.mode : "—",
+      chequeNo: "-",
+      chequeDate: "-",
+    }));
+    return [...deb, ...cr];
+  }, [expenseRows, incomeRows]);
+
+  const byKind = useMemo(() => {
+    if (ledgerKind === "debit") return mergedBase.filter((r) => r._entry === "debit");
+    if (ledgerKind === "credit") return mergedBase.filter((r) => r._entry === "credit");
+    return mergedBase;
+  }, [mergedBase, ledgerKind]);
+
+  const handleSort = (key) => {
+    if (sortBy === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedRows = useMemo(() => {
+    const q = ledgerSearch.trim().toLowerCase();
+    let rows = byKind;
+    if (q) {
+      rows = rows.filter((r) => {
+        const blob = [r.date, r.project, r.party, r.partyType, r.type, r.mode, r.chequeNo, String(r.amount), r._entry].join(" ");
+        return String(blob).toLowerCase().includes(q);
+      });
+    }
+    const dateVal = (s) => {
+      if (!s || s === "-") return 0;
+      const [d, m, y] = String(s).split("/");
+      return new Date(+y, +m - 1, +d).getTime();
+    };
+    const get = (r) => {
+      if (sortBy === "date" || sortBy === "chequeDate") return dateVal(r[sortBy]);
+      if (sortBy === "amount") return r.amount;
+      if (sortBy === "matched") return r.matched ? 1 : 0;
+      if (sortBy === "chequeNo") return (r.chequeNo === "-" ? "" : r.chequeNo);
+      if (sortBy === "_entry") return r._entry === "debit" ? 0 : 1;
+      const v = r[sortBy];
+      return typeof v === "string" ? v.toLowerCase() : v;
+    };
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const va = get(a);
+      const vb = get(b);
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return copy;
+  }, [byKind, ledgerSearch, sortBy, sortDir]);
+
+  const allMatched = sortedRows.length > 0 && sortedRows.every((r) => r.matched);
+  const someMatched = sortedRows.some((r) => r.matched) && !allMatched;
+
+  return (
+    <div className="ledger-card">
+      <div className="accent" />
+      <div className="body">
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <button className="filter-btn" onClick={onFilter} title="Filter">
+                <I.Filter />
+                {activeFilterCount > 0 && <span className="dot">{activeFilterCount}</span>}
+              </button>
+              <div
+                className="inline-flex items-center gap-1 rounded-lg border bg-white px-0.5 py-0.5"
+                style={{ borderColor: "var(--line)" }}
+              >
+                {[
+                  { k: "all", label: "All" },
+                  { k: "debit", label: "Debit" },
+                  { k: "credit", label: "Credit" },
+                ].map(({ k, label }) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => onLedgerKindChange(k)}
+                    className={`px-3 py-0.5 text-xs font-semibold transition-colors ${ledgerKind === k ? "rounded-md" : ""}`}
+                    style={{
+                      background: ledgerKind === k ? "#212121" : "#fff",
+                      color: ledgerKind === k ? "#fff" : "var(--ink-2)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs font-semibold muted">{sortedRows.length} entries</span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+              <input
+                className="input min-w-[160px] flex-1"
+                style={{ maxWidth: 420, fontWeight: 400, fontSize: 13 }}
+                value={ledgerSearch}
+                onChange={(e) => setLedgerSearch(e.target.value)}
+                placeholder="Search date, project, party, amount, mode, cheque, debit/cr"
+              />
+              <button
+                onClick={onAddExp}
+                onMouseEnter={() => setExpBtnHover(true)}
+                onMouseLeave={() => setExpBtnHover(false)}
+                className="btn-add flex shrink-0 items-center gap-1.5"
+                style={{
+                  background: expBtnHover ? "var(--red)" : "#fff",
+                  color: expBtnHover ? "#fff" : "var(--red)",
+                  border: "1px solid #fadcdc",
+                }}
+              >
+                <span
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 5,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: expBtnHover ? "#fff" : "var(--red)",
+                    color: expBtnHover ? "var(--red)" : "#fff",
+                  }}
+                >
+                  <I.Plus />
+                </span>
+                Add Expense
+              </button>
+              <button
+                onClick={onAddInc}
+                onMouseEnter={() => setIncBtnHover(true)}
+                onMouseLeave={() => setIncBtnHover(false)}
+                className="btn-add flex shrink-0 items-center gap-1.5"
+                style={{
+                  background: incBtnHover ? "var(--green)" : "#fff",
+                  color: incBtnHover ? "#fff" : "var(--green)",
+                  border: "1px solid #cce8d8",
+                }}
+              >
+                <span
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 5,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: incBtnHover ? "#fff" : "var(--green)",
+                    color: incBtnHover ? "var(--green)" : "#fff",
+                  }}
+                >
+                  <I.Plus />
+                </span>
+                Add Income
+              </button>
+            </div>
+          </div>
+          <FilterChips filter={filter} onClear={onClearFilter} onClearAll={onClearAll} />
+        </div>
+
+        <div className="desk-table expenses-table-wrap table-scroll select-none px-2" {...dragScroll}>
+          <table className="ledger-table">
+            <colgroup>
+              {reconcileMode && <col style={{ width: "4%" }} />}
+              <col style={{ width: "4%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: reconcileMode ? "16%" : "18%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "5%" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                {reconcileMode && (
+                  <th>
+                    <div
+                      className={`check-box ${allMatched ? "checked" : ""} ${someMatched ? "partial" : ""}`}
+                      onClick={() => onToggleAllMerged(!allMatched, sortedRows)}
+                      title={allMatched ? "Uncheck all" : "Check all"}
+                    >
+                      {allMatched && <I.Check />}
+                      {someMatched && <span className="partial-mark" />}
+                    </div>
+                  </th>
+                )}
+                <SortableTh label="#" sortKey="id" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Date" sortKey="date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Project" sortKey="project" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Party" sortKey="party" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Type" sortKey="partyType" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Purpose" sortKey="type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Amount" sortKey="amount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" noBottomBorder={filterOpen} />
+                <SortableTh label="Dr/Cr" sortKey="_entry" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Mode" sortKey="mode" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <SortableTh label="Cheque" sortKey="chequeNo" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} noBottomBorder={filterOpen} />
+                <th className="text-right" style={{ borderBottom: filterOpen ? "0" : undefined }}>
+                  ·
+                </th>
+              </tr>
+              {filterOpen && (
+                <tr>
+                  {reconcileMode && <th style={{ top: 42 }} />}
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }} />
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)", whiteSpace: "normal" }}>
+                    <CustomDateField
+                      value={dateFilterISO}
+                      onChange={(v) => onSetFilter("date", v || "")}
+                      placeholder="dd/mm/yyyy"
+                      alwaysOpenBelow
+                      className="[&>button]:!whitespace-nowrap [&>button]:!pl-[5px] [&>button]:!pr-10 [&>button]:!text-[13px] [&>button]:!font-normal [&>button]:!text-[color:var(--ink-2)]"
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <Select
+                      value={getSelected(filter.project)}
+                      onChange={(opt) => onSetFilter("project", opt?.value || "")}
+                      options={toSelectOptions(projectOptions)}
+                      isClearable
+                      isSearchable
+                      placeholder="All"
+                      styles={selectStyles}
+                      menuPortalTarget={document.body}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <Select
+                      value={getSelected(filter.party)}
+                      onChange={(opt) => onSetFilter("party", opt?.value || "")}
+                      options={toSelectOptions(partyOptions)}
+                      isClearable
+                      isSearchable
+                      placeholder="All"
+                      styles={selectStyles}
+                      menuPortalTarget={document.body}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <Select
+                      value={getSelected(filter.partyType)}
+                      onChange={(opt) => onSetFilter("partyType", opt?.value || "")}
+                      options={toSelectOptions(partyTypeOptions)}
+                      isClearable
+                      isSearchable
+                      placeholder="All"
+                      styles={selectStyles}
+                      menuPortalTarget={document.body}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <Select
+                      value={getSelected(filter.purpose)}
+                      onChange={(opt) => onSetFilter("purpose", opt?.value || "")}
+                      options={toSelectOptions(purposeOptions)}
+                      isClearable
+                      isSearchable
+                      placeholder="All"
+                      styles={selectStyles}
+                      menuPortalTarget={document.body}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <input
+                      className="input num-cell"
+                      value={filter.amount}
+                      onChange={(e) => onSetFilter("amount", e.target.value)}
+                      placeholder="Amount..."
+                      style={{ fontWeight: 400, fontSize: 13, height: 45, paddingTop: 0, paddingBottom: 0 }}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }} />
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <Select
+                      value={getSelected(filter.mode)}
+                      onChange={(opt) => onSetFilter("mode", opt?.value || "")}
+                      options={toSelectOptions(modeOptions)}
+                      isClearable
+                      isSearchable
+                      placeholder="All"
+                      styles={selectStyles}
+                      menuPortalTarget={document.body}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
+                    <Select
+                      value={getSelected(filter.cheque)}
+                      onChange={(opt) => onSetFilter("cheque", opt?.value || "")}
+                      options={toSelectOptions(chequeOptions)}
+                      isClearable
+                      isSearchable
+                      placeholder="All"
+                      styles={selectStyles}
+                      menuPortalTarget={document.body}
+                    />
+                  </th>
+                  <th style={{ top: 42, borderTop: "1px solid var(--line)" }} />
+                </tr>
+              )}
+            </thead>
+            <tbody>
+              {sortedRows.map((r, i) => (
+                <tr key={`${r._entry}-${r.id}`} className={r.matched ? "matched" : ""}>
+                  {reconcileMode && (
+                    <td className="text-left">
+                      <div
+                        className={`check-box ${r.matched ? "checked" : ""}`}
+                        onClick={() => (r._source === "expense" ? onToggleMatchExp(r) : onToggleMatchInc(r))}
+                      >
+                        {r.matched && <I.Check />}
+                      </div>
+                    </td>
+                  )}
+                  <td className="ink text-left font-semibold">{String(i + 1).padStart(2, "0")}</td>
+                  <td className="num-cell text-left">{r.date}</td>
+                  <td className="ink truncate-cell text-left" title={r.project}>
+                    {r.project}
+                  </td>
+                  <td className="truncate-cell text-left" title={r.party}>
+                    {r.party}
+                  </td>
+                  <td className="text-left">
+                    {r.partyType && r.partyType !== "—" ? <PartyChip type={r.partyType} /> : <span className="muted">—</span>}
+                  </td>
+                  <td className="truncate-cell text-left" title={r.type}>
+                    {r.type}
+                  </td>
+                  <td className={`num-cell text-right font-semibold ${r._entry === "credit" ? "" : "ink"}`} style={r._entry === "credit" ? { color: "var(--green)" } : { color: "var(--red)" }}>
+                    {r._entry === "credit" ? `+ ₹${fmtINR(r.amount)}` : `- ₹${fmtINR(r.amount)}`}
+                  </td>
+                  <td className="text-left">
+                    {r._entry === "debit" ? (
+                      <span className="chip" style={{ background: "var(--red-bg)", color: "var(--red)", fontWeight: 600 }}>
+                        Debit
+                      </span>
+                    ) : (
+                      <span className="chip" style={{ background: "var(--green-bg)", color: "var(--green)", fontWeight: 600 }}>
+                        Credit
+                      </span>
+                    )}
+                  </td>
+                  <td className="text-left">
+                    <span className="chip chip-mode truncate-cell" style={{ maxWidth: "100%" }}>
+                      {r.mode}
+                    </span>
+                  </td>
+                  <td className="num-cell truncate-cell text-right" title={r.chequeNo !== "-" ? `${r.chequeNo} · ${r.chequeDate}` : ""}>
+                    {r.chequeNo !== "-" ? <span className="ink font-semibold">{r.chequeNo}</span> : <span className="muted">—</span>}
+                  </td>
+                  <td>
+                    <div className="act-cell">
+                      {r._source === "expense" ? (
+                        <>
+                          <button onClick={() => onEditExp(r)} title="Edit">
+                            <I.Edit />
+                          </button>
+                          <button onClick={() => onDeleteExp(r)} title="Delete">
+                            <I.Trash />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => onEditInc(r)} title="Edit">
+                            <I.Edit />
+                          </button>
+                          <button onClick={() => onDeleteInc(r)} title="Delete">
+                            <I.Trash />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {sortedRows.length === 0 && (
+                <tr>
+                  <td colSpan={reconcileMode ? 12 : 11} className="muted py-8 text-center">
+                    No matching entries for this account and date range.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mob-cards px-3 pb-4 pt-2">
+          {sortedRows.map((r, i) => (
+            <div key={`${r._entry}-${r.id}`} className={`mob-card ${r.matched ? "matched" : ""}`}>
+              <div className="mb-1 flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {reconcileMode && (
+                    <div className={`check-box ${r.matched ? "checked" : ""}`} onClick={() => (r._source === "expense" ? onToggleMatchExp(r) : onToggleMatchInc(r))}>
+                      {r.matched && <I.Check />}
+                    </div>
+                  )}
+                  <div style={{ textAlign: "left" }}>
+                    <div className="muted text-[11px]">
+                      #{String(i + 1).padStart(2, "0")} · {r.date} · {r._entry === "debit" ? "Debit" : "Credit"}
+                    </div>
+                    <div className="mt-0.5 text-sm font-semibold leading-snug ink">{r.project}</div>
+                  </div>
+                </div>
+                <div className="num-cell font-bold" style={{ color: r._entry === "credit" ? "var(--green)" : "var(--red)" }}>
+                  {r._entry === "credit" ? `+ ₹${fmtINR(r.amount)}` : `- ₹${fmtINR(r.amount)}`}
+                </div>
+              </div>
+              <div className="text-xs muted" style={{ textAlign: "left" }}>
+                {r.party} • {r.type}
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {r.partyType && r.partyType !== "—" ? <PartyChip type={r.partyType} /> : null}
+                  <span className="chip chip-mode">{r.mode}</span>
+                  {r.chequeNo !== "-" && <span className="chip chip-mode">#{r.chequeNo}</span>}
+                  {r.matched && <span className="chip chip-matched">Reconciled</span>}
+                </div>
+                <div className="act-cell">
+                  {r._source === "expense" ? (
+                    <>
+                      <button onClick={() => onEditExp(r)}>
+                        <I.Edit />
+                      </button>
+                      <button onClick={() => onDeleteExp(r)}>
+                        <I.Trash />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => onEditInc(r)}>
+                        <I.Edit />
+                      </button>
+                      <button onClick={() => onDeleteInc(r)}>
+                        <I.Trash />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {sortedRows.length === 0 && <div className="muted py-8 text-center text-sm">No matching entries for this account and date range.</div>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- Expense Register ----------
 const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onToggleMatch, onToggleAll, filter, onSetFilter, onClearFilter, onClearAll, activeFilterCount, reconcileMode, filterOpen, allRowsForFilters}) => {
   const [sortBy,setSortBy] = useState("");
   const [sortDir,setSortDir] = useState("asc");
+  const dragScroll = useTableDragScroll();
 
   const filterRows = allRowsForFilters || rows;
   const dateFilterISO = filter.date || "";
@@ -378,7 +1006,7 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
     control: (base) => ({
       ...base,
       minHeight: 45,
-      height: 45,
+      height: "auto",
       borderRadius: 8,
       borderColor: "var(--line)",
       boxShadow: "none",
@@ -386,15 +1014,25 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
       textAlign: "left",
       fontWeight: 400,
     }),
-    valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+    valueContainer: (base) => ({ ...base, padding: "4px 8px", flexWrap: "nowrap" }),
     input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 13 }),
     indicatorsContainer: (base) => ({ ...base, height: 45 }),
     dropdownIndicator: (base) => ({ ...base, padding: 6 }),
-    clearIndicator: (base) => ({ ...base, padding: 6 }),
+    indicatorSeparator: () => ({ display: "none" }),
+    clearIndicator: (base) => ({ ...base, padding: 0 }),
     menu: (base) => ({ ...base, zIndex: 80 }),
     option: (base) => ({ ...base, fontSize: 13, textAlign: "left" }),
     placeholder: (base) => ({ ...base, fontSize: 13, fontWeight: 400, color: "var(--ink-2)" }),
-    singleValue: (base) => ({ ...base, fontSize: 13, fontWeight: 400, color: "var(--ink-2)", textAlign: "left" }),
+    singleValue: (base) => ({
+      ...base,
+      fontSize: 13,
+      fontWeight: 400,
+      color: "var(--ink-2)",
+      textAlign: "left",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    }),
     menuList: (base) => ({
       ...base,
       textAlign: "left",
@@ -460,7 +1098,7 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
         <FilterChips filter={filter} onClear={onClearFilter} onClearAll={onClearAll}/>
       </div>
 
-      <div className="desk-table expenses-table-wrap table-scroll px-2">
+      <div className="desk-table expenses-table-wrap table-scroll select-none px-2" {...dragScroll}>
         <table className="ledger-table">
           <colgroup>
             {reconcileMode && <col style={{width:"4%"}}/>}
@@ -469,10 +1107,10 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
             <col style={{width:reconcileMode?"18%":"21%"}}/>
             <col style={{width:reconcileMode?"13%":"13%"}}/>
             <col style={{width:"9%"}}/>
-            <col style={{width:"12%"}}/>
-            <col style={{width:"10%"}}/>
+            <col style={{width:"8%"}}/>
+            <col style={{width:"6%"}}/>
             <col style={{width:"9%"}}/>
-            <col style={{width:reconcileMode?"6%":"7%"}}/>
+            <col style={{width:"10%"}}/>
             <col style={{width:"5%"}}/>
           </colgroup>
           <thead>
@@ -663,6 +1301,7 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
 const IncomeRegister = ({rows, total, onAdd, onEdit, onDelete, onToggleMatch, onToggleAll, reconcileMode}) => {
   const [sortBy,setSortBy] = useState("");
   const [sortDir,setSortDir] = useState("asc");
+  const dragScroll = useTableDragScroll();
   const handleSort = (key) => {
     if(sortBy===key){ setSortDir(d=>d==="asc"?"desc":"asc"); }
     else { setSortBy(key); setSortDir("asc"); }
@@ -692,7 +1331,7 @@ const IncomeRegister = ({rows, total, onAdd, onEdit, onDelete, onToggleMatch, on
         </div>
       </div>
 
-      <div className="desk-table table-scroll px-2">
+      <div className="desk-table table-scroll select-none px-2" {...dragScroll}>
         <table className="ledger-table">
           <colgroup>
             {reconcileMode && <col style={{width:"15%"}}/>}
@@ -864,32 +1503,81 @@ const ExpenseModal = ({open, initial, onClose, onSave, account}) => {
   );
 };
 
-const IncomeModal = ({open, initial, onClose, onSave, account}) => {
-  const empty = {date:new Date().toLocaleDateString("en-GB"), account, amount:"", matched:false};
-  const [f,setF] = useState(initial||empty);
-  useEffect(()=>{ setF(initial||{...empty, account}); }, [initial,open,account]);
-  if(!open) return null;
-  const set = (k,v)=>setF(s=>({...s,[k]:v}));
-  const save = () => { if(!f.amount) return; onSave({...f, amount:Number(f.amount), id:f.id||Date.now()}); };
+const IncomeModal = ({open, initial, onClose, onSave, account, accountLabel}) => {
+  const empty = {
+    date: new Date().toLocaleDateString("en-GB"),
+    account,
+    amount: "",
+    matched: false,
+    mode: "NEFT",
+    receivedFrom: "",
+    description: "",
+  };
+  const [f, setF] = useState(initial || empty);
+  useEffect(() => {
+    const base = { ...empty, account };
+    if (initial) setF({ ...base, ...initial, account: initial.account || account });
+    else setF(base);
+  }, [initial, open, account]);
+  if (!open) return null;
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const save = () => {
+    if (!f.amount) return;
+    onSave({ ...f, amount: Number(f.amount), id: f.id || Date.now() });
+  };
   const dateISO = ddmmToISO(f.date);
+  const accountLine = accountLabel ?? f.account ?? account;
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal text-left" style={{overflow:"visible"}} onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-xl ink">{initial?"Edit Income":"Add Income"}</h3>
-          <button onClick={onClose} className="ink"><I.Close/></button>
+      <div className="modal text-left" style={{ overflow: "visible" }} onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-xl ink">{initial ? "Edit Income" : "Add Income"}</h3>
+          <button type="button" onClick={onClose} className="ink">
+            <I.Close />
+          </button>
         </div>
-        <div className="text-xs muted mb-3">Account: <span className="font-semibold ink">{f.account}</span></div>
+        <div className="muted mb-4 text-xs">
+          Account: <span className="font-semibold ink">{accountLine}</span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <div className="label-text mb-1">Date</div>
-            <CustomDateField value={dateISO} onChange={(v)=>set("date", fromISO(v||""))} placeholder="dd-mm-yyyy" alwaysOpenBelow/>
+            <CustomDateField value={dateISO} onChange={(v) => set("date", fromISO(v || ""))} placeholder="dd-mm-yyyy" alwaysOpenBelow />
           </div>
-          <div><div className="label-text mb-1">Amount (₹)</div><input className="input num-cell" type="number" value={f.amount} onChange={e=>set("amount",e.target.value)} placeholder="0"/></div>
+          <div>
+            <div className="label-text mb-1">Amount (₹)</div>
+            <input className="input num-cell" type="number" value={f.amount} onChange={(e) => set("amount", e.target.value)} placeholder="0" />
+          </div>
+          <div>
+            <div className="label-text mb-1">Payment Mode</div>
+            <select className="input" value={f.mode || ""} onChange={(e) => set("mode", e.target.value)}>
+              {MODES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div className="label-text mb-1">Received From</div>
+            <input className="input" value={f.receivedFrom || ""} onChange={(e) => set("receivedFrom", e.target.value)} placeholder="e.g. Surya Residences booking" />
+          </div>
+          <div className="col-span-2">
+            <div className="label-text mb-1">Description (optional)</div>
+            <input className="input" value={f.description || ""} onChange={(e) => set("description", e.target.value)} placeholder="UTR, cheque no, ref" />
+          </div>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-add" onClick={save}>{initial?"Save Changes":"Add Income"}</button>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            className="rounded-lg border border-[var(--green)] bg-white px-4 py-2 text-sm font-semibold text-[var(--green)] hover:bg-[var(--green-bg)]"
+          >
+            {initial ? "Save Changes" : "Add Income"}
+          </button>
         </div>
       </div>
     </div>
@@ -1120,11 +1808,11 @@ const BankRegister6Inner = () => {
   const [incModal,setIncModal] = useState({open:false, initial:null});
   const [filter,setFilter] = useState({date:"",project:"",party:"",purpose:"",cheque:"",partyType:"",mode:"",matched:"",amount:""});
   const [filterOpen,setFilterOpen] = useState(false);
+  const [ledgerKind, setLedgerKind] = useState("all");
   const [dateRangeOpen,setDateRangeOpen] = useState(false);
   const [dateRange,setDateRange] = useState({from:"2026-04-01", to:"2026-05-04"});
   const [reconcileMode,setReconcileMode] = useState(false);
   const [toast,setToast] = useState("");
-  const [sideOpen,setSideOpen] = useState(false);
 
   useEffect(() => {
     const sameId = (a, b) => {
@@ -1214,6 +1902,7 @@ const BankRegister6Inner = () => {
           party: partyData.name,
           partyType: partyData.type,
           type: item.type || "-",
+          rent_management_id: item.rent_management_id,
           mode: item.bill_payment_mode || "-",
           chequeNo: item.cheque_number || "-",
           chequeDate: item.cheque_date ? new Date(item.cheque_date).toLocaleDateString("en-GB") : "-",
@@ -1275,6 +1964,16 @@ const BankRegister6Inner = () => {
   const netbankTotal = accountExpenses.filter(r=>["Net Banking","RTGS","NEFT"].includes(r.mode)).reduce((s,r)=>s+r.amount,0);
   const balance = totalIncome - totalExpense;
 
+  const isBillRegisterCredit = (r) => r.type === "Rent Payment" && r.rent_management_id;
+  const registerDebitTotal = filteredExpenses.reduce(
+    (s, r) => s + (isBillRegisterCredit(r) ? 0 : Number(r.amount) || 0),
+    0
+  );
+  const registerCreditTotal =
+    accountIncome.reduce((s, r) => s + (Number(r.amount) || 0), 0) +
+    filteredExpenses.reduce((s, r) => s + (isBillRegisterCredit(r) ? Number(r.amount) || 0 : 0), 0);
+  const registerNetTotal = registerCreditTotal - registerDebitTotal;
+
   // Reconciliation stats
   const expReconciled = accountExpenses.filter(r=>r.matched).length;
   const incReconciled = accountIncome.filter(r=>r.matched).length;
@@ -1283,6 +1982,17 @@ const BankRegister6Inner = () => {
   const reconcilePct = totalEntries ? Math.round((reconciledEntries/totalEntries)*100) : 0;
 
   const activeFilterCount = Object.values(filter).filter(v=>v).length;
+
+  const selectedAccountLabel = useMemo(() => {
+    const b = banksForBranch.find((x) => x.name === bank);
+    const list = b?.accounts || [];
+    for (const a of list) {
+      const val = typeof a === "string" ? a : a?.value;
+      const label = typeof a === "string" ? a : a?.label || val;
+      if (val != null && String(val) === String(account)) return label || String(val);
+    }
+    return account;
+  }, [banksForBranch, bank, account]);
 
   const showToast = (m) => { setToast(m); setTimeout(()=>setToast(""),2000); };
   const saveExpense = (r) => { setExpenses(prev=> prev.some(x=>x.id===r.id) ? prev.map(x=>x.id===r.id?r:x) : [r,...prev]); setExpModal({open:false,initial:null}); showToast("Saved"); };
@@ -1301,6 +2011,14 @@ const BankRegister6Inner = () => {
     const visibleIds = new Set(accountIncome.map(r=>r.id));
     setIncome(prev=>prev.map(x=> visibleIds.has(x.id) ? {...x,matched:checked} : x));
     showToast(checked?`Marked ${visibleIds.size} income reconciled`:`Cleared ${visibleIds.size} income`);
+  };
+  const toggleAllMerged = (checked, visibleRows) => {
+    const expIds = new Set(visibleRows.filter((r) => r._source === "expense").map((r) => r.id));
+    const incIds = new Set(visibleRows.filter((r) => r._source === "income").map((r) => r.id));
+    setExpenses((prev) => prev.map((x) => (expIds.has(x.id) ? { ...x, matched: checked } : x)));
+    setIncome((prev) => prev.map((x) => (incIds.has(x.id) ? { ...x, matched: checked } : x)));
+    const n = expIds.size + incIds.size;
+    showToast(checked ? `Marked ${n} entries reconciled` : `Cleared ${n} entries`);
   };
 
   const clearFilterKey = (k) => setFilter(f=>({...f,[k]:""}));
@@ -1347,8 +2065,68 @@ const BankRegister6Inner = () => {
     const w = window.open("", "_blank");
     if(!w){ showToast("Popup blocked — allow popups"); return; }
     const fmt = (n)=>"₹"+Number(n).toLocaleString("en-IN",{minimumFractionDigits:2});
-    const expRows = filteredExpenses.map(r=>`<tr><td>${r.date}</td><td>${r.project}</td><td>${r.party}</td><td>${r.partyType}</td><td>${r.type}</td><td>${r.mode}</td><td>${r.chequeNo}</td><td style="text-align:right">${fmt(r.amount)}</td><td>${r.matched?"✓":""}</td></tr>`).join("");
-    const incRows = accountIncome.map(r=>`<tr><td>${r.date}</td><td style="text-align:right">${fmt(r.amount)}</td><td>${r.matched?"✓":""}</td></tr>`).join("");
+    const dateVal = (s) => {
+      const d = parseDDMMYYYY(s);
+      return d ? d.getTime() : 0;
+    };
+    const mergedBase = [
+      ...filteredExpenses.map((r) => {
+        const creditSide = r.type === "Rent Payment" && r.rent_management_id;
+        return {
+          ...r,
+          _source: "expense",
+          _entry: creditSide ? "credit" : "debit",
+        };
+      }),
+      ...accountIncome.map((r) => ({
+        ...r,
+        _source: "income",
+        _entry: "credit",
+        project: "—",
+        party: r.receivedFrom && String(r.receivedFrom).trim() ? r.receivedFrom : "—",
+        partyType: "—",
+        type: r.description && String(r.description).trim() ? r.description : "Bank credit",
+        mode: r.mode && String(r.mode).trim() ? r.mode : "—",
+        chequeNo: "-",
+        chequeDate: "-",
+      })),
+    ];
+    let merged = [...mergedBase];
+    if (ledgerKind === "debit") merged = merged.filter((r) => r._entry === "debit");
+    else if (ledgerKind === "credit") merged = merged.filter((r) => r._entry === "credit");
+    merged.sort((a, b) => dateVal(a.date) - dateVal(b.date));
+
+    const { pdfDrTotal, pdfCrTotal } = merged.reduce(
+      (acc, r) => {
+        const a = Number(r.amount || 0);
+        if (r._entry === "debit") acc.pdfDrTotal += a;
+        else acc.pdfCrTotal += a;
+        return acc;
+      },
+      { pdfDrTotal: 0, pdfCrTotal: 0 }
+    );
+
+    const pdfNetTotal = pdfCrTotal - pdfDrTotal;
+
+    const mergedRows = merged
+      .map((r) => {
+        const drcr = r._entry === "debit" ? "Debit" : "Credit";
+        const amt = r._entry === "debit" ? `- ${fmt(r.amount)}` : `+ ${fmt(r.amount)}`;
+        const amtColor = r._entry === "debit" ? "#d23b3b" : "#2f9e6e";
+        return `<tr>
+          <td>${r.date || "-"}</td>
+          <td>${r.project || "-"}</td>
+          <td>${r.party || "-"}</td>
+          <td>${r.partyType || "-"}</td>
+          <td>${r.type || "-"}</td>
+          <td style="text-align:right;color:${amtColor};font-weight:700">${amt}</td>
+          <td>${drcr}</td>
+          <td>${r.mode || "-"}</td>
+          <td>${r.chequeNo || "-"}</td>
+          <td style="text-align:center">${r.matched ? "✓" : ""}</td>
+        </tr>`;
+      })
+      .join("");
     const html = `<!DOCTYPE html><html><head><title>Bank Reconciliation — ${account}</title>
       <style>
         body{font-family:Arial,sans-serif;color:#212121;padding:24px;font-size:11px;}
@@ -1368,15 +2146,34 @@ const BankRegister6Inner = () => {
         <strong>Period:</strong> ${fmtRangeShort(dateRange.from,dateRange.to)} &nbsp;|&nbsp;
         <strong>Generated:</strong> ${new Date().toLocaleString("en-IN")}
       </div>
-      <h2>Expenses (Debit) — ${filteredExpenses.length} entries</h2>
-      <table><thead><tr><th>Date</th><th>Project</th><th>Party</th><th>Type</th><th>Purpose</th><th>Mode</th><th>Cheque</th><th style="text-align:right">Amount</th><th>✓</th></tr></thead>
-      <tbody>${expRows}<tr class="total"><td colspan="7">Total Expense</td><td style="text-align:right">${fmt(totalExpense)}</td><td></td></tr></tbody></table>
-      <h2>Income (Credit) — ${accountIncome.length} entries</h2>
-      <table><thead><tr><th>Date</th><th style="text-align:right">Amount</th><th>✓</th></tr></thead>
-      <tbody>${incRows}<tr class="total"><td>Total Income</td><td style="text-align:right">${fmt(totalIncome)}</td><td></td></tr></tbody></table>
+      <h2>Register — ${ledgerKind === "all" ? "All" : ledgerKind === "debit" ? "Debit" : "Credit"} · ${merged.length} entries</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Project</th>
+            <th>Party</th>
+            <th>Type</th>
+            <th>Purpose</th>
+            <th style="text-align:right">Amount</th>
+            <th>Dr/Cr</th>
+            <th>Mode</th>
+            <th>Cheque</th>
+            <th style="text-align:center">✓</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${mergedRows}
+          <tr class="total">
+            <td colspan="5">Totals</td>
+            <td style="text-align:right">${fmt(pdfNetTotal)}</td>
+            <td colspan="4" style="text-align:right">Debit: ${fmt(pdfDrTotal)} · Credit: ${fmt(pdfCrTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
       <div class="footer">
         <div><strong>Reconciliation:</strong> ${reconciledEntries} of ${totalEntries} entries matched (${reconcilePct}%)</div>
-        <div><strong>Net Balance:</strong> ${fmt(balance)}</div>
+        <div><strong>Net Balance:</strong> ${fmt(pdfNetTotal)}</div>
       </div>
       <script>window.onload=()=>setTimeout(()=>window.print(),300);<\/script>
       </body></html>`;
@@ -1409,7 +2206,23 @@ const BankRegister6Inner = () => {
           <StatCard label="UPI" tone="#FFF1D6" icon={<I.UPI/>} value={fmtINR2(upiTotal)}/>
           <StatCard label="Cheque" tone="#FBE9D6" icon={<I.Cheque/>} value={fmtINR2(chequeTotal)}/>
           <StatCard label="Net Banking" tone="#E0F1E5" icon={<I.NetBank/>} value={fmtINR2(netbankTotal)}/>
-          <StatCard label="Net Balance" tone="#EFE2FF" icon={<I.Wallet/>} value={fmtINR2(balance)}/>
+          <div className="stat-card">
+            <div className="flex items-center justify-between gap-3 text-[12px] font-semibold">
+              <span className="muted">Debit</span>
+              <span style={{ color: "var(--red)", fontVariantNumeric: "tabular-nums" }}>₹{fmtINR2(registerDebitTotal)}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-3 text-[12px] font-semibold">
+              <span className="muted">Credit</span>
+              <span style={{ color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>₹{fmtINR2(registerCreditTotal)}</span>
+            </div>
+            <div
+              className="mt-2 flex items-center justify-between gap-3 pt-2 text-[12px] font-semibold"
+              style={{ borderTop: "1px dashed var(--line)" }}
+            >
+              <span className="muted text-black">Net</span>
+              <span style={{ color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>₹{fmtINR2(registerNetTotal)}</span>
+            </div>
+          </div>
         </div>
 
         {!account ? (
@@ -1417,57 +2230,39 @@ const BankRegister6Inner = () => {
             <p className="muted text-sm">Please select a bank account above to view its register.</p>
           </div></div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-9 lg:pl-4">
-              <ExpenseRegister
-                rows={filteredExpenses}
-                total={totalExpense}
-                onAdd={()=>setExpModal({open:true,initial:null})}
-                onEdit={(r)=>setExpModal({open:true,initial:r})}
-                onDelete={deleteExp}
-                onFilter={()=>setFilterOpen(o=>!o)}
-                onToggleMatch={toggleMatchExp}
-                onToggleAll={toggleAllExp}
-                filter={filter}
-                onSetFilter={(k,v)=>setFilter(f=>({...f,[k]:v}))}
-                onClearFilter={clearFilterKey}
-                onClearAll={clearAllFilters}
-                activeFilterCount={activeFilterCount}
-                reconcileMode={reconcileMode}
-                filterOpen={filterOpen}
-                allRowsForFilters={accountExpenses}
-              />
-            </div>
-            <aside className={`lg:col-span-3 side-col ${sideOpen?'open':''}`} style={{paddingRight:16}}>
-              <div className="lg:hidden flex items-center justify-between mb-3" style={{marginTop:58}}>
-                <h2 className="font-display text-lg ink">Income</h2>
-                <button className="icon-btn" onClick={()=>setSideOpen(false)}><I.Close/></button>
-              </div>
-              <IncomeRegister
-                rows={accountIncome}
-                total={totalIncome}
-                onAdd={()=>setIncModal({open:true,initial:null})}
-                onEdit={(r)=>setIncModal({open:true,initial:r})}
-                onDelete={deleteInc}
-                onToggleMatch={toggleMatchInc}
-                onToggleAll={toggleAllInc}
-                reconcileMode={reconcileMode}
-              />
-            </aside>
-            <div className={`side-overlay ${sideOpen?'open':''}`} onClick={()=>setSideOpen(false)}></div>
+          <div className="lg:px-4">
+            <MergedBankLedger
+              expenseRows={filteredExpenses}
+              incomeRows={accountIncome}
+              totalExpense={totalExpense}
+              totalIncome={totalIncome}
+              onAddExp={()=>setExpModal({open:true,initial:null})}
+              onEditExp={(r)=>{ const {_entry,_source,...rest} = r; setExpModal({open:true,initial:rest}); }}
+              onDeleteExp={deleteExp}
+              onAddInc={()=>setIncModal({open:true,initial:null})}
+              onEditInc={(r)=>{ const row = income.find((x)=>x.id===r.id); if(row) setIncModal({open:true,initial:row}); }}
+              onDeleteInc={deleteInc}
+              onFilter={()=>setFilterOpen(o=>!o)}
+              onToggleMatchExp={toggleMatchExp}
+              onToggleMatchInc={toggleMatchInc}
+              onToggleAllMerged={toggleAllMerged}
+              filter={filter}
+              onSetFilter={(k,v)=>setFilter(f=>({...f,[k]:v}))}
+              onClearFilter={clearFilterKey}
+              onClearAll={clearAllFilters}
+              activeFilterCount={activeFilterCount}
+              reconcileMode={reconcileMode}
+              filterOpen={filterOpen}
+              allRowsForFilters={accountExpenses}
+              ledgerKind={ledgerKind}
+              onLedgerKindChange={setLedgerKind}
+            />
           </div>
         )}
       </div>
 
-      {account && (
-        <button className="side-fab" onClick={()=>setSideOpen(true)}>
-          <I.Coin/>
-          <span>Income · ₹{fmtINR(totalIncome)}</span>
-        </button>
-      )}
-
       <ExpenseModal open={expModal.open} initial={expModal.initial} onClose={()=>setExpModal({open:false,initial:null})} onSave={saveExpense} account={account}/>
-      <IncomeModal open={incModal.open} initial={incModal.initial} onClose={()=>setIncModal({open:false,initial:null})} onSave={saveIncome} account={account}/>
+      <IncomeModal open={incModal.open} initial={incModal.initial} onClose={()=>setIncModal({open:false,initial:null})} onSave={saveIncome} account={account} accountLabel={selectedAccountLabel}/>
       <FilterModal open={false} value={filter} onClose={()=>setFilterOpen(false)} onApply={setFilter} onReset={clearAllFilters}/>
       <DateRangeModal open={dateRangeOpen} value={dateRange} onClose={()=>setDateRangeOpen(false)} onApply={setDateRange}/>
 

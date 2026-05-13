@@ -13,10 +13,17 @@ import fileUpload from '../Images/file_upload.png';
 import file from '../Images/file.png';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { i } from 'mathjs';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
 import restore from '../Images/data-recovery.png';
+const WEEKLY_SUMMARY_FILE_API = 'https://backendaab.in/demoAabuildersDash/api/weekly_summary';
+
 function cleanUrl(url) {
     if (!url) return url;
     let cleanedUrl = url.replace(/^["']|["']$/g, '');
@@ -37,13 +44,13 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         const propUsername = typeof username === 'string' ? username.trim() : '';
         if (propUsername) return propUsername;
         try {
-          const user = JSON.parse(localStorage.getItem("user") || "{}");
-          return user?.name || user?.username || user?.userName || '';
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            return user?.name || user?.username || user?.userName || '';
         } catch {
-          return '';
+            return '';
         }
-      };
-      const enteredBy = resolveEnteredBy();
+    };
+    const enteredBy = resolveEnteredBy();
     const normalizedUsername = username?.trim();
     const canEditDelete = normalizedUsername === 'Admin' || normalizedUsername === 'Mahalingam M';
     const isExpensesEntryUploadOnly = viewMode === 'expenses-entry-upload';
@@ -189,6 +196,62 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
     const [expenseEntryRefreshNonce, setExpenseEntryRefreshNonce] = useState(0);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
+    const [weeklySummaryFile, setWeeklySummaryFile] = useState(null);
+    const [weeklySummaryLoading, setWeeklySummaryLoading] = useState(false);
+    const [weeklySummaryUploading, setWeeklySummaryUploading] = useState(false);
+    const [weeklySummaryDeleteLoading, setWeeklySummaryDeleteLoading] = useState(false);
+    const [lastDeletedWeeklySummary, setLastDeletedWeeklySummary] = useState(null);
+    const weeklySummaryFileInputRef = useRef(null);
+    const fetchWeeklySummaryFile = useCallback(async () => {
+        if (!selectedWeek) {
+            setWeeklySummaryFile(null);
+            setLastDeletedWeeklySummary(null);
+            return;
+        }
+        setWeeklySummaryLoading(true);
+        try {
+            const res = await fetch(
+                `${WEEKLY_SUMMARY_FILE_API}/${encodeURIComponent(String(selectedWeek))}`
+            );
+            if (res.ok) {
+                const data = await res.json();
+                setWeeklySummaryFile(data);
+                setLastDeletedWeeklySummary(null);
+            } else {
+                setWeeklySummaryFile(null);
+                // If no active record, try to fetch the most recent deleted record
+                try {
+                    const deletedRes = await fetch(
+                        `${WEEKLY_SUMMARY_FILE_API}/last-deleted/${encodeURIComponent(String(selectedWeek))}`
+                    );
+                    if (deletedRes.ok) {
+                        const deletedData = await deletedRes.json();
+                        const deletedId = deletedData?.id;
+                        if (deletedId !== null && deletedId !== undefined) {
+                            setLastDeletedWeeklySummary({
+                                id: Number(deletedId),
+                                weekNumber: String(selectedWeek),
+                                summaryBillCopyUrl: deletedData?.summary_bill_copy_url ?? deletedData?.summaryBillCopyUrl ?? '',
+                            });
+                        } else {
+                            setLastDeletedWeeklySummary(null);
+                        }
+                    } else {
+                        setLastDeletedWeeklySummary(null);
+                    }
+                } catch (e) {
+                    console.error("Error fetching last deleted weekly summary file:", e);
+                    setLastDeletedWeeklySummary(null);
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching weekly summary file:", e);
+            setWeeklySummaryFile(null);
+            setLastDeletedWeeklySummary(null);
+        } finally {
+            setWeeklySummaryLoading(false);
+        }
+    }, [selectedWeek]);
     const [removedBillCopyRows, setRemovedBillCopyRows] = useState({});
     const [showCategoryPopup, setShowCategoryPopup] = useState(false);
     const [categoryOptions, setCategoryOptions] = useState([]);
@@ -772,6 +835,138 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             });
         }
     };
+    const uploadWeeklySummaryBlobToUrl = async (file) => {
+        const now = new Date();
+        const timestamp = now.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        })
+            .replace(",", "")
+            .replace(/\s/g, "-");
+        const uploadFormData = new FormData();
+        uploadFormData.append("files", file);
+        uploadFormData.append("folder", "FileUpload / Cash_Register_Weekly_Signature_Copy");
+        uploadFormData.append("fileName", `${timestamp}-Week-${selectedWeek}-SignatureCopy`);
+        const uploadResponse = await fetch(
+            "https://backendaab.in/demoAabuildersDash/api/files/upload",
+            { method: "POST", body: uploadFormData }
+        );
+        if (!uploadResponse.ok) {
+            throw new Error("File upload failed");
+        }
+        const uploadResult = await uploadResponse.json();
+        const pdfUrl = uploadResult.urls?.[0];
+        if (!pdfUrl) {
+            throw new Error("No file URL returned");
+        }
+        return pdfUrl;
+    };
+    const handleWeeklySummaryFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file || !selectedWeek) return;
+        if (weeklySummaryFile) {
+            alert("A summary bill is already uploaded for this week. Remove it first to replace.");
+            return;
+        }
+        setWeeklySummaryUploading(true);
+        try {
+            const pdfUrl = await uploadWeeklySummaryBlobToUrl(file);
+            const saveRes = await fetch(`${WEEKLY_SUMMARY_FILE_API}/save`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    summary_bill_copy_url: pdfUrl,
+                    week_number: String(selectedWeek),
+                }),
+            });
+            const saveMsg = await saveRes.text();
+            if (!saveRes.ok || (saveMsg && saveMsg.toLowerCase().includes("already exists"))) {
+                alert(saveMsg || "Failed to save weekly summary file.");
+                return;
+            }
+            if (!saveMsg.toLowerCase().includes("success")) {
+                alert(saveMsg || "Failed to save weekly summary file.");
+                return;
+            }
+            setLastDeletedWeeklySummary(null);
+            await fetchWeeklySummaryFile();
+            setPopup({
+                show: true,
+                message: "Weekly summary file saved successfully!",
+                type: "success",
+                dateStr: new Date().toLocaleDateString("en-GB"),
+            });
+        } catch (err) {
+            console.error(err);
+            setPopup({
+                show: true,
+                message: "Error uploading weekly summary file. Please try again.",
+                type: "error",
+                dateStr: new Date().toLocaleDateString("en-GB"),
+            });
+        } finally {
+            setWeeklySummaryUploading(false);
+        }
+    };
+    const handleWeeklySummaryMarkDeleted = async () => {
+        if (!weeklySummaryFile?.id) return;
+        const ok = window.confirm(
+            "Remove the weekly summary bill for this week? You can undo this, or upload a new file after it is removed."
+        );
+        if (!ok) return;
+        setWeeklySummaryDeleteLoading(true);
+        try {
+            const res = await fetch(
+                `${WEEKLY_SUMMARY_FILE_API}/delete-status/${weeklySummaryFile.id}?isDeleted=true`,
+                { method: "PUT" }
+            );
+            const msg = await res.text();
+            if (!res.ok) {
+                alert(msg || "Failed to update delete status.");
+                return;
+            }
+            setLastDeletedWeeklySummary({
+                id: weeklySummaryFile.id,
+                weekNumber: String(selectedWeek),
+                summaryBillCopyUrl: weeklySummaryFile?.summary_bill_copy_url ?? weeklySummaryFile?.summaryBillCopyUrl ?? '',
+            });
+            setWeeklySummaryFile(null);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to mark summary as deleted.");
+        } finally {
+            setWeeklySummaryDeleteLoading(false);
+        }
+    };
+    const handleWeeklySummaryUndoDelete = async () => {
+        const id = lastDeletedWeeklySummary?.id;
+        if (id == null) return;
+        setWeeklySummaryDeleteLoading(true);
+        try {
+            const res = await fetch(
+                `${WEEKLY_SUMMARY_FILE_API}/delete-status/${id}?isDeleted=false`,
+                { method: "PUT" }
+            );
+            const msg = await res.text();
+            if (!res.ok) {
+                alert(msg || "Failed to restore summary file.");
+                return;
+            }
+            setLastDeletedWeeklySummary(null);
+            await fetchWeeklySummaryFile();
+        } catch (err) {
+            console.error(err);
+            alert("Failed to undo delete.");
+        } finally {
+            setWeeklySummaryDeleteLoading(false);
+        }
+    };
     const handleRemoveBillCopyUrl = async (row) => {
         if (!row?.id) return;
         const shouldRemove = window.confirm('Remove attached bill file?');
@@ -1314,6 +1509,9 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         };
         fetchWeekData();
     }, [selectedWeek, year, activeBranchId, expenseEntryRefreshNonce]);
+    useEffect(() => {
+        void fetchWeeklySummaryFile();
+    }, [selectedWeek, fetchWeeklySummaryFile]);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === "type") {
@@ -3338,8 +3536,75 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                     </div>
                 </div>
                 {!isExpensesEntryUploadOnly && (
-                    <div className='flex justify-end mb-20 mr-6'>
-                        <button className="font-semibold text-lg cursor-pointer flex items-center gap-2" onClick={generatePDF}>
+                    <div className="flex justify-end mb-20 mr-6 items-center gap-6 flex-wrap">
+                        <div className="flex flex-col items-end gap-1 min-w-0 max-w-[420px]">
+                            <div className="flex items-center gap-2 flex-wrap justify-end">
+                                {!selectedWeek && (
+                                    <span className="text-xs text-gray-500">Select a week</span>
+                                )}
+                                {selectedWeek && weeklySummaryLoading && (
+                                    <span className="text-xs text-gray-500">Loading…</span>
+                                )}
+                                {selectedWeek && !weeklySummaryLoading && weeklySummaryFile && (
+                                    <>
+                                        <a
+                                            href={cleanUrl(weeklySummaryFile.summary_bill_copy_url)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm text-blue-600 underline font-medium"
+                                        >
+                                            View file
+                                        </a>
+                                        {canEditDelete && (
+                                            <button
+                                                type="button"
+                                                disabled={weeklySummaryDeleteLoading}
+                                                onClick={handleWeeklySummaryMarkDeleted}
+                                                className="text-sm font-semibold text-red-600 hover:underline disabled:opacity-50"
+                                            >
+                                                {weeklySummaryDeleteLoading ? "…" : "Remove"}
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                {selectedWeek && !weeklySummaryLoading && !weeklySummaryFile && (
+                                    <>
+                                        {canEditDelete &&
+                                            lastDeletedWeeklySummary &&
+                                            String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) && (
+                                                <button
+                                                    type="button"
+                                                    disabled={weeklySummaryDeleteLoading}
+                                                    onClick={handleWeeklySummaryUndoDelete}
+                                                    className="text-sm font-semibold text-[#BF9853] flex items-center gap-1 disabled:opacity-50"
+                                                    title="Restore removed summary"
+                                                >
+                                                    <img src={restore} alt="" className="w-4 h-4" />
+                                                    Restore
+                                                </button>
+                                            )}
+                                        <input
+                                            ref={weeklySummaryFileInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
+                                            onChange={handleWeeklySummaryFileChange}
+                                        />
+                                        <button
+                                            type="button"
+                                            disabled={weeklySummaryUploading}
+                                            onClick={() => weeklySummaryFileInputRef.current?.click()}
+                                            className="text-sm font-semibold flex items-center gap-2 text-gray-800 disabled:opacity-50"
+                                            title="Upload Signature Copy for this week"
+                                        >
+                                            <img src={fileUpload} alt="" className="w-5 h-5" />
+                                            {weeklySummaryUploading ? "Uploading…" : "Upload Signature Copy"}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <button className="font-semibold text-lg cursor-pointer flex items-center gap-2 shrink-0" onClick={generatePDF}>
                             Report
                             <img className='w-6 h-5' src={download} alt="Download" />
                         </button>
@@ -4121,91 +4386,91 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         </div>
                                                         {!isExpensesEntryUploadOnly && (
                                                             <div className="mr-6 flex items-center gap-3">
-                                                            {row.type === "Project Advance" ? (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        let description = "";
-                                                                        if (row.advance_portal_id) {
-                                                                            try {
-                                                                                const res = await fetch(
-                                                                                    `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
-                                                                                );
-                                                                                if (!res.ok) throw new Error("Failed to fetch advance portal data");
-                                                                                const data = await res.json();
-                                                                                description = data.description || "";
-                                                                            } catch (error) {
-                                                                                console.error("Error fetching advance portal data:", error);
-                                                                            }
-                                                                        }
-                                                                        setEditFormData((prev) => ({ ...prev, description }));
-                                                                        setCurrentRow(row);
-                                                                        setShowPopups(true);
-                                                                    }}
-                                                                >
-                                                                    <img
-                                                                        src={
-                                                                            portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart
-                                                                        }
-                                                                        alt="Notes"
-                                                                        className="w-4 h-4 mr-3"
-                                                                    />
-                                                                </button>
-                                                            ) : (
-                                                                <button>
-                                                                    <img
-                                                                        src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPC9zdmc+"
-                                                                        alt=""
-                                                                        className="w-4 h-4 mr-3 opacity-0"
-                                                                    />
-                                                                </button>
-                                                            )}
-                                                            {row.bill_copy_url ? (
-                                                                <div className="ml-3 flex items-center gap-2">
-                                                                    <a
-                                                                        href={cleanUrl(row.bill_copy_url)}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="cursor-pointer"
-                                                                        title="View File"
-                                                                    >
-                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                    </a>
-                                                                    {canEditDelete && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                            className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee]"
-                                                                            title="Remove File"
-                                                                        >
-                                                                            ×
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="ml-3 flex items-center gap-2">
+                                                                {row.type === "Project Advance" ? (
                                                                     <button
-                                                                        onClick={() => handleFileUploadClick(row)}
-                                                                        className="cursor-pointer"
-                                                                        title="Upload File"
+                                                                        onClick={async () => {
+                                                                            let description = "";
+                                                                            if (row.advance_portal_id) {
+                                                                                try {
+                                                                                    const res = await fetch(
+                                                                                        `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                    );
+                                                                                    if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                    const data = await res.json();
+                                                                                    description = data.description || "";
+                                                                                } catch (error) {
+                                                                                    console.error("Error fetching advance portal data:", error);
+                                                                                }
+                                                                            }
+                                                                            setEditFormData((prev) => ({ ...prev, description }));
+                                                                            setCurrentRow(row);
+                                                                            setShowPopups(true);
+                                                                        }}
                                                                     >
                                                                         <img
-                                                                            src={fileUpload}
-                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                            alt="Upload File"
+                                                                            src={
+                                                                                portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart
+                                                                            }
+                                                                            alt="Notes"
+                                                                            className="w-4 h-4 mr-3"
                                                                         />
                                                                     </button>
-                                                                    {canEditDelete && removedBillCopyRows[row.id] && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                            className="rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
-                                                                            title="Restore Removed File"
+                                                                ) : (
+                                                                    <button>
+                                                                        <img
+                                                                            src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPC9zdmc+"
+                                                                            alt=""
+                                                                            className="w-4 h-4 mr-3 opacity-0"
+                                                                        />
+                                                                    </button>
+                                                                )}
+                                                                {row.bill_copy_url ? (
+                                                                    <div className="ml-3 flex items-center gap-2">
+                                                                        <a
+                                                                            href={cleanUrl(row.bill_copy_url)}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="cursor-pointer"
+                                                                            title="View File"
                                                                         >
-                                                                            Restore
+                                                                            <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                        </a>
+                                                                        {canEditDelete && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRemoveBillCopyUrl(row)}
+                                                                                className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee]"
+                                                                                title="Remove File"
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="ml-3 flex items-center gap-2">
+                                                                        <button
+                                                                            onClick={() => handleFileUploadClick(row)}
+                                                                            className="cursor-pointer"
+                                                                            title="Upload File"
+                                                                        >
+                                                                            <img
+                                                                                src={fileUpload}
+                                                                                className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                                alt="Upload File"
+                                                                            />
                                                                         </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                                                        {canEditDelete && removedBillCopyRows[row.id] && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRestoreBillCopyUrl(row)}
+                                                                                className="rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
+                                                                                title="Restore Removed File"
+                                                                            >
+                                                                                Restore
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -4261,54 +4526,54 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         )
                                                     ) : (
                                                         canEditSelectedWeek && (
-                                                        <div className="flex gap-2">
-                                                            {editingRowId === row.id ? (
-                                                                <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
-                                                                    ✓
-                                                                </button>
-                                                            ) : (
-                                                                row.type === "Daily" ? (
+                                                            <div className="flex gap-2">
+                                                                {editingRowId === row.id ? (
+                                                                    <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                        ✓
+                                                                    </button>
+                                                                ) : (
+                                                                    row.type === "Daily" ? (
+                                                                        <img
+                                                                            className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                            src={Edit}
+                                                                            alt="Edit Disabled"
+                                                                        />
+                                                                    ) : (
+                                                                        canEditSelectedWeek && (
+                                                                            <button onClick={() => {
+                                                                                setEditingRowId(row.id);
+                                                                                setEditingOriginalRow({ ...row });
+                                                                            }}>
+                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                            </button>
+                                                                        )
+                                                                    )
+                                                                )}
+                                                                {row.type === "Daily" ? (
                                                                     <img
                                                                         className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={Edit}
-                                                                        alt="Edit Disabled"
+                                                                        src={Delete}
+                                                                        alt="Delete Disabled"
                                                                     />
                                                                 ) : (
                                                                     canEditDelete && canEditSelectedWeek && (
-                                                                        <button onClick={() => {
-                                                                            setEditingRowId(row.id);
-                                                                            setEditingOriginalRow({ ...row });
-                                                                        }}>
-                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                        <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
+                                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                         </button>
                                                                     )
-                                                                )
-                                                            )}
-                                                            {row.type === "Daily" ? (
-                                                                <img
-                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={Delete}
-                                                                    alt="Delete Disabled"
-                                                                />
-                                                            ) : (
-                                                                canEditDelete && canEditSelectedWeek && (
-                                                                    <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
-                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                )}
+                                                                {row.type === "Daily" ? (
+                                                                    <img
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                        src={history}
+                                                                        alt="History Disabled"
+                                                                    />
+                                                                ) : (
+                                                                    <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
+                                                                        <img src={history} className="w-5 h-4" alt="History" />
                                                                     </button>
-                                                                )
-                                                            )}
-                                                            {row.type === "Daily" ? (
-                                                                <img
-                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={history}
-                                                                    alt="History Disabled"
-                                                                />
-                                                            ) : (
-                                                                <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
-                                                                    <img src={history} className="w-5 h-4" alt="History" />
-                                                                </button>
-                                                            )}
-                                                        </div>
+                                                                )}
+                                                            </div>
                                                         )
                                                     )}
                                                 </td>
@@ -4320,244 +4585,244 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                         </div>
                     </div>
                     {!isExpensesEntryUploadOnly && (
-                    <div className="w-full xl:flex-[2] xl:min-w-[300px]">
-                        <div className="block">
-                            <div className="flex flex-col sm:flex-row justify-between mb-4 gap-2">
-                                <h1 className="font-bold text-base">Payments Received</h1>
-                                <h1 className="font-bold text-base text-[#E4572E]">
-                                    Total: <span style={{ color: "#E4572E" }}>
-                                        {payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                                    </span>
-                                </h1>
-                            </div>
-                            <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px] thin-scrollbar"
-                                style={{
-                                    willChange: 'scroll-position',
-                                    WebkitOverflowScrolling: 'touch',
-                                    transform: 'translateZ(0)', // Force hardware acceleration
-                                    backfaceVisibility: 'hidden' // Optimize rendering
-                                }}
-                                onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
-                                onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
-                                onMouseUp={() => handleMouseUp(paymentsScrollRef)}
-                                onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
-                                onWheel={(e) => e.stopPropagation()}
-                            >
-                                <table className="w-full border-collapse">
-                                    <thead className="bg-[#FAF6ED] h-12">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Date</th>
-                                            <th className="px-4 py-2">Amount</th>
-                                            <th className="px-4 py-2 text-left">Type</th>
-                                            <th>Activity</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {payments.map((row, index) => (
-                                            <tr key={index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                <td className="px-4 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <input
-                                                            type="date"
-                                                            value={row.date || ""}
-                                                            onChange={(e) =>
-                                                                handleEditPayment(index, "date", e.target.value)
-                                                            }
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg bg-transparent w-[120px] h-[40px] focus:outline-none"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-[120px] h-[40px] flex items-center">
-                                                            {formatDateOnly(row.date) || ""}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <input
-                                                            type="number"
-                                                            value={row.amount || ""}
-                                                            onChange={(e) =>
-                                                                handleEditPayment(index, "amount", e.target.value)
-                                                            }
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg bg-transparent w-[90px] h-[40px] focus:outline-none"
-                                                            onWheel={(e) => e.preventDefault()}
-                                                            onFocus={() =>
-                                                                window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
-                                                            }
-                                                            onBlur={() =>
-                                                                window.removeEventListener("wheel", (e) => e.preventDefault())
-                                                            }
-                                                        />
-                                                    ) : (
-                                                        <div className="w-[90px] h-[40px] flex items-center">
-                                                            {Number(row.amount).toLocaleString('en-IN')}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    {editingPaymentId === (row.id || null) ? (
-                                                        <>
-                                                            <select
-                                                                value={row.type || ""}
+                        <div className="w-full xl:flex-[2] xl:min-w-[300px]">
+                            <div className="block">
+                                <div className="flex flex-col sm:flex-row justify-between mb-4 gap-2">
+                                    <h1 className="font-bold text-base">Payments Received</h1>
+                                    <h1 className="font-bold text-base text-[#E4572E]">
+                                        Total: <span style={{ color: "#E4572E" }}>
+                                            {payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
+                                        </span>
+                                    </h1>
+                                </div>
+                                <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px] thin-scrollbar"
+                                    style={{
+                                        willChange: 'scroll-position',
+                                        WebkitOverflowScrolling: 'touch',
+                                        transform: 'translateZ(0)', // Force hardware acceleration
+                                        backfaceVisibility: 'hidden' // Optimize rendering
+                                    }}
+                                    onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
+                                    onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
+                                    onMouseUp={() => handleMouseUp(paymentsScrollRef)}
+                                    onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
+                                    onWheel={(e) => e.stopPropagation()}
+                                >
+                                    <table className="w-full border-collapse">
+                                        <thead className="bg-[#FAF6ED] h-12">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left">Date</th>
+                                                <th className="px-4 py-2">Amount</th>
+                                                <th className="px-4 py-2 text-left">Type</th>
+                                                <th>Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {payments.map((row, index) => (
+                                                <tr key={index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                                    <td className="px-4 py-2">
+                                                        {editingPaymentId === (row.id || null) ? (
+                                                            <input
+                                                                type="date"
+                                                                value={row.date || ""}
                                                                 onChange={(e) =>
-                                                                    handleEditPayment(index, "type", e.target.value)
+                                                                    handleEditPayment(index, "date", e.target.value)
                                                                 }
-                                                                className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg bg-transparent focus:outline-none"
-                                                                disabled={editingPaymentId !== row.id}
-                                                            >
-                                                                <option value="">Select</option>
-                                                                {weeklyReceivedTypes.map((type, idx) => (
-                                                                    <option key={idx} value={type.received_type}>
-                                                                        {type.received_type}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </>
-                                                    ) : (
-                                                        <div className="w-[90px] h-[40px] flex items-center">
-                                                            {row.type}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-2 py-2">
-                                                    {canEditSelectedWeek && (
-                                                        <div className="flex gap-1">
-                                                            {editingPaymentId === row.id ? (
-                                                                <button
-                                                                    className="text-green-600 font-bold text-lg"
-                                                                    onClick={() => saveEditedPaymentReceived(row)}
-                                                                    disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg bg-transparent w-[120px] h-[40px] focus:outline-none"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-[120px] h-[40px] flex items-center">
+                                                                {formatDateOnly(row.date) || ""}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {editingPaymentId === (row.id || null) ? (
+                                                            <input
+                                                                type="number"
+                                                                value={row.amount || ""}
+                                                                onChange={(e) =>
+                                                                    handleEditPayment(index, "amount", e.target.value)
+                                                                }
+                                                                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg bg-transparent w-[90px] h-[40px] focus:outline-none"
+                                                                onWheel={(e) => e.preventDefault()}
+                                                                onFocus={() =>
+                                                                    window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
+                                                                }
+                                                                onBlur={() =>
+                                                                    window.removeEventListener("wheel", (e) => e.preventDefault())
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <div className="w-[90px] h-[40px] flex items-center">
+                                                                {Number(row.amount).toLocaleString('en-IN')}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {editingPaymentId === (row.id || null) ? (
+                                                            <>
+                                                                <select
+                                                                    value={row.type || ""}
+                                                                    onChange={(e) =>
+                                                                        handleEditPayment(index, "type", e.target.value)
+                                                                    }
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg bg-transparent focus:outline-none"
+                                                                    disabled={editingPaymentId !== row.id}
                                                                 >
-                                                                    ✓
-                                                                </button>
-                                                            ) : (
-                                                                weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                    <option value="">Select</option>
+                                                                    {weeklyReceivedTypes.map((type, idx) => (
+                                                                        <option key={idx} value={type.received_type}>
+                                                                            {type.received_type}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </>
+                                                        ) : (
+                                                            <div className="w-[90px] h-[40px] flex items-center">
+                                                                {row.type}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 py-2">
+                                                        {canEditSelectedWeek && (
+                                                            <div className="flex gap-1">
+                                                                {editingPaymentId === row.id ? (
+                                                                    <button
+                                                                        className="text-green-600 font-bold text-lg"
+                                                                        onClick={() => saveEditedPaymentReceived(row)}
+                                                                        disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
+                                                                    >
+                                                                        ✓
+                                                                    </button>
+                                                                ) : (
+                                                                    weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                        canEditSelectedWeek && (
+                                                                            <button onClick={() => {
+                                                                                setEditingPaymentId(row.id);
+                                                                                setEditingOriginalPayment({ ...row });
+                                                                            }}>
+                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                            </button>
+                                                                        )
+                                                                    ) : (
+                                                                        <img
+                                                                            className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                            src={Edit}
+                                                                            alt="Edit Disabled"
+                                                                        />
+                                                                    )
+                                                                )}
+                                                                {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
                                                                     canEditDelete && canEditSelectedWeek && (
-                                                                        <button onClick={() => {
-                                                                            setEditingPaymentId(row.id);
-                                                                            setEditingOriginalPayment({ ...row });
-                                                                        }}>
-                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                        <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
+                                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                         </button>
                                                                     )
                                                                 ) : (
                                                                     <img
                                                                         className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={Edit}
-                                                                        alt="Edit Disabled"
+                                                                        src={Delete}
+                                                                        alt="Delete Disabled"
                                                                     />
-                                                                )
-                                                            )}
-                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                canEditDelete && canEditSelectedWeek && (
-                                                                    <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
-                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                )}
+                                                                {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                    <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                                        <img src={history} className="w-5 h-4" alt="History" />
                                                                     </button>
-                                                                )
-                                                            ) : (
-                                                                <img
-                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={Delete}
-                                                                    alt="Delete Disabled"
-                                                                />
-                                                            )}
-                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                    <img src={history} className="w-5 h-4" alt="History" />
-                                                                </button>
-                                                            ) : (
-                                                                <img
-                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                    src={history}
-                                                                    alt="History Disabled"
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {canEditSelectedWeek ? (
-                                            <tr>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="date"
-                                                        name="date"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
-                                                        value={newPayment.date}
-                                                        onChange={handlePaymentChange}
-                                                        onKeyDown={handleKeyDown1}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none"
-                                                        value={newPayment.amount}
-                                                        onChange={handlePaymentChange}
-                                                        onKeyDown={handleKeyDown1}
-                                                        onWheel={(e) => e.preventDefault()}
-                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
-                                                        value={newPayment.type}
-                                                        onChange={handlePaymentChange}
-                                                        onKeyDown={handleKeyDown1}
-                                                    >
-                                                        <option value="">Select</option>
-                                                        {weeklyReceivedTypes.map((type, index) => (
-                                                            <option key={index} value={type.received_type}>
-                                                                {type.received_type}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td></td>
-                                            </tr>
-                                        ) : null}
-                                    </tbody>
-                                </table>
+                                                                ) : (
+                                                                    <img
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                        src={history}
+                                                                        alt="History Disabled"
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {canEditSelectedWeek ? (
+                                                <tr>
+                                                    <td className="px-4 py-2">
+                                                        <input
+                                                            type="date"
+                                                            name="date"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
+                                                            value={newPayment.date}
+                                                            onChange={handlePaymentChange}
+                                                            onKeyDown={handleKeyDown1}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <input
+                                                            type="number"
+                                                            name="amount"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none"
+                                                            value={newPayment.amount}
+                                                            onChange={handlePaymentChange}
+                                                            onKeyDown={handleKeyDown1}
+                                                            onWheel={(e) => e.preventDefault()}
+                                                            onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                            onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <select
+                                                            name="type"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                            value={newPayment.type}
+                                                            onChange={handlePaymentChange}
+                                                            onKeyDown={handleKeyDown1}
+                                                        >
+                                                            <option value="">Select</option>
+                                                            {weeklyReceivedTypes.map((type, index) => (
+                                                                <option key={index} value={type.received_type}>
+                                                                    {type.received_type}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td></td>
+                                                </tr>
+                                            ) : null}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div className="mt-4 pt-2">
+                                <h2 className="font-bold text-lg mb-2">Summary</h2>
+                                <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853] text-left">
+                                    <table className="w-full border-collapse">
+                                        <tbody>
+                                            {Object.entries(
+                                                filteredExpenses
+                                                    .filter(expense => Number(expense.amount) > 0)
+                                                    .reduce((acc, expense) => {
+                                                        const type = expense.type;
+                                                        const amount = Number(expense.amount);
+                                                        acc[type] = (acc[type] || 0) + amount;
+                                                        return acc;
+                                                    }, {})
+                                            ).map(([type, total], index, arr) => (
+                                                <tr key={type}
+                                                    className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
+                                                        } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
+                                                >
+                                                    <td className="font-bold py-1.5 pl-2">{type}</td>
+                                                    <td className="font-bold py-1.5 px-4 text-right">
+                                                        {Number(total).toLocaleString("en-US", {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        })}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                        <div className="mt-4 pt-2">
-                            <h2 className="font-bold text-lg mb-2">Summary</h2>
-                            <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853] text-left">
-                                <table className="w-full border-collapse">
-                                    <tbody>
-                                        {Object.entries(
-                                            filteredExpenses
-                                                .filter(expense => Number(expense.amount) > 0)
-                                                .reduce((acc, expense) => {
-                                                    const type = expense.type;
-                                                    const amount = Number(expense.amount);
-                                                    acc[type] = (acc[type] || 0) + amount;
-                                                    return acc;
-                                                }, {})
-                                        ).map(([type, total], index, arr) => (
-                                            <tr key={type}
-                                                className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
-                                                    } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
-                                            >
-                                                <td className="font-bold py-1.5 pl-2">{type}</td>
-                                                <td className="font-bold py-1.5 px-4 text-right">
-                                                    {Number(total).toLocaleString("en-US", {
-                                                        minimumFractionDigits: 2,
-                                                        maximumFractionDigits: 2,
-                                                    })}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
                     )}
                 </div>
                 <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
@@ -4789,6 +5054,23 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                     onClick={async () => {
                                         try {
                                             if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                                if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
+                                                    let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
+                                                    if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                        mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
+                                                    } else if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                        mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
+                                                    }
+                                                    await postBankRegisterLogSave(
+                                                        bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
+                                                        "Cash Register — Weekly Payment History",
+                                                        {
+                                                            bill_payment_mode: paymentPopupData.paymentMode,
+                                                            amount: paymentPopupData.amount,
+                                                            entered_by: enteredBy,
+                                                        }
+                                                    );
+                                                }
                                                 let advancePortalId = null;
                                                 let staffAdvancePortalId = null;
                                                 if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {

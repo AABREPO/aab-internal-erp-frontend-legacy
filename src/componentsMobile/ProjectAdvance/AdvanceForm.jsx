@@ -9,6 +9,11 @@ import {
   fetchMaxEntryNoFromBranch,
   computeAdvanceTotalsFromGetAll,
 } from './advancePortalApi';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 /** Keeps dropdown mapping/render cheap on huge vendor/site lists. */
 const MAX_SELECT_OPTIONS = 500;
@@ -961,7 +966,19 @@ const AdvanceForm = ({
         file_url: fileUrl,
         branch_id: activeBranchId,
       };
-      const advanceResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
+      const advanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
+      if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(advanceSaveUrl),
+          "Advance Portal (Mobile)",
+          {
+            bill_payment_mode: paymentModalData.paymentMode,
+            amount: parseFloat(paymentModalData.amount) || 0,
+            entered_by: username,
+          }
+        );
+      }
+      const advanceResponse = await fetch(advanceSaveUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(advancePayload)
@@ -992,7 +1009,8 @@ const AdvanceForm = ({
         account_number: paymentModalData.accountNumber || null,
         branch_id: activeBranchId
       };
-      const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save'), {
+      const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');
+      const weeklyResponse = await fetch(weeklyBillSaveUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(weeklyPaymentBillPayload)

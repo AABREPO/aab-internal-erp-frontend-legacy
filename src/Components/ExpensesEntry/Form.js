@@ -5,6 +5,15 @@ import axios from "axios";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
+import XL from '../Images/sheets.png'
+import Pdf from '../Images/pdf.png'
+import CustomMonthField from './CustomMonthField';
+import CustomDateField from './CustomDateField';
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
@@ -814,9 +823,9 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                             if (previousEntry.utilityValidityDays) {
                                 setThirdInput(previousEntry.utilityValidityDays);
                             }
-                        if (previousEntry.utilityValidityType) {
-                            setValidityType(previousEntry.utilityValidityType);
-                        }
+                            if (previousEntry.utilityValidityType) {
+                                setValidityType(previousEntry.utilityValidityType);
+                            }
 
                             setTimeout(() => {
                                 if (siteOption && projectData) {
@@ -1418,7 +1427,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
     const submitExpenseData = async () => {
         if (
             (selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') &&
-            ["GPay", "Gpay","PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
+            ["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)
         ) {
             setPaymentModalData({
                 date: date,
@@ -1866,7 +1875,22 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                 branchId: activeBranchId,
                 enteredBy: username
             };
-            const expensesResponse = await fetch(buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
+            const expensesSaveUrl = buildBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save");
+            if (
+                selectedAccountType !== 'Bill Payments' &&
+                isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)
+            ) {
+                await postBankRegisterLogSave(
+                    bankRegisterLogSaveUrlMatchingRequest(expensesSaveUrl),
+                    "Expense Entry",
+                    {
+                        bill_payment_mode: paymentModalData.paymentMode,
+                        amount: paymentModalData.amount,
+                        entered_by: username,
+                    }
+                );
+            }
+            const expensesResponse = await fetch(expensesSaveUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -2088,12 +2112,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                     outline: none !important;
                 }
             `}</style>
-            <div className={`p-6 pb-20 bg-white rounded shadow-lg w-full `}>
+            <div className={`p-6 pb-20 bg-white rounded shadow-lg w-full overflow-x-clip`}>
                 <form onSubmit={handleFormSubmit}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-1">
+                    <div className="grid grid-cols-1 md:grid-cols-[max-content_1fr] gap-x-32 min-w-0">
+                        <div className="md:col-start-1 md:row-start-1 space-y-3 min-w-0">
                             {summaryBillMode && (
-                                <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                                <div className=" rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                                     <div className="text-sm font-semibold text-orange-800">
                                         {splitRemainingLabel}:&nbsp;
                                         <span className="text-base font-bold">
@@ -2128,94 +2152,103 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                     </div>
                                 </div>
                             )}
-                            <div className='flex gap-10 mb-3 flex-wrap items-start'>
+                            <div className='flex gap-10 flex-wrap items-start'>
                                 <div className='text-left'>
-                                    <h4 className="text-base font-semibold mb-2 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
-                                    <select className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] bg-white w-[290px]"
-                                        value={selectedAccountType}
-                                        onChange={(e) => {
-                                            const selectedValue = e.target.value;
+                                    <h4 className="text-base font-semibold mb-0.5 text-[#E4572E]">Account Type <span className="text-red-500">*</span></h4>
+                                    <Select
+                                        options={accountTypeOptions}
+                                        value={accountTypeOptions.find((option) => option.value === selectedAccountType) || null}
+                                        onChange={(selectedOption) => {
+                                            const selectedValue = selectedOption ? selectedOption.value : '';
                                             setSelectedAccountType(selectedValue);
-                                            const selectedOption = accountTypeOptions.find(option => option.value === selectedValue);
                                             if (selectedOption) {
                                                 console.log("Selected ID:", selectedOption.id);
                                             }
-                                        }}>
-                                        <option value="" disabled>--- Select ---</option>
-                                        {accountTypeOptions.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        }}
+                                        placeholder="Account Type"
+                                        isSearchable={true}
+                                        isClearable
+                                        styles={customStyles}
+                                        className="custom-select rounded-lg w-[290px] h-[45px]"
+                                    />
 
                                     {selectedAccountType === 'Utility Bills' && (
-                                        <div className='mt-3 w-[290px]'>
-                                            <h4 className="text-base font-semibold mb-2">Utility Type <span className="text-red-500">*</span></h4>
-                                            <Select
-                                                options={[
-                                                    { value: 'Electricity', label: 'Electricity' },
-                                                    { value: 'Property', label: 'Property' },
-                                                    { value: 'Water', label: 'Water' },
-                                                    { value: 'Telecom', label: 'Telecom' },
-                                                    { value: 'Subscription', label: 'Subscription' },
-                                                ]}
-                                                value={utilityType ? { value: utilityType, label: utilityType } : null}
-                                                onChange={(selectedOption) => setUtilityType(selectedOption ? selectedOption.value : '')}
-                                                placeholder="--- Select ---"
-                                                styles={customStyles}
-                                                isSearchable={false}
-                                                className="custom-select rounded-lg w-[290px] h-[45px]"
-                                            />
-                                        </div>
+                                       <div className='mt-3 w-[290px]'>
+                                       <h4 className="text-base font-semibold mb-0.5">
+                                         Utility Type <span className="text-red-500">*</span>
+                                       </h4>
+                                     
+                                       <Select
+                                         options={[
+                                           { value: 'Electricity', label: 'Electricity' },
+                                           { value: 'Property', label: 'Property' },
+                                           { value: 'Water', label: 'Water' },
+                                           { value: 'Telecom', label: 'Telecom' },
+                                           { value: 'Subscription', label: 'Subscription' },
+                                         ]}
+                                         value={
+                                           utilityType
+                                             ? { value: utilityType, label: utilityType }
+                                             : null
+                                         }
+                                         onChange={(selectedOption) =>
+                                           setUtilityType(selectedOption ? selectedOption.value : '')
+                                         }
+                                         placeholder="Utility Type"
+                                         styles={customStyles}
+                                     
+                                         // Make searchable
+                                         isSearchable={true}
+                                     
+                                         className="custom-select rounded-lg w-[290px] lg:w-[615px] h-[45px]"
+                                       />
+                                     </div>
                                     )}
                                 </div>
-
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-2 block">Date <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="date"
+                                    <label className="text-md font-semibold mb-0.5 block">Date <span className="text-red-500">*</span></label>
+                                    <CustomDateField
                                         value={date}
-                                        onChange={(e) => setDate(e.target.value)}
-                                        className="border-2 border-[#BF9853] w-[290px] h-[45px] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20]"
+                                        onChange={setDate}
+                                        placeholder="dd-mm-yyyy"
+                                        className="w-[290px]"
+                                        alwaysOpenBelow
                                     />
                                 </div>
                             </div>
-                        </div>
-                        <div className="md:col-start-1 md:row-start-2">
-                            <div className='flex gap-10 mb-3'>
+                            <div className='flex gap-10'>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-2  block">Project Name <span className="text-red-500">*</span></label>
+                                    <label className="text-md font-semibold mb-0.5  block">Project Name <span className="text-red-500">*</span></label>
                                     <Select
                                         options={sortedSiteOptions || []}
-                                        placeholder="Select a site..."
+                                        placeholder="Project Name."
                                         isSearchable={true}
                                         value={selectedSite}
                                         onChange={setSelectedSite}
                                         styles={customStyles}
                                         isClearable
-                                        className="custom-select rounded-lg w-[290px] h-[45px]"
+                                        className="custom-select rounded-lg w-[290px] h-[45px] no-scrollbar scrollbar-none"
                                     />
                                 </div>
                                 <div className='text-left'>
-                                    <div className='flex'>
-                                        <label className="text-md font-semibold mb-2 block">Vendor/Contractor Name <span className="text-red-500">*</span></label>
-                                        {selectedType && <span className="text-xs text-orange-600 font-semibold block ml-10 mt-3">{selectedType}</span>}
+                                    <div className='flex  mb-0.5'>
+                                        <label className="text-md font-semibold block">Vendor/Contractor Name <span className="text-red-500">*</span></label>
+                                        {selectedType && <span className="text-xs text-orange-600 font-semibold block ml-10 mt-1.5">{selectedType}</span>}
                                     </div>
                                     <Select
                                         options={combinedOptions}
                                         value={selectedOption}
                                         onChange={handleChange}
-                                        placeholder="Select an Option..."
+                                        placeholder="Vendor/Contractor Name"
                                         styles={customStyles}
                                         isClearable
                                         className="custom-select rounded-lg w-[290px] h-[45px] "
                                     />
                                 </div>
                             </div>
-                            <div className='flex gap-10 mb-3'>
+                            <div className='flex gap-10'>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-2 block">Quantity</label>
+                                    <label className="text-md font-semibold mb-0.5 block">Quantity</label>
                                     <input
                                         type="text"
                                         value={quantity}
@@ -2224,7 +2257,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                     />
                                 </div>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-2 block">Amount <span className="text-red-500">*</span></label>
+                                    <label className="text-md font-semibold mb-0.5 block">Amount <span className="text-red-500">*</span></label>
                                     <div className="relative w-[290px] h-[45px]">
                                         <span className="absolute top-1/2 left-4 transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
                                         <input
@@ -2237,57 +2270,61 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                     </div>
                                 </div>
                             </div>
-                            <div className='flex gap-10 mb-3'>
+                            <div className='flex gap-10'>
                                 <div className={`text-left ${selectedAccountType === 'Claim' ? '' : ''}`}>
-                                    <label className="text-md font-semibold mb-2 block">Category <span className="text-red-500">*</span></label>
+                                    <label className="text-md font-semibold mb-0.5 block">Category <span className="text-red-500">*</span></label>
                                     <Select
                                         options={categoryOptions}
                                         value={selectedCategory}
                                         onChange={handleCategoryChange}
                                         styles={customStyles}
                                         isClearable
-                                        placeholder="Select a category..."
+                                        placeholder="Category"
                                         className="custom-select rounded-lg w-[290px] h-[45px]"
                                     />
                                 </div>
                                 {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') ? (
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-2 block">Payment Mode <span className="text-red-500">*</span></label>
+                                        <label className="text-md font-semibold mb-0.5 block">Payment Mode <span className="text-red-500">*</span></label>
                                         {billPaymentsCashRegisterPrefill && selectedAccountType === 'Bill Payments' ? (
-                                            <select
-                                                value="Cash"
-                                                disabled
-                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] border-opacity-[0.20] bg-gray-50 text-gray-800 cursor-not-allowed"
-                                            >
-                                                <option value="Cash">Cash</option>
-                                            </select>
+                                            <Select
+                                                value={{ value: 'Cash', label: 'Cash' }}
+                                                isDisabled
+                                                placeholder="Payment Mode"
+                                                isSearchable={true}
+                                                isClearable={false}
+                                                styles={customStyles}
+                                                className="custom-select rounded-lg w-[290px] h-[43px]"
+                                            />
                                         ) : (
-                                            <select
-                                                value={paymentMode}
-                                                onChange={(e) => setPaymentMode(e.target.value)}
-                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[43px] focus:outline-none border-opacity-[0.20]"
-                                            >
-                                                <option value="">Select Payment Mode</option>
-                                                {finalPaymentModeOptions
+                                            <Select
+                                                options={finalPaymentModeOptions
                                                     .filter(mode => selectedAccountType !== 'Weekly Payment' || mode.modeOfPayment !== 'Cash')
-                                                    .map(mode => (
-                                                        <option key={mode.id || mode.modeOfPayment} value={mode.modeOfPayment}>
-                                                            {mode.modeOfPayment}
-                                                        </option>
-                                                    ))}
-                                            </select>
+                                                    .map((mode) => ({
+                                                        value: mode.modeOfPayment,
+                                                        label: mode.modeOfPayment,
+                                                        id: mode.id
+                                                    }))}
+                                                value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
+                                                onChange={(selectedOption) => setPaymentMode(selectedOption ? selectedOption.value : '')}
+                                                placeholder="Payment Mode"
+                                                isSearchable={true}
+                                                isClearable
+                                                styles={customStyles}
+                                                className="custom-select rounded-lg w-[290px] h-[43px]"
+                                            />
                                         )}
                                     </div>
                                 ) : showMachineTools ? (
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-2 block">Item Name</label>
+                                        <label className="text-md font-semibold mb-0.5 block">Item Name</label>
                                         <Select
                                             options={toolsItemNameOptions}
                                             value={selectedToolsItemName}
                                             onChange={setSelectedToolsItemName}
                                             styles={customStyles}
                                             isClearable
-                                            placeholder="Select item name..."
+                                            placeholder="Item Name"
                                             className="custom-select rounded-lg w-[290px] h-[45px]"
                                         />
                                     </div>
@@ -2298,10 +2335,10 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                     selectedAccountType === 'Utility Bills' ||
                                     selectedAccountType === 'Weekly Payment' ||
                                     selectedAccountType === 'Bill Payments') && (
-                                    <div className='flex gap-10 mb-3'>
+                                    <div className='flex gap-10'>
                                         <div className='w-[290px] min-w-[290px] shrink-0' aria-hidden="true" />
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">Machine Tool</label>
+                                            <label className="text-md font-semibold mb-0.5 block">Machine Tool</label>
                                             <Select
                                                 options={filteredMachineToolOptions}
                                                 value={selectedMachineTools}
@@ -2310,7 +2347,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                 isClearable
                                                 placeholder={
                                                     !selectedToolsItemName
-                                                        ? 'Select item name first...'
+                                                        ? 'Item Name'
                                                         : filteredMachineToolOptions.length === 0
                                                             ? 'No tools for this item'
                                                             : 'Select a machine tool...'
@@ -2325,21 +2362,21 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                     selectedAccountType === 'Utility Bills' ||
                                     selectedAccountType === 'Weekly Payment' ||
                                     selectedAccountType === 'Bill Payments') && (
-                                    <div className='flex gap-10 mb-3'>
+                                    <div className='flex gap-10'>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">Item Name</label>
+                                            <label className="text-md font-semibold mb-0.5 block">Item Name</label>
                                             <Select
                                                 options={toolsItemNameOptions}
                                                 value={selectedToolsItemName}
                                                 onChange={setSelectedToolsItemName}
                                                 styles={customStyles}
                                                 isClearable
-                                                placeholder="Select item name..."
+                                                placeholder="Item Name"
                                                 className="custom-select rounded-lg w-[290px] h-[45px]"
                                             />
                                         </div>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">Machine Tool</label>
+                                            <label className="text-md font-semibold mb-0.5 block">Machine Tool</label>
                                             <Select
                                                 options={filteredMachineToolOptions}
                                                 value={selectedMachineTools}
@@ -2348,7 +2385,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                 isClearable
                                                 placeholder={
                                                     !selectedToolsItemName
-                                                        ? 'Select item name first...'
+                                                        ? 'Item Name'
                                                         : filteredMachineToolOptions.length === 0
                                                             ? 'No tools for this item'
                                                             : 'Select a machine tool...'
@@ -2360,9 +2397,9 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                 )}
                             {selectedAccountType === 'Utility Bills' && (
                                 <>
-                                    <div className='flex gap-10 mb-3'>
+                                    <div className='flex gap-10'>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">
+                                            <label className="text-md font-semibold mb-0.5 block">
                                                 {utilityType === 'Electricity' ? 'EB Number' :
                                                     utilityType === 'Property' ? 'Property Tax Number' :
                                                         utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
@@ -2380,20 +2417,19 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                             />
                                         </div>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-2 block">For The Month Of</label>
-                                            <input
-                                                type="month"
+                                            <label className="text-md font-semibold mb-0.5 block">For The Month Of</label>
+                                            <CustomMonthField
                                                 value={selectedMonths}
-                                                onChange={(e) => setSelectedMonths(e.target.value)}
-                                                placeholder="Enter months..."
-                                                className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                                onChange={(v) => setSelectedMonths(v)}
+                                                className="w-[290px]"
+                                                alwaysOpenBelow
                                             />
                                         </div>
                                     </div>
                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
-                                        <div className="flex gap-4 items-end">
+                                        <div className="flex gap-4 items-end ">
                                             <div className="text-left">
-                                                <label className="text-md font-semibold mb-2 block">Validity</label>
+                                                <label className="text-md font-semibold mb-0.5 block">Validity</label>
                                                 <input
                                                     type="text"
                                                     value={thirdInput}
@@ -2402,61 +2438,72 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                     className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
                                                 />
                                             </div>
-                                            <div className="text-left">
-                                                <label className="text-md font-semibold mb-2 block">Validity Type</label>
-                                                <select
-                                                    value={validityType}
-                                                    onChange={(e) => setValidityType(e.target.value)}
-                                                    className="h-[45px] border-2 border-[#BF9853] rounded-lg px-4 py-2 focus:outline-none border-opacity-[0.20] w-[160px]"
-                                                >
-                                                    <option value="">--- Select ---</option>
-                                                    <option value="Days">Days</option>
-                                                    <option value="Month">Month</option>
-                                                    <option value="Year">Year</option>
-                                                </select>
-                                            </div>
-                                            {utilityType === 'Telecom' && (
+                                            <div className="flex gap-4 ml-[22px]">
                                                 <div className="text-left">
-                                                    <label className="text-md font-semibold mb-2 block">Service Start Date</label>
-                                                    <input
-                                                        type="date"
-                                                        value={serviceStartingDate}
-                                                        onChange={(e) => setServiceStartingDate(e.target.value)}
-                                                        className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[185px] h-[45px] focus:outline-none border-opacity-[0.20]"
-                                                    />
+                                                    <label className="text-md font-semibold mb-0.5 block">
+                                                        Validity Type
+                                                    </label>
+
+                                                    <select
+                                                        value={validityType}
+                                                        onChange={(e) => setValidityType(e.target.value)}
+                                                        className="h-[45px] border-2 border-[#BF9853] bg-white rounded-lg px-1 py-2 focus:outline-none border-opacity-[0.20] w-[125px]"
+                                                    >
+                                                        <option value="" disabled hidden>
+                                                            Validity Type
+                                                        </option>
+
+                                                        <option value="Days">Days</option>
+                                                        <option value="Month">Month</option>
+                                                        <option value="Year">Year</option>
+                                                    </select>
                                                 </div>
-                                            )}
+                                                {utilityType === 'Telecom' && (
+                                                    <div className="text-left">
+                                                        <label className="text-md font-semibold mb-0.5 block">Service Start Date</label>
+                                                        <CustomDateField
+                                                            value={serviceStartingDate}
+                                                            onChange={setServiceStartingDate}
+                                                            placeholder="dd-mm-yyyy"
+                                                            className="w-[150px]"
+                                                            alwaysOpenBelow
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </>
                             )}
                             {(selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && (
-                                <div className="flex gap-10 mb-3">
+                                <div className="flex gap-10">
                                     <div className="text-left">
-                                        <label className="text-md font-semibold mb-2 block">
+                                        <label className="text-md font-semibold mb-0.5 block">
                                             Bill Arrival Date
                                         </label>
-                                        <input
-                                            type="date"
+                                        <CustomDateField
                                             value={billArrivalDate}
-                                            onChange={(e) => setBillArrivalDate(e.target.value)}
-                                            className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[45px] focus:outline-none border-opacity-[0.20]"
+                                            onChange={setBillArrivalDate}
+                                            placeholder="dd-mm-yyyy"
+                                            className="w-[290px]"
+                                            alwaysOpenBelow
+                                            placeholderButtonClassName="!text-sm !font-normal !text-[#808080]"
                                         />
                                     </div>
                                 </div>
                             )}
                             {/* Comments + Attach + Submit kept in left column so there is no empty gap next to the advance table */}
-                            <div className="mt-6 text-left">
-                                <label className="text-md font-semibold mb-2 block">Comments</label>
+                            <div className=" text-left">
+                                <label className="text-md font-semibold mb-0.5 block">Comments</label>
                                 <input
                                     type="text"
                                     value={comments}
                                     onChange={(e) => setComments(e.target.value)}
                                     placeholder="Enter Your Comments ..."
-                                    className="border-2 border-[#BF9853] rounded-md px-4 py-2 lg:w-[604px] w-80 h-[45px] focus:outline-none border-opacity-[0.20]"
+                                    className="border-2 border-[#BF9853] rounded-md px-4 py-2 lg:w-[615px] w-80 h-[45px] focus:outline-none border-opacity-[0.20]"
                                 />
                             </div>
-                            <div className="mt-4 flex items-center justify-between">
+                            <div className=" flex items-center justify-between">
                                 <div className='flex'>
                                     <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
                                         <img className='w-5 h-4' alt='' src={Attach}></img>
@@ -2487,136 +2534,135 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                         </div>
                         {/* Advance history table for selected project and vendor/contractor (same logic as Advance Portal) */}
                         {embedded ? null : (
-                        <div className="hidden lg:flex flex-col items-stretch -ml-[120px] lg:col-start-2 lg:row-start-1">
-                            <div className="flex items-center mb-2">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-base font-semibold text-[#E4572E]">Advance </h2>
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={projectAdvance}
-                                        className="border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs"
-                                    />
+                            <div className="hidden lg:flex flex-col items-stretch lg:col-start-2 lg:row-start-1 min-w-0">
+                                <div className="flex items-center justify-between w-[465px] mb-2 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-base font-semibold text-[#E4572E]">Advance </h2>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={projectAdvance}
+                                            className="border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs"
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap gap-4 ml-16">
+                                        <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer'>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                                        <span className='text-[#007233] mr-1 flex items-center gap-1 font-semibold hover:underline cursor-pointer'>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-wrap gap-4 ml-4">
-                                    <span className="text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm">Export PDF</span>
-                                    <span className="text-[#007233] font-semibold hover:underline cursor-pointer text-sm">Export XL</span>
-                                    <span className="text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm">Print</span>
-                                </div>
-                            </div>
-                            <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full max-w-[640px]">
-                                <div className="overflow-x-auto max-h-[430px] overflow-y-auto thin-scrollbar w-full">
-                                    <table className="w-auto table-auto border-collapse">
-                                        <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
-                                            <tr>
-                                                <th className="pl-4 pr-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
-                                                <th className="pl-0 pr-5 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Advance</th>
-                                                <th className="pl-0 pr-5 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Bill</th>
-                                                <th className="pl-0 pr-6 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
-                                                <th className="pl-0 pr-4 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {!selectedOption || !selectedSite ? (
+                                <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full max-w-[640px]">
+                                    <div className="overflow-x-auto max-h-[430px] overflow-y-auto thin-scrollbar w-full">
+                                        <table className="w-auto table-auto border-collapse">
+                                            <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
                                                 <tr>
-                                                    <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
-                                                        Please select a project and vendor/contractor to view advance records.
-                                                    </td>
+                                                    <th className="pl-4 pr-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
+                                                    <th className="pl-0 pr-5 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Advance</th>
+                                                    <th className="pl-0 pr-5 py-2 text-xs sm:text-sm whitespace-nowrap text-right">Bill</th>
+                                                    <th className="pl-0 pr-6 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
+                                                    <th className="pl-0 pr-4 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
                                                 </tr>
-                                            ) : (() => {
-                                                const filtered = advanceData
-                                                    .filter(entry => {
-                                                        const isMatchingVendor =
-                                                            selectedOption?.type === 'Vendor'
-                                                                ? entry.vendor_id === selectedOption.id
-                                                                : selectedOption?.type === 'Contractor'
-                                                                    ? entry.contractor_id === selectedOption.id
-                                                                    : false;
-                                                        const isForCurrentProject = entry.project_id === selectedSite.id;
-                                                        return isMatchingVendor && isForCurrentProject;
-                                                    })
-                                                    .sort((a, b) => {
-                                                        const entryNoA = a.entry_no || 0;
-                                                        const entryNoB = b.entry_no || 0;
-                                                        return entryNoB - entryNoA;
-                                                    });
-                                                if (!filtered.length) {
-                                                    return (
-                                                        <tr>
-                                                            <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
-                                                                No advance records found for the selected project and vendor/contractor.
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                }
-                                                return filtered.map((entry, index) => {
-                                                    const {
-                                                        date: entryDate,
-                                                        amount: entryAmount,
-                                                        bill_amount,
-                                                        type,
-                                                        transfer_site_id,
-                                                        payment_mode,
-                                                        refund_amount,
-                                                        file_url,
-                                                    } = entry;
-                                                    const advanceAmount = (() => {
-                                                        if (type === 'Refund') {
-                                                            return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
-                                                        }
-                                                        return parseFloat(entryAmount || 0).toLocaleString('en-IN');
-                                                    })();
-                                                    const billAmount = type === 'Bill Settlement'
-                                                        ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
-                                                        : '';
-                                                    let transferOrRefund = '';
-                                                    if (type === 'Refund') {
-                                                        transferOrRefund = 'Refund';
-                                                    } else if (type === 'Transfer') {
-                                                        const relatedSiteId = transfer_site_id;
-                                                        const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
-                                                        transferOrRefund =
-                                                            parseFloat(entryAmount) < 0
-                                                                ? `Transfer to ${siteLabel || 'Unknown Site'}`
-                                                                : `Transfer from ${siteLabel || 'Unknown Site'}`;
+                                            </thead>
+                                            <tbody>
+                                                {!selectedOption || !selectedSite ? (
+                                                    <tr>
+                                                        <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                                                            Please select a project and vendor/contractor to view advance records.
+                                                        </td>
+                                                    </tr>
+                                                ) : (() => {
+                                                    const filtered = advanceData
+                                                        .filter(entry => {
+                                                            const isMatchingVendor =
+                                                                selectedOption?.type === 'Vendor'
+                                                                    ? entry.vendor_id === selectedOption.id
+                                                                    : selectedOption?.type === 'Contractor'
+                                                                        ? entry.contractor_id === selectedOption.id
+                                                                        : false;
+                                                            const isForCurrentProject = entry.project_id === selectedSite.id;
+                                                            return isMatchingVendor && isForCurrentProject;
+                                                        })
+                                                        .sort((a, b) => {
+                                                            const entryNoA = a.entry_no || 0;
+                                                            const entryNoB = b.entry_no || 0;
+                                                            return entryNoB - entryNoA;
+                                                        });
+                                                    if (!filtered.length) {
+                                                        return (
+                                                            <tr>
+                                                                <td colSpan="5" className="text-center py-4 text-sm text-gray-500">
+                                                                    No advance records found for the selected project and vendor/contractor.
+                                                                </td>
+                                                            </tr>
+                                                        );
                                                     }
-                                                    return (
-                                                        <tr key={index} className="border-t hover:bg-gray-50">
-                                                            <td className="pl-4 pr-6 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
-                                                                {entryDate ? new Date(entryDate).toLocaleDateString('en-GB') : ''}
-                                                            </td>
-                                                            <td className="pl-0 pr-5 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
-                                                                {advanceAmount}
-                                                            </td>
-                                                            <td className="pl-0 pr-5 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
-                                                                {billAmount && file_url ? (
-                                                                    <a
-                                                                        href={file_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="hover:text-red-600 cursor-pointer"
-                                                                    >
-                                                                        {billAmount}
-                                                                    </a>
-                                                                ) : (
-                                                                    billAmount
-                                                                )}
-                                                            </td>
-                                                            <td className="pl-0 pr-6 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
-                                                                {transferOrRefund}
-                                                            </td>
-                                                            <td className="pl-0 pr-4 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
-                                                                {payment_mode || ''}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                });
-                                            })()}
-                                        </tbody>
-                                    </table>
+                                                    return filtered.map((entry, index) => {
+                                                        const {
+                                                            date: entryDate,
+                                                            amount: entryAmount,
+                                                            bill_amount,
+                                                            type,
+                                                            transfer_site_id,
+                                                            payment_mode,
+                                                            refund_amount,
+                                                            file_url,
+                                                        } = entry;
+                                                        const advanceAmount = (() => {
+                                                            if (type === 'Refund') {
+                                                                return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
+                                                            }
+                                                            return parseFloat(entryAmount || 0).toLocaleString('en-IN');
+                                                        })();
+                                                        const billAmount = type === 'Bill Settlement'
+                                                            ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
+                                                            : '';
+                                                        let transferOrRefund = '';
+                                                        if (type === 'Refund') {
+                                                            transferOrRefund = 'Refund';
+                                                        } else if (type === 'Transfer') {
+                                                            const relatedSiteId = transfer_site_id;
+                                                            const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
+                                                            transferOrRefund =
+                                                                parseFloat(entryAmount) < 0
+                                                                    ? `Transfer to ${siteLabel || 'Unknown Site'}`
+                                                                    : `Transfer from ${siteLabel || 'Unknown Site'}`;
+                                                        }
+                                                        return (
+                                                            <tr key={index} className="border-t hover:bg-gray-50">
+                                                                <td className="pl-4 pr-6 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
+                                                                    {entryDate ? new Date(entryDate).toLocaleDateString('en-GB') : ''}
+                                                                </td>
+                                                                <td className="pl-0 pr-5 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
+                                                                    {advanceAmount}
+                                                                </td>
+                                                                <td className="pl-0 pr-5 py-2 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">
+                                                                    {billAmount && file_url ? (
+                                                                        <a
+                                                                            href={file_url}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="hover:text-red-600 cursor-pointer"
+                                                                        >
+                                                                            {billAmount}
+                                                                        </a>
+                                                                    ) : (
+                                                                        billAmount
+                                                                    )}
+                                                                </td>
+                                                                <td className="pl-0 pr-6 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
+                                                                    {transferOrRefund}
+                                                                </td>
+                                                                <td className="pl-0 pr-4 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
+                                                                    {payment_mode || ''}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    });
+                                                })()}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         )}
                     </div>
                 </form>
@@ -2759,7 +2805,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                         }
                                                     }}
                                                 >
-                                                    <option value="" disabled>--- Select ---</option>
+                                                    <option value="" disabled hidden>Account Type</option>
                                                     {accountTypeOptions.map((option) => (
                                                         <option key={option.value} value={option.value}>
                                                             {option.label}
@@ -2769,11 +2815,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                             </div>
                                             <div>
                                                 <label className="text-sm font-semibold mb-1 block">Date</label>
-                                                <input
-                                                    type="date"
+                                                <CustomDateField
                                                     value={date}
-                                                    onChange={(e) => setDate(e.target.value)}
-                                                    className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                    onChange={setDate}
+                                                    placeholder="dd-mm-yyyy"
+                                                    className="w-full"
+                                                    alwaysOpenBelow
                                                 />
                                             </div>
                                             <div>
@@ -2836,12 +2883,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                             </div>
                                             {(selectedAccountType === 'Claim' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Weekly Payment' || selectedAccountType === 'Bill Payments') && (
                                                 <div>
-                                                    <label className="text-sm font-semibold mb-1 block">Payment Mode</label>
+                                                    <label className="text-sm font-semibold mb-0.5 block">Payment Mode</label>
                                                     {billPaymentsCashRegisterPrefill && selectedAccountType === 'Bill Payments' ? (
                                                         <select
                                                             value="Cash"
                                                             disabled
-                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20 bg-gray-50 cursor-not-allowed"
+                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20 bg-white cursor-not-allowed"
                                                         >
                                                             <option value="Cash">Cash</option>
                                                         </select>
@@ -2849,7 +2896,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                         <select
                                                             value={paymentMode}
                                                             onChange={(e) => setPaymentMode(e.target.value)}
-                                                            className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                            className="w-full h-[45px] border-2 border-[#BF9853] bg-white rounded-lg px-3 border-opacity-20"
                                                         >
                                                             <option value="">Select Payment Mode</option>
                                                             {finalPaymentModeOptions
@@ -2872,7 +2919,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                             onChange={(e) => setUtilityType(e.target.value)}
                                                             className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                         >
-                                                            <option value="" disabled>--- Select ---</option>
+                                                            <option value="" disabled hidden>Utility Type</option>
                                                             <option value="Electricity">Electricity</option>
                                                             <option value="Property">Property</option>
                                                             <option value="Water">Water</option>
@@ -2933,11 +2980,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                             {utilityType === 'Telecom' && (
                                                                 <div>
                                                                     <label className="text-sm font-semibold mb-1 block">Service Start Date</label>
-                                                                    <input
-                                                                        type="date"
+                                                                    <CustomDateField
                                                                         value={serviceStartingDate}
-                                                                        onChange={(e) => setServiceStartingDate(e.target.value)}
-                                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                                        onChange={setServiceStartingDate}
+                                                                        placeholder="dd-mm-yyyy"
+                                                                        className="w-full"
+                                                                        alwaysOpenBelow
                                                                     />
                                                                 </div>
                                                             )}
@@ -2950,11 +2998,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                     <label className="text-sm font-semibold mb-1 block">
                                                         Bill Arrival Date
                                                     </label>
-                                                    <input
-                                                        type="date"
+                                                    <CustomDateField
                                                         value={billArrivalDate}
-                                                        onChange={(e) => setBillArrivalDate(e.target.value)}
-                                                        className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                                        onChange={setBillArrivalDate}
+                                                        placeholder="dd-mm-yyyy"
+                                                        className="w-full"
+                                                        alwaysOpenBelow
+                                                        placeholderButtonClassName="!text-sm !font-normal !text-[#808080]"
                                                     />
                                                 </div>
                                             )}
@@ -3053,12 +3103,13 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                            <input
-                                                type="date"
+                                            <CustomDateField
                                                 value={paymentModalData.date}
-                                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, date: e.target.value }))}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none bg-gray-100"
+                                                onChange={() => {}}
+                                                placeholder="dd-mm-yyyy"
+                                                className="w-full"
+                                                alwaysOpenBelow
+                                                disabled
                                             />
                                         </div>
                                         <div>
@@ -3099,11 +3150,12 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                                                         </div>
                                                         <div>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
-                                                            <input
-                                                                type="date"
+                                                            <CustomDateField
                                                                 value={paymentModalData.chequeDate}
-                                                                onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
+                                                                placeholder="dd-mm-yyyy"
+                                                                className="w-full"
+                                                                alwaysOpenBelow
                                                             />
                                                         </div>
                                                     </div>
@@ -3163,10 +3215,27 @@ const customStyles = {
         ...provided,
         borderWidth: '2px',
         borderRadius: '8px',
-        borderColor: state.isFocused ? 'rgba(191, 152, 83, 1)' : 'rgba(191, 152, 83, 0.2)',
-        boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.2)' : 'none',
+        borderColor: state.isFocused
+            ? 'rgba(191, 152, 83, 1)'
+            : 'rgba(191, 152, 83, 0.2)',
+        boxShadow: state.isFocused
+            ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+            : 'none',
         '&:hover': {
             borderColor: 'rgba(191, 152, 83, 0.2)',
-        }
+        },
+    }),
+
+    menuList: (provided) => ({
+        ...provided,
+
+        // Hide scrollbar
+        scrollbarWidth: 'none', // Firefox
+        msOverflowStyle: 'none', // IE & Edge
+
+        // Chrome, Safari
+        '&::-webkit-scrollbar': {
+            display: 'none',
+        },
     }),
 };

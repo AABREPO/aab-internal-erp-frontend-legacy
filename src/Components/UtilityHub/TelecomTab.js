@@ -6,12 +6,43 @@ import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
+import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
 const PROJECTS_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/api/projects/getAll';
 const TELECOM_EXPENSES_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/expenses_form/utility/telecom';
 const FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-frequency/getAll';
 const SAVE_FREQUENCY_HISTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-frequency/save';
+
+const normalizeShopNoKey = (shopNo) => {
+    const raw = (shopNo ?? '').toString().trim();
+    if (!raw || raw === '-') return { empty: true, letters: '', number: 0, raw: '' };
+    const str = raw.replace(/\s+/g, '').toUpperCase();
+    if (!str) return { empty: true, letters: '', number: 0, raw: '' };
+    const letterMatch = str.match(/^([A-Z]{1,2})/);
+    const letters = letterMatch ? letterMatch[1] : '';
+    const numberMatch = str.match(/(\d+)/);
+    const number = numberMatch ? parseInt(numberMatch[1], 10) : 0;
+    return { empty: false, letters, number, raw: str };
+};
+
+const comparePropertyShopNoAsc = (a, b) => {
+    const pa = normalizeShopNoKey(a?.shopNo);
+    const pb = normalizeShopNoKey(b?.shopNo);
+    if (pa.empty !== pb.empty) return pa.empty ? 1 : -1;
+    if (pa.empty && pb.empty) return 0;
+    if (pa.letters !== pb.letters) return pa.letters < pb.letters ? -1 : pa.letters > pb.letters ? 1 : 0;
+    if (pa.number !== pb.number) return pa.number - pb.number;
+    return pa.raw.localeCompare(pb.raw, undefined, { numeric: true, sensitivity: 'base' });
+};
+
+const sortProjectsPropertyDetailsByShopNo = (projects) => {
+    if (!Array.isArray(projects)) return [];
+    return projects.map((p) => ({
+        ...p,
+        propertyDetails: [...(p.propertyDetails || [])].sort(comparePropertyShopNoAsc),
+    }));
+};
 
 const TelecomTab = ({ username, userRoles = [] }) => {
     const [filters, setFilters] = useState({
@@ -56,6 +87,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         { value: 'occupied', label: 'Occupied Shop' },
         { value: 'vacated', label: 'Vacated Shop' }
     ];
+
+    const { scrollRef, onMouseDown, onMouseMove, onMouseUp, onMouseLeave } = useUtilityHubTableDragScroll();
 
     const openTelecomExpenseEntry = (serviceNumber, project) => {
         const prefillData = {
@@ -182,8 +215,9 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                     project.propertyDetails.some(property => property.ebNo && property.ebNo.trim() !== '')
                 );
 
-                setProjects(groupedProjects);
-                setFilteredProjects(groupedProjects);
+                const sortedGrouped = sortProjectsPropertyDetailsByShopNo(groupedProjects);
+                setProjects(sortedGrouped);
+                setFilteredProjects(sortedGrouped);
                 setHiddenProjects([]);
                 setVendorOptions(Array.from(vendorSet).sort().map(vendor => ({
                     value: vendor,
@@ -338,14 +372,14 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
             acc.push({
                 ...project,
-                propertyDetails: filteredProperties
+                propertyDetails: [...filteredProperties].sort(comparePropertyShopNoAsc)
             });
 
             return acc;
         }, []);
 
         setFilteredProjects(filtered);
-    }, [filters, projects, selectedCategory, tenantShopData]);
+    }, [filters, projects, selectedCategory, tenantShopData, telecomPayments]);
 
     const handleFilterChange = (filterType, selectedOption) => {
         setFilters(prev => ({
@@ -780,40 +814,62 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         return monthLabels.some((month) => evaluateMonth(month));
     };
 
+    const sortedFilteredProjects = useMemo(
+        () => sortProjectsPropertyDetailsByShopNo(filteredProjects),
+        [filteredProjects]
+    );
+
+    const telecomTableRows = useMemo(() => {
+        const rows = sortedFilteredProjects.flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+        return rows;
+    }, [sortedFilteredProjects]);
+
+    const hiddenTelecomTableRows = useMemo(() => {
+        const rows = sortProjectsPropertyDetailsByShopNo(hiddenProjects).flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+        return rows;
+    }, [hiddenProjects]);
+
     // Validity is used to hide "0" in covered months (no column).
 
     const buildExportRows = () => {
-        const rows = [];
-        let rowNumber = 0;
+        const pairs = sortedFilteredProjects.flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        pairs.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
 
-        filteredProjects.forEach(project => {
-            const properties = Array.isArray(project.propertyDetails) ? project.propertyDetails : [];
-            properties
-                .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                .forEach(property => {
-                    rowNumber += 1;
-                    const row = {
-                        slNo: rowNumber,
-                        pid: project.projectId || '-',
-                        projectName: project.projectName || '-',
-                        category: property.projectType || project.projectCategory || '-',
-                        doorNo: property.doorNo || '-',
-                        serviceNo: property.ebNo || '-',
-                        // validity is applied in getPaymentData/getUnpaidCount to hide covered months
-                    };
+        return pairs.map(({ project, property }, index) => {
+            const rowNumber = index + 1;
+            const row = {
+                slNo: rowNumber,
+                pid: project.projectId || '-',
+                projectName: project.projectName || '-',
+                category: property.projectType || project.projectCategory || '-',
+                shopNo: property.shopNo || '-',
+                doorNo: property.doorNo || '-',
+                serviceNo: property.ebNo || '-',
+            };
 
-                    const telecomKey = property.utilityTelecomId ?? property.id;
-                    monthLabels.forEach(month => {
-                        const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
-                        row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
-                    });
+            const telecomKey = property.utilityTelecomId ?? property.id;
+            monthLabels.forEach(month => {
+                const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
+                row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
+            });
 
-                    row.unpaid = getUnpaidCount(property.ebNo, telecomKey, property);
-                    rows.push(row);
-                });
+            row.unpaid = getUnpaidCount(property.ebNo, telecomKey, property);
+            return row;
         });
-
-        return rows;
     };
 
     const handleExportPDF = () => {
@@ -824,12 +880,13 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         doc.setFontSize(14);
         doc.text('Telecom Services Overview', 14, 20);
 
-        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
+        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map(row => [
             row.slNo,
             row.pid,
             row.projectName,
             row.category,
+            row.shopNo,
             row.doorNo,
             row.serviceNo,
             ...monthLabels.map(month => row[month]),
@@ -866,6 +923,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                 PID: row.pid,
                 'Project Name': row.projectName,
                 Category: row.category,
+                'Shop No': row.shopNo,
                 'Door No': row.doorNo,
                 'Service No': row.serviceNo
             };
@@ -884,10 +942,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         XLSX.writeFile(workbook, 'TelecomServices.xlsx');
     };
 
-    const hasExportableData = filteredProjects.some(project =>
-        Array.isArray(project.propertyDetails) &&
-        project.propertyDetails.some(property => property.ebNo && property.ebNo.trim() !== '')
-    );
+    const hasExportableData = telecomTableRows.length > 0;
 
     const toggleProjectHideStatus = (projectId, isHide) => {
         if (isHide) {
@@ -1066,7 +1121,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
             <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
                     {/* Match ElectricityTab filter layout */}
-                    <div className="grid grid-cols-5 gap-4 text-left">
+                    <div className="grid grid-cols-6 gap-4 text-left">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -1142,12 +1197,12 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Door No</label>
+                            <label className="block font-semibold mb-1">Shop</label>
                             <Select
-                                options={getUniqueValues('doorNo')}
-                                value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
-                                onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
-                                placeholder="Select Door No"
+                                options={getUniqueValues('shop')}
+                                value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
+                                onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
+                                placeholder="Select Shop"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -1156,12 +1211,12 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Shop</label>
+                            <label className="block font-semibold mb-1">Door No</label>
                             <Select
-                                options={getUniqueValues('shop')}
-                                value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
-                                onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
-                                placeholder="Select Shop"
+                                options={getUniqueValues('doorNo')}
+                                value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
+                                onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
+                                placeholder="Select Door No"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -1285,18 +1340,24 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
-                    <div className="border-l-8 border-l-[#BF9853] rounded-lg">
-                        <div className="overflow-x-auto">
-                            <div className="overflow-y-auto h-[480px] min-w-max">
-                                <table className="w-full border-collapse table-auto">
-                                    <thead className="sticky top-0 z-10">
+                    <div className="rounded-lg">
+                        <div
+                            ref={scrollRef}
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[480px] overflow-auto select-none thin-scrollbar"
+                            onMouseDown={onMouseDown}
+                            onMouseMove={onMouseMove}
+                            onMouseUp={onMouseUp}
+                            onMouseLeave={onMouseLeave}
+                        >
+                                <table className="w-full border-collapse table-auto min-w-max">
+                                    <thead className="sticky top-0 z-10 bg-[#FAF6ED]">
                                         <tr className="bg-[#FAF6ED]">
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Sl.No</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">PID</td>
                                             <td className="px-4 py-2 text-left font-semibold">Project Name</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap"></td>
-                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">D.No</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Shop No</td>
+                                            <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">D.No</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Service No</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Jan</td>
                                             <td className="px-4 py-2 text-left font-semibold whitespace-nowrap">Feb</td>
@@ -1328,19 +1389,14 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                 {error}
                                             </td>
                                         </tr>
-                                    ) : filteredProjects.length === 0 ? (
+                                    ) : telecomTableRows.length === 0 ? (
                                         <tr>
                                             <td colSpan="22" className="text-center py-4">
                                                 No telecom services found
                                             </td>
                                         </tr>
                                     ) : (
-                                            filteredProjects
-                                                .flatMap(project =>
-                                                    project.propertyDetails
-                                                        .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                                                        .map(property => ({ project, property }))
-                                                )
+                                            telecomTableRows
                                                 .map(({ project, property }, index) => {
                                                     const categoryBadge = property.projectType || project.projectCategory || '-';
                                                     const telecomKey = property.utilityTelecomId ?? property.id;
@@ -1361,8 +1417,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                                     {categoryBadge}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-2 py-2">{property.doorNo || '-'}</td>
                                                             <td className="px-2 py-2">{property.shopNo || '-'}</td>
+                                                            <td className="px-2 py-2">{property.doorNo || '-'}</td>
                                                             <td
                                                                 className="px-2 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
                                                                 onClick={() => openTelecomExpenseEntry(property.ebNo, project)}
@@ -1422,7 +1478,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                         )}
                                     </tbody>
                                 </table>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1451,24 +1506,21 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2 text-left font-semibold">Sl.No</td>
                                             <td className="px-4 py-2 text-left font-semibold">PID</td>
                                             <td className="px-4 py-2 text-left font-semibold">Project Name</td>
+                                            <td className="px-4 py-2 text-left font-semibold">Shop No</td>
                                             <td className="px-4 py-2 text-left font-semibold">D.No</td>
                                             <td className="px-4 py-2 text-left font-semibold">Service No</td>
                                             <td className="px-4 py-2 text-left font-semibold">Unhide</td>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {hiddenProjects
-                                            .flatMap(project =>
-                                                project.propertyDetails
-                                                    .filter(property => property.ebNo && property.ebNo.trim() !== '')
-                                                    .map(property => ({ project, property }))
-                                            )
+                                        {hiddenTelecomTableRows
                                             .map(({ project, property }, index) => {
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
+                                                            <td className="px-4 py-2">{property.shopNo || '-'}</td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
                                                             <td
                                                                 className="px-4 py-2 text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
@@ -1526,6 +1578,9 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         <span className="font-medium">Service No:</span> {selectedRowData.property.ebNo}
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                        <span className="font-medium">Shop No:</span> {selectedRowData.property.shopNo || '-'}
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         <span className="font-medium">Door No:</span> {selectedRowData.property.doorNo || '-'}

@@ -7,6 +7,11 @@ import 'jspdf-autotable';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const resolveActiveBranchId = () => {
     try {
@@ -651,7 +656,19 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
         payload.to_purpose_id = null;
         payload.amount = dataToSubmit.selectedType === 'Advance' ? parseFloat(dataToSubmit.amountGivenInput) || 0 : 0;
       }
-      const saveRes = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/staff-advance/save'), {
+      const staffAdvanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/staff-advance/save');
+      if (paymentDetails && isPaymentModeRequiringBankRegisterLog(paymentDetails.paymentMode)) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(staffAdvanceSaveUrl),
+          "Staff Advance",
+          {
+            bill_payment_mode: paymentDetails.paymentMode,
+            amount: paymentDetails.amount,
+            entered_by: username,
+          }
+        );
+      }
+      const saveRes = await fetch(staffAdvanceSaveUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -693,8 +710,9 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           branch_id: activeBranchId
         };
         try {
+          const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save");
           const weeklyPaymentBillResponse = await axios.post(
-            withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save"),
+            weeklyBillSaveUrl,
             weeklyPaymentBillPayload,
             { headers: { "Content-Type": "application/json" } }
           );

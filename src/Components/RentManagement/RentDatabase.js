@@ -9,6 +9,11 @@ import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import QRCode from '../Images/AAB_QR_CODE.jpeg';
 Modal.setAppElement('#root');
 
@@ -891,8 +896,21 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 editedBy: username,
             };
 
+            const rentalUpdateUrl = `https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`;
+            if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
+                await postBankRegisterLogSave(
+                    bankRegisterLogSaveUrlMatchingRequest(rentalUpdateUrl),
+                    "Rent Management",
+                    {
+                        bill_payment_mode: paymentModalData.paymentMode,
+                        amount: parseFloat(paymentModalData.amount || amount),
+                        entered_by: username,
+                    }
+                );
+            }
+
             // Update rental form first
-            const updateResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/rental_forms/update/${editId}`, {
+            const updateResponse = await fetch(rentalUpdateUrl, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

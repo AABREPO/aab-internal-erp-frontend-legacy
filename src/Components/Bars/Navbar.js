@@ -5,7 +5,6 @@ import logo from '../Images/aablogo.png';
 import Sidebar from './Sidebar';
 import Logout from '../Images/Logout.png'
 import DownloadIcon from '../Images/download.png';
-import EditIcon from '../Images/Edit.svg';
 const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [], branchId, brachId }) => {
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isProfileDropdownVisible, setIsProfileDropdownVisible] = useState(false);
@@ -26,6 +25,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const sidebarRef = useRef(null);
   const profileRef = useRef(null);
+  const notificationScrollRef = useRef(null);
   const [roleModels, setRoleModels] = useState([]);
   useEffect(() => {
     const fetchUserRoles = async () => {
@@ -1126,8 +1126,83 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       return dateString;
     }
   };
+  const formatRelativeTime = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const then = new Date(dateString).getTime();
+      if (Number.isNaN(then)) return formatDate(dateString);
+      const sec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+      if (sec < 60) return `${sec || 1} sec ago`;
+      const min = Math.floor(sec / 60);
+      if (min < 60) return `${min} min ago`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `${hr} hr ago`;
+      const day = Math.floor(hr / 24);
+      if (day < 7) return `${day} day${day === 1 ? '' : 's'} ago`;
+      return formatDate(dateString);
+    } catch {
+      return formatDate(dateString);
+    }
+  };
+  const getNotificationRowMeta = (request) => {
+    const mod = String(request?.module_name || '').toLowerCase();
+    if (mod.includes('advance')) {
+      return {
+        title: 'Advance recorded',
+        iconBg: '#FFF4D6',
+        icon: <span className="text-[13px] font-bold leading-none text-[#B8860B]">₹</span>,
+      };
+    }
+    if (mod.includes('loan')) {
+      return {
+        title: 'Bill settled',
+        iconBg: '#E8F5EC',
+        icon: (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="#2f9e6e" strokeWidth="1.5" />
+            <path d="M8 12l3 3 5-6" stroke="#2f9e6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ),
+      };
+    }
+    if (mod.includes('staff')) {
+      return {
+        title: 'Receipt attached',
+        iconBg: '#F5EFE3',
+        icon: (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M8.5 12.5c2-2 5-2 7 0"
+              stroke="#B8924B"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <path d="M7 5h10a2 2 0 012 2v12H5V7a2 2 0 012-2z" stroke="#B8924B" strokeWidth="1.4" />
+          </svg>
+        ),
+      };
+    }
+    return {
+      title: 'Pending approval',
+      iconBg: '#FFE7E7',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="#d23b3b" strokeWidth="1.5" />
+          <path d="M12 8v5" stroke="#d23b3b" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="12" cy="16.5" r="1" fill="#d23b3b" />
+        </svg>
+      ),
+    };
+  };
   return (
     <>
+      <style>{`
+        .navbar-notification-scroll::-webkit-scrollbar { width: 8px; }
+        .navbar-notification-scroll::-webkit-scrollbar-track { background: #e8e4dc; border-radius: 6px; margin: 4px 0; }
+        .navbar-notification-scroll::-webkit-scrollbar-thumb { background: #b8b3a8; border-radius: 6px; }
+        .navbar-notification-scroll::-webkit-scrollbar-thumb:hover { background: #9c968a; }
+        .navbar-notification-scroll { scrollbar-width: thin; scrollbar-color: #b8b3a8 #e8e4dc; }
+      `}</style>
       <nav className="navbar fixed w-full top-0 z-50 bg-white h-14 shadow-md">
         <div className="flex justify-between items-center h-full px-4">
           <div className="flex items-center">
@@ -1183,51 +1258,97 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
                       fetchEditRequests();
                     }
                   }}
-                  className="relative flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 p-2"
-                  title="Edit Requests"
+                  className="relative flex h-9 w-9 items-center justify-center rounded-md border border-[#BF9853] text-[#BF9853] transition-colors duration-150 hover:bg-[#BF9853] hover:text-white"
+                  title="Notifications"
+                  aria-label="Notifications"
                 >
-                  <img src={EditIcon} alt="Edit Requests" className="w-5 h-5" />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path
+                      d="M12 3a5 5 0 00-5 5v3.5L5 18h14l-2-6.5V8a5 5 0 00-5-5z"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M10 18a2 2 0 004 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
                   {pendingRequestsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white">
                       {pendingRequestsCount}
                     </span>
                   )}
                 </button>
                 {isEditRequestsDropdownOpen && (
-                  <div className="absolute right-0 top-12 w-96 bg-white shadow-2xl rounded-2xl border border-gray-200 p-4 z-[200]">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-[#BF9853]">Pending Requests</h3>
-                      <span className="text-xs text-gray-500">
-                        {pendingRequestsCount} pending
-                      </span>
+                  <div
+                    className="absolute right-0 top-12 z-[200] w-[min(100vw-24px,380px)] overflow-hidden rounded-xl border border-[#E8E4DC] shadow-[0_12px_40px_rgba(0,0,0,0.12)]"
+                    style={{ background: '#FAF9F6' }}
+                  >
+                    <div className="flex items-center justify-between border-b border-[#ECE8E0] px-4 py-3">
+                      <h3
+                        className="text-[17px] font-bold tracking-tight text-[#1a1a1a]"
+                        style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                      >
+                        Notifications
+                      </h3>
+                      <button
+                        type="button"
+                        className="text-[13px] font-semibold text-[#B8924B] hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEditRequestsDropdownOpen(false);
+                        }}
+                      >
+                        Mark all read
+                      </button>
                     </div>
                     {editRequests.length === 0 ? (
-                      <div className="text-center text-sm text-gray-500 py-6">
-                        No pending edit requests
-                      </div>
+                      <div className="px-4 py-10 text-center text-[13px] text-[#7A756C]">No notifications</div>
                     ) : (
-                      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                        {editRequests.map((request) => (
-                          <div
-                            key={request.id}
-                            onClick={() => handleRequestCardClick(request)}
-                            className="border border-gray-200 rounded-xl p-2 cursor-pointer hover:shadow-md transition-colors duration-200 hover:border-[#BF9853]"
-                          >
-                            <div className="flex justify-between gap-5 text-sm text-gray-800 font-semibold">
-                              <div className="space-y-1">
-                                <p>{request.module_name || '-'}</p>
-                                <p className="text-[8px]">{request.request_send_by || '-'}</p>
+                      <div
+                        ref={notificationScrollRef}
+                        className="navbar-notification-scroll max-h-[min(52vh,340px)] overflow-y-auto"
+                      >
+                        {editRequests.map((request) => {
+                          const meta = getNotificationRowMeta(request);
+                          const desc = `Edit request for ${request.module_name || 'record'} — Entry ${request.module_name_eno ?? '-'} · ${request.request_send_by || 'Unknown'}`;
+                          return (
+                            <button
+                              key={request.id}
+                              type="button"
+                              onClick={() => handleRequestCardClick(request)}
+                              className="flex w-full gap-3 border-b border-[#EFEDE8] px-4 py-3 text-left transition-colors hover:bg-[#F3F1EA]"
+                            >
+                              <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                                style={{ backgroundColor: meta.iconBg }}
+                              >
+                                {meta.icon}
                               </div>
-                              <div className="text-right space-y-1">
-                                <p>{request.module_name_eno || '-'}</p>
-                                <p className="text-[8px]">{formatDate(request.timestamp)}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[13px] font-bold text-[#1a1a1a]">{meta.title}</p>
+                                <p className="mt-0.5 text-[12px] leading-snug text-[#6B6B6B]">{desc}</p>
+                                <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#8A8A8A]">
+                                  <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                                  {formatRelativeTime(request.timestamp)}
+                                </p>
                               </div>
-                            </div>
-
-                          </div>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
+                    <div className="border-t border-[#E8E4DC] bg-[#F3F0E8] px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        className="text-[13px] font-semibold text-[#B8924B] hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const el = notificationScrollRef.current;
+                          if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                        }}
+                      >
+                        View all notifications
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

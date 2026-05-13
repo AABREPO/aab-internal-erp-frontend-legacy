@@ -7,6 +7,11 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import edit from '../Images/Edit.svg';
 import axios from 'axios';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const resolveActiveBranchId = () => {
@@ -1110,7 +1115,19 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     };
     console.log("Submitting loan data with payload:", payload);
     try {
-      const response = await fetch(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save"), {
+      const loanSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save");
+      if (selectedLoanType === "Loan" && isPaymentModeRequiringBankRegisterLog(paymentMode)) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(loanSaveUrl),
+          "Loan Portal",
+          {
+            bill_payment_mode: paymentMode,
+            amount: parseFloat(amountGiven) || 0,
+            entered_by: username,
+          }
+        );
+      }
+      const response = await fetch(loanSaveUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1148,8 +1165,9 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           branch_id: activeBranchId
         };
 
+        const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save");
         const weeklyPaymentBillResponse = await axios.post(
-          withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save"),
+          weeklyBillSaveUrl,
           weeklyPaymentBillPayload,
           { headers: { "Content-Type": "application/json" } }
         );

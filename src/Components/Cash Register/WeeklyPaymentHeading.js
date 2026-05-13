@@ -52,24 +52,15 @@ const WHeading = ({ username, userRoles = [] }) => {
                     className={`link ${activeTab === 'weeklyhistory' ? 'active' : ''}`}
                     onClick={() => setActiveTab('weeklyhistory')}
                 >
-                    History
+                   Weekly History
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'dailyhistory' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('dailyhistory')}
-                >
+                <h2 className={`link ${activeTab === 'dailyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('dailyhistory')}>
                     Daily History
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'handoverpaymentspage' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('handoverpaymentspage')}
-                >
+                <h2 className={`link ${activeTab === 'handoverpaymentspage' ? 'active' : ''}`} onClick={() => setActiveTab('handoverpaymentspage')} >
                     Handover
                 </h2>                
-                <h2
-                    className={`link ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('weeklypaymentaddinput')}
-                >
+                <h2 className={`link ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypaymentaddinput')} >
                     Add Input
                 </h2>
             </div>

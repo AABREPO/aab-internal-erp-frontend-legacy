@@ -5,6 +5,11 @@ import edit from '../Images/Edit.svg';
 import deletes from '../Images/Delete.svg';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
     const resolveActiveBranchId = () => {
@@ -3807,7 +3812,19 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                         bill_url: billUrl,
                         branch_id: activeBranchId
                     }
-                    const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save", {
+                    const vendorTrackerSaveUrl = "https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save";
+                    if (isPaymentModeRequiringBankRegisterLog(entry.mode)) {
+                        await postBankRegisterLogSave(
+                            bankRegisterLogSaveUrlMatchingRequest(vendorTrackerSaveUrl),
+                            "Bill Payments Tracker",
+                            {
+                                bill_payment_mode: entry.mode,
+                                amount: parseFloat(entry.amount) || 0,
+                                entered_by: username,
+                            }
+                        );
+                    }
+                    const response = await fetch(vendorTrackerSaveUrl, {
                         method: "POST",
                         credentials: "include",
                         headers: {

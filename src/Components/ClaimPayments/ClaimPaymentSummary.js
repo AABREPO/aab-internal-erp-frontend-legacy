@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import axios from 'axios';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import Filter from '../Images/filter (3).png'
 const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
   const [showModal, setShowModal] = useState(false);
@@ -394,7 +399,23 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       account_number: paymentPopupData.accountNumber
     };
     try {
-      const response = await fetch("https://backendaab.in/demoAabuildersDash/api/claim_payments/save", {
+      const claimSaveUrl = "https://backendaab.in/demoAabuildersDash/api/claim_payments/save";
+      if (
+        isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode) &&
+        !isDiscountOnlyPayment &&
+        Number(paymentPopupData.amount) > 0
+      ) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(claimSaveUrl),
+          "Claim Payments",
+          {
+            bill_payment_mode: paymentPopupData.paymentMode,
+            amount: paymentPopupData.amount,
+            entered_by: username,
+          }
+        );
+      }
+      const response = await fetch(claimSaveUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newPayment),

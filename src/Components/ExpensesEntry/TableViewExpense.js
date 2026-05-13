@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
@@ -7,6 +7,11 @@ import Filter from '../Images/filter (3).png'
 import Reload from '../Images/rotate-right.png'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
 import CustomDateField from './CustomDateField';
@@ -26,6 +31,84 @@ const EDIT_POPUP_VALIDITY_TYPE_OPTIONS = [
     { value: 'Year', label: 'Year' },
 ];
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
+
+/** Scoped styles to match Bank Register ledger table UI (BankRegisterPayments.jsx). */
+const TVE_LEDGER_TABLE_UI_CSS = `
+.tve-exp-ledger-ui{
+  --gold:#D6AB60; --gold-soft:#E6C68A; --gold-deep:#B8924B;
+  --ink:#212121; --ink-2:#3a3a3a; --muted:#8a8275;
+  --cream:#FBF7F0; --cream-2:#F5EFE3; --cream-3:#FAF4E8; --row-alt:#FAF4E8;
+  --line:#EADFC8; --line-soft:#f0e9d8;
+  --green:#2f9e6e; --green-bg:#E0F1E5;
+  --red:#d23b3b; --red-bg:#FFE7E7;
+}
+.tve-exp-ledger-ui .ledger-card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;}
+.tve-exp-ledger-ui .ledger-card .accent{width:5px;background:var(--gold);flex-shrink:0;}
+.tve-exp-ledger-ui .ledger-card .body{flex:1;min-width:0;}
+/* Same as BankRegisterPayments.jsx .ledger-table: fixed layout + separate borders + colgroup widths = no column shift when filter row mounts. */
+.tve-exp-ledger-ui .ledger-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;}
+.tve-exp-ledger-ui .ledger-table th{
+  font-size:12px;font-weight:700;color:var(--ink);text-align:left;padding:12px 10px;background:#fff;
+  white-space:nowrap;border-bottom:1px solid var(--line);letter-spacing:0.005em;
+  position:sticky;top:0;z-index:2;vertical-align:middle;
+}
+.tve-exp-ledger-ui .ledger-table th.text-right,
+.tve-exp-ledger-ui .ledger-table td.text-right{text-align:right;}
+/* Amount column: one shared right edge for heading, filter total, and row amounts */
+.tve-exp-ledger-ui .ledger-table th.tve-amount-col,
+.tve-exp-ledger-ui .ledger-table td.tve-amount-col{
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  padding-left:10px;
+  padding-right:10px;
+  box-sizing:border-box;
+  letter-spacing:normal;
+  font-size:12.5px;
+  font-weight:400;
+  white-space:nowrap;
+}
+.tve-exp-ledger-ui .ledger-table thead tr:first-child th.tve-amount-col .tve-amount-th-inner{
+  display:inline-flex;
+  width:100%;
+  justify-content:flex-end;
+  align-items:center;
+  gap:3px;
+}
+.tve-exp-ledger-ui .ledger-table thead tr.filter-row th.tve-amount-col{font-weight:400;}
+.tve-exp-ledger-ui .ledger-table thead tr:first-child th.tve-amount-col{font-weight:700;}
+.tve-exp-ledger-ui .ledger-table th:hover{background:var(--cream-2);}
+.tve-exp-ledger-ui .ledger-table thead tr.filter-row th{
+  position:sticky;top:var(--tve-sticky-header-h, 44px);z-index:3;background:#fff;
+  border-top:1px solid var(--line);
+  padding-top:8px;padding-bottom:5px;padding-left:10px;padding-right:10px;
+}
+.tve-exp-ledger-ui .ledger-table.tve-filters-open tbody tr:first-child td{
+  padding-top:6px !important;
+}
+.tve-exp-ledger-ui .ledger-table thead tr.filter-row th:first-child{z-index:4;}
+/* When filter row is shown: same as Bank Register noBottomBorder — only remove double border; keep default th padding (12px 10px) so headings/data vertical rhythm matches. */
+.tve-exp-ledger-ui .ledger-table.tve-filters-open thead tr:first-child th{
+  border-bottom:0 !important;
+}
+.tve-exp-ledger-ui .ledger-table td{
+  font-size:12.5px;color:var(--ink-2);padding:12px 10px;vertical-align:middle;
+  border-top:1px solid var(--line-soft);
+}
+.tve-exp-ledger-ui .ledger-table td.tve-col-wrap{white-space:normal;word-break:break-word;}
+.tve-exp-ledger-ui .ledger-table tbody tr:nth-child(even){background:var(--row-alt);}
+.tve-exp-ledger-ui .num-cell{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.tve-exp-ledger-ui .truncate-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tve-exp-ledger-ui .ink{color:var(--ink);}
+.tve-exp-ledger-ui .muted{color:var(--muted);}
+.tve-exp-ledger-ui .table-scroll{max-height:600px;overflow-y:auto;overflow-x:auto;}
+.tve-exp-ledger-ui .table-scroll::-webkit-scrollbar{width:8px;height:8px;}
+.tve-exp-ledger-ui .table-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+.tve-exp-ledger-ui .table-scroll::-webkit-scrollbar-thumb:hover{background:var(--gold-soft);}
+.tve-exp-ledger-ui .table-scroll::-webkit-scrollbar-track{background:transparent;}
+.tve-exp-ledger-ui .expenses-table-wrap .ledger-table{min-width:1971px;}
+.tve-exp-ledger-ui .act-cell{display:flex;align-items:center;justify-content:flex-start;gap:7px;}
+`;
+
 const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
     const resolveActiveBranchId = useCallback(() => {
@@ -109,6 +192,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [sortDirection, setSortDirection] = useState('asc');
     const scrollRef = useRef(null);
     const filterRowRef = useRef(null);
+    const headerRowRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -182,6 +266,33 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     useEffect(() => {
         return () => cancelMomentum();
     }, []);
+    useEffect(() => {
+        const STYLE_ID = 'tve-expense-ledger-table-ui-css';
+        if (document.getElementById(STYLE_ID)) return;
+        const el = document.createElement('style');
+        el.id = STYLE_ID;
+        el.textContent = TVE_LEDGER_TABLE_UI_CSS;
+        document.head.appendChild(el);
+    }, []);
+    /** Keeps filter-row `top` equal to sort-header height so tbody does not show between sticky rows. */
+    useLayoutEffect(() => {
+        const scroller = scrollRef.current;
+        const headerTr = headerRowRef.current;
+        if (!scroller || !headerTr) return undefined;
+        const apply = () => {
+            const h = headerTr.getBoundingClientRect().height;
+            if (h > 0) scroller.style.setProperty('--tve-sticky-header-h', `${h}px`);
+        };
+        apply();
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null;
+        ro?.observe(headerTr);
+        window.addEventListener('resize', apply);
+        return () => {
+            ro?.disconnect();
+            window.removeEventListener('resize', apply);
+            scroller.style.removeProperty('--tve-sticky-header-h');
+        };
+    }, [showFilters]);
     useEffect(() => {
         localStorage.setItem('expenseFilter_siteName', selectedSiteName);
     }, [selectedSiteName]);
@@ -1052,7 +1163,24 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             ...updatedFormData,
             billArrivalDate: billArrivalForApi
         };
-        const response = await fetch(`https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`, {
+        const updateUrl = `https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`;
+        const isPaymentTypeForWeekly = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
+        if (
+            isPaymentTypeForWeekly &&
+            isPaymentModeRequiringBankRegisterLog(updatedFormData.paymentMode) &&
+            editId &&
+            !sentToWeeklyPaymentBillsRef.current.has(editId)
+        ) {
+            await postBankRegisterLogSave(
+                bankRegisterLogSaveUrlMatchingRequest(updateUrl),
+                "Expense Entry",
+                {
+                    bill_payment_mode: updatedFormData.paymentMode,
+                    amount: updatedFormData.amount,
+                }
+            );
+        }
+        const response = await fetch(updateUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatePayload)
@@ -1220,6 +1348,50 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         indicatorSeparator: (provided) => ({
             ...provided,
             display: 'none',
+        }),
+    }), []);
+    /** BankRegisterPayments.jsx filter `selectStyles` — used only on ledger table filter row so spacing matches bank; modals keep `customStyles`. */
+    const ledgerFilterSelectStyles = useMemo(() => ({
+        control: (base) => ({
+            ...base,
+            minHeight: 45,
+            height: 'auto',
+            borderRadius: 8,
+            borderColor: 'var(--line)',
+            borderWidth: '1px',
+            boxShadow: 'none',
+            backgroundColor: '#fff',
+            textAlign: 'left',
+            fontWeight: 400,
+        }),
+        valueContainer: (base) => ({ ...base, padding: '4px 8px', flexWrap: 'nowrap' }),
+        input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 13 }),
+        indicatorsContainer: (base) => ({ ...base, height: 45 }),
+        dropdownIndicator: (base) => ({ ...base, padding: 6 }),
+        indicatorSeparator: () => ({ display: 'none' }),
+        clearIndicator: (base) => ({ ...base, padding: 0 }),
+        menu: (base) => ({ ...base, zIndex: 999 }),
+        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+        option: (base) => ({ ...base, fontSize: 13, textAlign: 'left' }),
+        placeholder: (base) => ({ ...base, fontSize: 13, fontWeight: 400, color: 'var(--ink-2)' }),
+        singleValue: (base) => ({
+            ...base,
+            fontSize: 13,
+            fontWeight: 400,
+            color: 'var(--ink-2)',
+            textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+        }),
+        menuList: (base) => ({
+            ...base,
+            textAlign: 'left',
+            maxHeight: 250,
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
         }),
     }), []);
     const sortedExpenses = [...filteredExpenses].sort((a, b) => {
@@ -1629,73 +1801,106 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                             </div>
                         </div>
                     </div>
-                    <div>
-                        <div ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-scroll select-none thin-scrollbar"
-                            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-                        >
-                            <table className="table-fixed min-w-[1885px] w-full border-collapse [&_th]:!pr-[20px] [&_td]:!pr-[20px] [&_th:not(:first-child)]:!pl-[20px] [&_td:not(:first-child)]:!pl-[20px] [&_th:last-child]:!pr-[40px] [&_td:last-child]:!pr-[40px] [&_th]:!text-sm [&_th]:!font-medium [&_td]:!font-medium">
-                                <thead className="sticky top-0 z-20 bg-white ">
-                                    <tr className="h-[56px] bg-[#FAF6ED] [&>th]:!py-0 [&>th]:align-middle">
-                                        <th className="pt-2 pl-3 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
+                    <div className="tve-exp-ledger-ui w-full" style={{ color: 'var(--ink, #212121)' }}>
+                        <div className="ledger-card">
+                            <div className="accent" aria-hidden="true" />
+                            <div className="body">
+                                <div
+                                    ref={scrollRef}
+                                    className="desk-table expenses-table-wrap table-scroll select-none px-2 thin-scrollbar"
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUp}
+                                    onMouseLeave={handleMouseUp}
+                                >
+                                    <table className={`ledger-table min-w-[1971px] w-full${showFilters ? ' tve-filters-open' : ''}`}>
+                                        <colgroup>
+                                            <col style={{ width: '150px' }} />
+                                            <col style={{ width: '280px' }} />
+                                            <col style={{ width: '220px' }} />
+                                            <col style={{ width: '200px' }} />
+                                            <col style={{ width: '100px' }} />
+                                            <col style={{ width: '70px' }} />
+                                            <col style={{ width: '90px' }} />
+                                            <col style={{ width: '110px' }} />
+                                            <col style={{ width: '110px' }} />                                            
+                                            <col style={{ width: '120px' }} />
+                                            <col style={{ width: '110px' }} />
+                                            <col style={{ width: '110px' }} />
+                                            <col style={{ width: '120px' }} />
+                                            <col style={{ width: '100px' }} />
+                                            <col style={{ width: '100px' }} />
+                                            <col style={{ width: '40px' }} />
+                                            <col style={{ width: '30px' }} />
+                                        </colgroup>
+                                <thead>
+                                    <tr ref={headerRowRef}>
+                                        <th className="w-[150px] text-left cursor-pointer select-none" onClick={() => handleSort('date')}>
                                             Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
+                                        <th className="w-[280px] text-left cursor-pointer select-none" onClick={() => handleSort('siteName')}>
                                             Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
+                                        <th className="w-[220px] text-left cursor-pointer select-none" onClick={() => handleSort('vendor')}>
                                             Vendor {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
+                                        <th className="w-[200px] text-left cursor-pointer select-none" onClick={() => handleSort('contractor')}>
                                             Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
+                                        <th className="w-[100px] text-left cursor-pointer select-none" onClick={() => handleSort('staff')}>
                                             Staff {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
+                                        <th className="w-[70px] text-left cursor-pointer select-none" onClick={() => handleSort('quantity')}>
                                             Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none " onClick={() => handleSort('amount')}>
-                                            Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[260px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
-                                            Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
+                                        <th className="w-[90px] tve-amount-col text-right cursor-pointer select-none" onClick={() => handleSort('amount')}>
+                                            <span className="tve-amount-th-inner">
+                                                {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                                <span>Amount</span>
+                                            </span>
+                                        </th>                                        
+                                        <th className="w-[110px] text-left cursor-pointer select-none" onClick={() => handleSort('category')}>
                                             Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
+                                        <th className="w-[110px] text-left cursor-pointer select-none" onClick={() => handleSort('accountType')}>
                                             A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
+                                        <th className="w-[120px] text-left cursor-pointer select-none" onClick={() => handleSort('comments')}>
+                                            Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="w-[110px] text-left cursor-pointer select-none" onClick={() => handleSort('machineTools')}>
                                             Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
+                                        <th className="w-[110px] text-left cursor-pointer select-none" onClick={() => handleSort('source')}>
                                             Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
+                                        <th className="w-[120px] text-left cursor-pointer select-none" onClick={() => handleSort('branch')}>
                                             Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
+                                        <th className="w-[100px] text-left cursor-pointer select-none" onClick={() => handleSort('eno')}>
                                             E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
+                                        <th className="w-[100px] text-left cursor-pointer select-none" onClick={() => handleSort('billArrivalDate')}>
                                             Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
-                                        <th className="px-0.5 w-[60px] font-bold text-left">Edit</th>
-                                        <th className="px-0.5 w-[50px] font-bold text-left">File</th>
+                                        <th className="w-[40px] text-left">Edit</th>
+                                        <th className="w-[30px] text-left">File</th>
                                     </tr>
                                     {showFilters && (
-                                        <tr ref={filterRowRef} className="h-[56px] bg-[#FAF6ED] [&_th]:!py-[7px]">
-                                            <th className="py-3">
+                                        <tr ref={filterRowRef} className="filter-row">
+                                            <th>
                                                 <div className="relative [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowDateRangePicker(true)}
-                                                        className="w-full min-w-[140px] h-[41px] px-2 py-0 text-sm !font-normal bg-white text-left flex items-center gap-1"
+                                                        className="w-full max-w-[130px] h-[45px] px-2 py-0 text-sm !font-normal bg-white text-left flex items-center gap-1"
                                                     >
                                                         <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${startDate && endDate ? 'text-black font-medium' : 'text-[#d3d5db] !font-normal'}`}>
-                                                            {startDate ? (endDate ? `${startDate} – ${endDate}` : `From ${startDate}`) : 'Date'}
+                                                            {startDate
+                                                                ? endDate
+                                                                    ? `${startDate.split('-').reverse().join('-')} – ${endDate.split('-').reverse().join('-')}`
+                                                                    : `From ${startDate.split('-').reverse().join('-')}`
+                                                                : 'Date'}
                                                         </span>
                                                         <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
                                                     </button>
@@ -1712,112 +1917,139 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     />
                                                 </div>
                                             </th>
-                                            <th className=" py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={siteOptions}
                                                     value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
                                                     onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Project Name"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className=" py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={vendorOptions}
                                                     value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
                                                     onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Vendor"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className=" py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={contractorOptions}
                                                     value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
                                                     onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Contractor"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
                                             <th></th>
                                             <th></th>
-                                            <th className="text-sm text-right font-medium py-3 w-[150px] !pr-5 whitespace-nowrap">
+                                            <th className="tve-amount-col num-cell text-right text-[color:var(--ink-2)] whitespace-nowrap">
                                                 ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </th>
-                                            <th></th>
-                                            <th className=" py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={categoryOptions}
                                                     value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
                                                     onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Category"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className=" py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={accountTypeOptions}
                                                     value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
                                                     onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="A/C Type"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
-                                            </th>
-                                            <th className=" py-3">
+                                            </th>                                            
+                                            <th></th>
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={machineToolsOptions}
                                                     value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="MachineTools"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className="py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={sourceOptions}
                                                     value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
                                                     onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="SourceFrom"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className="py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={branchFilterOptions}
                                                     value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
                                                     onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Branch"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className="py-3">
+                                            <th>
                                                 <Select
                                                     className="w-full"
                                                     options={enoOptions.map((eno) => ({ value: String(eno), label: String(eno) }))}
                                                     value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
                                                     onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="E.No"
+                                                    placeholder="All"
+                                                    isClearable
+                                                    isSearchable
                                                     menuPlacement="bottom"
-                                                    styles={customStyles}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                    styles={ledgerFilterSelectStyles}
                                                 />
                                             </th>
-                                            <th className="py-3" aria-label="Bill Arrival filter" />
+                                            <th aria-label="Bill Arrival filter" />
                                             <th></th>
                                             <th></th>
                                         </tr>
@@ -1825,36 +2057,50 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                 </thead>
                                 <tbody>
                                     {currentItems.map((expense, index) => (
-                                        <tr key={expense.id} className="h-[48px] odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className=" text-sm text-left pl-3 w-32 ">{formatDateOnly(expense.date)}</td>
-                                            <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
-                                            <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
-                                            <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
-                                            <td className=" text-sm text-left ">{getDisplayStaffName(expense)}</td>
-                                            <td className=" text-sm text-left ">{expense.quantity}</td>
-                                            <td className="text-sm text-right w-[120px]">
+                                        <tr key={expense.id}>
+                                            <td className="num-cell text-left pl-3 w-[200px]">{formatDateOnly(expense.date)}</td>
+                                            <td className="ink truncate-cell text-left w-60" title={getDisplaySiteName(expense)}>{getDisplaySiteName(expense)}</td>
+                                            <td className="truncate-cell text-left" title={getDisplayVendorName(expense)}>{getDisplayVendorName(expense)}</td>
+                                            <td className="truncate-cell text-left" title={getDisplayContractorName(expense)}>{getDisplayContractorName(expense)}</td>
+                                            <td className="truncate-cell text-left" title={getDisplayStaffName(expense)}>{getDisplayStaffName(expense)}</td>
+                                            <td className="num-cell text-right">{expense.quantity}</td>
+                                            <td className="tve-amount-col num-cell ink text-right font-normal w-[90px]">
                                                 ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className="text-sm text-left w-[260px] max-w-[260px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
-                                            <td className=" text-sm text-left ">{expense.category}</td>
-                                            <td className=" text-sm text-left ">{expense.accountType}</td>
-                                            <td className=" text-sm text-left ">{getMachineToolsItemIdDisplay(expense.machineTools)}</td>
-                                            <td className=" text-sm text-left ">{expense.source}</td>
-                                            <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
-                                            <td className=" text-sm text-left pl-3 ">{expense.eno}</td>
-                                            <td className="text-sm text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense.billArrivalDate)}</td>
-                                            <td className=" py-1.5">
-                                                {userPermissions.includes("Edit") && (
-                                                    <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
-                                                        <img
-                                                            src={edit}
-                                                            alt="Edit"
-                                                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                                                        />
-                                                    </button>
-                                                )}
+                                            <td className="truncate-cell text-left" title={expense.category}>{expense.category}</td>
+                                            <td className="truncate-cell text-left" title={expense.accountType}>{expense.accountType}</td>
+                                            <td className="tve-col-wrap text-left max-w-[260px] px-1">{expense.comments || ''}</td>
+                                            <td className="truncate-cell text-left" title={getMachineToolsItemIdDisplay(expense.machineTools)}>{getMachineToolsItemIdDisplay(expense.machineTools)}</td>
+                                            <td className="truncate-cell text-left" title={expense.source}>{expense.source}</td>
+                                            <td className="truncate-cell text-left" title={getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}>{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
+                                            <td className="num-cell text-left pl-3">{expense.eno}</td>
+                                            <td className="num-cell text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense.billArrivalDate)}</td>
+                                            <td className="py-1.5 w-[50px]">
+                                                <div className="act-cell">
+                                                <button
+                                                    onClick={() => handleEditClick(expense)}
+                                                    className="rounded-full transition duration-200 inline-flex items-center justify-center"
+                                                    title="Edit"
+                                                >
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 14.75 17.56"
+                                                        className="w-5 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                        fill="none"
+                                                        stroke="#007233"
+                                                        strokeWidth="1.5"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        aria-label="Edit"
+                                                    >
+                                                        <line x1="9.709" y1="2.451" x2="12.451" y2="5.042" />
+                                                        <path d="M4.556,12.462 L0.773,13.693 L1.773,9.893 L11.159,0.072 a0.273,0.273 0 0 1 0.383,0 l2.371,2.223 a0.266,0.266 0 0 1 0.016,0.379 z" />
+                                                        <line x1="0.0" y1="16.0" x2="11.395" y2="16.0" />
+                                                    </svg>
+                                                </button>
+                                                </div>
                                             </td>
-                                            <td className="px-1 text-sm">
+                                            <td className="px-1">
                                                 {expense.billCopy ? (
                                                     <a href={expense.billCopy} className="text-red-500 underline" target="_blank" rel="noopener noreferrer">
                                                         View
@@ -1867,7 +2113,10 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                     ))}
                                 </tbody>
                             </table>
+                                </div>
+                            </div>
                         </div>
+                    </div>
                         <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
                             <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-700">Items per page:</span>
@@ -2745,7 +2994,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                         )}
                     </div>
                 </div>
-            </div>
         </body>
     );
 };

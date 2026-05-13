@@ -14,6 +14,11 @@ import {
   todayIso,
   withBranchUrl
 } from './staffAdvanceHelpers';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const uploadAttachment = async (selectedFile, employeeName) => {
   if (!selectedFile) return null;
@@ -414,14 +419,30 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, onSav
         branch_id: activeBranchId
       };
 
-      const saveResponse = await fetch(
-        withBranchUrl('https://backendaab.in/demoAabuildersDash/api/staff-advance/save', activeBranchId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }
+      const staffAdvanceSaveUrl = withBranchUrl(
+        'https://backendaab.in/demoAabuildersDash/api/staff-advance/save',
+        activeBranchId
       );
+      if (
+        (formData.selectedType === 'Advance' || formData.selectedType === 'Refund') &&
+        DIGITAL_PAYMENT_MODES.includes(formData.paymentMode) &&
+        isPaymentModeRequiringBankRegisterLog(formData.paymentMode)
+      ) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(staffAdvanceSaveUrl),
+          'Staff Advance (Mobile)',
+          {
+            bill_payment_mode: formData.paymentMode,
+            amount: parseNumber(formData.amountGivenInput),
+          }
+        );
+      }
+
+      const saveResponse = await fetch(staffAdvanceSaveUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
       if (!saveResponse.ok) {
         throw new Error('Failed to save staff advance');
@@ -434,41 +455,40 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, onSav
         DIGITAL_PAYMENT_MODES.includes(formData.paymentMode)
       ) {
         try {
-          await fetch(
-            withBranchUrl(
-              'https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save',
-              activeBranchId
-            ),
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                date: formData.date,
-                created_at: new Date().toISOString(),
-                contractor_id: null,
-                vendor_id: null,
-                employee_id: formData.empName?.type === 'Employee' ? formData.empName.id : null,
-                project_id: null,
-                type: 'Staff Advance',
-                bill_payment_mode: formData.paymentMode,
-                amount: parseNumber(formData.amountGivenInput),
-                status: true,
-                weekly_number: '',
-                weekly_payment_expense_id: null,
-                advance_portal_id: null,
-                staff_advance_portal_id:
-                  savedRecord?.id ||
-                  savedRecord?.staffAdvancePortalId ||
-                  savedRecord?.staff_advance_portal_id,
-                claim_payment_id: null,
-                cheque_number: null,
-                cheque_date: null,
-                transaction_number: null,
-                account_number: null,
-                branch_id: activeBranchId
-              })
-            }
+          const weeklyBillSaveUrl = withBranchUrl(
+            'https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save',
+            activeBranchId
           );
+          const weeklyPaymentBillPayload = {
+            date: formData.date,
+            created_at: new Date().toISOString(),
+            contractor_id: null,
+            vendor_id: null,
+            employee_id: formData.empName?.type === 'Employee' ? formData.empName.id : null,
+            project_id: null,
+            type: 'Staff Advance',
+            bill_payment_mode: formData.paymentMode,
+            amount: parseNumber(formData.amountGivenInput),
+            status: true,
+            weekly_number: '',
+            weekly_payment_expense_id: null,
+            advance_portal_id: null,
+            staff_advance_portal_id:
+              savedRecord?.id ||
+              savedRecord?.staffAdvancePortalId ||
+              savedRecord?.staff_advance_portal_id,
+            claim_payment_id: null,
+            cheque_number: null,
+            cheque_date: null,
+            transaction_number: null,
+            account_number: null,
+            branch_id: activeBranchId
+          };
+          await fetch(weeklyBillSaveUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(weeklyPaymentBillPayload)
+          });
         } catch (weeklyPaymentError) {
           console.error('Weekly payment bill save failed:', weeklyPaymentError);
         }

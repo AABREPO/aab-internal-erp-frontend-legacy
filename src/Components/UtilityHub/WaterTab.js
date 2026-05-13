@@ -1,9 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
+import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const normalizeShopNoKey = (shopNo) => {
+    const raw = (shopNo ?? '').toString().trim();
+    if (!raw || raw === '-') return { empty: true, letters: '', number: 0, raw: '' };
+    const str = raw.replace(/\s+/g, '').toUpperCase();
+    if (!str) return { empty: true, letters: '', number: 0, raw: '' };
+    const letterMatch = str.match(/^([A-Z]{1,2})/);
+    const letters = letterMatch ? letterMatch[1] : '';
+    const numberMatch = str.match(/(\d+)/);
+    const number = numberMatch ? parseInt(numberMatch[1], 10) : 0;
+    return { empty: false, letters, number, raw: str };
+};
+
+const comparePropertyShopNoAsc = (a, b) => {
+    const pa = normalizeShopNoKey(a?.shopNo);
+    const pb = normalizeShopNoKey(b?.shopNo);
+    if (pa.empty !== pb.empty) return pa.empty ? 1 : -1;
+    if (pa.empty && pb.empty) return 0;
+    if (pa.letters !== pb.letters) return pa.letters < pb.letters ? -1 : pa.letters > pb.letters ? 1 : 0;
+    if (pa.number !== pb.number) return pa.number - pb.number;
+    return pa.raw.localeCompare(pb.raw, undefined, { numeric: true, sensitivity: 'base' });
+};
+
+const sortProjectsPropertyDetailsByShopNo = (projects) => {
+    if (!Array.isArray(projects)) return [];
+    return projects.map((p) => ({
+        ...p,
+        propertyDetails: [...(p.propertyDetails || [])].sort(comparePropertyShopNoAsc),
+    }));
+};
 
 const WaterTab = ({ username, userRoles = [] }) => {
     
@@ -50,6 +84,8 @@ const WaterTab = ({ username, userRoles = [] }) => {
         { value: 'vacated', label: 'Vacated Shop' }
     ];
 
+    const { scrollRef, onMouseDown, onMouseMove, onMouseUp, onMouseLeave } = useUtilityHubTableDragScroll();
+
     // Fetch projects data
     useEffect(() => {
         const fetchProjects = async () => {
@@ -63,11 +99,11 @@ const WaterTab = ({ username, userRoles = [] }) => {
 
                 // Separate hidden and visible projects
                 const visibleProjects = projectsWithWaterTaxNo.filter(project => !project.hide);
-                const hiddenProjects = projectsWithWaterTaxNo.filter(project => project.hide);
+                const hiddenList = projectsWithWaterTaxNo.filter(project => project.hide);
 
-                setProjects(visibleProjects);
-                setHiddenProjects(hiddenProjects);
-                setFilteredProjects(visibleProjects);
+                setProjects(sortProjectsPropertyDetailsByShopNo(visibleProjects));
+                setHiddenProjects(sortProjectsPropertyDetailsByShopNo(hiddenList));
+                setFilteredProjects(sortProjectsPropertyDetailsByShopNo(visibleProjects));
             } catch (error) {
                 console.error('Error fetching projects:', error);
                 setError('Failed to fetch projects data');
@@ -162,6 +198,74 @@ const WaterTab = ({ username, userRoles = [] }) => {
             fetchTenants();
         }
     }, [projects]);
+
+    const tenantNamesTooltipByPropertyId = useMemo(() => {
+        const byProperty = new Map();
+        if (!Array.isArray(tenantShopData)) return byProperty;
+        tenantShopData.forEach((tenant) => {
+            const tName = (tenant?.tenantName || '').toString().trim();
+            if (!tName) return;
+            (tenant?.shopNos || []).forEach((shop) => {
+                const propertyId = shop?.shopNoId;
+                if (propertyId == null || propertyId === '') return;
+                const key = String(propertyId);
+                if (!byProperty.has(key)) byProperty.set(key, []);
+                byProperty.get(key).push({
+                    tenantName: tName,
+                    shopClosureDate: shop?.shopClosureDate || null,
+                });
+            });
+        });
+        const titles = new Map();
+        byProperty.forEach((links, id) => {
+            if (!links.length) return;
+            const active = links.filter((l) => !l.shopClosureDate);
+            if (active.length > 0) {
+                const names = [...new Set(active.map((l) => l.tenantName))];
+                titles.set(id, names.join(', '));
+                return;
+            }
+            const withClosure = links
+                .map((l) => ({
+                    tenantName: l.tenantName,
+                    closureTime: l.shopClosureDate ? new Date(l.shopClosureDate).getTime() : NaN,
+                }))
+                .filter((l) => !Number.isNaN(l.closureTime));
+            if (withClosure.length > 0) {
+                withClosure.sort((a, b) => b.closureTime - a.closureTime);
+                titles.set(id, withClosure[0].tenantName);
+                return;
+            }
+            const names = [...new Set(links.map((l) => l.tenantName))];
+            titles.set(id, names.join(', '));
+        });
+        return titles;
+    }, [tenantShopData]);
+
+    const sortedFilteredProjects = useMemo(
+        () => sortProjectsPropertyDetailsByShopNo(filteredProjects),
+        [filteredProjects]
+    );
+
+    const waterTaxTableRows = useMemo(() => {
+        const rows = sortedFilteredProjects.flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property.waterTaxNo && property.waterTaxNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+        return rows;
+    }, [sortedFilteredProjects]);
+
+    const hiddenWaterTaxTableRows = useMemo(() => {
+        const rows = sortProjectsPropertyDetailsByShopNo(hiddenProjects).flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property.waterTaxNo && property.waterTaxNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+        return rows;
+    }, [hiddenProjects]);
 
     const matchesPaymentFilters = (property) => {
         const selectedMonth = filters.month;
@@ -304,7 +408,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
 
             acc.push({
                 ...project,
-                propertyDetails: filteredProperties
+                propertyDetails: [...filteredProperties].sort(comparePropertyShopNoAsc)
             });
 
             return acc;
@@ -460,6 +564,19 @@ const WaterTab = ({ username, userRoles = [] }) => {
         if (!monthNumber) return { amount: '-', date: null };
 
         const yearMonth = `${selectedYear}-${monthNumber}`;
+        // If a payment exists for this month, always show it (even when frequency=0).
+        const existingPayment = waterTaxPayments.find(p =>
+            p.utilityTypeNumber === waterTaxNo &&
+            p.utilityForTheMonth === yearMonth
+        );
+        if (existingPayment) {
+            return {
+                amount: existingPayment.amount || '0',
+                date: existingPayment.date || null,
+                billCopyUrl:
+                    existingPayment.billCopyUrl || existingPayment.billCopy || existingPayment.fileUrl || null
+            };
+        }
         // ✅ Helper: find the active frequency record for this month
         const getActiveFrequencyData = (propertyId, year, monthNumber) => {
             if (!frequencyHistory || frequencyHistory.length === 0) return null;
@@ -539,17 +656,6 @@ const WaterTab = ({ username, userRoles = [] }) => {
             );
             return { amount: '-', date: null, isNotRequired: true };
         }
-        const payment = waterTaxPayments.find(p =>
-            p.utilityTypeNumber === waterTaxNo &&
-            p.utilityForTheMonth === yearMonth
-        );
-        if (payment) {
-            return {
-                amount: payment.amount || '0',
-                date: payment.date || null,
-                billCopyUrl: payment.billCopyUrl || payment.billCopy || payment.fileUrl || null
-            };
-        }
         // ✅ Include starting month as payable
         const shouldPay = monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
         if (shouldPay) {
@@ -584,6 +690,109 @@ const WaterTab = ({ username, userRoles = [] }) => {
         });
         return unpaidCount;
     };
+
+    const buildExportRows = () => {
+        const pairs = sortedFilteredProjects.flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property.waterTaxNo && property.waterTaxNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        pairs.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+
+        return pairs.map(({ project, property }, index) => {
+            const rowNumber = index + 1;
+            const row = {
+                slNo: rowNumber,
+                pid: project.projectId || '-',
+                projectName: project.projectName || '-',
+                category: property.projectType || project.projectCategory || '-',
+                doorNo: property.doorNo || '-',
+                shopNo: property.shopNo || '-',
+                serviceNo: property.waterTaxNo || '-'
+            };
+
+            monthLabels.forEach((month) => {
+                const paymentData = getPaymentData(property.waterTaxNo, month, property.id);
+                row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
+            });
+
+            row.unpaid = getUnpaidCount(property.waterTaxNo, property.id);
+            return row;
+        });
+    };
+
+    const handleExportPDF = () => {
+        const rows = buildExportRows();
+        if (!rows.length) return;
+
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text('Water Tax Projects Overview', 14, 20);
+
+        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'D.No', 'Service No', ...monthLabels, 'Unpaid'];
+        const body = rows.map((row) => [
+            row.slNo,
+            row.pid,
+            row.projectName,
+            row.category,
+            row.shopNo,
+            row.doorNo,
+            row.serviceNo,
+            ...monthLabels.map((month) => row[month]),
+            row.unpaid
+        ]);
+
+        doc.autoTable({
+            head: [headers],
+            body,
+            startY: 28,
+            styles: {
+                fontSize: 7,
+                cellPadding: 2
+            },
+            headStyles: {
+                fillColor: [191, 152, 83]
+            },
+            margin: {
+                left: 10,
+                right: 10
+            }
+        });
+
+        doc.save('WaterTaxProjects.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const rows = buildExportRows();
+        if (!rows.length) return;
+
+        const worksheetData = rows.map((row) => {
+            const base = {
+                'Sl.No': row.slNo,
+                PID: row.pid,
+                'Project Name': row.projectName,
+                Category: row.category,
+                'Shop No': row.shopNo,
+                'D.No': row.doorNo,
+                'Service No': row.serviceNo
+            };
+
+            monthLabels.forEach((month) => {
+                base[month] = row[month];
+            });
+
+            base.Unpaid = row.unpaid;
+            return base;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'WaterTax');
+        XLSX.writeFile(workbook, 'WaterTaxProjects.xlsx');
+    };
+
+    const hasExportableData = waterTaxTableRows.length > 0;
+
     const toggleProjectHideStatus = async (projectId, isHide) => {
         try {
             const response = await axios.put(`https://backendaab.in/demoAabuilderDash/api/projects/hide/${projectId}`, null, {
@@ -683,7 +892,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
             <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
                     {/* 10 filters -> grid of 5 columns naturally renders them as 2 rows */}
-                    <div className="grid grid-cols-5 gap-4 text-left">
+                    <div className="grid grid-cols-6 gap-4 text-left">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -910,13 +1119,23 @@ const WaterTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-black">
-                            <button className="flex items-center font-semibold gap-2 hover:text-blue-600">
+                            <button
+                                type="button"
+                                onClick={handleExportPDF}
+                                disabled={loading || !hasExportableData}
+                                className="flex items-center font-semibold gap-2 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                            >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                                 </svg>
                                 Export PDF
                             </button>
-                            <button className="flex items-center font-semibold gap-2 hover:text-green-600">
+                            <button
+                                type="button"
+                                onClick={handleExportExcel}
+                                disabled={loading || !hasExportableData}
+                                className="flex items-center font-semibold gap-2 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                            >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                                 </svg>
@@ -933,15 +1152,23 @@ const WaterTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
-                    <div className="border-l-8 border-l-[#BF9853] rounded-lg">
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
+                    <div className="rounded-lg">
+                        <div
+                            ref={scrollRef}
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[480px] overflow-auto select-none thin-scrollbar"
+                            onMouseDown={onMouseDown}
+                            onMouseMove={onMouseMove}
+                            onMouseUp={onMouseUp}
+                            onMouseLeave={onMouseLeave}
+                        >
+                            <table className="w-full border-collapse table-auto min-w-max">
+                                <thead className="sticky top-0 z-10 bg-[#FAF6ED]">
                                     <tr className="bg-[#FAF6ED]">
                                         <td className=" px-4 py-2 text-left font-semibold">Sl.No</td>
                                         <td className=" px-4 py-2 text-left font-semibold">PID</td>
                                         <td className=" px-4 py-2 text-left font-semibold">Project Name</td>
                                         <td className=" px-4 py-2 text-left font-semibold"></td>
+                                        <td className=" px-4 py-2 text-left font-semibold">Shop No</td>
                                         <td className=" px-4 py-2 text-left font-semibold">D.No</td>
                                         <td className=" px-4 py-2 text-left font-semibold">Service No</td>
                                         <td className=" px-4 py-2 text-left font-semibold">Jan</td>
@@ -964,31 +1191,27 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                 <tbody>
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4">
+                                            <td colSpan="22" className="text-center py-4">
                                                 Loading...
                                             </td>
                                         </tr>
                                     ) : error ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4 text-red-500">
+                                            <td colSpan="22" className="text-center py-4 text-red-500">
                                                 {error}
                                             </td>
                                         </tr>
-                                    ) : filteredProjects.length === 0 ? (
+                                    ) : waterTaxTableRows.length === 0 ? (
                                         <tr>
-                                            <td colSpan="19" className="text-center py-4">
+                                            <td colSpan="22" className="text-center py-4">
                                                 No projects found with water tax connections
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredProjects.map((project, projectIndex) =>
-                                            project.propertyDetails
-                                                .filter(property => property.waterTaxNo && property.waterTaxNo.trim() !== '')
-                                                .map((property, propertyIndex) => {
-                                                    const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
+                                        waterTaxTableRows.map(({ project, property }, index) => {
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-4 py-2">{rowIndex + 1}</td>
+                                                            <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2 text-left">{project.projectName}</td>
                                                             <td className="px-4 py-2">
@@ -1000,6 +1223,12 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                                     }`}>
                                                                     {property.projectType || project.projectCategory || '-'}
                                                                 </span>
+                                                            </td>
+                                                            <td
+                                                                className="px-4 py-2 whitespace-nowrap cursor-default"
+                                                                title={tenantNamesTooltipByPropertyId.get(property.id != null ? String(property.id) : '') || undefined}
+                                                            >
+                                                                {property.shopNo || '-'}
                                                             </td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
                                                             <td className="px-4 py-2 text-left">{property.waterTaxNo}</td>
@@ -1052,8 +1281,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                             </td>
                                                         </tr>
                                                     );
-                                                })
-                                        )
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -1083,22 +1311,20 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2 text-left font-semibold">Sl.No</td>
                                             <td className="px-4 py-2 text-left font-semibold">PID</td>
                                             <td className="px-4 py-2 text-left font-semibold">Project Name</td>
+                                            <td className="px-4 py-2 text-left font-semibold">Shop No</td>
                                             <td className="px-4 py-2 text-left font-semibold">D.No</td>
                                             <td className="px-4 py-2 text-left font-semibold">Service No</td>
                                             <td className="px-4 py-2 text-left font-semibold">Unhide</td>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {hiddenProjects.map((project, projectIndex) =>
-                                            project.propertyDetails
-                                                .filter(property => property.waterTaxNo && property.waterTaxNo.trim() !== '')
-                                                .map((property, propertyIndex) => {
-                                                    const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
+                                        {hiddenWaterTaxTableRows.map(({ project, property }, index) => {
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                            <td className="px-4 py-2">{rowIndex + 1}</td>
+                                                            <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
+                                                            <td className="px-4 py-2">{property.shopNo || '-'}</td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
                                                             <td className="px-4 py-2">{property.waterTaxNo}</td>
                                                             <td className="px-4 py-2">
@@ -1110,8 +1336,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                             </td>
                                                         </tr>
                                                     );
-                                                })
-                                        )}
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

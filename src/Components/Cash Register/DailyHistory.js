@@ -31,6 +31,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             ? { params: { branchId: activeBranchId } }
             : {}
     ), [activeBranchId]);
+    /** Only rows for the selected branch — used so week lists never mix branches if API returns extra rows. */
+    const isRowForActiveBranch = useCallback((row) => {
+        if (activeBranchId === null || activeBranchId === undefined || activeBranchId === "") return true;
+        const bid = row?.branch_id ?? row?.branchId;
+        if (bid === null || bid === undefined || bid === "") return false;
+        return Number(bid) === Number(activeBranchId);
+    }, [activeBranchId]);
     useEffect(() => {
         const syncBranch = () => {
             const nextBranchId = resolveActiveBranchId();
@@ -43,6 +50,8 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [selectedWeek, setSelectedWeek] = useState("");
     const [weeks, setWeeks] = useState([]);
     const [lastWeekWithData, setLastWeekWithData] = useState(null);
+    /** Tracks branch+year for the last fetchWeeks run — used to reset the week dropdown when branch/year changes. */
+    const prevWeeksContextKeyRef = useRef(null);
     const [selectedDate, setSelectedDate] = useState(null);
     const [dailyExpenses, setDailyExpenses] = useState([]);
     const [refundPayments, setRefundPayments] = useState([]);
@@ -101,6 +110,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [editingDailyExpenseRowId, setEditingDailyExpenseRowId] = useState('');
     const [editingPaymentId, setEditingPaymentId] = useState('');
     const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
+    const editDailyExpenseOriginalRef = useRef(null);
     const [editDailyExpenseData, setEditDailyExpenseData] = useState({
         date: "",
         labour_id: "",
@@ -147,7 +157,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const startYear = 2000;
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i);
     const lastWeekNumber = weeks.length > 0 ? Math.max(...weeks.map(week => week.number)) : 0;
-    const canEditDelete = userRoles.includes('Admin') || username === 'Mahalingam M';
+    const canEditDelete = username === 'Admin' || username === 'Mahalingam M';
     // Allow editing only for the most recent week (across all years) that has data with status === true
     const canEditSelectedWeek = selectedWeek && lastEditableWeek !== null &&
         Number(selectedWeek) === Number(lastEditableWeek.weekNumber) &&
@@ -294,82 +304,116 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         ISOweekEnd.setHours(23, 59, 59, 999);
         return { startDate: ISOweekStart, endDate: ISOweekEnd };
     }
+
+    const getIsoYearFromRowDate = (row) => {
+        const raw =
+            row?.period_end_date ||
+            row?.created_at ||
+            row?.date ||
+            row?.timestamp ||
+            null;
+        if (!raw) return null;
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return null;
+        return getWeekYear(d);
+    };
+
+    const getLatestStatusTrueWeekFromPayments = (paymentsRows) => {
+        const rows = (Array.isArray(paymentsRows) ? paymentsRows : []).filter(isRowForActiveBranch);
+        const byIso = rows
+            .filter((p) => p?.status === true)
+            .map((p) => {
+                const wn = Number(p.weekly_number);
+                const isoYear = getIsoYearFromRowDate(p);
+                if (!Number.isFinite(wn) || !Number.isFinite(isoYear)) return null;
+                return { weekNumber: wn, year: isoYear };
+            })
+            .filter(Boolean);
+        if (byIso.length === 0) return null;
+        return byIso.reduce((best, cur) => {
+            if (!best) return cur;
+            if (cur.year > best.year) return cur;
+            if (cur.year < best.year) return best;
+            return cur.weekNumber > best.weekNumber ? cur : best;
+        }, null);
+    };
+
     useEffect(() => {
         const fetchWeeks = async () => {
+            const selectedYear = parseInt(year, 10);
+            const requestBranchId = activeBranchId;
+            const requestYearNum = selectedYear;
+            const requestKey = `${requestBranchId ?? "none"}-${requestYearNum}`;
             try {
-                const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/active_weeks', withBranchParams());
-                const selectedYear = parseInt(year, 10);
                 const currentWeekNumber = getCurrentISOWeekNumber();
                 const currentWeekYear = getCurrentWeekYear();
-                // Determine "closed" weeks (status=true) for the selected year, like WeeklyPaymentHistory
+
+                // Fetch all payments to determine which weeks have data (branch-scoped rows only)
                 let weeksWithData = new Set();
                 try {
                     const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
                     (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).forEach((payment) => {
-                        if (payment?.status !== true || !payment?.period_end_date) return;
-                        const paymentDate = new Date(payment.period_end_date);
-                        if (Number.isNaN(paymentDate.getTime())) return;
-                        const y = getWeekYear(paymentDate);
-                        if (y !== selectedYear) return;
-                        const wn = getISOWeekNumber(paymentDate);
+                        if (!isRowForActiveBranch(payment)) return;
+                        if (payment?.status !== true) return;
+                        const wn = Number(payment.weekly_number);
                         if (!Number.isFinite(wn)) return;
-                        weeksWithData.add(wn);
+                        const paymentWeekYear = getIsoYearFromRowDate(payment);
+                        if (paymentWeekYear === selectedYear) {
+                            weeksWithData.add(wn);
+                        }
                     });
                 } catch (error) {
                     console.error('Error fetching payments for week filtering:', error);
                 }
 
-                // Filter and enrich weeks for the selected year
-                const enrichedWeeks = (Array.isArray(response.data) ? response.data : [])
-                    .map((weekNumber) => {
-                        // Calculate week dates for the selected year
-                        const weekInfo = getStartAndEndDateOfWeek(weekNumber, selectedYear);
-                        // Check if this week actually belongs to the selected year (ISO 8601)
-                        const weekStartDate = new Date(weekInfo.start);
-                        const weekYear = getWeekYear(weekStartDate);
+                // Ignore stale responses if branch/year changed while the request was in flight
+                if (requestBranchId !== activeBranchId || requestYearNum !== parseInt(year, 10)) {
+                    return;
+                }
 
-                        // Only include weeks that belong to the selected year
-                        if (weekYear === selectedYear) {
-                            return weekInfo;
-                        }
-                        return null;
-                    })
-                    .filter(week => week !== null); // Remove weeks that don't belong to selected year
+                // Get all possible weeks for the year (1-53)
+                const allWeeks = [];
+                for (let weekNum = 1; weekNum <= 53; weekNum++) {
+                    const weekInfo = getStartAndEndDateOfWeek(weekNum, selectedYear);
+                    const weekStartDate = new Date(weekInfo.start);
+                    const weekYear = getWeekYear(weekStartDate);
+                    const hasData = weeksWithData.has(weekNum);
+                    const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
+                    // Only include weeks up to current week (no future weeks). Keep weeks that already have data.
+                    if (hasData || (weekYear === selectedYear && isCurrentWeek)) {
+                        allWeeks.push(weekInfo);
+                    }
+                }
 
-                // No future weeks in the dropdown for the current ISO week-year.
-                const filteredWeeks =
-                    selectedYear === currentWeekYear
-                        ? enrichedWeeks.filter((w) => Number(w.number) <= Number(currentWeekNumber))
-                        : enrichedWeeks;
+                allWeeks.sort((a, b) => b.number - a.number);
 
-                // Match WeeklyPaymentHistory: newest week first (reverse order)
-                filteredWeeks.sort((a, b) => b.number - a.number);
                 const lastWeekWithDataValue = weeksWithData.size > 0 ? Math.max(...Array.from(weeksWithData)) : null;
+                const defaultWeekNum =
+                    lastWeekWithDataValue != null && allWeeks.some((w) => w.number === lastWeekWithDataValue)
+                        ? lastWeekWithDataValue
+                        : allWeeks[0]?.number ?? null;
+
+                const previousKey = prevWeeksContextKeyRef.current;
+                const contextChanged = previousKey !== null && previousKey !== requestKey;
+                prevWeeksContextKeyRef.current = requestKey;
+
                 setLastWeekWithData(lastWeekWithDataValue);
-                setWeeks(filteredWeeks);
+                setWeeks(allWeeks);
+
+                setSelectedWeek((prev) => {
+                    if (allWeeks.length === 0 || defaultWeekNum == null) return "";
+                    const prevNum = prev !== "" && prev != null ? Number(prev) : NaN;
+                    const prevInList = !Number.isNaN(prevNum) && allWeeks.some((w) => w.number === prevNum);
+                    if (contextChanged) return String(defaultWeekNum);
+                    if (!prev || prev === "" || !prevInList) return String(defaultWeekNum);
+                    return prev;
+                });
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
             }
         };
         fetchWeeks();
-    }, [year, withBranchParams]);
-    useEffect(() => {
-        if (weeks.length > 0) {
-            // Match WeeklyPaymentHistory: default to the last "closed" week if available, else newest in list
-            if (lastWeekWithData != null && weeks.some((w) => Number(w.number) === Number(lastWeekWithData))) {
-                setSelectedWeek(String(lastWeekWithData));
-            } else {
-                setSelectedWeek(String(weeks[0].number));
-            }
-        } else {
-            setSelectedWeek("");
-            setSelectedDate(null);
-            setDailyExpenses([]);
-            setRefundPayments([]);
-            setExpenses([]);
-            setPayments([]);
-        }
-    }, [weeks, lastWeekWithData]);
+    }, [year, activeBranchId, withBranchParams, isRowForActiveBranch]);
     // Find the most recent week (across all years) that has data with status === true
     useEffect(() => {
         const computeEditableWeek = async () => {
@@ -378,23 +422,28 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 const currentWeekNumber = getISOWeekNumber(now);
                 const currentWeekYear = getWeekYear(now);
                 const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
-                const hasCurrentWeekTrue = Array.isArray(paymentsResponse.data) && paymentsResponse.data.some(payment => {
-                    if (payment?.status !== true || !payment?.period_end_date) return false;
-                    const paymentDate = new Date(payment.period_end_date);
-                    if (isNaN(paymentDate.getTime())) return false;
-                    const weekYear = getWeekYear(paymentDate);
-                    const weekNumber = getISOWeekNumber(paymentDate);
-                    return weekYear === currentWeekYear && weekNumber === currentWeekNumber;
+                const data = (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).filter(isRowForActiveBranch);
+                const hasCurrentWeekTrue = data.some((payment) => {
+                    if (payment?.status !== true) return false;
+                    const wn = Number(payment.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== currentWeekNumber) return false;
+                    return getIsoYearFromRowDate(payment) === currentWeekYear;
                 });
                 if (hasCurrentWeekTrue) {
                     setLastEditableWeek({ weekNumber: currentWeekNumber, year: currentWeekYear });
                 } else {
-                    const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
-                    const prevDate = new Date(startDate);
-                    prevDate.setDate(prevDate.getDate() - 1);
-                    const prevWeekNumber = getISOWeekNumber(prevDate);
-                    const prevWeekYear = getWeekYear(prevDate);
-                    setLastEditableWeek({ weekNumber: prevWeekNumber, year: prevWeekYear });
+                    const latest = getLatestStatusTrueWeekFromPayments(data);
+                    if (latest) {
+                        setLastEditableWeek(latest);
+                    } else {
+                        const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+                        const prevDate = new Date(startDate);
+                        prevDate.setDate(prevDate.getDate() - 1);
+                        setLastEditableWeek({
+                            weekNumber: getISOWeekNumber(prevDate),
+                            year: getWeekYear(prevDate),
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error computing editable week:', error);
@@ -405,13 +454,14 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
                 const prevDate = new Date(startDate);
                 prevDate.setDate(prevDate.getDate() - 1);
-                const prevWeekNumber = getISOWeekNumber(prevDate);
-                const prevWeekYear = getWeekYear(prevDate);
-                setLastEditableWeek({ weekNumber: prevWeekNumber, year: prevWeekYear });
+                setLastEditableWeek({
+                    weekNumber: getISOWeekNumber(prevDate),
+                    year: getWeekYear(prevDate),
+                });
             }
         };
         computeEditableWeek();
-    }, [withBranchParams]); // Recompute when branch changes
+    }, [activeBranchId, withBranchParams, isRowForActiveBranch]); // Recompute when branch changes
     useEffect(() => {
         const fetchWeekData = async () => {
             if (!selectedWeek) return;
@@ -1856,6 +1906,23 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             description: row.description || "",
             file_url: row.file_url || ""
         });
+        // Snapshot the original values in the same normalized shape used for saving.
+        editDailyExpenseOriginalRef.current = {
+            date: row.date,
+            labour_id: Number(row.labour_id) || null,
+            vendor_id: Number(row.vendor_id) || null,
+            contractor_id: Number(row.contractor_id) || null,
+            employee_id: Number(row.employee_id) || null,
+            project_id: Number(row.project_id),
+            quantity: Number(row.quantity) || 0,
+            type: row.type || "",
+            type_id: getWeeklyExpenseTypeId(row.type || ""),
+            amount: Number(row.amount),
+            extra_amount: Number(row.extra_amount || 0),
+            description: row.description || "",
+            file_url: row.file_url || null,
+            branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
+        };
     };
     const saveEditedExpense = async (row) => {
         try {
@@ -1875,6 +1942,35 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 file_url: editDailyExpenseData.file_url || null,
                 branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
             };
+            const original = editDailyExpenseOriginalRef.current;
+            const keysToCompare = [
+                "date",
+                "labour_id",
+                "vendor_id",
+                "contractor_id",
+                "employee_id",
+                "project_id",
+                "quantity",
+                "type",
+                "type_id",
+                "amount",
+                "extra_amount",
+                "description",
+                "file_url",
+                "branch_id",
+            ];
+            const hasChanges =
+                !original ||
+                keysToCompare.some((key) => {
+                    const a = original[key];
+                    const b = payload[key];
+                    return a !== b;
+                });
+
+            if (!hasChanges) {
+                setEditingDailyExpenseRowId(null);
+                return;
+            }
             const response = await axios.put(
                 `https://backendaab.in/demoAabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
@@ -2011,7 +2107,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             const now = new Date();
             const actualCurrentWeekNumber = getISOWeekNumber(now);
             const actualCurrentWeekYear = getWeekYear(now);
-            
+
             // Calculate previous week number and year by going back 7 days from current week start
             // This correctly handles cases where previous week might be week 53 of previous year
             const { startDate: currentWeekStart } = getStartAndEndDateOfISOWeek(actualCurrentWeekNumber, actualCurrentWeekYear);
@@ -2020,11 +2116,11 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             previousWeekDate.setHours(0, 0, 0, 0);
             const previousWeekNumber = getISOWeekNumber(previousWeekDate);
             const previousWeekYear = getWeekYear(previousWeekDate);
-            
+
             // Filter expenses: exclude those from current week or previous week using ISO week calculation
             allDailyPayments = allDailyPayments.filter(expense => {
                 if (!expense.date) return true;
-                
+
                 const expenseDate = new Date(expense.date);
                 // Check if date is valid
                 if (isNaN(expenseDate.getTime())) {
@@ -2032,21 +2128,21 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     return true; // Include invalid dates (let them pass through)
                 }
                 expenseDate.setHours(0, 0, 0, 0);
-                
+
                 // Calculate ISO week number and year for this expense
                 const expenseWeekNumber = getISOWeekNumber(expenseDate);
                 const expenseWeekYear = getWeekYear(expenseDate);
-                
+
                 // Exclude if expense is from current week
                 if (expenseWeekNumber === actualCurrentWeekNumber && expenseWeekYear === actualCurrentWeekYear) {
                     return false;
                 }
-                
+
                 // Exclude if expense is from previous week
                 if (expenseWeekNumber === previousWeekNumber && expenseWeekYear === previousWeekYear) {
                     return false;
                 }
-                
+
                 return true;
             });
             let expensesToSend = allDailyPayments.filter(expense =>
@@ -3010,17 +3106,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                     <td className="px-1 py-2 relative">
                                                         {canEditSelectedWeek && (
                                                             <div className="flex gap-2 w-[80px]">
+                                                                {editingDailyExpenseRowId === row.id ? (
+                                                                    <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                        ✓
+                                                                    </button>
+                                                                ) : (
+                                                                    <button onClick={() => handleEditClick(row)}>
+                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                    </button>
+                                                                )}
                                                                 {canEditDelete && (
                                                                     <>
-                                                                        {editingDailyExpenseRowId === row.id ? (
-                                                                            <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
-                                                                                ✓
-                                                                            </button>
-                                                                        ) : (
-                                                                            <button onClick={() => handleEditClick(row)}>
-                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                            </button>
-                                                                        )}
                                                                         <button onClick={() => handleDailyExpensesDelete(row.id)}>
                                                                             <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                         </button>
@@ -3125,17 +3221,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                 <td className="py-2">
                                                     {canEditSelectedWeek && (
                                                         <div className="flex">
+                                                            {editingPaymentId === row.id ? (
+                                                                <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
+                                                                    ✓
+                                                                </button>
+                                                            ) : (
+                                                                <button onClick={() => handleEditRefundClick(row)}>
+                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                </button>
+                                                            )}
                                                             {canEditDelete && (
                                                                 <>
-                                                                    {editingPaymentId === row.id ? (
-                                                                        <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
-                                                                            ✓
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button onClick={() => handleEditRefundClick(row)}>
-                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                        </button>
-                                                                    )}
                                                                     <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
                                                                         <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                     </button>

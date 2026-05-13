@@ -27,7 +27,7 @@ const Dashboard = () => {
     const [showEditPopup, setShowEditPopup] = useState(false);
     const [projects, setProjects] = useState([]);
     const [showVacantPopup, setShowVacantPopup] = useState(false);
-    const [sortField, setSortField] = useState('tenantName'); // or 'shopNo'
+    const [sortField, setSortField] = useState('shopNo');
     const [sortOrder, setSortOrder] = useState('asc'); // or 'desc'
     const [selectedShopNo, setSelectedShopNo] = useState('');
     const [selectedTenantName, setSelectedTenantName] = useState('');
@@ -157,11 +157,6 @@ const Dashboard = () => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-    const vacantShops = useMemo(() => {
-        return tableData.filter(shop =>
-            shop.tenantName === "Vacant" || !shop.advance
-        );
-    }, [tableData]);
     useEffect(() => {
         fetchProjects();
     }, []);
@@ -918,7 +913,7 @@ const Dashboard = () => {
     const handleExportVacantPDF = () => {
         const doc = new jsPDF();
         const tableColumn = ["S.No", "Shop No", "Door No", "Project Reference Name"];
-        const tableRows = filteredVacantShops.map((shop, index) => [
+        const tableRows = portfolioVacantShopsList.map((shop, index) => [
             index + 1,
             shop.shopNo,
             shop.doorNo || 'N/A',
@@ -952,23 +947,26 @@ const Dashboard = () => {
 
         doc.save("Vacant-Shops.pdf");
     };
-    const filteredVacantShops = useMemo(() => {
-        const vacantShops = filteredTableData.filter(shop => {
+    /** Same rules as table occupancy filter; based on full tableData like other summary totals. */
+    const portfolioOccupiedCount = useMemo(
+        () => tableData.filter((shop) => shop.tenantName !== 'Vacant' && !shop.vacated).length,
+        [tableData]
+    );
+    const portfolioVacantShopsList = useMemo(() => {
+        const vacantShopsList = tableData.filter((shop) => {
             const shopInfo = shopInfoMap[shop.shopNo];
-            const isVacant = shop.tenantName === "Vacant" || !shop.advance;
+            const isVacant = shop.tenantName === 'Vacant';
             const shouldInclude = !shopInfo || shopInfo.shouldCollectAdvance !== false;
             return isVacant && shouldInclude;
-        });        
-        const uniqueVacantShops = vacantShops.reduce((acc, current) => {
-            const existingShop = acc.find(shop => shop.shopNo === current.shopNo);
+        });
+        return vacantShopsList.reduce((acc, current) => {
+            const existingShop = acc.find((shop) => shop.shopNo === current.shopNo);
             if (!existingShop) {
                 acc.push(current);
             }
             return acc;
-        }, []);        
-        return uniqueVacantShops;
-    }, [filteredTableData, shopInfoMap]);
-    const occupiedCount = sortedTableData.length - filteredVacantShops.length;
+        }, []);
+    }, [tableData, shopInfoMap]);
     const totalMonthlyRents = useMemo(() => {
         if (selectedMonth === '' || selectedYear === '') return 0;
         const selectedMonthIndex = parseInt(selectedMonth); // 0-based
@@ -1279,13 +1277,13 @@ const Dashboard = () => {
                     <div className="font-semibold flex gap-2">
                         <span>Total Occupied Shops:</span>
                         <span className='font-bold cursor-pointer text-[#E4572E]'>
-                            {occupiedCount}
+                            {portfolioOccupiedCount}
                         </span>
                     </div>
                     <div className="font-semibold flex gap-2">
                         <span>Total Shop Vacancy:</span>
                         <span className='font-bold cursor-pointer text-[#E4572E]' onClick={() => setShowVacantPopup(true)}>
-                            {filteredVacantShops.length}
+                            {portfolioVacantShopsList.length}
                         </span>
                     </div>
                     <button className='font-bold text-sm text-[#E4572E] cursor-pointer hover:underline text-left lg:text-right' onClick={handleExportPDF}>
@@ -1579,7 +1577,7 @@ const Dashboard = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredVacantShops.map((shop, index) => (
+                                        {portfolioVacantShopsList.map((shop, index) => (
                                             <tr key={shop.shopNo} className="border-b border-gray-200">
                                                 <td className="px-2 py-2">{index + 1}</td>
                                                 <td className="px-2 py-2 font-medium">{shop.shopNo}</td>

@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import Select from 'react-select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 
 const AMCTab = ({ username, userRoles = [] }) => {
     const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -18,13 +22,15 @@ const AMCTab = ({ username, userRoles = [] }) => {
         paymentStatus: '',
         vendor: '',
         service: '',
-        doorNo: '',
         shop: '',
+        doorNo: '',
         projectName: '',
         projectType: '',
         tenant: '',
         occupancyStatus: ''
     });
+
+    const { scrollRef, onMouseDown, onMouseMove, onMouseUp, onMouseLeave } = useUtilityHubTableDragScroll();
 
     const customSelectStyles = {
         control: (provided, state) => ({
@@ -67,11 +73,103 @@ const AMCTab = ({ username, userRoles = [] }) => {
         }));
     };
 
+    const amcFilterFieldLabels = {
+        year: 'Year',
+        month: 'Month',
+        paymentStatus: 'Payment Status',
+        vendor: 'Vendor',
+        service: 'Service',
+        shop: 'Shop',
+        doorNo: 'Door No',
+        projectName: 'Project Name',
+        projectType: 'Project Type',
+        tenant: 'Tenant',
+        occupancyStatus: 'Occupancy Status'
+    };
+
+    const amcFilterExportOrder = [
+        'year',
+        'month',
+        'paymentStatus',
+        'vendor',
+        'service',
+        'shop',
+        'doorNo',
+        'projectName',
+        'projectType',
+        'tenant',
+        'occupancyStatus'
+    ];
+
+    const buildAmcFilterExportBody = () =>
+        amcFilterExportOrder.map((key) => [
+            amcFilterFieldLabels[key] || key,
+            filters[key] && String(filters[key]).trim() !== '' ? String(filters[key]) : '-'
+        ]);
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF({ orientation: 'portrait' });
+        doc.setFontSize(14);
+        doc.text('AMC Utility – Filter snapshot', 14, 20);
+        doc.autoTable({
+            head: [['Field', 'Value']],
+            body: buildAmcFilterExportBody(),
+            startY: 28,
+            styles: { fontSize: 10, cellPadding: 3 },
+            headStyles: { fillColor: [191, 152, 83] },
+            margin: { left: 14, right: 14 }
+        });
+        doc.save('AMCUtilityFilters.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const row = {};
+        amcFilterExportOrder.forEach((key) => {
+            const label = amcFilterFieldLabels[key] || key;
+            const value = filters[key];
+            row[label] = value && String(value).trim() !== '' ? String(value) : '';
+        });
+        const worksheet = XLSX.utils.json_to_sheet([row]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'AMCFilters');
+        XLSX.writeFile(workbook, 'AMCUtilityFilters.xlsx');
+    };
+
     return (
         <div className="bg-white rounded-lg shadow-sm">
-            <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
+            <div className="bg-white rounded-md mb-5 ml-5 mr-5">
+                <div
+                    ref={scrollRef}
+                    className="rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] max-h-[480px] overflow-auto select-none thin-scrollbar"
+                    onMouseDown={onMouseDown}
+                    onMouseMove={onMouseMove}
+                    onMouseUp={onMouseUp}
+                    onMouseLeave={onMouseLeave}
+                >
                 <div className="p-6">
-                    <div className="grid grid-cols-5 gap-4 text-left">
+                    <div className="flex justify-end gap-4 mb-4 text-sm text-black">
+                        <button
+                            type="button"
+                            onClick={handleExportPDF}
+                            className="flex items-center font-semibold gap-2 hover:text-blue-600"
+                        >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            Export PDF
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="flex items-center font-semibold gap-2 hover:text-green-600"
+                        >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            Export XL
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-6 gap-4 text-left">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -147,12 +245,12 @@ const AMCTab = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Door No</label>
+                            <label className="block font-semibold mb-1">Shop</label>
                             <Select
                                 options={[]}
-                                value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
-                                onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
-                                placeholder="Select Door No"
+                                value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
+                                onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
+                                placeholder="Select Shop"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -161,12 +259,12 @@ const AMCTab = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Shop</label>
+                            <label className="block font-semibold mb-1">Door No</label>
                             <Select
                                 options={[]}
-                                value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
-                                onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
-                                placeholder="Select Shop"
+                                value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
+                                onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
+                                placeholder="Select Door No"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -231,6 +329,7 @@ const AMCTab = ({ username, userRoles = [] }) => {
                             />
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
         </div>

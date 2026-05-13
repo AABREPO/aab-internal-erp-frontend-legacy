@@ -8,6 +8,11 @@ import 'react-toastify/dist/ReactToastify.css';
 import edit from '../Images/Edit.svg';
 import file from '../Images/file.png';
 import { use } from 'react';
+import {
+  postBankRegisterLogSave,
+  bankRegisterLogSaveUrlMatchingRequest,
+  isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embedded = false, onSuccess  }) => {
   const resolveEnteredBy = () => {
@@ -1633,6 +1638,18 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
         entered_by: enteredBy,
         source: "Advance Portal",
       };
+      const advanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
+      if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
+        await postBankRegisterLogSave(
+          bankRegisterLogSaveUrlMatchingRequest(advanceSaveUrl),
+          "Advance Portal",
+          {
+            bill_payment_mode: paymentModalData.paymentMode,
+            amount: parseFloat(paymentModalData.amount) || 0,
+            entered_by: enteredBy,
+          }
+        );
+      }
       // Save to advance portal
       const { response: advanceResponse, data: advanceResult } = await saveAdvancePortalWithLogs(advancePayload, 'Advance Portal Payment Submit');
       if (!advanceResponse.ok) {
@@ -1679,7 +1696,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
           entered_by: enteredBy
         };
         // Save to weekly payment bills
-        const weeklyResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save'), {
+        const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');
+        const weeklyResponse = await fetch(weeklyBillSaveUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(weeklyPaymentBillPayload)

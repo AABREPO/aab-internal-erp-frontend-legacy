@@ -5,6 +5,11 @@ import edit from '../Images/Edit.svg';
 import deletes from '../Images/Delete.svg';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import {
+    postBankRegisterLogSave,
+    bankRegisterLogSaveUrlMatchingRequest,
+    isPaymentModeRequiringBankRegisterLog,
+} from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 // BillDatabase component - displays fully paid bills (verified + entered + fully paid with tick)
 const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
@@ -1953,7 +1958,19 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         account_number: entry.accountNumber || '',
                         bill_url: billUrl
                     }
-                    const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save", {
+                    const vendorTrackerSaveUrl = "https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save";
+                    if (isPaymentModeRequiringBankRegisterLog(entry.mode)) {
+                        await postBankRegisterLogSave(
+                            bankRegisterLogSaveUrlMatchingRequest(vendorTrackerSaveUrl),
+                            "Bill Payments Tracker",
+                            {
+                                bill_payment_mode: entry.mode,
+                                amount: parseFloat(entry.amount) || 0,
+                                entered_by: username,
+                            }
+                        );
+                    }
+                    const response = await fetch(vendorTrackerSaveUrl, {
                         method: "POST",
                         credentials: "include",
                         headers: {

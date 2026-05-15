@@ -923,7 +923,8 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                     {
                         bill_payment_mode: weeklyPaymentData.paymentMode,
                         amount: weeklyPaymentData.amount,
-                        entered_by: enteredBy,
+                        enteredBy: enteredBy,
+                        branchId: resolveActiveBranchId(),
                     }
                 );
             }
@@ -1207,6 +1208,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             const paymentMode = isClosure && shopClosureToggle
                 ? formPaymentMode + " From Cash Register"
                 : formPaymentMode;
+            const enteredBy = resolveEnteredBy();
             const form = {
                 formType: selectedRentType,
                 shopNo: formShopNo,
@@ -1221,6 +1223,8 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 forTheMonthOf: selectedRentType === "Rent" || selectedRentType === "Pending Rent" ? selectedMonth : "",
                 attachedFile: pdfUrl,
                 shopClosureDate: closureValueForForm,
+                enteredBy: enteredBy,
+                branchId: resolveActiveBranchId(),
             };
             submissions.push(form);
         }

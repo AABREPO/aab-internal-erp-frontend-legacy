@@ -8,6 +8,18 @@ import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 
+const getTenantLinkPhone = (tenant) =>
+    String(
+        tenant?.mobileNumber ??
+        tenant?.mobile_number ??
+        tenant?.phoneNumber ??
+        tenant?.phone_number ??
+        tenant?.phone ??
+        tenant?.tenantPhone ??
+        tenant?.tenant_phone ??
+        ''
+    ).trim();
+
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** Shop sort: letters + numeric (like Rent Dashboard); blank / "-" shop numbers sort last. */
@@ -194,6 +206,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         tenantShopData.forEach((tenant) => {
             const tName = (tenant?.tenantName || '').toString().trim();
             if (!tName) return;
+            const tPhone = getTenantLinkPhone(tenant);
             (tenant?.shopNos || []).forEach((shop) => {
                 const propertyId = shop?.shopNoId;
                 if (propertyId == null || propertyId === '') return;
@@ -201,32 +214,42 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 if (!byProperty.has(key)) byProperty.set(key, []);
                 byProperty.get(key).push({
                     tenantName: tName,
+                    tenantPhone: tPhone,
                     shopClosureDate: shop?.shopClosureDate || null,
                 });
             });
         });
         const titles = new Map();
+        const withPhone = (namesJoined, phonesJoined) => {
+            const n = (namesJoined || '').trim() || '-';
+            const p = (phonesJoined || '').trim();
+            return p ? `${n}\nPhone: ${p}` : n;
+        };
         byProperty.forEach((links, id) => {
             if (!links.length) return;
             const active = links.filter((l) => !l.shopClosureDate);
             if (active.length > 0) {
-                const names = [...new Set(active.map((l) => l.tenantName))];
-                titles.set(id, names.join(', '));
+                const names = [...new Set(active.map((l) => l.tenantName).filter(Boolean))].join(', ');
+                const phones = [...new Set(active.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+                titles.set(id, withPhone(names, phones));
                 return;
             }
             const withClosure = links
                 .map((l) => ({
                     tenantName: l.tenantName,
+                    tenantPhone: l.tenantPhone,
                     closureTime: l.shopClosureDate ? new Date(l.shopClosureDate).getTime() : NaN,
                 }))
                 .filter((l) => !Number.isNaN(l.closureTime));
             if (withClosure.length > 0) {
                 withClosure.sort((a, b) => b.closureTime - a.closureTime);
-                titles.set(id, withClosure[0].tenantName);
+                const last = withClosure[0];
+                titles.set(id, withPhone(last.tenantName || '-', last.tenantPhone || ''));
                 return;
             }
-            const names = [...new Set(links.map((l) => l.tenantName))];
-            titles.set(id, names.join(', '));
+            const names = [...new Set(links.map((l) => l.tenantName).filter(Boolean))].join(', ');
+            const phones = [...new Set(links.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+            titles.set(id, withPhone(names, phones));
         });
         return titles;
     }, [tenantShopData]);
@@ -1352,7 +1375,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                             <td className="px-4 py-2 whitespace-normal break-words max-w-[220px]">
                                                                 {project.projectName}
                                                             </td>
-                                                            <td className="px-4 py-2">{property.shopNo || '-'}</td>
+                                                            <td
+                                                                className="px-4 py-2 cursor-default"
+                                                                title={tenantNamesTooltipByPropertyId.get(property.id != null ? String(property.id) : '') || undefined}
+                                                            >
+                                                                {property.shopNo || '-'}
+                                                            </td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
                                                             <td className="px-4 py-2">
                                                                 {property.ebNoPhase ? 

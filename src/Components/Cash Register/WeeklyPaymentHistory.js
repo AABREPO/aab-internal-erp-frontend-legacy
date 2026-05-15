@@ -1782,6 +1782,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             description: description || "",
             file_url: "",
             branch_id: activeBranchId ?? null,
+            entered_by: enteredBy,
         };
         const response = await fetch(
             "https://backendaab.in/demoAabuildersDash/api/loans/save",
@@ -3331,11 +3332,11 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         }),
         menu: (provided) => ({
             ...provided,
-            zIndex: 9999,
+            zIndex: 10050,
         }),
         menuPortal: (provided) => ({
             ...provided,
-            zIndex: 9999,
+            zIndex: 10050,
         }),
     };
     const saveEditedPaymentReceived = async (row) => {
@@ -3705,6 +3706,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         isSearchable
                                                         isClearable
                                                         menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
                                                         styles={{
                                                             control: (provided, state) => ({
                                                                 ...provided,
@@ -3726,7 +3728,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             }),
                                                             menu: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9999,
+                                                                zIndex: 10050,
                                                                 maxHeight: '300px',
                                                                 overflow: 'auto',
                                                             }),
@@ -3738,7 +3740,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             }),
                                                             menuPortal: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9999,
+                                                                zIndex: 10050,
                                                             }),
                                                             option: (provided, state) => ({
                                                                 ...provided,
@@ -3783,6 +3785,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         isSearchable
                                                         isClearable
                                                         menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
                                                         styles={{
                                                             control: (provided, state) => ({
                                                                 ...provided,
@@ -3804,7 +3807,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             }),
                                                             menu: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9999,
+                                                                zIndex: 10050,
                                                                 maxHeight: '300px',
                                                                 overflow: 'auto',
                                                             }),
@@ -3816,7 +3819,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             }),
                                                             menuPortal: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9999,
+                                                                zIndex: 10050,
                                                             }),
                                                             option: (provided, state) => ({
                                                                 ...provided,
@@ -4039,11 +4042,12 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             isSearchable
                                                             isClearable
                                                             menuPortalTarget={document.body}
+                                                            menuPosition="fixed"
                                                             styles={{
                                                                 ...customStyles,
                                                                 menu: (provided) => ({
                                                                     ...provided,
-                                                                    zIndex: 9999,
+                                                                    zIndex: 10050,
                                                                     maxHeight: '300px',
                                                                     overflow: 'auto',
                                                                 }),
@@ -4057,7 +4061,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                                 }),
                                                                 menuPortal: (provided) => ({
                                                                     ...provided,
-                                                                    zIndex: 9999,
+                                                                    zIndex: 10050,
                                                                 }),
                                                             }}
                                                         />
@@ -4094,15 +4098,16 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         isSearchable
                                                         isClearable
                                                         menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
                                                         styles={{
                                                             ...customStyles,
                                                             menu: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9999,
+                                                                zIndex: 10050,
                                                             }),
                                                             menuPortal: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9999,
+                                                                zIndex: 10050,
                                                             }),
                                                         }}
                                                     />
@@ -4214,11 +4219,12 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             isSearchable
                                                             isClearable
                                                             menuPortalTarget={document.body}
+                                                            menuPosition="fixed"
                                                             styles={{
                                                                 ...customStyles,
                                                                 menu: (provided) => ({
                                                                     ...provided,
-                                                                    zIndex: 9999,
+                                                                    zIndex: 10050,
                                                                     maxHeight: '300px',
                                                                     overflow: 'auto',
                                                                 }),
@@ -4232,7 +4238,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                                 }),
                                                                 menuPortal: (provided) => ({
                                                                     ...provided,
-                                                                    zIndex: 9999,
+                                                                    zIndex: 10050,
                                                                 }),
                                                             }}
                                                         />
@@ -4260,11 +4266,12 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             isSearchable
                                                             isClearable
                                                             menuPortalTarget={document.body}
+                                                            menuPosition="fixed"
                                                             styles={{
                                                                 ...customStyles,
                                                                 menu: (provided) => ({
                                                                     ...provided,
-                                                                    zIndex: 9999,
+                                                                    zIndex: 10050,
                                                                     maxHeight: '300px',
                                                                     overflow: 'auto',
                                                                 }),
@@ -4278,7 +4285,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                                 }),
                                                                 menuPortal: (provided) => ({
                                                                     ...provided,
-                                                                    zIndex: 9999,
+                                                                    zIndex: 10050,
                                                                 }),
                                                             }}
                                                         />
@@ -5454,6 +5461,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                 isSearchable
                                 isClearable
                                 menuPortalTarget={document.body}
+                                menuPosition="fixed"
                                 styles={{
                                     control: (provided, state) => ({
                                         ...provided,
@@ -5475,7 +5483,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                     }),
                                     menu: (provided) => ({
                                         ...provided,
-                                        zIndex: 9999,
+                                        zIndex: 10050,
                                         maxHeight: '300px',
                                         overflow: 'auto',
                                     }),
@@ -5487,7 +5495,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                     }),
                                     menuPortal: (provided) => ({
                                         ...provided,
-                                        zIndex: 9999,
+                                        zIndex: 10050,
                                     }),
                                     option: (provided, state) => ({
                                         ...provided,
@@ -5716,6 +5724,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                 onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
                                 options={purposeOptions}
                                 menuPortalTarget={document.body}
+                                menuPosition="fixed"
                                 styles={{
                                     control: (provided, state) => ({
                                         ...provided,
@@ -5753,11 +5762,11 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                     }),
                                     menuPortal: (provided) => ({
                                         ...provided,
-                                        zIndex: 9999
+                                        zIndex: 10050
                                     }),
                                     menu: (provided) => ({
                                         ...provided,
-                                        zIndex: 9999
+                                        zIndex: 10050
                                     })
                                 }}
                             />

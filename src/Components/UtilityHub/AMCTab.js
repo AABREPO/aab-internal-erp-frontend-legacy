@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
+
+const getTenantLinkPhone = (tenant) =>
+    String(
+        tenant?.mobileNumber ??
+        tenant?.mobile_number ??
+        tenant?.phoneNumber ??
+        tenant?.phone_number ??
+        tenant?.phone ??
+        tenant?.tenantPhone ??
+        tenant?.tenant_phone ??
+        ''
+    ).trim();
 
 const AMCTab = ({ username, userRoles = [] }) => {
     const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -29,6 +41,44 @@ const AMCTab = ({ username, userRoles = [] }) => {
         tenant: '',
         occupancyStatus: ''
     });
+    const [tenantShopData, setTenantShopData] = useState([]);
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const res = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+                if (!res.ok) {
+                    setTenantShopData([]);
+                    return;
+                }
+                const data = await res.json();
+                setTenantShopData(Array.isArray(data) ? data : []);
+            } catch {
+                setTenantShopData([]);
+            }
+        };
+        load();
+    }, []);
+
+    const tenantPhoneByTenantName = useMemo(() => {
+        const m = new Map();
+        tenantShopData.forEach((t) => {
+            const n = (t?.tenantName || '').toString().trim().toLowerCase();
+            const ph = getTenantLinkPhone(t);
+            if (n && ph) m.set(n, ph);
+        });
+        return m;
+    }, [tenantShopData]);
+
+    const tenantFilterHoverTitle = useMemo(() => {
+        const name = (filters.tenant || '').toString().trim().toLowerCase();
+        if (!name) return 'Select a tenant to see their phone on hover (from tenant–shop data).';
+        const ph = tenantPhoneByTenantName.get(name);
+        return ph ? `Phone: ${ph}` : 'No phone on file for this tenant name in tenant–shop data.';
+    }, [filters.tenant, tenantPhoneByTenantName]);
+
+    const shopFilterHoverTitle =
+        'On Electricity, Property, Water, Telecom, and Subscription tabs, hover Shop No to see tenant name and phone.';
 
     const { scrollRef, onMouseDown, onMouseMove, onMouseUp, onMouseLeave } = useUtilityHubTableDragScroll();
 
@@ -244,7 +294,7 @@ const AMCTab = ({ username, userRoles = [] }) => {
                                 className="w-full"
                             />
                         </div>
-                        <div>
+                        <div title={shopFilterHoverTitle}>
                             <label className="block font-semibold mb-1">Shop</label>
                             <Select
                                 options={[]}
@@ -300,7 +350,7 @@ const AMCTab = ({ username, userRoles = [] }) => {
                                 className="w-full"
                             />
                         </div>
-                        <div>
+                        <div title={tenantFilterHoverTitle}>
                             <label className="block font-semibold mb-1">Tenant</label>
                             <Select
                                 options={[]}

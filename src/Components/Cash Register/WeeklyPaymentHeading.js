@@ -36,22 +36,13 @@ const WHeading = ({ username, userRoles = [] }) => {
     return (
         <div className="bg-[#FAF6ED]">
             <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'weeklypayment' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('weeklypayment')}
-                >
+                <h2 className={`link ${activeTab === 'weeklypayment' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypayment')}>
                     Weekly Payment
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'dailypayment' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('dailypayment')}
-                >
+                <h2 className={`link ${activeTab === 'dailypayment' ? 'active' : ''}`} onClick={() => setActiveTab('dailypayment')}>
                     Daily Payment
                 </h2>
-                <h2
-                    className={`link ${activeTab === 'weeklyhistory' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('weeklyhistory')}
-                >
+                <h2 className={`link ${activeTab === 'weeklyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('weeklyhistory')}>
                    Weekly History
                 </h2>
                 <h2 className={`link ${activeTab === 'dailyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('dailyhistory')}>
@@ -59,7 +50,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                 </h2>
                 <h2 className={`link ${activeTab === 'handoverpaymentspage' ? 'active' : ''}`} onClick={() => setActiveTab('handoverpaymentspage')} >
                     Handover
-                </h2>                
+                </h2>
                 <h2 className={`link ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypaymentaddinput')} >
                     Add Input
                 </h2>

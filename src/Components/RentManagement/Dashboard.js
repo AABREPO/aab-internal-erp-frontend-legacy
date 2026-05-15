@@ -810,10 +810,27 @@ const Dashboard = () => {
     const doorOptions = [...new Set(filteredByTenant.map(shop => shop.doorNo))].map(door => ({ value: door, label: door }));
     const handleExportPDF = () => {
         const doc = new jsPDF('landscape');
-        const reportTitle =
-            paymentStatus?.trim().toLowerCase() === 'unpaid'
-                ? `Unpaid Shops Rent Report ${monthNames[selectedMonth]} ${selectedYear}`
-                : `Shop Rent Report ${monthNames[selectedMonth]} ${selectedYear}`;
+        const monthYearSuffix = `${monthNames[selectedMonth]} ${selectedYear}`;
+        const occ = (selectedOccupancyStatus || '').trim().toLowerCase();
+        const pay = (paymentStatus || '').trim().toLowerCase();
+
+        let reportTitle;
+        if (pay === 'unpaid' && occ === 'occupied') {
+            reportTitle = `Unpaid Occupied Shop Report ${monthYearSuffix}`;
+        } else if (pay === 'unpaid' && occ === 'vacated') {
+            reportTitle = `Unpaid Vacated Shop Report ${monthYearSuffix}`;
+        } else if (occ === 'occupied') {
+            reportTitle = `Occupied Shop Report ${monthYearSuffix}`;
+        } else if (occ === 'vacated') {
+            reportTitle = `Vacated Shop Report ${monthYearSuffix}`;
+        } else if (pay === 'unpaid') {
+            reportTitle = `Unpaid Shops Rent Report ${monthYearSuffix}`;
+        } else if (pay === 'paid') {
+            reportTitle = `Paid Shops Rent Report ${monthYearSuffix}`;
+        } else {
+            reportTitle = `Shop Rent Report ${monthYearSuffix}`;
+        }
+
         const tableColumn = [
             "S.No",
             "Shop No",
@@ -866,11 +883,18 @@ const Dashboard = () => {
                     const total = arr.reduce((a, b) => a + b, 0);
                     return isPastMonth && total === 0 && !isBeforeStart;
                 }).length.toString().padStart(2, '0');
+            const tenantDisplay = isVacant
+                ? "Vacant"
+                : isVacated
+                    ? (shop.tenantName && shop.tenantName !== 'Vacated'
+                        ? `${shop.tenantName} - Vacated`
+                        : 'Vacated')
+                    : shop.tenantName;
             return {
                 rowData: [
                     index + 1,
                     shop.shopNo,
-                    isVacant ? "Vacant" : shop.tenantName,
+                    tenantDisplay,
                     shop.doorNo || "-",
                     advance,
                     ...monthValues,
@@ -904,10 +928,7 @@ const Dashboard = () => {
             },
             theme: 'grid'
         });
-        const fileName =
-            paymentStatus?.trim().toLowerCase() === 'unpaid'
-                ? `Unpaid Shops Rent Report - ${selectedMonthYear}.pdf`
-                : `Shop-Rent-${selectedMonthYear}.pdf`;
+        const fileName = `${reportTitle.replace(/\s+/g, '-')}.pdf`;
         doc.save(fileName);
     };
     const handleExportVacantPDF = () => {

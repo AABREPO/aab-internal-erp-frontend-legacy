@@ -3,10 +3,13 @@ import './Heading.css';
 import Form from './ExpensesEntry/Form';
 import Tableview from './ExpensesEntry/TableViewExpense';
 import Database from './ExpensesEntry/DatabaseExpenses';
+import DatabaseExpenseHistoryLog from './ExpensesEntry/DatabaseExpenseHistoryLog';
 import ExpensesAddInput from './ExpensesEntry/ExpensesInputData';
 import EntryChecking from './ExpensesEntry/EntryCheck';
 import WeeklyPaymentHistory from './Cash Register/WeeklyPaymentHistory';
 import DailyHistory from './Cash Register/DailyHistory';
+
+const isAdminExpenseUser = (u) => u === 'Mahalingam M' || u === 'Admin' || u === 'Marimuthu A';
 
 const getInitialExpenseTab = (username) => {
     const prefillData = localStorage.getItem('expenseEntryPrefill');
@@ -14,7 +17,7 @@ const getInitialExpenseTab = (username) => {
         return 'expense-entry';
     }
     const savedTab = localStorage.getItem('activeTab');
-    if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin' && username !== 'Marimuthu A')) {
+    if ((savedTab === 'database' || savedTab === 'databaseHistory') && !isAdminExpenseUser(username)) {
         return 'expense-entry';
     }
     return savedTab || 'expense-entry';
@@ -23,10 +26,10 @@ const getInitialExpenseTab = (username) => {
 const Heading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => getInitialExpenseTab(username));
     const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialExpenseTab(username)]));
-    const isAdminExpense = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
+    const isAdminExpense = isAdminExpenseUser(username);
 
     useEffect(() => {
-        if (activeTab === 'database' && !isAdminExpense) {
+        if ((activeTab === 'database' || activeTab === 'databaseHistory') && !isAdminExpense) {
             setActiveTab('expense-entry');
         } else {
             localStorage.setItem('activeTab', activeTab);
@@ -53,6 +56,10 @@ const Heading = ({ username, userRoles = [] }) => {
                         <h2 className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
                             onClick={() => setActiveTab('database')}>
                             Database
+                        </h2>
+                        <h2 className={`link whitespace-nowrap ${activeTab === 'databaseHistory' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('databaseHistory')}>
+                            Log
                         </h2>
                         <h2 className={`link whitespace-nowrap ${activeTab === 'addInput' ? 'active' : ''}`}
                             onClick={() => setActiveTab('addInput')}>
@@ -87,6 +94,15 @@ const Heading = ({ username, userRoles = [] }) => {
                 {isAdminExpense && visitedTabs.has('database') && (
                     <div className={activeTab === 'database' ? '' : 'hidden'}>
                         <Database username={username} userRoles={userRoles} isActive={activeTab === 'database'} />
+                    </div>
+                )}
+                {isAdminExpense && visitedTabs.has('databaseHistory') && (
+                    <div className={activeTab === 'databaseHistory' ? '' : 'hidden'}>
+                        <DatabaseExpenseHistoryLog
+                            username={username}
+                            userRoles={userRoles}
+                            isActive={activeTab === 'databaseHistory'}
+                        />
                     </div>
                 )}
                 {isAdminExpense && visitedTabs.has('addInput') && (

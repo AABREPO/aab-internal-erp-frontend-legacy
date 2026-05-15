@@ -5,7 +5,20 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
+import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
+
+const getTenantLinkPhone = (tenant) =>
+  String(
+    tenant?.mobileNumber ??
+    tenant?.mobile_number ??
+    tenant?.phoneNumber ??
+    tenant?.phone_number ??
+    tenant?.phone ??
+    tenant?.tenantPhone ??
+    tenant?.tenant_phone ??
+    ''
+  ).trim();
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -73,6 +86,8 @@ const PropertyTab = ({ username, userRoles = [] }) => {
     });
     const [selectedRowData, setSelectedRowData] = useState(null);
     const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
+    const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false);
+    const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null);
     const monthLabels = MONTH_LABELS;
     const paymentStatusOptions = [
         { value: 'Paid', label: 'Paid' },
@@ -204,6 +219,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         tenantShopData.forEach((tenant) => {
             const tName = (tenant?.tenantName || '').toString().trim();
             if (!tName) return;
+            const tPhone = getTenantLinkPhone(tenant);
             (tenant?.shopNos || []).forEach((shop) => {
                 const propertyId = shop?.shopNoId;
                 if (propertyId == null || propertyId === '') return;
@@ -211,32 +227,42 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                 if (!byProperty.has(key)) byProperty.set(key, []);
                 byProperty.get(key).push({
                     tenantName: tName,
+                    tenantPhone: tPhone,
                     shopClosureDate: shop?.shopClosureDate || null,
                 });
             });
         });
         const titles = new Map();
+        const withPhone = (namesJoined, phonesJoined) => {
+            const n = (namesJoined || '').trim() || '-';
+            const p = (phonesJoined || '').trim();
+            return p ? `${n}\nPhone: ${p}` : n;
+        };
         byProperty.forEach((links, id) => {
             if (!links.length) return;
             const active = links.filter((l) => !l.shopClosureDate);
             if (active.length > 0) {
-                const names = [...new Set(active.map((l) => l.tenantName))];
-                titles.set(id, names.join(', '));
+                const names = [...new Set(active.map((l) => l.tenantName).filter(Boolean))].join(', ');
+                const phones = [...new Set(active.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+                titles.set(id, withPhone(names, phones));
                 return;
             }
             const withClosure = links
                 .map((l) => ({
                     tenantName: l.tenantName,
+                    tenantPhone: l.tenantPhone,
                     closureTime: l.shopClosureDate ? new Date(l.shopClosureDate).getTime() : NaN,
                 }))
                 .filter((l) => !Number.isNaN(l.closureTime));
             if (withClosure.length > 0) {
                 withClosure.sort((a, b) => b.closureTime - a.closureTime);
-                titles.set(id, withClosure[0].tenantName);
+                const last = withClosure[0];
+                titles.set(id, withPhone(last.tenantName || '-', last.tenantPhone || ''));
                 return;
             }
-            const names = [...new Set(links.map((l) => l.tenantName))];
-            titles.set(id, names.join(', '));
+            const names = [...new Set(links.map((l) => l.tenantName).filter(Boolean))].join(', ');
+            const phones = [...new Set(links.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+            titles.set(id, withPhone(names, phones));
         });
         return titles;
     }, [tenantShopData]);
@@ -938,8 +964,64 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         setSelectedCategory(''); // Also clear category filter
     };
 
+    const handleOpenExpenseEntryPopup = ({ propertyTaxNo, project, property }) => {
+        const prefillData = {
+            utilityType: 'Property',
+            siteName: project?.projectName || project?.siteName || '',
+            projectId: project?.id ?? project?.projectId ?? null,
+            propertyId: property?.id ?? null,
+            utilityIdentifier: { key: 'propertyTaxNo', value: propertyTaxNo },
+            propertyTaxNo
+        };
+        try {
+            localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefillData));
+        } catch {
+            // ignore storage errors
+        }
+        setExpenseEntryPrefill(prefillData);
+        setShowExpenseEntryModal(true);
+    };
+
     return (
         <div className="bg-[#FAF6ED] rounded-lg shadow-sm">
+            {showExpenseEntryModal ? (
+                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowExpenseEntryModal(false);
+                                    setExpenseEntryPrefill(null);
+                                    try { localStorage.removeItem('expenseEntryPrefill'); } catch { /* ignore */ }
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-3">
+                            <ExpenseEntryForm
+                                username={username}
+                                userRoles={userRoles}
+                                embedded
+                                onSuccess={async () => {
+                                    setShowExpenseEntryModal(false);
+                                    setExpenseEntryPrefill(null);
+                                    try { localStorage.removeItem('expenseEntryPrefill'); } catch { /* ignore */ }
+                                    try {
+                                        const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/property');
+                                        setPropertyTaxPayments(response.data || []);
+                                    } catch {
+                                        // ignore refresh errors
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
             <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
                     {/* 10 filters -> grid of 5 columns naturally renders them as 2 rows */}
@@ -1287,7 +1369,18 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                                                 {property.shopNo || '-'}
                                                             </td>
                                                             <td className="px-4 py-2 whitespace-nowrap">{property.doorNo || '-'}</td>
-                                                            <td className="px-4 py-2 text-left">{property.propertyTaxNo}</td>
+                                                            <td
+                                                                className="px-4 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                                                onClick={() =>
+                                                                    handleOpenExpenseEntryPopup({
+                                                                        propertyTaxNo: property.propertyTaxNo,
+                                                                        project,
+                                                                        property
+                                                                    })
+                                                                }
+                                                            >
+                                                                {property.propertyTaxNo}
+                                                            </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
                                                                 const paymentData = getPaymentData(property.propertyTaxNo, month, property.id);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
@@ -1387,9 +1480,25 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
-                                                            <td className="px-4 py-2">{property.shopNo || '-'}</td>
+                                                            <td
+                                                                className="px-4 py-2 cursor-default"
+                                                                title={tenantNamesTooltipByPropertyId.get(property.id != null ? String(property.id) : '') || undefined}
+                                                            >
+                                                                {property.shopNo || '-'}
+                                                            </td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
-                                                            <td className="px-4 py-2">{property.propertyTaxNo}</td>
+                                                            <td
+                                                                className="px-4 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                                                onClick={() =>
+                                                                    handleOpenExpenseEntryPopup({
+                                                                        propertyTaxNo: property.propertyTaxNo,
+                                                                        project,
+                                                                        property
+                                                                    })
+                                                                }
+                                                            >
+                                                                {property.propertyTaxNo}
+                                                            </td>
                                                             <td className="px-4 py-2">
                                                                 <button
                                                                     onClick={() => toggleProjectHideStatus(project.id, false)}

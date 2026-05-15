@@ -1,6 +1,102 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import axios from 'axios'
 import ExpenseEntryForm from '../ExpensesEntry/Form'
+
+/** Hover: shop / tenant / phone; portaled + fixed above anchor so card overflow does not clip it. */
+const UtilityUpcomingShopTooltip = ({ item, children }) => {
+  const shop = (item.shopNo ?? '').toString().trim() || '-'
+  const tenant = (item.tenantName ?? '').toString().trim() || '-'
+  const phone = (item.tenantPhone ?? '').toString().trim() || '-'
+  const anchorRef = useRef(null)
+  const tipRef = useRef(null)
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ left: 0, bottom: 0 })
+
+  const syncPosition = useCallback(() => {
+    const anchor = anchorRef.current
+    if (!anchor) return
+    const r = anchor.getBoundingClientRect()
+    const gap = 8
+    let left = r.left
+    const bottom = window.innerHeight - r.top + gap
+    const tip = tipRef.current
+    if (tip) {
+      const tw = tip.getBoundingClientRect().width
+      if (left + tw > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - tw - 8)
+      }
+      if (left < 8) left = 8
+    }
+    setPos({ left, bottom })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    syncPosition()
+    const id = requestAnimationFrame(() => syncPosition())
+    return () => cancelAnimationFrame(id)
+  }, [open, shop, tenant, phone, syncPosition])
+
+  useEffect(() => {
+    if (!open) return
+    const onScrollOrResize = () => syncPosition()
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+    }
+  }, [open, syncPosition])
+
+  return (
+    <>
+      <span
+        ref={anchorRef}
+        className="inline-block max-w-full align-top"
+        onMouseEnter={() => {
+          const anchor = anchorRef.current
+          if (anchor) {
+            const r = anchor.getBoundingClientRect()
+            const gap = 8
+            setPos({
+              left: r.left,
+              bottom: window.innerHeight - r.top + gap,
+            })
+          }
+          setOpen(true)
+        }}
+        onMouseLeave={() => setOpen(false)}
+      >
+        {children}
+      </span>
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={tipRef}
+            role="tooltip"
+            className="pointer-events-none fixed z-[10050] min-w-[18rem] w-max max-w-[min(calc(100vw-2rem),36rem)] rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-left text-xs font-normal text-white shadow-xl"
+            style={{ left: pos.left, bottom: pos.bottom }}
+          >
+            <span className="block break-words leading-snug">
+              <span className="text-gray-300">Shop No : </span>
+              {shop}
+            </span>
+            <span className="mt-1.5 block whitespace-nowrap leading-snug">
+              <span className="text-gray-300">Tenant Name: </span>
+              {tenant}
+            </span>
+            <span className="mt-1.5 block whitespace-nowrap leading-snug">
+              <span className="text-gray-300">Phone: </span>
+              {phone}
+            </span>
+          </div>,
+          document.body
+        )}
+    </>
+  )
+}
 
 const UtilityDashboard = () => {
   const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false)
@@ -26,6 +122,7 @@ const UtilityDashboard = () => {
   const [waterTaxData, setWaterTaxData] = useState([])
   const [loadingWaterTax, setLoadingWaterTax] = useState(true)
   const [errorWaterTax, setErrorWaterTax] = useState(null)
+  const [tenantShopData, setTenantShopData] = useState([])
 
   const [telecomDirectory, setTelecomDirectory] = useState([])
   const [telecomExpensePayments, setTelecomExpensePayments] = useState([])
@@ -151,6 +248,19 @@ const UtilityDashboard = () => {
     fetchWaterTax()
   }, [fetchWaterTax])
 
+  useEffect(() => {
+    const loadTenantShopLinks = async () => {
+      try {
+        const res = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll')
+        setTenantShopData(Array.isArray(res.data) ? res.data : [])
+      } catch (e) {
+        console.error('UtilityDashboard: failed to load tenant–shop links', e)
+        setTenantShopData([])
+      }
+    }
+    loadTenantShopLinks()
+  }, [])
+
   const addMonthsClamped = (date, months) => {
     const d = new Date(date.getTime())
     const targetMonth = d.getMonth() + months
@@ -200,6 +310,65 @@ const UtilityDashboard = () => {
       : null
     return rec?.projectName ?? rec?.siteName ?? rec?.project ?? '-'
   }
+
+  const resolvePropertyDetailsId = (property) =>
+    property?.id ?? property?.propertyId ?? property?.projectNamePropertyDetailsId ?? null
+
+  const tenantMetaByPropertyId = useMemo(() => {
+    const map = {}
+    if (!Array.isArray(tenantShopData) || tenantShopData.length === 0) return map
+
+    const tenantPhone = (t) =>
+      t?.mobileNumber ??
+      t?.mobile_number ??
+      t?.phoneNumber ??
+      t?.phone_number ??
+      t?.phone ??
+      t?.tenantPhone ??
+      t?.tenant_phone ??
+      ''
+
+    tenantShopData.forEach((tenant) => {
+      const name = (tenant?.tenantName || '').trim()
+      const phone = String(tenantPhone(tenant) || '').trim()
+      ;(tenant.shopNos || []).forEach((shop) => {
+        const pid = shop?.shopNoId
+        if (pid === undefined || pid === null) return
+        const key = String(pid)
+        if (!map[key]) map[key] = { entries: [] }
+        map[key].entries.push({
+          tenantName: name,
+          phone,
+          closureTime: shop.shopClosureDate ? new Date(shop.shopClosureDate).getTime() : null,
+          isActive: !shop.shopClosureDate,
+        })
+      })
+    })
+
+    Object.keys(map).forEach((key) => {
+      const entries = map[key].entries
+      const active = entries.filter((e) => e.isActive)
+      const hasActive = active.length > 0
+      const occupancy = hasActive ? 'Occupied' : 'Vacant'
+      let tenantName = '-'
+      let tenantPhoneOut = ''
+      if (hasActive) {
+        const names = [...new Set(active.map((e) => e.tenantName).filter(Boolean))]
+        tenantName = names.length ? names.join(', ') : '-'
+        tenantPhoneOut = active.find((e) => e.phone)?.phone || ''
+      } else {
+        const closed = entries
+          .filter((e) => e.closureTime != null && !Number.isNaN(e.closureTime))
+          .sort((a, b) => b.closureTime - a.closureTime)
+        const last = closed[0]
+        tenantName = last?.tenantName || '-'
+        tenantPhoneOut = last?.phone || ''
+      }
+      map[key] = { occupancy, tenantName, tenantPhone: tenantPhoneOut }
+    })
+
+    return map
+  }, [tenantShopData])
 
   const getLatestTelecomExpensePayment = (serviceNumber) => {
     if (!serviceNumber) return null
@@ -499,7 +668,8 @@ const UtilityDashboard = () => {
           if (processed.has(identifierValue)) return
           processed.add(identifierValue)
 
-          const nextDue = calculateDue(identifierValue, property.id)
+          const propertyDetailsId = resolvePropertyDetailsId(property)
+          const nextDue = calculateDue(identifierValue, propertyDetailsId ?? property.id)
           if (!nextDue) return
 
           const daysLeft = daysBetween(today, nextDue)
@@ -508,13 +678,29 @@ const UtilityDashboard = () => {
           } else {
             if (daysLeft >= 0 || daysLeft < -Math.abs(expiredLimitDays)) return
           }
+
+          const pidKey = propertyDetailsId != null ? String(propertyDetailsId) : ''
+          const shopNoStr = String(property.shopNo ?? property.shop_no ?? '').trim()
+          const hasShopNo = shopNoStr.length > 0
+          const tenantRow = !hasShopNo
+            ? { occupancy: '', tenantName: '-', tenantPhone: '' }
+            : pidKey && tenantMetaByPropertyId[pidKey]
+              ? tenantMetaByPropertyId[pidKey]
+              : { occupancy: 'Vacant', tenantName: '-', tenantPhone: '' }
+
           items.push({
             identifier: identifierValue,
+            identifierKey,
             siteName: project.projectName || property.siteName || '-',
             nextDue,
             daysLeft,
             projectId: project.id,
             propertyId: property.id,
+            shopNo: shopNoStr,
+            waterNo: property.waterNo || '',
+            occupancy: tenantRow.occupancy,
+            tenantName: tenantRow.tenantName,
+            tenantPhone: tenantRow.tenantPhone,
           })
         })
     })
@@ -531,7 +717,7 @@ const UtilityDashboard = () => {
       upcomingLimitDays: 30,
       expiredLimitDays: 30,
     })
-  }, [electricityData, frequencyHistory, projects, electricityView])
+  }, [electricityData, frequencyHistory, projects, electricityView, tenantMetaByPropertyId])
 
   const upcomingPropertyTax = useMemo(() => {
     return buildUpcomingItems({
@@ -543,7 +729,7 @@ const UtilityDashboard = () => {
       upcomingLimitDays: 15,
       expiredLimitDays: 30,
     })
-  }, [propertyTaxData, frequencyHistory, projects, propertyView])
+  }, [propertyTaxData, frequencyHistory, projects, propertyView, tenantMetaByPropertyId])
 
   const upcomingWaterTax = useMemo(() => {
     return buildUpcomingItems({
@@ -555,7 +741,7 @@ const UtilityDashboard = () => {
       upcomingLimitDays: 15,
       expiredLimitDays: 30,
     })
-  }, [waterTaxData, frequencyHistory, projects, waterView])
+  }, [waterTaxData, frequencyHistory, projects, waterView, tenantMetaByPropertyId])
 
   const handleNavigateToExpense = ({ utilityType, identifierKey, identifierValue, projectId, propertyId, siteName }) => {
     const prefillData = {
@@ -667,21 +853,24 @@ const UtilityDashboard = () => {
                   upcomingElectricity.map((item) => (
                     <div key={item.identifier} className="flex items-start justify-between py-2 border-b last:border-b-0">
                       <div className="text-left">
-                        <div 
-                          className="text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
-                          onClick={() => {
-                            handleNavigateToExpense({
-                              utilityType: 'Electricity',
-                              identifierKey: 'ebNo',
-                              identifierValue: item.identifier,
-                              projectId: item.projectId,
-                              propertyId: item.propertyId,
-                              siteName: item.siteName,
-                            })
-                          }}
-                        >
-                          {item.identifier}
-                        </div>
+                        <UtilityUpcomingShopTooltip item={item}>
+                          <div
+                            className="text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                            onClick={() => {
+                              handleNavigateToExpense({
+                                utilityType: 'Electricity',
+                                identifierKey: 'ebNo',
+                                identifierValue: item.identifier,
+                                projectId: item.projectId,
+                                propertyId: item.propertyId,
+                                siteName: item.siteName,
+                              })
+                            }}
+                          >
+                            {item.identifier}
+                            {item.occupancy ? ` - ${item.occupancy}` : ''}
+                          </div>
+                        </UtilityUpcomingShopTooltip>
                         <div className="text-xs text-[#BF9853] font-medium">{item.siteName}</div>
                       </div>
                       <div className="text-right">
@@ -735,21 +924,23 @@ const UtilityDashboard = () => {
                   upcomingPropertyTax.map(item => (
                     <div key={item.identifier} className="flex items-start justify-between py-2 border-b last:border-b-0">
                       <div className="text-left">
-                        <div
-                          className="text-sm font-semibold text-black cursor-pointer hover:text-pink-300 hover:underline"
-                          onClick={() => {
-                            handleNavigateToExpense({
-                              utilityType: 'Property Tax',
-                              identifierKey: 'propertyTaxNo',
-                              identifierValue: item.identifier,
-                              projectId: item.projectId,
-                              propertyId: item.propertyId,
-                              siteName: item.siteName,
-                            })
-                          }}
-                        >
-                          {item.identifier}
-                        </div>
+                        <UtilityUpcomingShopTooltip item={item}>
+                          <div
+                            className="text-sm font-semibold text-black cursor-pointer hover:text-pink-300 hover:underline"
+                            onClick={() => {
+                              handleNavigateToExpense({
+                                utilityType: 'Property Tax',
+                                identifierKey: 'propertyTaxNo',
+                                identifierValue: item.identifier,
+                                projectId: item.projectId,
+                                propertyId: item.propertyId,
+                                siteName: item.siteName,
+                              })
+                            }}
+                          >
+                            {item.identifier}
+                          </div>
+                        </UtilityUpcomingShopTooltip>
                         <div className="text-xs text-pink-300 font-medium">{item.siteName}</div>
                       </div>
                       <div className="text-right">
@@ -803,21 +994,23 @@ const UtilityDashboard = () => {
                   upcomingWaterTax.map(item => (
                     <div key={item.identifier} className="flex items-start justify-between py-2 border-b last:border-b-0">
                       <div className="text-left">
-                        <div
-                          className="text-sm font-semibold text-black cursor-pointer hover:text-blue-300 hover:underline"
-                          onClick={() => {
-                            handleNavigateToExpense({
-                              utilityType: 'Water Tax',
-                              identifierKey: 'waterTaxNo',
-                              identifierValue: item.identifier,
-                              projectId: item.projectId,
-                              propertyId: item.propertyId,
-                              siteName: item.siteName,
-                            })
-                          }}
-                        >
-                          {item.identifier}
-                        </div>
+                        <UtilityUpcomingShopTooltip item={item}>
+                          <div
+                            className="text-sm font-semibold text-black cursor-pointer hover:text-blue-300 hover:underline"
+                            onClick={() => {
+                              handleNavigateToExpense({
+                                utilityType: 'Water Tax',
+                                identifierKey: 'waterTaxNo',
+                                identifierValue: item.identifier,
+                                projectId: item.projectId,
+                                propertyId: item.propertyId,
+                                siteName: item.siteName,
+                              })
+                            }}
+                          >
+                            {item.identifier}
+                          </div>
+                        </UtilityUpcomingShopTooltip>
                         <div className="text-xs text-blue-300 font-medium">{item.siteName}</div>
                       </div>
                       <div className="text-right">

@@ -44,6 +44,31 @@ const sortProjectsPropertyDetailsByShopNo = (projects) => {
     }));
 };
 
+const getTenantLinkPhone = (tenant) =>
+    String(
+        tenant?.mobileNumber ??
+        tenant?.mobile_number ??
+        tenant?.phoneNumber ??
+        tenant?.phone_number ??
+        tenant?.phone ??
+        tenant?.tenantPhone ??
+        tenant?.tenant_phone ??
+        ''
+    ).trim();
+
+/** Service provider from telecom directory (vendorName on row, or raw entry). */
+const getTelecomServiceProviderDisplay = (property) => {
+    if (!property) return '-';
+    const entry = property.telecomEntry;
+    const raw =
+        property.vendorName ??
+        entry?.service_provider ??
+        entry?.serviceProvider ??
+        '';
+    const s = String(raw ?? '').trim();
+    return s || '-';
+};
+
 const TelecomTab = ({ username, userRoles = [] }) => {
     const [filters, setFilters] = useState({
         year: new Date().getFullYear().toString(),
@@ -54,7 +79,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         doorNo: '',
         shop: '',
         projectName: '',
-        projectType: '',
         tenant: '',
         occupancyStatus: ''
     });
@@ -194,6 +218,11 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         existingProject.propertyDetails.push({
                             id: propertyId,
                             utilityTelecomId: entry.id ?? propertyId,
+                            shopLinkPropertyId:
+                                matchedProjectProperty?.id ??
+                                matchedProjectProperty?.propertyId ??
+                                matchedProjectProperty?.projectNamePropertyDetailsId ??
+                                null,
                             // Match ElectricityTab: door/shop come from project propertyDetails
                             doorNo: matchedProjectProperty?.doorNo ?? '-',
                             shopNo: matchedProjectProperty?.shopNo ?? matchedProjectProperty?.shop_no ?? '-',
@@ -277,6 +306,60 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         }
     }, [projects]);
 
+    const tenantNamesTooltipByPropertyId = useMemo(() => {
+        const byProperty = new Map();
+        if (!Array.isArray(tenantShopData)) return byProperty;
+        tenantShopData.forEach((tenant) => {
+            const tName = (tenant?.tenantName || '').toString().trim();
+            if (!tName) return;
+            const tPhone = getTenantLinkPhone(tenant);
+            (tenant?.shopNos || []).forEach((shop) => {
+                const propertyId = shop?.shopNoId;
+                if (propertyId == null || propertyId === '') return;
+                const key = String(propertyId);
+                if (!byProperty.has(key)) byProperty.set(key, []);
+                byProperty.get(key).push({
+                    tenantName: tName,
+                    tenantPhone: tPhone,
+                    shopClosureDate: shop?.shopClosureDate || null,
+                });
+            });
+        });
+        const titles = new Map();
+        const withPhone = (namesJoined, phonesJoined) => {
+            const n = (namesJoined || '').trim() || '-';
+            const p = (phonesJoined || '').trim();
+            return p ? `${n}\nPhone: ${p}` : n;
+        };
+        byProperty.forEach((links, id) => {
+            if (!links.length) return;
+            const active = links.filter((l) => !l.shopClosureDate);
+            if (active.length > 0) {
+                const names = [...new Set(active.map((l) => l.tenantName).filter(Boolean))].join(', ');
+                const phones = [...new Set(active.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+                titles.set(id, withPhone(names, phones));
+                return;
+            }
+            const withClosure = links
+                .map((l) => ({
+                    tenantName: l.tenantName,
+                    tenantPhone: l.tenantPhone,
+                    closureTime: l.shopClosureDate ? new Date(l.shopClosureDate).getTime() : NaN,
+                }))
+                .filter((l) => !Number.isNaN(l.closureTime));
+            if (withClosure.length > 0) {
+                withClosure.sort((a, b) => b.closureTime - a.closureTime);
+                const last = withClosure[0];
+                titles.set(id, withPhone(last.tenantName || '-', last.tenantPhone || ''));
+                return;
+            }
+            const names = [...new Set(links.map((l) => l.tenantName).filter(Boolean))].join(', ');
+            const phones = [...new Set(links.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+            titles.set(id, withPhone(names, phones));
+        });
+        return titles;
+    }, [tenantShopData]);
+
     const filteredFrequencyHistory = useMemo(() => frequencyHistory || [], [frequencyHistory]);
 
     useEffect(() => {
@@ -284,7 +367,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         const vendorFilter = toLower(filters.vendor);
         const doorFilter = toLower(filters.doorNo);
         const shopFilter = toLower(filters.shop);
-        const projectTypeFilter = toLower(filters.projectType);
         const serviceFilter = toLower(filters.service);
         const tenantFilter = toLower(filters.tenant);
         const projectNameFilter = toLower(filters.projectName);
@@ -341,9 +423,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                     return false;
                 }
                 if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
-                    return false;
-                }
-                if (projectTypeFilter && !toLower(property.projectType).includes(projectTypeFilter)) {
                     return false;
                 }
                 if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
@@ -436,10 +515,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
             } else if (key === 'shop') {
                 project.propertyDetails.forEach(property => {
                     if (property.shopNo) values.add(property.shopNo);
-                });
-            } else if (key === 'projectType') {
-                project.propertyDetails.forEach(property => {
-                    if (property.projectType) values.add(property.projectType);
                 });
             } else if (key === 'serviceNo') {
                 project.propertyDetails.forEach(property => {
@@ -855,7 +930,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                 slNo: rowNumber,
                 pid: project.projectId || '-',
                 projectName: project.projectName || '-',
-                category: property.projectType || project.projectCategory || '-',
+                serviceProvider: getTelecomServiceProviderDisplay(property),
                 shopNo: property.shopNo || '-',
                 doorNo: property.doorNo || '-',
                 serviceNo: property.ebNo || '-',
@@ -880,12 +955,12 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         doc.setFontSize(14);
         doc.text('Telecom Services Overview', 14, 20);
 
-        const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
+        const headers = ['Sl.No', 'PID', 'Project Name', 'Service provider', 'Shop No', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map(row => [
             row.slNo,
             row.pid,
             row.projectName,
-            row.category,
+            row.serviceProvider,
             row.shopNo,
             row.doorNo,
             row.serviceNo,
@@ -922,7 +997,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                 'Sl.No': row.slNo,
                 PID: row.pid,
                 'Project Name': row.projectName,
-                Category: row.category,
+                'Service provider': row.serviceProvider,
                 'Shop No': row.shopNo,
                 'Door No': row.doorNo,
                 'Service No': row.serviceNo
@@ -1169,12 +1244,12 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Vendor</label>
+                            <label className="block font-semibold mb-1">Service provider</label>
                             <Select
                                 options={vendorOptions}
                                 value={filters.vendor ? { value: filters.vendor, label: filters.vendor } : null}
                                 onChange={(selectedOption) => handleFilterChange('vendor', selectedOption)}
-                                placeholder="Select Vendor"
+                                placeholder="Select service "
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -1231,20 +1306,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectName', selectedOption)}
                                 placeholder="Select Project"
-                                isClearable
-                                isSearchable
-                                styles={customSelectStyles}
-                                {...selectPortalProps}
-                                className="w-full"
-                            />
-                        </div>
-                        <div>
-                            <label className="block font-semibold mb-1">Project Type</label>
-                            <Select
-                                options={getUniqueValues('projectType')}
-                                value={filters.projectType ? { value: filters.projectType, label: filters.projectType } : null}
-                                onChange={(selectedOption) => handleFilterChange('projectType', selectedOption)}
-                                placeholder="Select Project Type"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -1398,7 +1459,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                     ) : (
                                             telecomTableRows
                                                 .map(({ project, property }, index) => {
-                                                    const categoryBadge = property.projectType || project.projectCategory || '-';
+                                                    const serviceProviderLabel = getTelecomServiceProviderDisplay(property);
                                                     const telecomKey = property.utilityTelecomId ?? property.id;
                                                     return (
                                                         <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
@@ -1408,16 +1469,26 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                                 {project.projectName}
                                                             </td>
                                                             <td className="px-2 py-2">
-                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${project.projectCategory === 'Client Project'
-                                                                    ? 'bg-orange-100 text-orange-800'
-                                                                    : project.projectCategory === 'Own Project'
-                                                                        ? 'bg-green-100 text-green-800'
-                                                                        : 'bg-gray-100 text-gray-800'
-                                                                    }`}>
-                                                                    {categoryBadge}
+                                                                <span
+                                                                    className={`px-3 py-1 rounded-full text-xs font-medium max-w-[200px] inline-block truncate align-middle ${project.projectCategory === 'Client Project'
+                                                                        ? 'bg-orange-100 text-orange-800'
+                                                                        : project.projectCategory === 'Own Project'
+                                                                            ? 'bg-green-100 text-green-800'
+                                                                            : 'bg-gray-100 text-gray-800'
+                                                                        }`}
+                                                                    title={serviceProviderLabel}
+                                                                >
+                                                                    {serviceProviderLabel}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-2 py-2">{property.shopNo || '-'}</td>
+                                                            <td
+                                                                className="px-2 py-2 cursor-default"
+                                                                title={tenantNamesTooltipByPropertyId.get(
+                                                                    String(property.shopLinkPropertyId ?? property.id ?? '')
+                                                                ) || undefined}
+                                                            >
+                                                                {property.shopNo || '-'}
+                                                            </td>
                                                             <td className="px-2 py-2">{property.doorNo || '-'}</td>
                                                             <td
                                                                 className="px-2 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
@@ -1520,7 +1591,14 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
-                                                            <td className="px-4 py-2">{property.shopNo || '-'}</td>
+                                                            <td
+                                                                className="px-4 py-2 cursor-default"
+                                                                title={tenantNamesTooltipByPropertyId.get(
+                                                                    String(property.shopLinkPropertyId ?? property.id ?? '')
+                                                                ) || undefined}
+                                                            >
+                                                                {property.shopNo || '-'}
+                                                            </td>
                                                             <td className="px-4 py-2">{property.doorNo || '-'}</td>
                                                             <td
                                                                 className="px-4 py-2 text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"

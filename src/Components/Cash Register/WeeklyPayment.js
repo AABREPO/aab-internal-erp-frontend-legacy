@@ -3602,6 +3602,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         placeholder={isClientToggleActive ? "Client Name..." : "Contractor/Ven..."}
                                                         isSearchable
                                                         isClearable
+                                                        menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
                                                         styles={{
                                                             control: (provided, state) => ({
                                                                 ...provided,
@@ -3626,7 +3628,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             }),
                                                             menu: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9,
+                                                                zIndex: 10050,
+                                                            }),
+                                                            menuPortal: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 10050,
                                                             }),
                                                             option: (provided, state) => ({
                                                                 ...provided,
@@ -3679,6 +3685,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         placeholder="Project Name..."
                                                         isSearchable
                                                         isClearable
+                                                        menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
                                                         styles={{
                                                             control: (provided, state) => ({
                                                                 ...provided,
@@ -3700,7 +3708,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             }),
                                                             menu: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9,
+                                                                zIndex: 10050,
+                                                            }),
+                                                            menuPortal: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 10050,
                                                             }),
                                                             option: (provided, state) => ({
                                                                 ...provided,
@@ -3861,6 +3873,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         isSearchable
                                                         isClearable
                                                         menuPortalTarget={document.body}
+                                                        menuPosition="fixed"
                                                         styles={{
                                                             control: (provided, state) => ({
                                                                 ...provided,
@@ -3885,7 +3898,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             }),
                                                             menu: (provided) => ({
                                                                 ...provided,
-                                                                zIndex: 9,
+                                                                zIndex: 10050,
+                                                            }),
+                                                            menuPortal: (provided) => ({
+                                                                ...provided,
+                                                                zIndex: 10050,
                                                             }),
                                                             option: (provided, state) => ({
                                                                 ...provided,
@@ -3950,6 +3967,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                     isClearable
                                                     isSearchable
                                                     menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
                                                     styles={{
                                                         control: (provided, state) => ({
                                                             ...provided,
@@ -3971,7 +3989,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                         }),
                                                         menu: (provided) => ({
                                                             ...provided,
-                                                            zIndex: 9,
+                                                            zIndex: 10050,
+                                                        }),
+                                                        menuPortal: (provided) => ({
+                                                            ...provided,
+                                                            zIndex: 10050,
                                                         }),
                                                         option: (provided, state) => ({
                                                             ...provided,
@@ -4121,6 +4143,8 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 placeholder={(isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id)) && ["Loan", "Bank", "Claim"].includes(editFormData.type) ? "Client Name" : "Contractor/Ven..."}
                                                                 isSearchable
                                                                 isClearable
+                                                                menuPortalTarget={document.body}
+                                                                menuPosition="fixed"
                                                                 styles={{
                                                                     control: (provided, state) => ({
                                                                         ...provided,
@@ -4145,7 +4169,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                     }),
                                                                     menu: (provided) => ({
                                                                         ...provided,
-                                                                        zIndex: 9,
+                                                                        zIndex: 10050,
+                                                                    }),
+                                                                    menuPortal: (provided) => ({
+                                                                        ...provided,
+                                                                        zIndex: 10050,
                                                                     }),
                                                                     option: (provided, state) => ({
                                                                         ...provided,
@@ -4216,6 +4244,9 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 options={siteOptions}
                                                                 placeholder="Project Name..."
                                                                 isSearchable
+                                                                isClearable
+                                                                menuPortalTarget={document.body}
+                                                                menuPosition="fixed"
                                                                 styles={{
                                                                     control: (provided, state) => ({
                                                                         ...provided,
@@ -4237,7 +4268,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                     }),
                                                                     menu: (provided) => ({
                                                                         ...provided,
-                                                                        zIndex: 9,
+                                                                        zIndex: 10050,
+                                                                    }),
+                                                                    menuPortal: (provided) => ({
+                                                                        ...provided,
+                                                                        zIndex: 10050,
                                                                     }),
                                                                     option: (provided, state) => ({
                                                                         ...provided,
@@ -5681,6 +5716,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
                                 options={purposeOptions}
                                 menuPortalTarget={document.body}
+                                menuPosition="fixed"
                                 styles={{
                                     control: (provided, state) => ({
                                         ...provided,

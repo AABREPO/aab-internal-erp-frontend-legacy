@@ -480,10 +480,10 @@ const MergedBankLedger = ({
         textAlign: "left",
         fontWeight: 400,
       }),
-      valueContainer: (base) => ({ ...base, padding: "4px 8px", flexWrap: "nowrap" }),
+      valueContainer: (base) => ({ ...base, padding: "4px 0 4px 8px", flexWrap: "nowrap" }),
       input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 13 }),
-      indicatorsContainer: (base) => ({ ...base, height: 45 }),
-      dropdownIndicator: (base) => ({ ...base, padding: 6 }),
+      indicatorsContainer: (base) => ({ ...base, height: 45, padding: 0 }),
+      dropdownIndicator: (base) => ({ ...base, padding: 0 }),
       indicatorSeparator: () => ({ display: "none" }),
       clearIndicator: (base) => ({ ...base, padding: 0 }),
       menu: (base) => ({ ...base, zIndex: 80 }),
@@ -744,7 +744,7 @@ const MergedBankLedger = ({
                       onChange={(v) => onSetFilter("date", v || "")}
                       placeholder="dd/mm/yyyy"
                       alwaysOpenBelow
-                      className="[&>button]:!whitespace-nowrap [&>button]:!pl-[5px] [&>button]:!pr-10 [&>button]:!text-[13px] [&>button]:!font-normal [&>button]:!text-[color:var(--ink-2)]"
+                      className="[&>button]:!whitespace-nowrap [&>button]:!pl-[5px] [&>button]:!pr-0 [&>button]:!text-[13px] [&>button]:!font-normal [&>button]:!text-[color:var(--ink-2)]"
                     />
                   </th>
                   <th style={{ top: 42, borderTop: "1px solid var(--line)" }}>
@@ -752,7 +752,6 @@ const MergedBankLedger = ({
                       value={getSelected(filter.project)}
                       onChange={(opt) => onSetFilter("project", opt?.value || "")}
                       options={toSelectOptions(projectOptions)}
-                      isClearable
                       isSearchable
                       placeholder="All"
                       styles={selectStyles}
@@ -764,7 +763,6 @@ const MergedBankLedger = ({
                       value={getSelected(filter.party)}
                       onChange={(opt) => onSetFilter("party", opt?.value || "")}
                       options={toSelectOptions(partyOptions)}
-                      isClearable
                       isSearchable
                       placeholder="All"
                       styles={selectStyles}
@@ -776,7 +774,6 @@ const MergedBankLedger = ({
                       value={getSelected(filter.partyType)}
                       onChange={(opt) => onSetFilter("partyType", opt?.value || "")}
                       options={toSelectOptions(partyTypeOptions)}
-                      isClearable
                       isSearchable
                       placeholder="All"
                       styles={selectStyles}
@@ -788,7 +785,6 @@ const MergedBankLedger = ({
                       value={getSelected(filter.purpose)}
                       onChange={(opt) => onSetFilter("purpose", opt?.value || "")}
                       options={toSelectOptions(purposeOptions)}
-                      isClearable
                       isSearchable
                       placeholder="All"
                       styles={selectStyles}
@@ -810,7 +806,6 @@ const MergedBankLedger = ({
                       value={getSelected(filter.mode)}
                       onChange={(opt) => onSetFilter("mode", opt?.value || "")}
                       options={toSelectOptions(modeOptions)}
-                      isClearable
                       isSearchable
                       placeholder="All"
                       styles={selectStyles}
@@ -822,7 +817,6 @@ const MergedBankLedger = ({
                       value={getSelected(filter.cheque)}
                       onChange={(opt) => onSetFilter("cheque", opt?.value || "")}
                       options={toSelectOptions(chequeOptions)}
-                      isClearable
                       isSearchable
                       placeholder="All"
                       styles={selectStyles}
@@ -860,7 +854,7 @@ const MergedBankLedger = ({
                   <td className="truncate-cell text-left" title={r.type}>
                     {r.type}
                   </td>
-                  <td className={`num-cell text-right font-semibold ${r._entry === "credit" ? "" : "ink"}`} style={r._entry === "credit" ? { color: "var(--green)" } : { color: "var(--red)" }}>
+                  <td className={`num-cell text-right font-semibold ${r._entry === "credit" ? "" : "ink"}`} style={r._entry === "credit" ? { color: "var(--green)" } : { color: "var(--ink)" }}>
                     {r._entry === "credit" ? `+ ₹${fmtINR(r.amount)}` : `- ₹${fmtINR(r.amount)}`}
                   </td>
                   <td className="text-left">
@@ -1014,10 +1008,10 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
       textAlign: "left",
       fontWeight: 400,
     }),
-    valueContainer: (base) => ({ ...base, padding: "4px 8px", flexWrap: "nowrap" }),
+    valueContainer: (base) => ({ ...base, padding: "4px 0 4px 8px", flexWrap: "nowrap" }),
     input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 13 }),
-    indicatorsContainer: (base) => ({ ...base, height: 45 }),
-    dropdownIndicator: (base) => ({ ...base, padding: 6 }),
+    indicatorsContainer: (base) => ({ ...base, height: 45, padding: 0 }),
+    dropdownIndicator: (base) => ({ ...base, padding: 0 }),
     indicatorSeparator: () => ({ display: "none" }),
     clearIndicator: (base) => ({ ...base, padding: 0 }),
     menu: (base) => ({ ...base, zIndex: 80 }),
@@ -1146,7 +1140,7 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     onChange={(v)=>onSetFilter("date", v || "")}
                     placeholder="dd/mm/yyyy"
                     alwaysOpenBelow
-                    className="[&>button]:!whitespace-nowrap [&>button]:!pl-[5px] [&>button]:!pr-10 [&>button]:!text-[13px] [&>button]:!font-normal [&>button]:!text-[color:var(--ink-2)]"
+                    className="[&>button]:!whitespace-nowrap [&>button]:!pl-[5px] [&>button]:!pr-0 [&>button]:!text-[13px] [&>button]:!font-normal [&>button]:!text-[color:var(--ink-2)]"
                   />
                 </th>
                 <th style={{top:42, borderTop:"1px solid var(--line)"}}>
@@ -1154,7 +1148,6 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     value={getSelected(filter.project)}
                     onChange={(opt)=>onSetFilter("project", opt?.value || "")}
                     options={toSelectOptions(projectOptions)}
-                    isClearable
                     isSearchable
                     placeholder="All"
                     styles={selectStyles}
@@ -1166,7 +1159,6 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     value={getSelected(filter.party)}
                     onChange={(opt)=>onSetFilter("party", opt?.value || "")}
                     options={toSelectOptions(partyOptions)}
-                    isClearable
                     isSearchable
                     placeholder="All"
                     styles={selectStyles}
@@ -1178,7 +1170,6 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     value={getSelected(filter.partyType)}
                     onChange={(opt)=>onSetFilter("partyType", opt?.value || "")}
                     options={toSelectOptions(partyTypeOptions)}
-                    isClearable
                     isSearchable
                     placeholder="All"
                     styles={selectStyles}
@@ -1190,7 +1181,6 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     value={getSelected(filter.purpose)}
                     onChange={(opt)=>onSetFilter("purpose", opt?.value || "")}
                     options={toSelectOptions(purposeOptions)}
-                    isClearable
                     isSearchable
                     placeholder="All"
                     styles={selectStyles}
@@ -1211,7 +1201,6 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     value={getSelected(filter.mode)}
                     onChange={(opt)=>onSetFilter("mode", opt?.value || "")}
                     options={toSelectOptions(modeOptions)}
-                    isClearable
                     isSearchable
                     placeholder="All"
                     styles={selectStyles}
@@ -1223,7 +1212,6 @@ const ExpenseRegister = ({rows, total, onAdd, onEdit, onDelete, onFilter, onTogg
                     value={getSelected(filter.cheque)}
                     onChange={(opt)=>onSetFilter("cheque", opt?.value || "")}
                     options={toSelectOptions(chequeOptions)}
-                    isClearable
                     isSearchable
                     placeholder="All"
                     styles={selectStyles}

@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
+import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 
 const SUBSCRIPTION_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-subscription/getAll';
@@ -58,6 +59,18 @@ const sortProjectsSubscriptionDetailsByShopNo = (projects) => {
     subscriptionDetails: [...(p.subscriptionDetails || [])].sort(comparePropertyShopNoAsc)
   }));
 };
+
+const getTenantLinkPhone = (tenant) =>
+  String(
+    tenant?.mobileNumber ??
+      tenant?.mobile_number ??
+      tenant?.phoneNumber ??
+      tenant?.phone_number ??
+      tenant?.phone ??
+      tenant?.tenantPhone ??
+      tenant?.tenant_phone ??
+      ''
+  ).trim();
 
 const customSelectStyles = {
   control: (provided, state) => ({
@@ -114,7 +127,7 @@ const formatAmount = (value) => {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(numberValue);
 };
 
-const SubscriptionTab = () => {
+const SubscriptionTab = ({ username, userRoles = [] }) => {
   const [filters, setFilters] = useState({
     year: new Date().getFullYear().toString(),
     month: monthLabels[new Date().getMonth()],
@@ -136,6 +149,7 @@ const SubscriptionTab = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showHideModal, setShowHideModal] = useState(false);
   const [hiddenProjects, setHiddenProjects] = useState([]);
+  const [tenantShopData, setTenantShopData] = useState([]);
   const [providerOptions, setProviderOptions] = useState([]);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityFormData, setActivityFormData] = useState({
@@ -144,6 +158,8 @@ const SubscriptionTab = () => {
   });
   const [selectedRowData, setSelectedRowData] = useState(null);
   const [submittedFrequencyData, setSubmittedFrequencyData] = useState({});
+  const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false);
+  const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null);
   const paymentStatusOptions = [
     { value: 'Paid', label: 'Paid' },
     { value: 'Unpaid', label: 'Unpaid' }
@@ -216,9 +232,31 @@ const SubscriptionTab = () => {
               providerSet.add(providerName);
             }
 
+            const entryShopRaw =
+              entry.shop_no ??
+              entry.shopNo ??
+              entry.shop_number ??
+              entry.shopNumber ??
+              '';
+            const projectProperties = Array.isArray(projectMeta?.raw?.propertyDetails)
+              ? projectMeta.raw.propertyDetails
+              : [];
+            const matchedShopProp =
+              String(entryShopRaw).trim() !== ''
+                ? projectProperties.find(
+                    (p) => String(p?.shopNo ?? '').trim() === String(entryShopRaw).trim()
+                  )
+                : null;
+            const shopLinkPropertyId =
+              matchedShopProp?.id ??
+              matchedShopProp?.propertyId ??
+              matchedShopProp?.projectNamePropertyDetailsId ??
+              null;
+
             existingProject.subscriptionDetails.push({
               id: detailId,
               utilitySubscriptionId: entry.id ?? detailId,
+              shopLinkPropertyId,
               registeredPerson: entry.registered_person ?? entry.registeredPerson ?? '',
               planNumber: entry.plan_number ?? entry.planNumber ?? '',
               serviceType: entry.service_type ?? entry.serviceType ?? '',
@@ -266,6 +304,12 @@ const SubscriptionTab = () => {
             }))
         );
         setSubscriptionPayments(expensesRes.data || []);
+        try {
+          const tRes = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+          setTenantShopData(Array.isArray(tRes.data) ? tRes.data : []);
+        } catch {
+          setTenantShopData([]);
+        }
       } catch (fetchError) {
         console.error('Error fetching subscription data:', fetchError);
         setError('Failed to fetch subscription directory data');
@@ -273,6 +317,7 @@ const SubscriptionTab = () => {
         setFilteredProjects([]);
         setProviderOptions([]);
         setSubscriptionPayments([]);
+        setTenantShopData([]);
       } finally {
         setLoading(false);
       }
@@ -414,6 +459,60 @@ const SubscriptionTab = () => {
   };
 
   const filteredFrequencyHistory = useMemo(() => frequencyHistory || [], [frequencyHistory]);
+
+  const tenantNamesTooltipByPropertyId = useMemo(() => {
+    const byProperty = new Map();
+    if (!Array.isArray(tenantShopData)) return byProperty;
+    tenantShopData.forEach((tenant) => {
+      const tName = (tenant?.tenantName || '').toString().trim();
+      if (!tName) return;
+      const tPhone = getTenantLinkPhone(tenant);
+      (tenant?.shopNos || []).forEach((shop) => {
+        const propertyId = shop?.shopNoId;
+        if (propertyId == null || propertyId === '') return;
+        const key = String(propertyId);
+        if (!byProperty.has(key)) byProperty.set(key, []);
+        byProperty.get(key).push({
+          tenantName: tName,
+          tenantPhone: tPhone,
+          shopClosureDate: shop?.shopClosureDate || null
+        });
+      });
+    });
+    const titles = new Map();
+    const withPhone = (namesJoined, phonesJoined) => {
+      const n = (namesJoined || '').trim() || '-';
+      const p = (phonesJoined || '').trim();
+      return p ? `${n}\nPhone: ${p}` : n;
+    };
+    byProperty.forEach((links, id) => {
+      if (!links.length) return;
+      const active = links.filter((l) => !l.shopClosureDate);
+      if (active.length > 0) {
+        const names = [...new Set(active.map((l) => l.tenantName).filter(Boolean))].join(', ');
+        const phones = [...new Set(active.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+        titles.set(id, withPhone(names, phones));
+        return;
+      }
+      const withClosure = links
+        .map((l) => ({
+          tenantName: l.tenantName,
+          tenantPhone: l.tenantPhone,
+          closureTime: l.shopClosureDate ? new Date(l.shopClosureDate).getTime() : NaN
+        }))
+        .filter((l) => !Number.isNaN(l.closureTime));
+      if (withClosure.length > 0) {
+        withClosure.sort((a, b) => b.closureTime - a.closureTime);
+        const last = withClosure[0];
+        titles.set(id, withPhone(last.tenantName || '-', last.tenantPhone || ''));
+        return;
+      }
+      const names = [...new Set(links.map((l) => l.tenantName).filter(Boolean))].join(', ');
+      const phones = [...new Set(links.map((l) => l.tenantPhone).filter(Boolean))].join(', ');
+      titles.set(id, withPhone(names, phones));
+    });
+    return titles;
+  }, [tenantShopData]);
 
   const getFrequencyData = (subscriptionId) => {
     if (!subscriptionId) return null;
@@ -814,6 +913,24 @@ const SubscriptionTab = () => {
     return entries;
   };
 
+  const handleOpenExpenseEntryPopup = (serviceNumber, project) => {
+    const prefillData = {
+      utilityType: 'Subscription',
+      siteName: project?.projectName || '-',
+      projectId: project?.id ?? null,
+      propertyId: null,
+      utilityIdentifier: { key: 'utilityTypeNumber', value: serviceNumber },
+      utilityTypeNumber: serviceNumber
+    };
+    try {
+      localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefillData));
+    } catch {
+      // ignore storage errors
+    }
+    setExpenseEntryPrefill(prefillData);
+    setShowExpenseEntryModal(true);
+  };
+
   const renderFrequencyTable = (detail) => {
     const rows = frequencyRowsForDetail(detail.utilitySubscriptionId ?? detail.id);
     if (!rows.length) return null;
@@ -846,6 +963,44 @@ const SubscriptionTab = () => {
 
   return (
     <div className="bg-[#FAF6ED] rounded-lg shadow-sm">
+      {showExpenseEntryModal ? (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExpenseEntryModal(false);
+                  setExpenseEntryPrefill(null);
+                  try { localStorage.removeItem('expenseEntryPrefill'); } catch { /* ignore */ }
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-3">
+              <ExpenseEntryForm
+                username={username}
+                userRoles={userRoles}
+                embedded
+                onSuccess={async () => {
+                  setShowExpenseEntryModal(false);
+                  setExpenseEntryPrefill(null);
+                  try { localStorage.removeItem('expenseEntryPrefill'); } catch { /* ignore */ }
+                  try {
+                    const res = await axios.get(SUBSCRIPTION_EXPENSES_ENDPOINT);
+                    setSubscriptionPayments(Array.isArray(res.data) ? res.data : []);
+                  } catch {
+                    // ignore refresh errors
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
         <div className="p-6">
           <div className="grid grid-cols-6 gap-4 text-left">
@@ -1113,12 +1268,26 @@ const SubscriptionTab = () => {
                                 {project.projectCategory || '-'}
                               </span>
                             </td>
-                            <td className="px-4 py-2 whitespace-nowrap">{detail.shopNo || '-'}</td>
+                            <td
+                              className="px-4 py-2 whitespace-nowrap cursor-default"
+                              title={
+                                tenantNamesTooltipByPropertyId.get(
+                                  String(detail.shopLinkPropertyId ?? '')
+                                ) || undefined
+                              }
+                            >
+                              {detail.shopNo || '-'}
+                            </td>
                             <td className="px-4 py-2 whitespace-nowrap">{detail.doorNo || '-'}</td>
                             <td className="px-4 py-2">{detail.registeredPerson || '-'}</td>
                             <td className="px-4 py-2 text-left">
                               <div className="relative inline-block group">
-                                <span className="cursor-default">{detail.serviceNumber}</span>
+                                <span
+                                  className="cursor-pointer text-sm font-semibold text-black hover:text-[#BF9853] hover:underline"
+                                  onClick={() => handleOpenExpenseEntryPopup(detail.serviceNumber, project)}
+                                >
+                                  {detail.serviceNumber}
+                                </span>
                                 <div className="absolute right-0 top-full z-40 mt-2 hidden w-60 rounded-lg border border-[#BF9853]/30 bg-white p-3 text-sm shadow-lg group-hover:block">
                                   <div className="space-y-2">
                                     <div className="flex">
@@ -1242,10 +1411,24 @@ const SubscriptionTab = () => {
                               <td className="px-4 py-2">{index + 1}</td>
                               <td className="px-4 py-2">{project.projectId}</td>
                               <td className="px-4 py-2">{project.projectName}</td>
-                              <td className="px-4 py-2">{detail.shopNo || '-'}</td>
+                              <td
+                                className="px-4 py-2 cursor-default"
+                                title={
+                                  tenantNamesTooltipByPropertyId.get(
+                                    String(detail.shopLinkPropertyId ?? '')
+                                  ) || undefined
+                                }
+                              >
+                                {detail.shopNo || '-'}
+                              </td>
                               <td className="px-4 py-2">{detail.doorNo || '-'}</td>
                               <td className="px-4 py-2">{detail.registeredPerson || '-'}</td>
-                              <td className="px-4 py-2">{detail.serviceNumber}</td>
+                              <td
+                                className="px-4 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
+                                onClick={() => handleOpenExpenseEntryPopup(detail.serviceNumber, project)}
+                              >
+                                {detail.serviceNumber}
+                              </td>
                               <td className="px-4 py-2">
                                 <button
                                   onClick={() => toggleProjectHideStatus(project.id, false)}

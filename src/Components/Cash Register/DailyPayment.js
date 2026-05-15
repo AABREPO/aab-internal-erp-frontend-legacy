@@ -27,6 +27,17 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             return null;
         }
     };
+    const resolveEnteredBy = () => {
+        const propUsername = typeof username === 'string' ? username.trim() : '';
+        if (propUsername) return propUsername;
+        try {
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            return user?.name || user?.username || user?.userName || '';
+        } catch {
+            return '';
+        }
+    };
+    const enteredBy = resolveEnteredBy();
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const withBranchUrl = useCallback((baseUrl) => {
         const url = new URL(baseUrl);
@@ -1102,7 +1113,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     from_purpose_id: 5,
                     entry_no: entryNo,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -1118,7 +1129,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     weekly_number: Number(currentWeekNumber),
                     staff_advance_portal_id: staffAdvancePortalId,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/refund_received/save",
@@ -1188,7 +1199,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 file_url: "",
                 source: "Cash Register",
                 branch_id: activeBranchId,
-                enteredBy: username,
+                entered_by: enteredBy,
             };
             const loanPortalResponse = await axios.post(
                 "https://backendaab.in/demoAabuildersDash/api/loans/save",
@@ -1206,7 +1217,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 staff_advance_portal_id: null,
                 loan_portal_id: loanPortalResponse.data?.id || loanPortalResponse.data?.loanPortalId,
                 branch_id: activeBranchId,
-                enteredBy: username,
+                entered_by: enteredBy,
             };
             await axios.post(
                 "https://backendaab.in/demoAabuildersDash/api/refund_received/save",
@@ -1311,7 +1322,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         from_purpose_id: 5,
                         entry_no: entryNo,
                         branch_id: activeBranchId,
-                        enteredBy: username,
+                        entered_by: enteredBy,
                     };
                     const staffAdvanceResponse = await axios.post(
                         "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -1568,7 +1579,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     from_purpose_id: 5,
                     entry_no: entryNo,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -1592,7 +1603,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     weekly_number: Number(currentWeekNumber),
                     staff_advance_portal_id: staffAdvancePortalId,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/daily-payments/save",
@@ -1609,7 +1620,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     weekly_number: currentWeekNumber,
                     status: false,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save-daily",
@@ -1632,7 +1643,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
                     weekly_number: Number(currentWeekNumber),
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/daily-payments/save",
@@ -1649,7 +1660,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     weekly_number: currentWeekNumber,
                     status: false,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: enteredBy,
                 };
                 await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save-daily",

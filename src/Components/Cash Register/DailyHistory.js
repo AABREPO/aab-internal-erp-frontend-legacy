@@ -25,6 +25,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             return null;
         }
     };
+    const resolveEnteredBy = () => {
+        const propUsername = typeof username === 'string' ? username.trim() : '';
+        if (propUsername) return propUsername;
+        try {
+            const user = JSON.parse(localStorage.getItem("user") || "{}");
+            return user?.name || user?.username || user?.userName || '';
+        } catch {
+            return '';
+        }
+    };
+    const enteredBy = resolveEnteredBy();
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const withBranchParams = useCallback(() => (
         activeBranchId !== null && activeBranchId !== undefined && activeBranchId !== ""
@@ -827,7 +838,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 amount: Number(newRefundReceived.amount),
                 weekly_number: Number(selectedWeek),
                 branch_id: activeBranchId,
-                enteredBy: username,
+                entered_by: enteredBy,
             };
             const response = await axios.post(
                 'https://backendaab.in/demoAabuildersDash/api/refund_received/save',
@@ -883,7 +894,7 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                 description: newDailyExpense.description || "",
                 weekly_number: Number(selectedWeek),
                 branch_id: activeBranchId,
-                enteredBy: username,
+                entered_by: enteredBy,
             };
             await axios.post(
                 'https://backendaab.in/demoAabuildersDash/api/daily-payments/save',

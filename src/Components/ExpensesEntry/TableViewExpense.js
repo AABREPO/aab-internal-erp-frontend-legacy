@@ -74,13 +74,13 @@ const TVE_LEDGER_TABLE_UI_CSS = `
   align-items:center;
   gap:3px;
 }
-.tve-exp-ledger-ui .ledger-table thead tr.filter-row th.tve-amount-col{font-weight:400;}
+.tve-exp-ledger-ui .ledger-table thead tr.filter-row th.tve-amount-col{font-weight:400;padding-right:0;}
 .tve-exp-ledger-ui .ledger-table thead tr:first-child th.tve-amount-col{font-weight:700;}
 .tve-exp-ledger-ui .ledger-table th:hover{background:var(--cream-2);}
 .tve-exp-ledger-ui .ledger-table thead tr.filter-row th{
   position:sticky;top:var(--tve-sticky-header-h, 44px);z-index:3;background:#fff;
   border-top:1px solid var(--line);
-  padding-top:8px;padding-bottom:5px;padding-left:10px;padding-right:10px;
+  padding-top:8px;padding-bottom:5px;padding-left:10px;padding-right:0;
 }
 .tve-exp-ledger-ui .ledger-table.tve-filters-open tbody tr:first-child td{
   padding-top:6px !important;
@@ -1052,11 +1052,11 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     };
     const formatBillArrivalDisplay = (e) => {
         const raw = getExpenseBillArrivalRaw(e);
-        if (!raw) return '—';
+        if (!raw) return '';
         const head = String(raw).trim().slice(0, 10);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return formatChipDateDMY(head) || '—';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return formatChipDateDMY(head) || '';
         try {
-            return formatDateOnly(raw) || '—';
+            return formatDateOnly(raw) || '';
         } catch {
             return String(raw);
         }
@@ -1363,11 +1363,20 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             backgroundColor: '#fff',
             textAlign: 'left',
             fontWeight: 400,
+            paddingLeft: 0,
+            paddingRight: 0,
         }),
-        valueContainer: (base) => ({ ...base, padding: '4px 8px', flexWrap: 'nowrap' }),
+        valueContainer: (base) => ({
+            ...base,
+            padding: 0,
+            paddingLeft: 8,
+            paddingTop: 2,
+            paddingBottom: 2,
+            flexWrap: 'nowrap',
+        }),
         input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 13 }),
-        indicatorsContainer: (base) => ({ ...base, height: 45 }),
-        dropdownIndicator: (base) => ({ ...base, padding: 6 }),
+        indicatorsContainer: (base) => ({ ...base, height: 45, padding: 0, display: 'flex', alignItems: 'center' }),
+        dropdownIndicator: (base) => ({ ...base, padding: 0 }),
         indicatorSeparator: () => ({ display: 'none' }),
         clearIndicator: (base) => ({ ...base, padding: 0 }),
         menu: (base) => ({ ...base, zIndex: 999 }),
@@ -1807,7 +1816,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                             <div className="body">
                                 <div
                                     ref={scrollRef}
-                                    className="desk-table expenses-table-wrap table-scroll select-none px-2 thin-scrollbar"
+                                    className="desk-table expenses-table-wrap table-scroll select-none thin-scrollbar"
                                     onMouseDown={handleMouseDown}
                                     onMouseMove={handleMouseMove}
                                     onMouseUp={handleMouseUp}
@@ -1831,7 +1840,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                             <col style={{ width: '100px' }} />
                                             <col style={{ width: '100px' }} />
                                             <col style={{ width: '40px' }} />
-                                            <col style={{ width: '30px' }} />
+                                            <col style={{ width: '50px' }} />
                                         </colgroup>
                                 <thead>
                                     <tr ref={headerRowRef}>
@@ -1884,7 +1893,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                             Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
                                         </th>
                                         <th className="w-[40px] text-left">Edit</th>
-                                        <th className="w-[30px] text-left">File</th>
+                                        <th className="w-[50px] text-left">File</th>
                                     </tr>
                                     {showFilters && (
                                         <tr ref={filterRowRef} className="filter-row">
@@ -1893,7 +1902,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowDateRangePicker(true)}
-                                                        className="w-full max-w-[130px] h-[45px] px-2 py-0 text-sm !font-normal bg-white text-left flex items-center gap-1"
+                                                        className="w-full max-w-[130px] h-[45px] pl-2 pr-0 py-0 text-sm !font-normal bg-white text-left flex items-center gap-0"
                                                     >
                                                         <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${startDate && endDate ? 'text-black font-medium' : 'text-[#d3d5db] !font-normal'}`}>
                                                             {startDate
@@ -1924,7 +1933,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
                                                     onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -1938,7 +1946,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
                                                     onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -1952,7 +1959,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
                                                     onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -1971,7 +1977,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
                                                     onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -1985,7 +1990,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
                                                     onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -2000,7 +2004,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
                                                     onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -2014,7 +2017,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
                                                     onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -2028,7 +2030,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
                                                     onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -2042,7 +2043,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
                                                     onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
                                                     placeholder="All"
-                                                    isClearable
                                                     isSearchable
                                                     menuPlacement="bottom"
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -2073,8 +2073,8 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                             <td className="truncate-cell text-left" title={getMachineToolsItemIdDisplay(expense.machineTools)}>{getMachineToolsItemIdDisplay(expense.machineTools)}</td>
                                             <td className="truncate-cell text-left" title={expense.source}>{expense.source}</td>
                                             <td className="truncate-cell text-left" title={getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}>{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
-                                            <td className="num-cell text-left pl-3">{expense.eno}</td>
-                                            <td className="num-cell text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense.billArrivalDate)}</td>
+                                            <td className="num-cell text-right pl-3">{expense.eno}</td>
+                                            <td className="num-cell text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense)}</td>
                                             <td className="py-1.5 w-[50px]">
                                                 <div className="act-cell">
                                                 <button

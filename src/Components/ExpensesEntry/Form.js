@@ -17,6 +17,7 @@ import {
 
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
+const SUBSCRIPTION_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-subscription/getAll';
 
 const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWeeklyExpensesSave = false }) => {
     const predefinedSiteOptions = [
@@ -912,7 +913,7 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
             try {
                 const prefillData = JSON.parse(prefillDataStr);
                 const targetNumber =
-                    (prefillData.utilityType === 'Telecom' ? prefillData.utilityTypeNumber : null) ||
+                    ((prefillData.utilityType === 'Telecom' || prefillData.utilityType === 'Subscription') ? prefillData.utilityTypeNumber : null) ||
                     prefillData.ebNo ||
                     prefillData.propertyTaxNo ||
                     prefillData.waterTaxNo ||
@@ -1016,6 +1017,40 @@ const Form = ({ username, userRoles = [], embedded = false, onSuccess, disableWe
                 );
             } catch (e) {
                 console.error('Failed to fetch telecom service numbers', e);
+                setEbNumberOptions([]);
+            }
+            return;
+        }
+
+        if (utilityType === 'Subscription') {
+            const pid =
+                projectData?.id ??
+                projectData?.projectId ??
+                projectData?.project_id ??
+                selectedSite?.id ??
+                null;
+            if (!pid) {
+                setEbNumberOptions([]);
+                return;
+            }
+            try {
+                const res = await axios.get(SUBSCRIPTION_DIRECTORY_ENDPOINT);
+                const rows = Array.isArray(res.data) ? res.data : [];
+                const serviceNos = rows
+                    .filter((r) => String(r?.project_id ?? r?.projectId ?? '') === String(pid))
+                    .map((r) => r?.service_number ?? r?.serviceNumber ?? '')
+                    .map((v) => String(v || '').trim())
+                    .filter(Boolean);
+                const unique = Array.from(new Set(serviceNos));
+                setEbNumberOptions(
+                    unique.map((no, idx) => ({
+                        value: no,
+                        label: no,
+                        id: idx
+                    }))
+                );
+            } catch (e) {
+                console.error('Failed to fetch subscription service numbers', e);
                 setEbNumberOptions([]);
             }
             return;

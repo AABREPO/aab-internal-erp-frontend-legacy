@@ -365,6 +365,38 @@ const Outgoing = ({ user }) => {
       if (!inventoryItem) return;
       if (outgoingSiteOptions.length === 0 || outgoingEmployeeList.length === 0) {
         localStorage.setItem('editingInventory', JSON.stringify(inventoryItem));
+        const pendingItems = inventoryItem.inventoryItems || inventoryItem.inventory_items || [];
+        if (Array.isArray(pendingItems) && pendingItems.length > 0) {
+          const quickItems = pendingItems.map((invItem, index) => ({
+            id: index + 1,
+            name: invItem.itemName || invItem.item_name || invItem.name || '',
+            brand: invItem.brandName || invItem.brand_name || invItem.brand || '',
+            model: invItem.modelName || invItem.model_name || invItem.model || '',
+            type: invItem.typeName || invItem.type_name || invItem.type || '',
+            category: invItem.categoryName || invItem.category_name || invItem.category || '',
+            quantity: Math.abs(invItem.qty || invItem.quantity || invItem.Qty || invItem.Quantity || 0),
+            price: Number(invItem.amount) || 0,
+            itemId: invItem.item_id || invItem.itemId || null,
+            brandId: invItem.brand_id || invItem.brandId || null,
+            modelId: invItem.model_id || invItem.modelId || null,
+            typeId: invItem.type_id || invItem.typeId || null,
+            categoryId: invItem.category_id || invItem.categoryId || null,
+          }));
+          setItems(quickItems);
+          setHasOpenedAdd(true);
+          setHideSummaryCard(false);
+          setFromHistory(inventoryItem.fromHistory === true);
+          setIsEditMode(inventoryItem.isEditMode === true);
+          setOutgoingData((prev) => ({
+            ...prev,
+            projectName: inventoryItem.project_name || inventoryItem.projectName || prev.projectName,
+            projectIncharge: inventoryItem.project_incharge || inventoryItem.projectIncharge || prev.projectIncharge,
+            stockingLocation: inventoryItem.stocking_location || inventoryItem.stockingLocation || prev.stockingLocation,
+            contact: inventoryItem.site_incharge_mobile_number || inventoryItem.contact || prev.contact,
+            date: inventoryItem.date ? formatDate(inventoryItem.date) : prev.date,
+            outgoingType: inventoryItem.outgoing_type || inventoryItem.outgoingType || prev.outgoingType,
+          }));
+        }
         return;
       }
       // Format date
@@ -542,8 +574,13 @@ const Outgoing = ({ user }) => {
       // When cloning (not edit mode, not from history), show form fields instead of summary card
       if (!isEditModeFlag && !fromHistoryFlag && formattedItems.length > 0) {
         setHideSummaryCard(true);
+      } else if (fromHistoryFlag) {
+        // View / edit from History: show summary card and items list
+        setHideSummaryCard(false);
+        if (!isEditModeFlag && formattedItems.length > 0) {
+          setHasOpenedAdd(true);
+        }
       } else if (isEditModeFlag && fromHistoryFlag) {
-        // When editing from history, show summary card by default
         setHideSummaryCard(false);
       }
     };
@@ -1566,7 +1603,10 @@ const Outgoing = ({ user }) => {
       {(hasOpenedAdd || !isEmptyState || isEditMode) && (
         <>
           {/* Items Section - Show only when all three fields are filled */}
-          {(!isEmptyState || isEditMode) && outgoingData.projectName && outgoingData.projectIncharge && outgoingData.stockingLocation && (
+          {(!isEmptyState || isEditMode || (fromHistory && !isEditMode)) &&
+            outgoingData.projectName &&
+            outgoingData.projectIncharge &&
+            (outgoingData.stockingLocation || (fromHistory && !isEditMode)) && (
             <div className="flex flex-col flex-1 min-h-0 mb-4 mt-[10px]">
               {/* Items Header - Fixed */}
               <div className="flex-shrink-0 flex items-center gap-[8px] mb-2 border-b border-[#E0E0E0] pb-[8px]">

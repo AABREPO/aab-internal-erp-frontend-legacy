@@ -7,6 +7,17 @@ import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
+import {
+    buildPropertyStyleAutoFill,
+    buildTenantLinksMap,
+    computePropertyStyleFilteredProjects,
+    flattenPropertyStyleRows,
+    getDefaultPropertyStyleFilters,
+    getPropertyStyleFilterOptions,
+    getTenantOptionsFromFiltered,
+} from './utilityHubTabFilters';
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
 const PROJECTS_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/api/projects/getAll';
@@ -70,18 +81,7 @@ const getTelecomServiceProviderDisplay = (property) => {
 };
 
 const TelecomTab = ({ username, userRoles = [] }) => {
-    const [filters, setFilters] = useState({
-        year: new Date().getFullYear().toString(),
-        month: '',
-        paymentStatus: '',
-        vendor: '',
-        service: '',
-        doorNo: '',
-        shop: '',
-        projectName: '',
-        tenant: '',
-        occupancyStatus: ''
-    });
+    const [filters, setFilters] = useState(() => getDefaultPropertyStyleFilters(MONTH_LABELS, { month: '' }));
     const [projects, setProjects] = useState([]);
     const [telecomPayments, setTelecomPayments] = useState([]);
     const [frequencyHistory, setFrequencyHistory] = useState([]);
@@ -362,111 +362,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
     const filteredFrequencyHistory = useMemo(() => frequencyHistory || [], [frequencyHistory]);
 
-    useEffect(() => {
-        const toLower = (value) => (value ? value.toString().toLowerCase() : '');
-        const vendorFilter = toLower(filters.vendor);
-        const doorFilter = toLower(filters.doorNo);
-        const shopFilter = toLower(filters.shop);
-        const serviceFilter = toLower(filters.service);
-        const tenantFilter = toLower(filters.tenant);
-        const projectNameFilter = toLower(filters.projectName);
-        const occupancyFilter = toLower(filters.occupancyStatus);
-
-        // Tenant ↔ Shop link lookup (same as ElectricityTab)
-        const tenantLinksByPropertyId = new Map();
-        if (Array.isArray(tenantShopData) && tenantShopData.length) {
-            tenantShopData.forEach(tenant => {
-                const tName = (tenant?.tenantName || '').toString();
-                (tenant?.shopNos || []).forEach(shop => {
-                    const propertyId = shop?.shopNoId;
-                    if (!propertyId) return;
-                    if (!tenantLinksByPropertyId.has(propertyId)) tenantLinksByPropertyId.set(propertyId, []);
-                    tenantLinksByPropertyId.get(propertyId).push({
-                        tenantName: tName,
-                        shopClosureDate: shop?.shopClosureDate || null
-                    });
-                });
-            });
-        }
-        const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(propertyId) || [];
-        const matchesTenantFromLinks = (propertyId) => {
-            if (!tenantFilter) return true;
-            const links = getLinksForProperty(propertyId);
-            if (!links.length) return false;
-            return links.some(l => toLower(l.tenantName).includes(tenantFilter));
-        };
-        const matchesOccupancyFromLinks = (propertyId) => {
-            if (!occupancyFilter) return true;
-            const links = getLinksForProperty(propertyId);
-            const hasActive = links.some(l => !l.shopClosureDate);
-            const hasVacated = links.some(l => !!l.shopClosureDate);
-            if (occupancyFilter === 'occupied') return hasActive;
-            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
-            return true;
-        };
-
-        const filtered = projects.reduce((acc, project) => {
-            if (selectedCategory && project.projectCategory !== selectedCategory) {
-                return acc;
-            }
-
-            if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
-                return acc;
-            }
-
-            const filteredProperties = (project.propertyDetails || []).filter(property => {
-                if (!property || !property.ebNo || !property.ebNo.trim()) {
-                    return false;
-                }
-
-                if (doorFilter && !toLower(property.doorNo).includes(doorFilter)) {
-                    return false;
-                }
-                if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
-                    return false;
-                }
-                if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
-                    return false;
-                }
-                const propertyId = property?.id ?? property?.propertyId ?? property?.projectNamePropertyDetailsId;
-                if (!matchesTenantFromLinks(propertyId)) return false;
-                if (!matchesOccupancyFromLinks(propertyId)) return false;
-                if (vendorFilter) {
-                    const vendorValue = toLower(property.vendorName);
-                    if (!vendorValue || !vendorValue.includes(vendorFilter)) {
-                        return false;
-                    }
-                }
-
-                if (!matchesPaymentFilters(property)) {
-                    return false;
-                }
-
-                return true;
-            });
-
-            if (filteredProperties.length === 0) {
-                return acc;
-            }
-
-            acc.push({
-                ...project,
-                propertyDetails: [...filteredProperties].sort(comparePropertyShopNoAsc)
-            });
-
-            return acc;
-        }, []);
-
-        setFilteredProjects(filtered);
-    }, [filters, projects, selectedCategory, tenantShopData, telecomPayments]);
-
-    const handleFilterChange = (filterType, selectedOption) => {
-        setFilters(prev => ({
-            ...prev,
-            [filterType]: selectedOption ? selectedOption.value : ''
-        }));
-    };
-
     const customSelectStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -499,33 +394,6 @@ const TelecomTab = ({ username, userRoles = [] }) => {
     const selectPortalProps = {
         menuPortalTarget: document.body,
         menuPosition: 'fixed',
-    };
-
-    const getUniqueValues = (key) => {
-        const values = new Set();
-        projects.forEach(project => {
-            if (key === 'projectName') {
-                if (project.projectName) {
-                    values.add(project.projectName);
-                }
-            } else if (key === 'doorNo') {
-                project.propertyDetails.forEach(property => {
-                    if (property.doorNo) values.add(property.doorNo);
-                });
-            } else if (key === 'shop') {
-                project.propertyDetails.forEach(property => {
-                    if (property.shopNo) values.add(property.shopNo);
-                });
-            } else if (key === 'serviceNo') {
-                project.propertyDetails.forEach(property => {
-                    if (property.ebNo) values.add(property.ebNo);
-                });
-            }
-        });
-        return Array.from(values).sort().map(value => ({
-            value: value,
-            label: value
-        }));
     };
 
     const getFrequencyData = (telecomId) => {
@@ -793,8 +661,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         return diff >= 0 && diff < coverMonths;
     };
 
-    const getPaymentData = (serviceNumber, month, telecomId, property) => {
-        const selectedYear = filters.year || new Date().getFullYear().toString();
+    const getPaymentData = (serviceNumber, month, telecomId, property, yearOverride) => {
+        const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
             'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
@@ -866,28 +734,103 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         return unpaidCount;
     };
 
-    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthLabels = MONTH_LABELS;
 
-    const matchesPaymentFilters = (property) => {
-        const selectedMonth = filters.month;
-        const selectedStatus = filters.paymentStatus;
-        if (!selectedMonth && !selectedStatus) {
-            return true;
-        }
+    const getServiceNo = (property) => property?.ebNo;
+    const tenantLinksByPropertyId = useMemo(() => buildTenantLinksMap(tenantShopData), [tenantShopData]);
+    const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(String(propertyId)) || [];
+
+    const toLower = (value) => (value ? value.toString().toLowerCase() : '');
+
+    const matchesPaymentFiltersFor = (property, filterState) => {
+        const selectedMonth = filterState.month;
+        const selectedStatus = filterState.paymentStatus;
+        if (!selectedMonth && !selectedStatus) return true;
         const telecomKey = property?.utilityTelecomId ?? property?.id;
         const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
+            const paymentData = getPaymentData(property.ebNo, month, telecomKey, property, filterState.year);
             const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
             const isUnpaid = paymentData.amount === '0';
             if (selectedStatus === 'Paid') return isPaid;
             if (selectedStatus === 'Unpaid') return isUnpaid;
             return true;
         };
-        if (selectedMonth) {
-            return evaluateMonth(selectedMonth);
-        }
+        if (selectedMonth) return evaluateMonth(selectedMonth);
         return monthLabels.some((month) => evaluateMonth(month));
     };
+
+    const computeFiltered = (filterState, excludeField = null) =>
+        computePropertyStyleFilteredProjects({
+            projects,
+            selectedCategory,
+            filterState,
+            excludeField,
+            getServiceNo,
+            getLinksForProperty,
+            matchesPaymentFiltersFor,
+            payments: telecomPayments,
+            comparePropertyShopNoAsc,
+            matchVendor: (property, vendorFilter) => {
+                if (!vendorFilter) return true;
+                const raw = property?.vendorName || getTelecomServiceProviderDisplay(property);
+                const vendorValue = toLower(raw === '-' ? '' : raw);
+                return vendorValue.includes(vendorFilter);
+            },
+        });
+
+    useEffect(() => {
+        setFilteredProjects(computeFiltered(filters));
+    }, [filters, projects, selectedCategory, telecomPayments, tenantLinksByPropertyId]);
+
+    const handleFilterChange = (filterType, selectedOption) => {
+        setFilters((prev) => {
+            const next = { ...prev, [filterType]: selectedOption ? selectedOption.value : '' };
+            const rows = flattenPropertyStyleRows(computeFiltered(next), getServiceNo, comparePropertyShopNoAsc);
+            if (rows.length === 1) {
+                const auto = buildPropertyStyleAutoFill({
+                    row: rows[0],
+                    filterState: next,
+                    changedField: filterType,
+                    getServiceNo,
+                    getLinksForProperty,
+                    getPaymentData: (sn, month, propId, year) =>
+                        getPaymentData(sn, month, rows[0].property?.utilityTelecomId ?? rows[0].property?.id, rows[0].property, year),
+                    payments: telecomPayments,
+                    monthLabels: MONTH_LABELS,
+                });
+                const provider = getTelecomServiceProviderDisplay(rows[0].property);
+                if (filterType !== 'vendor' && provider && provider !== '-') {
+                    auto.vendor = provider;
+                }
+                return { ...next, ...auto };
+            }
+            return next;
+        });
+    };
+
+    const clearFilters = () => setFilters(getDefaultPropertyStyleFilters(MONTH_LABELS, { month: '' }));
+
+    const vendorFilterOptions = useMemo(() => {
+        const subset = computeFiltered(filters, 'vendor');
+        const rows = flattenPropertyStyleRows(subset, getServiceNo, comparePropertyShopNoAsc);
+        const vendors = new Set();
+        rows.forEach(({ property }) => {
+            const display = getTelecomServiceProviderDisplay(property);
+            if (display && display !== '-') vendors.add(display);
+            if (property?.vendorName) vendors.add(String(property.vendorName).trim());
+        });
+        return Array.from(vendors).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
+    }, [filters, projects, selectedCategory, telecomPayments, tenantLinksByPropertyId]);
+
+    const tenantFilterOptions = useMemo(
+        () => getTenantOptionsFromFiltered(filters, computeFiltered, (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc), getLinksForProperty),
+        [filters, projects, selectedCategory, telecomPayments, tenantLinksByPropertyId]
+    );
+
+    const getFilterOptions = (fieldKey, excludeField) =>
+        getPropertyStyleFilterOptions(filters, fieldKey, excludeField, computeFiltered, getServiceNo);
+
+    const matchesPaymentFilters = (property) => matchesPaymentFiltersFor(property, filters);
 
     const sortedFilteredProjects = useMemo(
         () => sortProjectsPropertyDetailsByShopNo(filteredProjects),
@@ -1177,6 +1120,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                lockUtilityPrefillFields
                                 onSuccess={async () => {
                                     setShowExpenseEntryModal(false);
                                     setExpenseEntryPrefill(null);
@@ -1196,7 +1140,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
             <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
                     {/* Match ElectricityTab filter layout */}
-                    <div className="grid grid-cols-6 gap-4 text-left">
+                    <div className="flex flex-wrap gap-4 text-left items-end">
+                    <div className="grid grid-cols-6 gap-4 flex-1 min-w-0">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -1246,7 +1191,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Service provider</label>
                             <Select
-                                options={vendorOptions}
+                                options={vendorFilterOptions}
                                 value={filters.vendor ? { value: filters.vendor, label: filters.vendor } : null}
                                 onChange={(selectedOption) => handleFilterChange('vendor', selectedOption)}
                                 placeholder="Select service "
@@ -1260,7 +1205,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Service</label>
                             <Select
-                                options={getUniqueValues('serviceNo')}
+                                options={getFilterOptions('serviceNo', 'service')}
                                 value={filters.service ? { value: filters.service, label: filters.service } : null}
                                 onChange={(selectedOption) => handleFilterChange('service', selectedOption)}
                                 placeholder="Select Service No"
@@ -1274,7 +1219,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Shop</label>
                             <Select
-                                options={getUniqueValues('shop')}
+                                options={getFilterOptions('shop', 'shop')}
                                 value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
                                 onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
                                 placeholder="Select Shop"
@@ -1288,7 +1233,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Door No</label>
                             <Select
-                                options={getUniqueValues('doorNo')}
+                                options={getFilterOptions('doorNo', 'doorNo')}
                                 value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
                                 onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
                                 placeholder="Select Door No"
@@ -1302,7 +1247,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Name</label>
                             <Select
-                                options={getUniqueValues('projectName')}
+                                options={getFilterOptions('projectName', 'projectName')}
                                 value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectName', selectedOption)}
                                 placeholder="Select Project"
@@ -1316,7 +1261,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Tenant</label>
                             <Select
-                                options={tenantOptions}
+                                options={tenantFilterOptions}
                                 value={filters.tenant ? { value: filters.tenant, label: filters.tenant } : null}
                                 onChange={(selectedOption) => handleFilterChange('tenant', selectedOption)}
                                 placeholder="Select Tenant"
@@ -1341,6 +1286,14 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                 className="w-full"
                             />
                         </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="px-5 py-2 h-[45px] border-2 border-[#BF9853] text-[#BF9853] rounded-lg font-semibold hover:bg-[#FAF6ED] transition-colors whitespace-nowrap shrink-0"
+                    >
+                        Clear
+                    </button>
                     </div>
                 </div>
             </div>

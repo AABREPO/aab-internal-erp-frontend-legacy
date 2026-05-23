@@ -9,6 +9,78 @@ import Close from '../Images/close.png'
 import Search from '../Images/Search.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
+const INVENTORY_EDIT_URL = 'https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history';
+const INVENTORY_GET_ALL_URL = 'https://backendaab.in/demoAabuildersDash/api/inventory/getAll';
+
+/** Load header + line items for a history row (getAll often omits nested items). */
+const fetchInventoryWithItems = async (inventoryData) => {
+  let data = { ...(inventoryData || {}) };
+  const attachItems = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return data;
+    return { ...data, inventoryItems: items, inventory_items: items };
+  };
+
+  const existing = data.inventoryItems || data.inventory_items;
+  if (Array.isArray(existing) && existing.length > 0) {
+    return attachItems(existing);
+  }
+
+  if (data.id != null && data.id !== '') {
+    try {
+      const response = await fetch(`${INVENTORY_EDIT_URL}/${data.id}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const detailed = await response.json();
+        const items = detailed.inventoryItems || detailed.inventory_items || [];
+        if (items.length > 0) {
+          return { ...data, ...detailed, inventoryItems: items, inventory_items: items };
+        }
+        return { ...data, ...detailed };
+      }
+    } catch (error) {
+      console.error('Error fetching inventory details:', error);
+    }
+  }
+
+  try {
+    const response = await fetch(INVENTORY_GET_ALL_URL, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+      const all = await response.json();
+      const match = (Array.isArray(all) ? all : []).find(
+        (row) => data.id != null && String(row.id) === String(data.id)
+      );
+      if (match) {
+        const items = match.inventoryItems || match.inventory_items || [];
+        return { ...data, ...match, inventoryItems: items, inventory_items: items };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching inventory list:', error);
+  }
+
+  return data;
+};
+
+const navigateToOutgoingView = (inventoryData, onTabChange) => {
+  const payload = {
+    ...inventoryData,
+    isEditMode: false,
+    fromHistory: true,
+  };
+  localStorage.setItem('editingInventory', JSON.stringify(payload));
+  window.dispatchEvent(new CustomEvent('editInventory', { detail: payload }));
+  if (onTabChange) {
+    onTabChange('outgoing');
+  }
+};
+
 const History = ({ onTabChange, user } = {}) => {
   // Prevent whole-page scroll; keep only inner list scrollable
   useEffect(() => {
@@ -612,85 +684,15 @@ const History = ({ onTabChange, user } = {}) => {
     };
   }, [filteredData]);
 
-  // Handle view (for viewing when clicking transaction ID)
+  // Handle view (for viewing when clicking transaction ID / eno)
   const handleView = async (item) => {
     try {
-      // Get the original inventory item data (should already have inventoryItems from originalItem)
-      let inventoryData = item.originalItem || item;
-
-      // Check if inventoryItems are present in the data
-      const hasInventoryItems = inventoryData?.inventoryItems || inventoryData?.inventory_items;
-
-      // If inventoryItems are missing, try to fetch them from the backend
-      if (!hasInventoryItems || (Array.isArray(inventoryData?.inventoryItems) && inventoryData.inventoryItems.length === 0) ||
-        (Array.isArray(inventoryData?.inventory_items) && inventoryData.inventory_items.length === 0)) {
-        if (inventoryData?.id) {
-          try {
-            // Try to fetch the inventory record with items by ID
-            const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/inventory/edit_with_history/${inventoryData.id}`, {
-              method: 'GET',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-
-            if (response.ok) {
-              const detailedData = await response.json();
-              // Merge the detailed data with inventoryItems
-              if (detailedData.inventoryItems || detailedData.inventory_items) {
-                const items = detailedData.inventoryItems || detailedData.inventory_items;
-                inventoryData = {
-                  ...inventoryData,
-                  inventoryItems: items,
-                  inventory_items: items
-                };
-              }
-            }
-          } catch (fetchError) {
-            console.error('Error fetching inventory details:', fetchError);
-            // Continue with existing data even if fetch fails
-          }
-        }
-      }
-
-      // Ensure inventoryItems are explicitly set (use both field names for compatibility)
-      if (inventoryData?.inventoryItems || inventoryData?.inventory_items) {
-        const items = inventoryData.inventoryItems || inventoryData.inventory_items;
-        inventoryData = {
-          ...inventoryData,
-          inventoryItems: items,
-          inventory_items: items
-        };
-      }
-
-      // Mark as view mode (not edit mode) - for showing Download button
-      inventoryData.isEditMode = false;
-      // Mark as view mode from History (for showing Download button instead of Stack Return/Dispatch)
-      inventoryData.fromHistory = true;
-
-      // Store inventory item data in localStorage to load in outgoing tab
-      if (inventoryData) {
-        localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
-      }
-      // Dispatch custom event for outgoing component to listen
-      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
-      // Navigate to outgoing tab for viewing
-      if (onTabChange) {
-        onTabChange('outgoing');
-      }
+      let inventoryData = await fetchInventoryWithItems(item.originalItem || item);
+      navigateToOutgoingView(inventoryData, onTabChange);
       setExpandedItemId(null);
     } catch (error) {
       console.error('Error in handleView:', error);
-      // Fallback: still try to pass the data even if there's an error
-      const inventoryData = item.originalItem || item;
-      inventoryData.isEditMode = false;
-      inventoryData.fromHistory = true;
-      localStorage.setItem('editingInventory', JSON.stringify(inventoryData));
-      window.dispatchEvent(new CustomEvent('editInventory', { detail: inventoryData }));
-      if (onTabChange) {
-        onTabChange('outgoing');
-      }
+      navigateToOutgoingView(item.originalItem || item, onTabChange);
       setExpandedItemId(null);
     }
   };

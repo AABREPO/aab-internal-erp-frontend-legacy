@@ -7,6 +7,14 @@ import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
+import {
+  buildSubscriptionAutoFill,
+  computeSubscriptionStyleFilteredProjects,
+  flattenSubscriptionRows,
+  getDefaultSubscriptionFilters,
+  getProviderOptionsFromFiltered,
+  getSubscriptionFilterOptions,
+} from './utilityHubTabFilters';
 
 const SUBSCRIPTION_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-subscription/getAll';
 const PROJECTS_ENDPOINT = 'https://backendaab.in/demoAabuilderDash/api/projects/getAll';
@@ -128,18 +136,7 @@ const formatAmount = (value) => {
 };
 
 const SubscriptionTab = ({ username, userRoles = [] }) => {
-  const [filters, setFilters] = useState({
-    year: new Date().getFullYear().toString(),
-    month: monthLabels[new Date().getMonth()],
-    paymentStatus: '',
-    provider: '',
-    serviceNumber: '',
-    registered: '',
-    planNumber: '',
-    projectName: '',
-    serviceType: '',
-    purpose: ''
-  });
+  const [filters, setFilters] = useState(() => getDefaultSubscriptionFilters(monthLabels));
   const [projects, setProjects] = useState([]);
   const [subscriptionPayments, setSubscriptionPayments] = useState([]);
   const [frequencyHistory, setFrequencyHistory] = useState([]);
@@ -337,127 +334,6 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
     fetchFrequencyHistory();
   }, []);
 
-  useEffect(() => {
-    const providerFilter = toLower(filters.provider);
-    const serviceFilter = toLower(filters.serviceNumber);
-    const registeredFilter = toLower(filters.registered);
-    const planFilter = toLower(filters.planNumber);
-    const serviceTypeFilter = toLower(filters.serviceType);
-    const purposeFilter = toLower(filters.purpose);
-    const projectNameFilter = toLower(filters.projectName);
-
-    const matchesPaymentFilters = (detail) => {
-      const selectedMonth = filters.month;
-      const selectedStatus = filters.paymentStatus;
-      if (!selectedMonth && !selectedStatus) return true;
-
-      const subscriptionKey = detail.utilitySubscriptionId ?? detail.id;
-
-      const evaluateMonth = (month) => {
-        const paymentData = getPaymentData(detail.serviceNumber, month, subscriptionKey);
-        const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
-        const isUnpaid = paymentData.amount === '0';
-        if (selectedStatus === 'Paid') return isPaid;
-        if (selectedStatus === 'Unpaid') return isUnpaid;
-        return true;
-      };
-
-      if (selectedMonth) return evaluateMonth(selectedMonth);
-      return monthLabels.some((m) => evaluateMonth(m));
-    };
-
-    const filtered = projects.reduce((acc, project) => {
-      if (selectedCategory && project.projectCategory !== selectedCategory) {
-        return acc;
-      }
-
-      if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
-        return acc;
-      }
-
-      const filteredDetails = (project.subscriptionDetails || []).filter((detail) => {
-        if (!detail || !detail.serviceNumber || !detail.serviceNumber.trim()) {
-          return false;
-        }
-
-        if (registeredFilter && !toLower(detail.registeredPerson).includes(registeredFilter)) {
-          return false;
-        }
-        if (planFilter && !toLower(detail.planNumber).includes(planFilter)) {
-          return false;
-        }
-        if (serviceTypeFilter && !toLower(detail.serviceType).includes(serviceTypeFilter)) {
-          return false;
-        }
-        if (serviceFilter && !toLower(detail.serviceNumber).includes(serviceFilter)) {
-          return false;
-        }
-        if (purposeFilter && !toLower(detail.purpose).includes(purposeFilter)) {
-          return false;
-        }
-        if (providerFilter && !toLower(detail.serviceProvider).includes(providerFilter)) {
-          return false;
-        }
-
-        if (filters.year) {
-          const paymentYear = detail.paymentDate ? String(new Date(detail.paymentDate).getFullYear()) : '';
-          if (paymentYear !== filters.year) {
-            return false;
-          }
-        }
-
-        if (!matchesPaymentFilters(detail)) {
-          return false;
-        }
-
-        return true;
-      });
-
-      if (filteredDetails.length === 0) {
-        return acc;
-      }
-
-      acc.push({
-        ...project,
-        subscriptionDetails: [...filteredDetails].sort(comparePropertyShopNoAsc)
-      });
-
-      return acc;
-    }, []);
-
-    setFilteredProjects(filtered);
-  }, [filters, projects, selectedCategory, subscriptionPayments]);
-
-  const handleFilterChange = (filterType, selectedOption) => {
-    setFilters((prev) => ({
-      ...prev,
-      [filterType]: selectedOption ? selectedOption.value : ''
-    }));
-  };
-
-  const getUniqueValues = (key) => {
-    const values = new Set();
-    projects.forEach((project) => {
-      if (key === 'projectName') {
-        if (project.projectName) values.add(project.projectName);
-      } else {
-        project.subscriptionDetails.forEach((detail) => {
-          if (key === 'serviceNumber' && detail.serviceNumber) values.add(detail.serviceNumber);
-          if (key === 'registered' && detail.registeredPerson) values.add(detail.registeredPerson);
-          if (key === 'planNumber' && detail.planNumber) values.add(detail.planNumber);
-          if (key === 'serviceType' && detail.serviceType) values.add(detail.serviceType);
-          if (key === 'purpose' && detail.purpose) values.add(detail.purpose);
-        });
-      }
-    });
-    return Array.from(values)
-      .sort()
-      .map((value) => ({
-        value,
-        label: value
-      }));
-  };
-
   const filteredFrequencyHistory = useMemo(() => frequencyHistory || [], [frequencyHistory]);
 
   const tenantNamesTooltipByPropertyId = useMemo(() => {
@@ -573,8 +449,8 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
     return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
   };
 
-  const getPaymentData = (serviceNumber, month, subscriptionId) => {
-    const selectedYear = filters.year || new Date().getFullYear().toString();
+  const getPaymentData = (serviceNumber, month, subscriptionId, yearOverride) => {
+    const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
     const monthNumber = monthMap[month];
     if (!monthNumber) return { amount: '-', date: null };
     const yearMonth = `${selectedYear}-${monthNumber}`;
@@ -609,6 +485,67 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
     }
     return { amount: '0', date: null };
   };
+
+  const matchesPaymentFiltersFor = (detail, filterState) => {
+    const selectedMonth = filterState.month;
+    const selectedStatus = filterState.paymentStatus;
+    if (!selectedMonth && !selectedStatus) return true;
+    const subscriptionKey = detail.utilitySubscriptionId ?? detail.id;
+    const evaluateMonth = (month) => {
+      const paymentData = getPaymentData(detail.serviceNumber, month, subscriptionKey, filterState.year);
+      const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+      const isUnpaid = paymentData.amount === '0';
+      if (selectedStatus === 'Paid') return isPaid;
+      if (selectedStatus === 'Unpaid') return isUnpaid;
+      return true;
+    };
+    if (selectedMonth) return evaluateMonth(selectedMonth);
+    return monthLabels.some((m) => evaluateMonth(m));
+  };
+
+  const computeFiltered = (filterState, excludeField = null) =>
+    computeSubscriptionStyleFilteredProjects({
+      projects,
+      selectedCategory,
+      filterState,
+      excludeField,
+      matchesPaymentFiltersFor,
+      compareDetailSort: comparePropertyShopNoAsc,
+    });
+
+  useEffect(() => {
+    setFilteredProjects(computeFiltered(filters));
+  }, [filters, projects, selectedCategory, subscriptionPayments]);
+
+  const handleFilterChange = (filterType, selectedOption) => {
+    setFilters((prev) => {
+      const next = { ...prev, [filterType]: selectedOption ? selectedOption.value : '' };
+      const rows = flattenSubscriptionRows(computeFiltered(next), comparePropertyShopNoAsc);
+      if (rows.length === 1) {
+        return {
+          ...next,
+          ...buildSubscriptionAutoFill({
+            row: rows[0],
+            filterState: next,
+            changedField: filterType,
+            getPaymentData,
+            monthLabels,
+          }),
+        };
+      }
+      return next;
+    });
+  };
+
+  const clearFilters = () => setFilters(getDefaultSubscriptionFilters(monthLabels));
+
+  const providerFilterOptions = useMemo(
+    () => getProviderOptionsFromFiltered(filters, computeFiltered, (list) => flattenSubscriptionRows(list, comparePropertyShopNoAsc)),
+    [filters, projects, selectedCategory, subscriptionPayments]
+  );
+
+  const getFilterOptions = (fieldKey, excludeField) =>
+    getSubscriptionFilterOptions(filters, fieldKey, excludeField, computeFiltered);
 
   const getUnpaidCount = (serviceNumber, subscriptionId) => {
     const selectedYear = filters.year || new Date().getFullYear().toString();
@@ -1003,7 +940,8 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
       ) : null}
       <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
         <div className="p-6">
-          <div className="grid grid-cols-6 gap-4 text-left">
+          <div className="flex flex-wrap gap-4 text-left items-end">
+          <div className="grid grid-cols-6 gap-4 flex-1 min-w-0">
             <div>
               <label className="block font-semibold mb-1">Year</label>
               <Select
@@ -1053,7 +991,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Service Provider</label>
               <Select
-                options={providerOptions}
+                options={providerFilterOptions}
                 value={filters.provider ? { value: filters.provider, label: filters.provider } : null}
                 onChange={(selectedOption) => handleFilterChange('provider', selectedOption)}
                 placeholder="Select Provider"
@@ -1067,7 +1005,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Service Number</label>
               <Select
-                options={getUniqueValues('serviceNumber')}
+                options={getFilterOptions('serviceNumber', 'serviceNumber')}
                 value={filters.serviceNumber ? { value: filters.serviceNumber, label: filters.serviceNumber } : null}
                 onChange={(selectedOption) => handleFilterChange('serviceNumber', selectedOption)}
                 placeholder="Select Service No"
@@ -1081,7 +1019,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Registered Person</label>
               <Select
-                options={getUniqueValues('registered')}
+                options={getFilterOptions('registered', 'registered')}
                 value={filters.registered ? { value: filters.registered, label: filters.registered } : null}
                 onChange={(selectedOption) => handleFilterChange('registered', selectedOption)}
                 placeholder="Select Registered"
@@ -1095,7 +1033,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Plan Number</label>
               <Select
-                options={getUniqueValues('planNumber')}
+                options={getFilterOptions('planNumber', 'planNumber')}
                 value={filters.planNumber ? { value: filters.planNumber, label: filters.planNumber } : null}
                 onChange={(selectedOption) => handleFilterChange('planNumber', selectedOption)}
                 placeholder="Select Plan"
@@ -1109,7 +1047,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Project Name</label>
               <Select
-                options={getUniqueValues('projectName')}
+                options={getFilterOptions('projectName', 'projectName')}
                 value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
                 onChange={(selectedOption) => handleFilterChange('projectName', selectedOption)}
                 placeholder="Select Project"
@@ -1123,7 +1061,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Service Type</label>
               <Select
-                options={getUniqueValues('serviceType')}
+                options={getFilterOptions('serviceType', 'serviceType')}
                 value={filters.serviceType ? { value: filters.serviceType, label: filters.serviceType } : null}
                 onChange={(selectedOption) => handleFilterChange('serviceType', selectedOption)}
                 placeholder="Select Type"
@@ -1137,7 +1075,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             <div>
               <label className="block font-semibold mb-1">Purpose</label>
               <Select
-                options={getUniqueValues('purpose')}
+                options={getFilterOptions('purpose', 'purpose')}
                 value={filters.purpose ? { value: filters.purpose, label: filters.purpose } : null}
                 onChange={(selectedOption) => handleFilterChange('purpose', selectedOption)}
                 placeholder="Select Purpose"
@@ -1148,6 +1086,14 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
                 className="w-full"
               />
             </div>
+          </div>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="px-5 py-2 h-[45px] border-2 border-[#BF9853] text-[#BF9853] rounded-lg font-semibold hover:bg-[#FAF6ED] transition-colors whitespace-nowrap shrink-0"
+          >
+            Clear
+          </button>
           </div>
         </div>
       </div>

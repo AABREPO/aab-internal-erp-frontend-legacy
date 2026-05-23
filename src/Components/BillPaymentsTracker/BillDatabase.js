@@ -2375,7 +2375,10 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                 if (enteredDates.length > 0) {
                     const billEnteredDates = enteredDates.map(date => new Date(date).toISOString().split('T')[0]);
                     const dateMatchedExpenses = expenses.filter((expense) => {
-                        const expenseDate = new Date(expense.timestamp || expense.date).toISOString().split('T')[0];
+                        // Match bill-entry entered_date against expenses_form timestamp only (not expense.date)
+                        const ts = expense?.timestamp ?? expense?.timeStamp;
+                        if (!ts) return false;
+                        const expenseDate = new Date(ts).toISOString().split('T')[0];
                         return billEnteredDates.includes(expenseDate);
                     });
                     const vendorMatchedExpenses = dateMatchedExpenses.filter((expense) => expense.vendor === vendorName);
@@ -2438,14 +2441,11 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
     }
     // Get entry status text
     const getEntryStatusText = (item) => {
-        if (item?.entry_status) return item.entry_status
-        const matchStatus = expenseMatchStatus[item.id];
-        const baseStatus = item.entry_status || 'Entry';
-        if (matchStatus === 'complete_match') {
-            return '✓ Entered';
-        } else if (matchStatus === 'partial_match') {
-            return 'Entered';
-        }
+        const baseStatus = item?.entry_status || item?.entryStatus || 'Entry';
+        if (baseStatus === 'Entry') return 'Entry';
+        const matchStatus = expenseMatchStatus[item?.id];
+        if (matchStatus === 'complete_match') return '✓ Entered';
+        if (baseStatus === 'Entered' || baseStatus === '✓ Entered') return 'Entered';
         return baseStatus;
     };
     // Check if all bills are verified
@@ -2503,8 +2503,11 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             const matchStatus = expenseMatchStatus[billId];
             if (matchStatus === 'complete_match') {
                 return 'px-4 py-2 rounded-full text-sm font-semibold bg-[#E2F9E1] border cursor-pointer transition-all duration-200 hover:bg-green-200'
-            } else if (matchStatus === 'partial_match') {
-                return 'px-4 py-2 rounded-full text-sm font-semibold bg-[#FFD39E] border cursor-pointer transition-all duration-200'
+            }
+            if (matchStatus === 'partial_match' || matchStatus === 'no_match') {
+                if (status === 'Entered' || status === '✓ Entered') {
+                    return 'px-6 py-2 rounded-full text-sm font-semibold bg-[#FFD39E] border cursor-pointer transition-all duration-200'
+                }
             }
         }
         if (status === '✓ Verified') {
@@ -3128,7 +3131,7 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                                         </td>
                                         <td className=" py-3 text-sm text-left border-b border-gray-100">
                                             <div className="">
-                                                <button className={`${getButtonClass(item.entry_status || 'Entry', item.id)}`}
+                                                <button className={`${getButtonClass(getEntryStatusText(item), item.id)}`}
                                                     onClick={() => handleEntryClick(item)}
                                                 >
                                                     {getEntryStatusText(item)}

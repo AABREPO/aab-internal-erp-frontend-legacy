@@ -22,6 +22,20 @@ const getTenantLinkPhone = (tenant) =>
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const getDefaultElectricityFilters = () => ({
+    year: new Date().getFullYear().toString(),
+    month: MONTH_LABELS[new Date().getMonth()],
+    paymentStatus: '',
+    vendor: '',
+    service: '',
+    doorNo: '',
+    shop: '',
+    projectName: '',
+    projectType: '',
+    tenant: '',
+    occupancyStatus: '',
+});
+
 /** Shop sort: letters + numeric (like Rent Dashboard); blank / "-" shop numbers sort last. */
 const normalizeShopNoKey = (shopNo) => {
     const raw = (shopNo ?? '').toString().trim();
@@ -56,19 +70,7 @@ const sortProjectsPropertyDetailsByShopNo = (projects) => {
 const ElectricityTab = ({ username, userRoles = [] }) => {
     const [showExpenseEntryModal, setShowExpenseEntryModal] = useState(false);
     const [expenseEntryPrefill, setExpenseEntryPrefill] = useState(null);
-    const [filters, setFilters] = useState({
-        year: new Date().getFullYear().toString(),
-        month: MONTH_LABELS[new Date().getMonth()],
-        paymentStatus: '',
-        vendor: '',
-        service: '',
-        doorNo: '',
-        shop: '',
-        projectName: '',
-        projectType: '',
-        tenant: '',
-        occupancyStatus: ''
-    });
+    const [filters, setFilters] = useState(getDefaultElectricityFilters);
     const [projects, setProjects] = useState([]);
     const [electricityPayments, setElectricityPayments] = useState([]);
     const [frequencyHistory, setFrequencyHistory] = useState([]);
@@ -254,6 +256,30 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return titles;
     }, [tenantShopData]);
 
+    const tenantLinksByPropertyId = useMemo(() => {
+        const map = new Map();
+        if (!Array.isArray(tenantShopData) || !tenantShopData.length) return map;
+        tenantShopData.forEach((tenant) => {
+            const tName = (tenant?.tenantName || '').toString();
+            (tenant?.shopNos || []).forEach((shop) => {
+                const propertyId = shop?.shopNoId;
+                if (propertyId == null || propertyId === '') return;
+                const key = String(propertyId);
+                if (!map.has(key)) map.set(key, []);
+                map.get(key).push({
+                    tenantName: tName,
+                    shopClosureDate: shop?.shopClosureDate || null,
+                });
+            });
+        });
+        return map;
+    }, [tenantShopData]);
+
+    const getLinksForProperty = (propertyId) => {
+        if (propertyId == null || propertyId === '') return [];
+        return tenantLinksByPropertyId.get(String(propertyId)) || [];
+    };
+
     const sortedFilteredProjects = useMemo(
         () => sortProjectsPropertyDetailsByShopNo(filteredProjects),
         [filteredProjects]
@@ -279,138 +305,6 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return rows;
     }, [hiddenProjects]);
 
-    useEffect(() => {
-        const toLower = (value) => (value ? value.toString().toLowerCase() : '');
-        const vendorFilter = toLower(filters.vendor);
-        const doorFilter = toLower(filters.doorNo);
-        const shopFilter = toLower(filters.shop);
-        const projectTypeFilter = toLower(filters.projectType);
-        const serviceFilter = toLower(filters.service);
-        const tenantFilter = toLower(filters.tenant);
-        const projectNameFilter = toLower(filters.projectName);
-        const occupancyFilter = toLower(filters.occupancyStatus);
-        const selectedYearForFilters = filters.year || new Date().getFullYear().toString();
-        const monthMap = {
-            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-            'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
-            'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-        };
-        const selectedMonthNumber = filters.month ? monthMap[filters.month] : null;
-        const selectedYearMonthForFilters = selectedMonthNumber ? `${selectedYearForFilters}-${selectedMonthNumber}` : null;
-        const getPaymentVendorValue = (payment) => toLower(
-            payment?.vendorName ??
-            payment?.vendor ??
-            payment?.vendor_name ??
-            payment?.vendorNameLabel ??
-            payment?.party ??
-            ''
-        );
-        const propertyMatchesVendorFromPayments = (property) => {
-            if (!vendorFilter) return true;
-            const ebNo = property?.ebNo;
-            if (!ebNo) return false;
-            const paymentsForService = electricityPayments.filter(p => p?.utilityTypeNumber === ebNo);
-            const scopedPayments = selectedYearMonthForFilters
-                ? paymentsForService.filter(p => p?.utilityForTheMonth === selectedYearMonthForFilters)
-                : paymentsForService.filter(p => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${selectedYearForFilters}-`));
-            return scopedPayments.some(p => getPaymentVendorValue(p).includes(vendorFilter));
-        };
-
-        // Tenant ↔ Shop link lookup (same source as RentManagement Dashboard)
-        const tenantLinksByPropertyId = new Map();
-        if (Array.isArray(tenantShopData) && tenantShopData.length) {
-            tenantShopData.forEach(tenant => {
-                const tName = (tenant?.tenantName || '').toString();
-                (tenant?.shopNos || []).forEach(shop => {
-                    const propertyId = shop?.shopNoId;
-                    if (!propertyId) return;
-                    if (!tenantLinksByPropertyId.has(propertyId)) tenantLinksByPropertyId.set(propertyId, []);
-                    tenantLinksByPropertyId.get(propertyId).push({
-                        tenantName: tName,
-                        shopClosureDate: shop?.shopClosureDate || null
-                    });
-                });
-            });
-        }
-        const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(propertyId) || [];
-        const matchesTenantFromLinks = (propertyId) => {
-            if (!tenantFilter) return true;
-            const links = getLinksForProperty(propertyId);
-            if (!links.length) return false;
-            return links.some(l => toLower(l.tenantName).includes(tenantFilter));
-        };
-        const matchesOccupancyFromLinks = (propertyId) => {
-            if (!occupancyFilter) return true;
-            const links = getLinksForProperty(propertyId);
-            const hasActive = links.some(l => !l.shopClosureDate);
-            const hasVacated = links.some(l => !!l.shopClosureDate);
-            if (occupancyFilter === 'occupied') return hasActive;
-            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
-            return true;
-        };
-
-        const filtered = projects.reduce((acc, project) => {
-            if (selectedCategory && project.projectCategory !== selectedCategory) {
-                return acc;
-            }
-            if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
-                return acc;
-            }
-
-            const filteredProperties = (project.propertyDetails || []).filter(property => {
-                if (!property || !property.ebNo || !property.ebNo.trim()) {
-                    return false;
-                }
-
-                if (doorFilter && !toLower(property.doorNo).includes(doorFilter)) {
-                    return false;
-                }
-                if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
-                    return false;
-                }
-                if (projectTypeFilter && !toLower(property.projectType).includes(projectTypeFilter)) {
-                    return false;
-                }
-                if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
-                    return false;
-                }
-                if (!matchesTenantFromLinks(property.id)) return false;
-                if (!matchesOccupancyFromLinks(property.id)) return false;
-                if (vendorFilter) {
-                    // Vendor is stored on each electricity payment record (expenses_form API),
-                    // so filter by matching payments for this EB No (optionally scoped to selected month/year).
-                    if (!propertyMatchesVendorFromPayments(property)) {
-                        return false;
-                    }
-                }
-
-                if (!matchesPaymentFilters(property)) {
-                    return false;
-                }
-
-                return true;
-            });
-
-            if (filteredProperties.length === 0) {
-                return acc;
-            }
-
-            acc.push({
-                ...project,
-                propertyDetails: [...filteredProperties].sort(comparePropertyShopNoAsc)
-            });
-
-            return acc;
-        }, []);
-
-        setFilteredProjects(filtered);
-    }, [filters, projects, selectedCategory, electricityPayments, frequencyHistory, tenantShopData]);
-    const handleFilterChange = (filterType, selectedOption) => {
-        setFilters(prev => ({
-            ...prev,
-            [filterType]: selectedOption ? selectedOption.value : ''
-        }));
-    };
     const customSelectStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -436,34 +330,6 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             ...provided,
             color: '#9CA3AF',
         }),
-    };
-    const getUniqueValues = (key) => {
-        const values = new Set();
-        projects.forEach(project => {
-            if (key === 'projectName') {
-                values.add(project.projectName);
-            } else if (key === 'doorNo') {
-                project.propertyDetails.forEach(property => {
-                    if (property.doorNo) values.add(property.doorNo);
-                });
-            } else if (key === 'shop') {
-                project.propertyDetails.forEach(property => {
-                    if (property.shopNo) values.add(property.shopNo);
-                });
-            } else if (key === 'projectType') {
-                project.propertyDetails.forEach(property => {
-                    if (property.projectType) values.add(property.projectType);
-                });
-            } else if (key === 'serviceNo') {
-                project.propertyDetails.forEach(property => {
-                    if (property.ebNo) values.add(property.ebNo);
-                });
-            }
-        });
-        return Array.from(values).sort().map(value => ({
-            value: value,
-            label: value
-        }));
     };
     const getFrequencyData = (propertyId) => {
         console.log('Looking for frequency data for property ID:', propertyId);
@@ -519,8 +385,8 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         }
         return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
     };
-    const getPaymentData = (ebNo, month, propertyId) => {
-        const selectedYear = filters.year || new Date().getFullYear().toString();
+    const getPaymentData = (ebNo, month, propertyId, yearOverride) => {
+        const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
             'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
@@ -632,16 +498,16 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         });
         return unpaidCount;
     };
-    const matchesPaymentFilters = (property) => {
-        const selectedMonth = filters.month;
-        const selectedStatus = filters.paymentStatus;
+    const matchesPaymentFiltersFor = (property, filterState) => {
+        const selectedMonth = filterState.month;
+        const selectedStatus = filterState.paymentStatus;
 
         if (!selectedMonth && !selectedStatus) {
             return true;
         }
 
         const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(property.ebNo, month, property.id);
+            const paymentData = getPaymentData(property.ebNo, month, property.id, filterState.year);
             const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
             const isUnpaid = paymentData.amount === '0';
 
@@ -656,6 +522,245 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
 
         return monthLabels.some((month) => evaluateMonth(month));
     };
+
+    const matchesPaymentFilters = (property) => matchesPaymentFiltersFor(property, filters);
+
+    const MONTH_NUMBER_MAP = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+        'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
+        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    };
+
+    const computeFilteredProjects = (filterState, excludeField = null) => {
+        const effective = { ...filterState };
+        if (excludeField) {
+            effective[excludeField] = '';
+        }
+        const toLower = (value) => (value ? value.toString().toLowerCase() : '');
+        const vendorFilter = toLower(effective.vendor);
+        const doorFilter = toLower(effective.doorNo);
+        const shopFilter = toLower(effective.shop);
+        const projectTypeFilter = toLower(effective.projectType);
+        const serviceFilter = toLower(effective.service);
+        const tenantFilter = toLower(effective.tenant);
+        const projectNameFilter = toLower(effective.projectName);
+        const occupancyFilter = toLower(effective.occupancyStatus);
+        const selectedYearForFilters = effective.year || new Date().getFullYear().toString();
+        const selectedMonthNumber = effective.month ? MONTH_NUMBER_MAP[effective.month] : null;
+        const selectedYearMonthForFilters = selectedMonthNumber ? `${selectedYearForFilters}-${selectedMonthNumber}` : null;
+        const getPaymentVendorValue = (payment) => toLower(
+            payment?.vendorName ??
+            payment?.vendor ??
+            payment?.vendor_name ??
+            payment?.vendorNameLabel ??
+            payment?.party ??
+            ''
+        );
+        const propertyMatchesVendorFromPayments = (property) => {
+            if (!vendorFilter) return true;
+            const ebNo = property?.ebNo;
+            if (!ebNo) return false;
+            const paymentsForService = electricityPayments.filter((p) => p?.utilityTypeNumber === ebNo);
+            const scopedPayments = selectedYearMonthForFilters
+                ? paymentsForService.filter((p) => p?.utilityForTheMonth === selectedYearMonthForFilters)
+                : paymentsForService.filter((p) => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${selectedYearForFilters}-`));
+            return scopedPayments.some((p) => getPaymentVendorValue(p).includes(vendorFilter));
+        };
+        const matchesTenantFromLinks = (propertyId) => {
+            if (!tenantFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            if (!links.length) return false;
+            return links.some((l) => toLower(l.tenantName).includes(tenantFilter));
+        };
+        const matchesOccupancyFromLinks = (propertyId) => {
+            if (!occupancyFilter) return true;
+            const links = getLinksForProperty(propertyId);
+            const hasActive = links.some((l) => !l.shopClosureDate);
+            const hasVacated = links.some((l) => !!l.shopClosureDate);
+            if (occupancyFilter === 'occupied') return hasActive;
+            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
+            return true;
+        };
+
+        return projects.reduce((acc, project) => {
+            if (selectedCategory && project.projectCategory !== selectedCategory) {
+                return acc;
+            }
+            if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
+                return acc;
+            }
+
+            const filteredProperties = (project.propertyDetails || []).filter((property) => {
+                if (!property || !property.ebNo || !property.ebNo.trim()) {
+                    return false;
+                }
+                if (doorFilter && !toLower(property.doorNo).includes(doorFilter)) {
+                    return false;
+                }
+                if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
+                    return false;
+                }
+                if (projectTypeFilter && !toLower(property.projectType).includes(projectTypeFilter)) {
+                    return false;
+                }
+                if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
+                    return false;
+                }
+                if (!matchesTenantFromLinks(property.id)) return false;
+                if (!matchesOccupancyFromLinks(property.id)) return false;
+                if (vendorFilter && !propertyMatchesVendorFromPayments(property)) {
+                    return false;
+                }
+                if (!matchesPaymentFiltersFor(property, effective)) {
+                    return false;
+                }
+                return true;
+            });
+
+            if (filteredProperties.length === 0) {
+                return acc;
+            }
+
+            acc.push({
+                ...project,
+                propertyDetails: [...filteredProperties].sort(comparePropertyShopNoAsc),
+            });
+            return acc;
+        }, []);
+    };
+
+    const flattenProjectsToPropertyRows = (projectList) => {
+        const rows = (projectList || []).flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property?.ebNo && property.ebNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+        return rows;
+    };
+
+    const buildAutoFillFromRow = ({ project, property }, filterState, changedField) => {
+        const filled = {};
+        if (property.doorNo) filled.doorNo = String(property.doorNo);
+        if (property.shopNo) filled.shop = String(property.shopNo);
+        if (property.ebNo) filled.service = String(property.ebNo);
+        if (project.projectName) filled.projectName = String(project.projectName);
+        if (property.projectType) filled.projectType = String(property.projectType);
+
+        const links = getLinksForProperty(property.id);
+        const active = links.filter((l) => !l.shopClosureDate);
+        if (active.length > 0) {
+            filled.tenant = active[0].tenantName;
+            filled.occupancyStatus = 'occupied';
+        } else if (links.some((l) => l.shopClosureDate)) {
+            filled.occupancyStatus = 'vacated';
+            const vacated = links
+                .filter((l) => l.shopClosureDate)
+                .sort((a, b) => new Date(b.shopClosureDate).getTime() - new Date(a.shopClosureDate).getTime());
+            if (vacated[0]?.tenantName) filled.tenant = vacated[0].tenantName;
+        }
+
+        const monthForStatus = filterState.month || MONTH_LABELS[new Date().getMonth()];
+        if (property.ebNo && monthForStatus) {
+            const paymentData = getPaymentData(property.ebNo, monthForStatus, property.id, filterState.year);
+            if (paymentData.amount === '0') filled.paymentStatus = 'Unpaid';
+            else if (paymentData.amount !== '-') filled.paymentStatus = 'Paid';
+
+            const monthNumber = MONTH_NUMBER_MAP[monthForStatus];
+            const year = filterState.year || new Date().getFullYear().toString();
+            if (monthNumber) {
+                const yearMonth = `${year}-${monthNumber}`;
+                const payment = electricityPayments.find(
+                    (p) => p?.utilityTypeNumber === property.ebNo && p?.utilityForTheMonth === yearMonth
+                );
+                const vendorVal = payment?.vendorName ?? payment?.vendor ?? payment?.vendor_name ?? '';
+                if (vendorVal) filled.vendor = String(vendorVal);
+            }
+        }
+
+        if (changedField) {
+            delete filled[changedField];
+        }
+        return filled;
+    };
+
+    useEffect(() => {
+        setFilteredProjects(computeFilteredProjects(filters));
+    }, [filters, projects, selectedCategory, electricityPayments, frequencyHistory, tenantLinksByPropertyId]);
+
+    const handleFilterChange = (filterType, selectedOption) => {
+        setFilters((prev) => {
+            const next = {
+                ...prev,
+                [filterType]: selectedOption ? selectedOption.value : ''
+            };
+            const rows = flattenProjectsToPropertyRows(computeFilteredProjects(next));
+            if (rows.length === 1) {
+                return { ...next, ...buildAutoFillFromRow(rows[0], next, filterType) };
+            }
+            return next;
+        });
+    };
+
+    const clearFilters = () => {
+        setFilters(getDefaultElectricityFilters());
+    };
+
+    const getFilterOptions = (fieldKey, excludeField) => {
+        const subset = computeFilteredProjects(filters, excludeField);
+        const values = new Set();
+        subset.forEach((project) => {
+            if (fieldKey === 'projectName' && project.projectName) {
+                values.add(String(project.projectName));
+            } else {
+                (project.propertyDetails || []).forEach((property) => {
+                    if (fieldKey === 'doorNo' && property.doorNo) values.add(String(property.doorNo));
+                    if (fieldKey === 'shop' && property.shopNo) values.add(String(property.shopNo));
+                    if (fieldKey === 'projectType' && property.projectType) values.add(String(property.projectType));
+                    if (fieldKey === 'serviceNo' && property.ebNo) values.add(String(property.ebNo));
+                });
+            }
+        });
+        return Array.from(values).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((value) => ({
+            value,
+            label: value,
+        }));
+    };
+
+    const vendorFilterOptions = useMemo(() => {
+        const subset = computeFilteredProjects(filters, 'vendor');
+        const rows = flattenProjectsToPropertyRows(subset);
+        const year = filters.year || new Date().getFullYear().toString();
+        const monthNumber = filters.month ? MONTH_NUMBER_MAP[filters.month] : null;
+        const yearMonth = monthNumber ? `${year}-${monthNumber}` : null;
+        const vendors = new Set();
+        rows.forEach(({ property }) => {
+            const ebNo = property?.ebNo;
+            if (!ebNo) return;
+            const paymentsForService = electricityPayments.filter((p) => p?.utilityTypeNumber === ebNo);
+            const scoped = yearMonth
+                ? paymentsForService.filter((p) => p?.utilityForTheMonth === yearMonth)
+                : paymentsForService.filter((p) => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${year}-`));
+            scoped.forEach((p) => {
+                const v = p?.vendorName ?? p?.vendor ?? p?.vendor_name ?? '';
+                if (v) vendors.add(String(v));
+            });
+        });
+        return Array.from(vendors).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
+    }, [filters, projects, selectedCategory, electricityPayments, tenantLinksByPropertyId]);
+
+    const tenantFilterOptions = useMemo(() => {
+        const subset = computeFilteredProjects(filters, 'tenant');
+        const rows = flattenProjectsToPropertyRows(subset);
+        const names = new Set();
+        rows.forEach(({ property }) => {
+            getLinksForProperty(property.id).forEach((l) => {
+                const name = (l.tenantName || '').trim();
+                if (name) names.add(name);
+            });
+        });
+        return Array.from(names).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
+    }, [filters, projects, selectedCategory, electricityPayments, tenantLinksByPropertyId]);
 
     const buildExportRows = () => {
         const pairs = sortedFilteredProjects.flatMap((project) =>
@@ -897,6 +1002,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                lockUtilityPrefillFields
                                 onSuccess={async () => {
                                     setShowExpenseEntryModal(false);
                                     setExpenseEntryPrefill(null);
@@ -915,8 +1021,8 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             ) : null}
             <div className="bg-white rounded-md mb-5 min-h-[128px] ml-5 mr-5">
                 <div className="p-6">
-                    {/* 10 filters -> grid of 5 columns naturally renders them as 2 rows */}
-                    <div className="grid grid-cols-6 gap-4 text-left">
+                    <div className="flex flex-wrap gap-4 text-left items-end">
+                    <div className="grid grid-cols-6 gap-4 flex-1 min-w-0">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -941,7 +1047,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Vendor</label>
                             <Select
-                                options={vendorOptions}
+                                options={vendorFilterOptions}
                                 value={filters.vendor ? { value: filters.vendor, label: filters.vendor } : null}
                                 onChange={(selectedOption) => handleFilterChange('vendor', selectedOption)}
                                 placeholder="Select Vendor"
@@ -995,7 +1101,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Service</label>
                             <Select
-                                options={getUniqueValues('serviceNo')}
+                                options={getFilterOptions('serviceNo', 'service')}
                                 value={filters.service ? { value: filters.service, label: filters.service } : null}
                                 onChange={(selectedOption) => handleFilterChange('service', selectedOption)}
                                 placeholder="Select Service No"
@@ -1013,7 +1119,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Door No</label>
                             <Select
-                                options={getUniqueValues('doorNo')}
+                                options={getFilterOptions('doorNo', 'doorNo')}
                                 value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
                                 onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
                                 placeholder="Select Door No"
@@ -1031,7 +1137,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Shop</label>
                             <Select
-                                options={getUniqueValues('shop')}
+                                options={getFilterOptions('shop', 'shop')}
                                 value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
                                 onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
                                 placeholder="Select Shop"
@@ -1049,7 +1155,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Name</label>
                             <Select
-                                options={getUniqueValues('projectName')}
+                                options={getFilterOptions('projectName', 'projectName')}
                                 value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectName', selectedOption)}
                                 placeholder="Select Project"
@@ -1067,7 +1173,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Type</label>
                             <Select
-                                options={getUniqueValues('projectType')}
+                                options={getFilterOptions('projectType', 'projectType')}
                                 value={filters.projectType ? { value: filters.projectType, label: filters.projectType } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectType', selectedOption)}
                                 placeholder="Select Project Type"
@@ -1085,7 +1191,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Tenant</label>
                             <Select
-                                options={tenantOptions}
+                                options={tenantFilterOptions}
                                 value={filters.tenant ? { value: filters.tenant, label: filters.tenant } : null}
                                 onChange={(selectedOption) => handleFilterChange('tenant', selectedOption)}
                                 placeholder="Select Tenant"
@@ -1118,6 +1224,14 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                 className="w-full"
                             />
                         </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="px-5 py-2 h-[45px] border-2 border-[#BF9853] text-[#BF9853] rounded-lg font-semibold hover:bg-[#FAF6ED] transition-colors whitespace-nowrap shrink-0"
+                    >
+                        Clear
+                    </button>
                     </div>
                 </div>
             </div>

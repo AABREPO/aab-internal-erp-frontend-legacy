@@ -169,6 +169,40 @@ const RentDatabase = ({ username, userRoles = [] }) => {
     const [tenantShopData, setTenantShopData] = useState([]);
     const [shopNoIdToShopNoMap, setShopNoIdToShopNoMap] = useState({});
     const [tenantNameIdToTenantNameMap, setTenantNameIdToTenantNameMap] = useState({});
+    const [branchOptions, setBranchOptions] = useState([]);
+
+    const getRentEnteredBy = (rent) =>
+        String(rent?.enteredBy ?? rent?.entered_by ?? rent?.createdBy ?? rent?.created_by ?? '').trim();
+
+    const getRentBranchDisplay = (rent) => {
+        const branchId = rent?.branchId ?? rent?.branch_id;
+        if (branchId != null && branchId !== '') {
+            const match = branchOptions.find((b) => String(b.id) === String(branchId));
+            const name = match?.branch ?? match?.branchName ?? '';
+            if (name) return String(name).trim();
+        }
+        return String(rent?.branch ?? rent?.branch_name ?? rent?.branchName ?? '').trim();
+    };
+
+    useEffect(() => {
+        const fetchBranches = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/branch/getAll', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) throw new Error('Failed to fetch branches');
+                const data = await response.json();
+                setBranchOptions(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error('Error fetching branches:', error);
+                setBranchOptions([]);
+            }
+        };
+        fetchBranches();
+    }, []);
+
     useEffect(() => {
         fetchProjects();
     }, []);
@@ -1028,7 +1062,9 @@ const RentDatabase = ({ username, userRoles = [] }) => {
             "E No",
             "For the Month Of",
             "Payment Mode",
-            "Type"
+            "Type",
+            "Entered By",
+            "Branch"
         ];
         const rows = currentItems.map(rent => [
             formatDate(rent.timestamp),
@@ -1047,7 +1083,9 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 })
                 : '',
             rent.paymentMode,
-            rent.formType
+            rent.formType,
+            getRentEnteredBy(rent),
+            getRentBranchDisplay(rent)
         ]);
         const csvContent = [headers, ...rows]
             .map(row => row.map(value => `"${value}"`).join(","))
@@ -1068,7 +1106,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
         doc.text('Rent Collection Report', 14, 15);
         const tableColumn = [
             "Timestamp", "Shop No", "Tenant Name", "Amount", "Paid On",
-            "E No", "For the Month Of", "Payment Mode", "Type"
+            "E No", "For the Month Of", "Payment Mode", "Type", "Entered By", "Branch"
         ];
         const tableRows = filteredRentForm.map((rent) => [
             formatDate(rent.timestamp),
@@ -1087,7 +1125,9 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                 })
                 : '',
             rent.paymentMode,
-            rent.formType
+            rent.formType,
+            getRentEnteredBy(rent),
+            getRentBranchDisplay(rent)
         ]);
         doc.autoTable({
             startY: 20,
@@ -1282,7 +1322,7 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp} >
-                            <table className="table-auto min-w-[1165px] w-screen border-collapse">
+                            <table className="table-auto min-w-[1400px] w-screen border-collapse">
                                 <thead>
                                     <tr className="bg-[#FAF6ED] text-left sticky top-0 z-90">
                                         <th className="px-4 py-2 font-bold">Timestamp</th>
@@ -1308,6 +1348,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                         <th className="px-4 py-2 font-bold cursor-pointer" onClick={() => handleSort('formType')} >
                                             Type {sortField === 'formType' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                                         </th>
+                                        <th className="px-4 py-2 font-bold">Entered By</th>
+                                        <th className="px-4 py-2 font-bold">Branch</th>
                                         <th className="px-4 py-2 font-bold">Activity</th>
                                         <th className="px-1 py-2 font-bold">Print</th>
                                     </tr>
@@ -1674,6 +1716,8 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             </th>
                                             <th></th>
                                             <th></th>
+                                            <th></th>
+                                            <th></th>
                                         </tr>
                                     )}
                                 </thead>
@@ -1713,6 +1757,12 @@ const RentDatabase = ({ username, userRoles = [] }) => {
                                             </td>
                                             <td className=" text-sm text-left px-4 font-semibold">{rent.paymentMode}</td>
                                             <td className=" text-sm text-left px-4 font-semibold">{rent.formType}</td>
+                                            <td className="text-sm text-left px-4 font-semibold">
+                                                {getRentEnteredBy(rent) || '-'}
+                                            </td>
+                                            <td className="text-sm text-left px-4 font-semibold">
+                                                {getRentBranchDisplay(rent) || '-'}
+                                            </td>
                                             <td className=" flex w-[100px] justify-between py-2">
                                                 <button
                                                     onClick={() => handleEditClick(rent)}

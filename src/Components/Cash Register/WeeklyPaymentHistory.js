@@ -18,6 +18,12 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+    fetchStaffPurposeOptions,
+    splitStaffAdvancePortalByPurpose,
+    getPortalAdvancePartyName,
+    getPortalAdvanceProjectName,
+} from '../../utils/weeklyPaymentStaffAdvancePdf';
 import { i } from 'mathjs';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
@@ -636,7 +642,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 (rawCid != null && !Number.isNaN(Number(rawCid)) ? getContractorName(Number(rawCid)) : "") ??
                 "";
             const prefill = {
-                accountType: row.type === 'Claim' ? 'Claim' : 'Bill Payments',
+                accountType: row.type === 'Claim' ? 'Claim Payment' : 'Bill Payments',
                 siteName,
                 amount: row.amount,
                 date: dateStr,
@@ -1583,26 +1589,29 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         if (entry.labour_id) return getLabourName(entry.labour_id);
         return "";
     };
+    const getExpenseFilterSnapshot = (entry) =>
+        editingRowId === entry.id && editingOriginalRow ? editingOriginalRow : entry;
     const filteredExpenses = expenses.filter((entry) => {
+        const snapshot = getExpenseFilterSnapshot(entry);
         if (selectDate) {
             const [year, month, day] = selectDate.split("-");
             const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-            const entryDateObj = new Date(entry.date);
+            const entryDateObj = new Date(snapshot.date);
             const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
             if (formattedEntryDate !== formattedSelectDate) return false;
         }
         if (selectContractororVendorName) {
-            const name = getPartyDisplayName(entry);
+            const name = getPartyDisplayName(snapshot);
             if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                 return false;
         }
         if (selectProjectName) {
-            const projectName = getSiteName(entry.project_id) || "";
+            const projectName = getSiteName(snapshot.project_id) || "";
             if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
                 return false;
         }
         if (selectType) {
-            if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+            if (snapshot.type?.toLowerCase() !== selectType.toLowerCase()) return false;
         }
         return true;
     });
@@ -2524,13 +2533,12 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             date.setHours(0, 0, 0, 0);
             return date >= start && date <= end;
         };
-        const staffAdvanceTotalFromPortal = staffAdvanceData
-            .filter(entry =>
-                entry.staff_payment_mode === "Cash" &&
-                entry.type === "Advance" &&
-                isDateInWeek(entry.date)
-            )
-            .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+        const staffPurposeOptions = await fetchStaffPurposeOptions();
+        const {
+            salaryAdvanceEntries: salaryAdvancePortalEntries,
+            wageAdvanceEntries: wageAdvancePortalEntries,
+            salaryAdvanceTotal: staffAdvanceTotalFromPortal,
+        } = splitStaffAdvancePortalByPurpose(staffAdvanceData, isDateInWeek, staffPurposeOptions);
         const loanTotalFromPortal = loanPortalData
             .filter(entry =>
                 (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") &&
@@ -2706,58 +2714,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         if (dailyExpenseData.length === 0) {
             dailyExpenseData.push(["No Daily Expenses", "0.00"]);
         }
-        autoTable(doc, {
-            head: [["DAILY WAGE", "AMOUNT"]],
-            body: dailyExpenseData,
-            startY: baseY + 210,
-            margin: { left: 300 },
-            tableWidth: 200,
-            theme: "grid",
-            styles: {
-                fontSize: 8,
-                cellPadding: 3,
-                textColor: [0, 0, 0],
-                lineColor: [0, 0, 0],
-                lineWidth: 0.5
-            },
-            headStyles: {
-                textColor: [0, 0, 0],
-                fillColor: [255, 230, 230],
-                lineColor: [0, 0, 0],
-                lineWidth: 1,
-                fontStyle: 'bold',
-                halign: 'left'
-            },
-            bodyStyles: {
-                fontStyle: 'bold'
-            },
-            columnStyles: {
-                0: { halign: 'left' },
-                1: { halign: 'right' }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        const dailyWageTable = doc.lastAutoTable;
-        if (dailyWageTable) {
-            const boxY = dailyWageTable.finalY + 2;
-            const boxX = 300;
-            const boxWidth = 200;
-            const boxHeight = 20;
-            const splitX = boxX + 114;
-            doc.rect(boxX, boxY, boxWidth, boxHeight);
-            doc.line(splitX, boxY, splitX, boxY + boxHeight);
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "bold");
-            doc.text("TOTAL", boxX + 10, boxY + 13);
-            doc.text(
-                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
-                boxX + boxWidth - 10,
-                boxY + 13,
-                { align: "right" }
-            );
-        }
+        const expenditureDailyWageGap = 28;
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
@@ -2791,6 +2748,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             });
         if (summaryMap["Staff Advance"]) {
             summaryMap["Staff Advance"].total = staffAdvanceTotalFromPortal;
+            summaryMap["Staff Advance"].count = salaryAdvancePortalEntries.length;
         }
         if (summaryMap["Loan"]) {
             summaryMap["Loan"].total = loanTotalFromPortal;
@@ -2877,32 +2835,92 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             summaryBoxY + 3,
             { align: "right" }
         );
+        const expenditureSectionBottomY = summaryBoxY + 8;
+        const dailyWageStartY = expenditureSectionBottomY + expenditureDailyWageGap;
+        autoTable(doc, {
+            head: [["DAILY WAGE", "AMOUNT"]],
+            body: dailyExpenseData,
+            startY: dailyWageStartY,
+            margin: { left: 300 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1,
+                fontStyle: 'bold',
+                halign: 'left'
+            },
+            bodyStyles: {
+                fontStyle: 'bold'
+            },
+            columnStyles: {
+                0: { halign: 'left' },
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+            }
+        });
+        const dailyWageTable = doc.lastAutoTable;
+        if (dailyWageTable) {
+            const boxY = dailyWageTable.finalY + 2;
+            const boxX = 300;
+            const boxWidth = 200;
+            const boxHeight = 20;
+            const splitX = boxX + 114;
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            doc.line(splitX, boxY, splitX, boxY + boxHeight);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("TOTAL", boxX + 10, boxY + 13);
+            doc.text(
+                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
+                boxX + boxWidth - 10,
+                boxY + 13,
+                { align: "right" }
+            );
+        }
         const newTableX = 520;
         let newTableY = baseY;
-        const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
-        if (staffAdvanceEntries.length > 0) {
-            const staffAdvanceCount = staffAdvanceEntries.length;
-            const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-            const staffAdvanceY = newTableY + 10;
+        const portalPartyHelpers = { getEmployeeName, getLabourName };
+        const appendPortalAdvanceTable = (title, portalEntries) => {
+            if (!portalEntries.length) return;
+            const count = portalEntries.length;
+            const total = portalEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            if (newTableY > doc.internal.pageSize.getHeight() - 150) {
+                doc.addPage();
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                newTableY = baseY;
+            }
+            const tableY = newTableY + 10;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
-            const staffAdvanceHead = [[
-                String(staffAdvanceCount || "0"),
+            doc.text(title, newTableX, tableY - 25);
+            const tableHead = [[
+                String(count || "0"),
                 "PARTY",
                 "PROJECT NAME",
-                String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+                String(total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
             ]];
-            const staffAdvanceBody = staffAdvanceEntries.map(e => [
-                String(e.date ? formatDateOnly(e.date) : ""),
-                String(getPartyDisplayName(e) || ""),
-                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
-                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            const tableBody = portalEntries.map((entry) => [
+                String(entry.date ? formatDateOnly(entry.date) : ""),
+                String(getPortalAdvancePartyName(entry, portalPartyHelpers) || ""),
+                String(getPortalAdvanceProjectName(entry, siteOptions) || ""),
+                String(Number(entry.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
             ]);
             autoTable(doc, {
-                head: staffAdvanceHead,
-                body: staffAdvanceBody,
-                startY: staffAdvanceY - 20,
+                head: tableHead,
+                body: tableBody,
+                startY: tableY - 20,
                 margin: { left: newTableX },
                 tableWidth: 310,
                 theme: "grid",
@@ -2918,11 +2936,13 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                     }
                 },
                 didDrawPage: () => {
-                    drawHeader(doc);
+                    drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
                 }
             });
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        }
+        };
+        appendPortalAdvanceTable("SALARY ADVANCE", salaryAdvancePortalEntries);
+        appendPortalAdvanceTable("WAGE ADVANCE", wageAdvancePortalEntries);
         const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
         if (staffSalaryEntries.length > 0) {
             const staffSalaryCount = staffSalaryEntries.length;
@@ -3624,7 +3644,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                     </h1>
                 </div>
             )}
-            <div className="mx-auto w-auto p-3 sm:p-6 border-collapse bg-[#FFFFFF] ml-[15px] sm:ml-[30px] mr-3 sm:mr-6 rounded-md">
+            <div className="mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent">
                 <div className="text-left mb-4 flex justify-between ">
                     <button onClick={() => setShowFilters(!showFilters)}>
                         <img
@@ -3648,9 +3668,9 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                     )}
                 </div>
                 <div className="flex flex-col xl:flex-row gap-6">
-                    <div className={`w-full ${isExpensesEntryUploadOnly ? '' : 'xl:flex-[6] xl:min-w-0'}`}>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-                            <h1 className="font-bold text-xl">PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span> </h1>
+                    <div className={`min-w-0 ${isExpensesEntryUploadOnly ? 'w-full' : 'flex-[3]'}`}>
+                        <div className="flex justify-between">
+                            <h1 className="font-bold text-xl">PS: {selectedWeek ?? "-"}</h1>
                             <h1 className="font-bold text-base">
                                 Expenses: <span style={{ color: "#E4572E" }}>
                                     {filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
@@ -3659,44 +3679,39 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                         </div>
                         <div className="w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
                             <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar"
-                                style={{
-                                    willChange: 'scroll-position',
-                                    WebkitOverflowScrolling: 'touch',
-                                    transform: 'translateZ(0)', // Force hardware acceleration
-                                    backfaceVisibility: 'hidden' // Optimize rendering
-                                }}
-                                onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
-                                onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)}
-                                onWheel={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => handleMouseDown(e, scrollRef)}
+                                onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                onMouseUp={() => handleMouseUp(scrollRef)}
+                                onMouseLeave={() => handleMouseUp(scrollRef)}
                             >
                                 <table className={`border-collapse text-left ${isExpensesEntryUploadOnly ? 'w-[1200px]' : 'w-[1320px]'}`}>
                                     <thead className="sticky top-0 z-10 bg-white">
                                         <tr className="bg-[#FAF6ED]">
-                                            <th className="pt-2 pl-2 w-[60px] font-bold text-left">Sl.No</th>
+                                            <th className="pt-2 pl-2 w-[60px] font-bold text-left">S.No</th>
                                             <th className="pt-2 w-[135px] font-bold text-left">Date</th>
-                                            <th className="pt-2 w-[200px] font-bold text-left">
+                                            <th className="px-1 w-[200px] font-bold text-left">
                                                 {isClientToggleActive ? "Client Name" : "Contractor/Vendor/Employee"}
                                             </th>
-                                            <th className="pt-2 w-[200px] font-bold text-left">Project Name</th>
-                                            <th className="pt-2 w-[100px] font-bold text-left">Type</th>
-                                            <th className="pt-2 w-[110px] font-bold text-left">Amount</th>
-                                            <th className="pt-2 w-[120px] font-bold text-left">
+                                            <th className="px-1 w-[240px] font-bold text-left">Project Name</th>
+                                            <th className="px-1 w-[100px] font-bold text-left">Type</th>
+                                            <th className="px-1 w-[110px] font-bold text-left">Amount</th>
+                                            <th className="px-1 w-[120px] font-bold text-left">
                                                 {isExpensesEntryUploadOnly ? 'File' : 'Activity'}
                                             </th>
                                         </tr>
                                         {showFilters && (
                                             <tr className="bg-[#FAF6ED] border-b border-gray-200">
                                                 <th className="pt-2 pb-2 w-[60px]"></th>
-                                                <th className="pt-2 pb-2 w-[120px] sm:w-[140px]">
+                                                <th className="pt-2 pb-2 w-[140px]">
                                                     <input
                                                         type="date"
                                                         value={selectDate}
                                                         onChange={(e) => setSelectDate(e.target.value)}
-                                                        className="p-1 rounded-md bg-transparent w-[120px] sm:w-[140px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                        className="p-1 rounded-md bg-transparent w-[140px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                                                         placeholder="Search Date..."
                                                     />
                                                 </th>
-                                                <th className="pt-2 pb-2 w-[160px] sm:w-[200px]">
+                                                <th className="pt-2 pb-2 w-[200px]">
                                                     <Select
                                                         options={contractorVendorFilterOptions}
                                                         value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
@@ -3775,7 +3790,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         }}
                                                     />
                                                 </th>
-                                                <th className="pt-2 pb-2 w-[180px] sm:w-[240px]">
+                                                <th className="pt-2 pb-2 w-[240px]">
                                                     <Select
                                                         options={projectFilterOptions}
                                                         value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
@@ -3854,11 +3869,11 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         }}
                                                     />
                                                 </th>
-                                                <th className="pt-2 pb-2 w-[80px] sm:w-[100px]">
+                                                <th className="pt-2 pb-2 w-[100px]">
                                                     <select
                                                         value={selectType}
                                                         onChange={(e) => setSelectType(e.target.value)}
-                                                        className="p-1 rounded-md bg-transparent w-[100px] sm:w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
+                                                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
                                                         placeholder="Type..."
                                                     >
                                                         <option value=''>Select Type...</option>
@@ -3881,26 +3896,24 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                 </th>
                                             </tr>
                                         )}
-                                    </thead>
-                                    <tbody>
                                         {!isExpensesEntryUploadOnly && canEditSelectedWeek ? (
-                                            <tr className="">
-                                                <td className="px-4 py-2 font-bold">{filteredExpenses.length + 1}.</td>
-                                                <td className="px-4 py-2">
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <td className="pt-2 pb-2 w-[60px] font-bold">{filteredExpenses.length + 1}.</td>
+                                                <td className="pt-2 pb-2 w-[135px]">
                                                     <input
                                                         type="date"
                                                         name="date"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[100px] sm:w-[120px] h-[40px] focus:outline-none"
+                                                        className="p-1 rounded-md bg-transparent w-[135px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                                                         value={newExpense.date}
                                                         onChange={handleExpenseChange}
                                                         onKeyDown={handleKeyDown}
                                                     />
                                                 </td>
-                                                <td className="px-4 py-2">
-                                                    <div className="flex items-center gap-2">
+                                                <td className="pt-2 pb-2 w-[200px]">
+                                                    <div className="flex items-center gap-2 w-full">
                                                         <Select
                                                             name="contractor"
-                                                            className="w-[150px] sm:w-[180px]"
+                                                            className="text-xs focus:outline-none"
                                                             value={
                                                                 isClientToggleActive
                                                                     ? selectedClient
@@ -4074,10 +4087,10 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         </button>
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-2">
+                                                <td className="pt-2 pb-2 w-[240px]">
                                                     <Select
                                                         name="project"
-                                                        className="w-[180px] sm:w-[220px]"
+                                                        isClearable
                                                         value={selectedProjectName || siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
                                                         onChange={(selectedOption) => {
                                                             if (isClientToggleActive) {
@@ -4094,9 +4107,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             setProjectId(selectedOption ? selectedOption.id : "");
                                                         }}
                                                         options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptionsForNewEntry}
-                                                        placeholder={isClientToggleActive ? "Client Project..." : "Select Site"}
+                                                        placeholder={isClientToggleActive ? "Client Project..." : "Project Name..."}
                                                         isSearchable
-                                                        isClearable
                                                         menuPortalTarget={document.body}
                                                         menuPosition="fixed"
                                                         styles={{
@@ -4112,15 +4124,15 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         }}
                                                     />
                                                 </td>
-                                                <td className="px-4 py-2 text-left">
+                                                <td className="pt-2 pb-2 w-[100px]">
                                                     <select
                                                         name="type"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[100px] sm:w-[120px] h-[40px] rounded-lg focus:outline-none"
+                                                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                                                         value={newExpense.type}
                                                         onChange={handleInputChange}
                                                         onKeyDown={handleKeyDown}
                                                     >
-                                                        <option value="">Select</option>
+                                                        <option value="">Select Type...</option>
                                                         {weeklyTypes.map((type, index) => (
                                                             <option key={index} value={type.type}>
                                                                 {type.type}
@@ -4128,11 +4140,11 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         ))}
                                                     </select>
                                                 </td>
-                                                <td className="px-4 py-2 text-left">
+                                                <td className="pt-2 pb-2 w-[110px]">
                                                     <input
                                                         type="number"
                                                         name="amount"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[80px] sm:w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                        className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner"
                                                         value={newExpense.amount}
                                                         onChange={handleExpenseChange}
                                                         onKeyDown={handleKeyDown}
@@ -4140,25 +4152,26 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
                                                     />
                                                 </td>
+                                                <td className="pt-2 pb-2 w-[120px]"></td>
                                             </tr>
                                         ) : null}
+                                    </thead>
+                                    <tbody>
                                         {[...filteredExpenses].reverse().map((row, index) => (
-                                            <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                <td className="text-sm text-left pl-2 w-[60px] font-semibold">{filteredExpenses.length - index}.</td>
-                                                <td className="text-sm text-left w-[135px] font-semibold">
+                                            <tr key={row.id} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                <td className="text-sm text-left p-2 w-[60px] font-semibold">{filteredExpenses.length - index}</td>
+                                                <td className="text-sm text-left p-2 w-[140px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <input
                                                             type="date"
                                                             name="date"
-                                                            className="bg-transparent p-1 rounded w-[120px] h-[40px] focus:outline-none"
+                                                            className="p-1 rounded-md bg-transparent w-[120px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                                                             value={row.date}
                                                             onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
                                                             disabled={editingRowId !== row.id}
                                                         />
                                                     ) : (
-                                                        <div className="w-[120px] h-[40px] flex items-center">
-                                                            {formatDateOnly(row.date) || ""}
-                                                        </div>
+                                                        formatDateOnly(row.date) || ""
                                                     )}
                                                 </td>
                                                 <td className="text-sm text-left w-[200px] font-semibold">
@@ -4243,16 +4256,13 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             }}
                                                         />
                                                     ) : (
-                                                        <div className="w-[180px] h-[40px] flex items-center">
-                                                            {getPartyDisplayName(row)}
-                                                        </div>
+                                                        getPartyDisplayName(row)
                                                     )}
                                                 </td>
-                                                <td className="text-sm text-left w-[200px] font-semibold">
+                                                <td className="text-sm text-left w-[240px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <Select
                                                             name="project"
-                                                            className="w-[220px]"
                                                             value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
                                                             onChange={(selectedOption) =>
                                                                 handleEditExpense(
@@ -4290,16 +4300,14 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                             }}
                                                         />
                                                     ) : (
-                                                        <div className="w-[220px] h-[40px] flex items-center">
-                                                            {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
-                                                        </div>
+                                                        siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
                                                     )}
                                                 </td>
                                                 <td className="text-sm text-left w-[100px] font-semibold">
                                                     {editingRowId === row.id ? (
                                                         <select
                                                             name="type"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                            className="p-1 rounded-md bg-transparent w-[90px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
                                                             value={row.type}
                                                             onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
                                                         >
@@ -4314,31 +4322,6 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
                                                                 <span>{row.type}</span>
-
-                                                                {!isExpensesEntryUploadOnly && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setCurrentProjectAdvanceRow(row);
-                                                                            setPaymentPopupData({
-                                                                                date: new Date().toISOString().split('T')[0],
-                                                                                amount: "",
-                                                                                paymentMode: "",
-                                                                                chequeNo: "",
-                                                                                chequeDate: "",
-                                                                                transactionNumber: "",
-                                                                                accountNumber: ""
-                                                                            });
-                                                                            const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
-                                                                            setPreviousPayments(previousPaymentsForExpense);
-                                                                            setShowPaymentPopup(true);
-                                                                        }}
-                                                                        className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
-                                                                        title="Add Payment"
-                                                                    >
-                                                                        +
-                                                                    </button>
-                                                                )}
-
                                                             </div>
                                                             {(() => {
                                                                 const payments = getPaymentsByExpenseId(row.id);
@@ -4371,13 +4354,13 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                     )}
                                                 </td>
                                                 <td className="text-sm text-left pl-2 w-[110px] font-semibold">
-                                                    <div className="flex items-center ">
-                                                        <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="min-w-0 flex-1 text-right pr-1">
                                                             {editingRowId === row.id ? (
                                                                 <input
                                                                     type="number"
                                                                     name="amount"
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 bg-transparent p-1 w-[90px] h-[40px] rounded-lg focus:outline-none"
+                                                                    className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner ml-auto block"
                                                                     value={row.amount}
                                                                     onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
                                                                     disabled={editingRowId !== row.id}
@@ -4386,103 +4369,133 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                                     onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
                                                                 />
                                                             ) : (
-                                                                <div className="w-[90px] h-[40px] flex items-center">
-                                                                    {Number(row.amount).toLocaleString('en-IN')}
-                                                                </div>
+                                                                Number(row.amount).toLocaleString('en-IN')
                                                             )}
                                                         </div>
                                                         {!isExpensesEntryUploadOnly && (
-                                                            <div className="mr-6 flex items-center gap-3">
-                                                                {row.type === "Project Advance" ? (
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            let description = "";
-                                                                            if (row.advance_portal_id) {
-                                                                                try {
-                                                                                    const res = await fetch(
-                                                                                        `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
-                                                                                    );
-                                                                                    if (!res.ok) throw new Error("Failed to fetch advance portal data");
-                                                                                    const data = await res.json();
-                                                                                    description = data.description || "";
-                                                                                } catch (error) {
-                                                                                    console.error("Error fetching advance portal data:", error);
-                                                                                }
-                                                                            }
-                                                                            setEditFormData((prev) => ({ ...prev, description }));
-                                                                            setCurrentRow(row);
-                                                                            setShowPopups(true);
-                                                                        }}
-                                                                    >
-                                                                        <img
-                                                                            src={
-                                                                                portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart
-                                                                            }
-                                                                            alt="Notes"
-                                                                            className="w-4 h-4 mr-3"
-                                                                        />
-                                                                    </button>
-                                                                ) : (
-                                                                    <button>
-                                                                        <img
-                                                                            src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPC9zdmc+"
-                                                                            alt=""
-                                                                            className="w-4 h-4 mr-3 opacity-0"
-                                                                        />
-                                                                    </button>
-                                                                )}
-                                                                {row.bill_copy_url ? (
-                                                                    <div className="ml-3 flex items-center gap-2">
-                                                                        <a
-                                                                            href={cleanUrl(row.bill_copy_url)}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="cursor-pointer"
-                                                                            title="View File"
-                                                                        >
-                                                                            <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                        </a>
-                                                                        {canEditDelete && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                                className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee]"
-                                                                                title="Remove File"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="ml-3 flex items-center gap-2">
+                                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                                <span className="inline-flex w-5 h-5 items-center justify-center">
+                                                                    {row.type !== "Daily" ? (
                                                                         <button
-                                                                            onClick={() => handleFileUploadClick(row)}
-                                                                            className="cursor-pointer"
-                                                                            title="Upload File"
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setCurrentProjectAdvanceRow(row);
+                                                                                setPaymentPopupData({
+                                                                                    date: new Date().toISOString().split('T')[0],
+                                                                                    amount: "",
+                                                                                    paymentMode: "",
+                                                                                    chequeNo: "",
+                                                                                    chequeDate: "",
+                                                                                    transactionNumber: "",
+                                                                                    accountNumber: ""
+                                                                                });
+                                                                                const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                                setPreviousPayments(previousPaymentsForExpense);
+                                                                                setShowPaymentPopup(true);
+                                                                            }}
+                                                                            className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
+                                                                            title="Add Payment"
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    ) : null}
+                                                                </span>
+                                                                <span className="inline-flex w-4 h-4 items-center justify-center">
+                                                                    {row.type === "Project Advance" ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={async () => {
+                                                                                let description = "";
+                                                                                if (row.advance_portal_id) {
+                                                                                    try {
+                                                                                        const res = await fetch(
+                                                                                            `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                        );
+                                                                                        if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                        const data = await res.json();
+                                                                                        description = data.description || "";
+                                                                                    } catch (error) {
+                                                                                        console.error("Error fetching advance portal data:", error);
+                                                                                    }
+                                                                                }
+                                                                                setEditFormData((prev) => ({ ...prev, description }));
+                                                                                setCurrentRow(row);
+                                                                                setShowPopups(true);
+                                                                            }}
                                                                         >
                                                                             <img
-                                                                                src={fileUpload}
-                                                                                className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                                alt="Upload File"
+                                                                                src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
+                                                                                alt="Notes"
+                                                                                className="w-4 h-4"
                                                                             />
                                                                         </button>
-                                                                        {canEditDelete && removedBillCopyRows[row.id] && (
+                                                                    ) : null}
+                                                                </span>
+                                                                <span className="inline-flex min-w-[44px] items-center justify-end gap-1">
+                                                                    {row.bill_copy_url ? (
+                                                                        <>
+                                                                            <a
+                                                                                href={cleanUrl(row.bill_copy_url)}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="inline-flex h-4 w-4 items-center justify-center"
+                                                                                title="View File"
+                                                                            >
+                                                                                <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                            </a>
+                                                                            {canEditDelete ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleRemoveBillCopyUrl(row)}
+                                                                                    className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[#E4572E] text-base font-bold leading-none hover:bg-[#fff1ee]"
+                                                                                    title="Remove File"
+                                                                                >
+                                                                                    ×
+                                                                                </button>
+                                                                            ) : (
+                                                                                <span className="inline-block h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                                className="rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
-                                                                                title="Restore Removed File"
+                                                                                onClick={() => handleFileUploadClick(row)}
+                                                                                className="inline-flex h-4 w-4 shrink-0 items-center justify-center"
+                                                                                title="Upload File"
                                                                             >
-                                                                                Restore
+                                                                                <img
+                                                                                    src={fileUpload}
+                                                                                    className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                                    alt="Upload File"
+                                                                                />
                                                                             </button>
-                                                                        )}
-                                                                    </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                tabIndex={-1}
+                                                                                aria-hidden="true"
+                                                                                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center pointer-events-none"
+                                                                            >
+                                                                                <span className="text-base font-bold leading-none opacity-0">×</span>
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </span>
+                                                                {canEditDelete && !row.bill_copy_url && removedBillCopyRows[row.id] && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
+                                                                        className="shrink-0 rounded border border-[#007233] px-1 text-[9px] font-semibold leading-tight text-[#007233] hover:bg-[#e9f8f0]"
+                                                                        title="Restore Removed File"
+                                                                    >
+                                                                        Restore
+                                                                    </button>
                                                                 )}
                                                             </div>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="text-sm text-left pl-2 w-[120px] font-semibold">
+                                                <td className="flex py-2 w-[120px]">
                                                     {isExpensesEntryUploadOnly ? (
                                                         row.bill_copy_url ? (
                                                             <div className="flex items-center gap-2">
@@ -4533,9 +4546,9 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                         )
                                                     ) : (
                                                         canEditSelectedWeek && (
-                                                            <div className="flex gap-2">
+                                                            <>
                                                                 {editingRowId === row.id ? (
-                                                                    <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                    <button onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg mr-3">
                                                                         ✓
                                                                     </button>
                                                                 ) : (
@@ -4546,41 +4559,54 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                                             alt="Edit Disabled"
                                                                         />
                                                                     ) : (
-                                                                        canEditSelectedWeek && (
-                                                                            <button onClick={() => {
-                                                                                setEditingRowId(row.id);
-                                                                                setEditingOriginalRow({ ...row });
-                                                                            }}>
-                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                            </button>
-                                                                        )
-                                                                    )
-                                                                )}
-                                                                {row.type === "Daily" ? (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={Delete}
-                                                                        alt="Delete Disabled"
-                                                                    />
-                                                                ) : (
-                                                                    canEditDelete && canEditSelectedWeek && (
-                                                                        <button className="" onClick={() => handleWeeklyExpensesDelete(row.id)}>
-                                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                        <button className="rounded-full transition duration-200 ml-2 mr-3">
+                                                                            <img
+                                                                                src={Edit}
+                                                                                onClick={() => {
+                                                                                    setEditingRowId(row.id);
+                                                                                    setEditingOriginalRow({ ...row });
+                                                                                }}
+                                                                                alt="Edit"
+                                                                                className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                            />
                                                                         </button>
                                                                     )
                                                                 )}
                                                                 {row.type === "Daily" ? (
                                                                     <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed ml-3"
+                                                                        src={Delete}
+                                                                        alt="Delete Disabled"
+                                                                    />
+                                                                ) : (
+                                                                    canEditDelete && (
+                                                                        <button className="rounded-full transition duration-200 mr-3">
+                                                                            <img
+                                                                                src={Delete}
+                                                                                className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                                onClick={() => handleWeeklyExpensesDelete(row.id)}
+                                                                                alt="Delete"
+                                                                            />
+                                                                        </button>
+                                                                    )
+                                                                )}
+                                                                {row.type === "Daily" ? (
+                                                                    <img
+                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed ml-3"
                                                                         src={history}
                                                                         alt="History Disabled"
                                                                     />
                                                                 ) : (
-                                                                    <button className="" onClick={() => fetchAuditDetailsForExpense(row.id)}>
-                                                                        <img src={history} className="w-5 h-4" alt="History" />
+                                                                    <button className="rounded-full transition duration-200 mr-3">
+                                                                        <img
+                                                                            src={history}
+                                                                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                            onClick={() => fetchAuditDetailsForExpense(row.id)}
+                                                                            alt="History"
+                                                                        />
                                                                     </button>
                                                                 )}
-                                                            </div>
+                                                            </>
                                                         )
                                                     )}
                                                 </td>
@@ -4592,7 +4618,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                         </div>
                     </div>
                     {!isExpensesEntryUploadOnly && (
-                        <div className="w-full xl:flex-[2] xl:min-w-[300px]">
+                        <div className="flex-[1] min-w-0">
                             <div className="block">
                                 <div className="flex flex-col sm:flex-row justify-between mb-4 gap-2">
                                     <h1 className="font-bold text-base">Payments Received</h1>
@@ -5314,6 +5340,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                lockAccountTypePrefill
                                 disableWeeklyExpensesSave
                                 onSuccess={() => {
                                     setShowBillExpenseEntryModal(false);
@@ -5357,6 +5384,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                lockTypePrefill
                                 onSuccess={() => {
                                     setShowBillSettlementAdvanceModal(false);
                                     try {

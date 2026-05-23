@@ -16,6 +16,12 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+    fetchStaffPurposeOptions,
+    splitStaffAdvancePortalByPurpose,
+    getPortalAdvancePartyName,
+    getPortalAdvanceProjectName,
+} from '../../utils/weeklyPaymentStaffAdvancePdf';
 import Change from '../Images/dropdownchange.png';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
@@ -353,6 +359,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         loan_portal_id: "",
     });
     const [editingRowId, setEditingRowId] = useState(null);
+    const [editingOriginalRow, setEditingOriginalRow] = useState(null);
     const [editFormData, setEditFormData] = useState({
         date: "",
         contractor_id: "",
@@ -370,6 +377,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     });
     const handleEditClick = async (row) => {
         setEditingRowId(row.id);
+        setEditingOriginalRow({ ...row });
         let description = row.description || "";
         if (row.advance_portal_id) {
             try {
@@ -643,7 +651,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                 (rawCid != null && !Number.isNaN(Number(rawCid)) ? getContractorName(Number(rawCid)) : "") ??
                 "";
             const prefill = {
-                accountType: row.type === 'Claim' ? 'Claim' : 'Bill Payments',
+                accountType: row.type === 'Claim' ? 'Claim Payment' : 'Bill Payments',
                 siteName,
                 amount: row.amount,
                 date: dateStr,
@@ -2323,6 +2331,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             );
             if (changedFields.length === 0) {
                 setEditingRowId(null);
+                setEditingOriginalRow(null);
                 return;
             }
             const onlyDescriptionChanged =
@@ -2516,6 +2525,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             }
             await refreshWeeklyPaymentData();
             setEditingRowId(null);
+            setEditingOriginalRow(null);
         } catch (error) {
             console.error("❌ Error updating expense:", error);
         }
@@ -2665,36 +2675,39 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         }
         return null;
     };
+    const getExpenseFilterSnapshot = (entry) =>
+        editingRowId === entry.id && editingOriginalRow ? editingOriginalRow : entry;
     const filteredExpenses = expenses.filter((entry) => {
+        const snapshot = getExpenseFilterSnapshot(entry);
         if (selectDate) {
             const [year, month, day] = selectDate.split("-");
             const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-            const entryDateObj = new Date(entry.date);
+            const entryDateObj = new Date(snapshot.date);
             const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
             if (formattedEntryDate !== formattedSelectDate) return false;
         }
         if (selectContractororVendorName) {
             if (isClientToggleActive) {
-                const clientName = getClientName(entry) || "";
+                const clientName = getClientName(snapshot) || "";
                 if (clientName.toLowerCase() !== selectContractororVendorName.toLowerCase()) {
                     return false;
                 }
             } else {
                 const name =
-                    entry.vendor_id
-                        ? getVendorName(entry.vendor_id)
-                        : getContractorName(entry.contractor_id) || getEmployeeName(entry.employee_id);
+                    snapshot.vendor_id
+                        ? getVendorName(snapshot.vendor_id)
+                        : getContractorName(snapshot.contractor_id) || getEmployeeName(snapshot.employee_id);
                 if (name.toLowerCase() !== selectContractororVendorName.toLowerCase())
                     return false;
             }
         }
         if (selectProjectName) {
-            const projectName = getSiteName(entry.project_id) || "";
+            const projectName = getSiteName(snapshot.project_id) || "";
             if (projectName.toLowerCase() !== selectProjectName.toLowerCase())
                 return false;
         }
         if (selectType) {
-            if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+            if (snapshot.type?.toLowerCase() !== selectType.toLowerCase()) return false;
         }
         return true;
     });
@@ -2879,13 +2892,12 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             date.setHours(0, 0, 0, 0);
             return date >= weekDates.startDate && date <= weekDates.endDate;
         };
-        const staffAdvanceTotalFromPortal = staffAdvanceData
-            .filter(entry =>
-                entry.staff_payment_mode === "Cash" &&
-                entry.type === "Advance" &&
-                isDateInWeek(entry.date)
-            )
-            .reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+        const staffPurposeOptions = await fetchStaffPurposeOptions();
+        const {
+            salaryAdvanceEntries: salaryAdvancePortalEntries,
+            wageAdvanceEntries: wageAdvancePortalEntries,
+            salaryAdvanceTotal: staffAdvanceTotalFromPortal,
+        } = splitStaffAdvancePortalByPurpose(staffAdvanceData, isDateInWeek, staffPurposeOptions);
         const loanTotalFromPortal = loanPortalData
             .filter(entry =>
                 (entry.loan_payment_mode === "Cash" || entry.payment_mode === "Cash") &&
@@ -3105,58 +3117,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
         if (dailyExpenseData.length === 0) {
             dailyExpenseData.push(["No Daily Expenses", "0.00"]);
         }
-        autoTable(doc, {
-            head: [["DAILY WAGE", "AMOUNT"]],
-            body: dailyExpenseData,
-            startY: baseY + 210,
-            margin: { left: 300 },
-            tableWidth: 200,
-            theme: "grid",
-            styles: {
-                fontSize: 8,
-                cellPadding: 3,
-                textColor: [0, 0, 0],
-                lineColor: [0, 0, 0],
-                lineWidth: 0.5
-            },
-            headStyles: {
-                textColor: [0, 0, 0],
-                fillColor: [255, 230, 230],
-                lineColor: [0, 0, 0],
-                lineWidth: 1,
-                fontStyle: 'bold',
-                halign: 'left'
-            },
-            bodyStyles: {
-                fontStyle: 'bold'
-            },
-            columnStyles: {
-                0: { halign: 'left' },
-                1: { halign: 'right' }
-            },
-            didDrawPage: () => {
-                drawHeader(doc);
-            }
-        });
-        const dailyWageTable = doc.lastAutoTable;
-        if (dailyWageTable) {
-            const boxY = dailyWageTable.finalY + 2;
-            const boxX = 300;
-            const boxWidth = 200;
-            const boxHeight = 20;
-            const splitX = boxX + 114;
-            doc.rect(boxX, boxY, boxWidth, boxHeight);
-            doc.line(splitX, boxY, splitX, boxY + boxHeight);
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "bold");
-            doc.text("TOTAL", boxX + 10, boxY + 13);
-            doc.text(
-                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
-                boxX + boxWidth - 10,
-                boxY + 13,
-                { align: "right" }
-            );
-        }
+        const expenditureDailyWageGap = 28;
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text("EXPENDITURE PAYMENTS", 300, baseY - 25);
@@ -3190,6 +3151,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             });
         if (summaryMap["Staff Advance"]) {
             summaryMap["Staff Advance"].total = staffAdvanceTotalFromPortal;
+            summaryMap["Staff Advance"].count = salaryAdvancePortalEntries.length;
         }
         if (summaryMap["Loan"]) {
             summaryMap["Loan"].total = loanTotalFromPortal;
@@ -3276,32 +3238,92 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
             summaryBoxY + 3,
             { align: "right" }
         );
+        const expenditureSectionBottomY = summaryBoxY + 8;
+        const dailyWageStartY = expenditureSectionBottomY + expenditureDailyWageGap;
+        autoTable(doc, {
+            head: [["DAILY WAGE", "AMOUNT"]],
+            body: dailyExpenseData,
+            startY: dailyWageStartY,
+            margin: { left: 300 },
+            tableWidth: 200,
+            theme: "grid",
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5
+            },
+            headStyles: {
+                textColor: [0, 0, 0],
+                fillColor: [255, 230, 230],
+                lineColor: [0, 0, 0],
+                lineWidth: 1,
+                fontStyle: 'bold',
+                halign: 'left'
+            },
+            bodyStyles: {
+                fontStyle: 'bold'
+            },
+            columnStyles: {
+                0: { halign: 'left' },
+                1: { halign: 'right' }
+            },
+            didDrawPage: () => {
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+            }
+        });
+        const dailyWageTable = doc.lastAutoTable;
+        if (dailyWageTable) {
+            const boxY = dailyWageTable.finalY + 2;
+            const boxX = 300;
+            const boxWidth = 200;
+            const boxHeight = 20;
+            const splitX = boxX + 114;
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            doc.line(splitX, boxY, splitX, boxY + boxHeight);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("TOTAL", boxX + 10, boxY + 13);
+            doc.text(
+                String(dailyExpensesTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
+                boxX + boxWidth - 10,
+                boxY + 13,
+                { align: "right" }
+            );
+        }
         const newTableX = 520;
         let newTableY = baseY;
-        const staffAdvanceEntries = expenses.filter(e => e.type === "Staff Advance");
-        if (staffAdvanceEntries.length > 0) {
-            const staffAdvanceCount = staffAdvanceEntries.length;
-            const staffAdvanceTotal = staffAdvanceEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-            const staffAdvanceY = newTableY + 10;
+        const portalPartyHelpers = { getEmployeeName };
+        const appendPortalAdvanceTable = (title, portalEntries) => {
+            if (!portalEntries.length) return;
+            const count = portalEntries.length;
+            const total = portalEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            if (newTableY > doc.internal.pageSize.getHeight() - 150) {
+                doc.addPage();
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                newTableY = baseY;
+            }
+            const tableY = newTableY + 10;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text("STAFF ADVANCE", newTableX, staffAdvanceY - 25);
-            const staffAdvanceHead = [[
-                String(staffAdvanceCount || "0"),
+            doc.text(title, newTableX, tableY - 25);
+            const tableHead = [[
+                String(count || "0"),
                 "PARTY",
                 "PROJECT NAME",
-                String(staffAdvanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+                String(total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
             ]];
-            const staffAdvanceBody = staffAdvanceEntries.map(e => [
-                String(e.date ? formatDateOnly(e.date) : ""),
-                String(getPartyDisplayName(e) || ""),
-                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
-                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            const tableBody = portalEntries.map((entry) => [
+                String(entry.date ? formatDateOnly(entry.date) : ""),
+                String(getPortalAdvancePartyName(entry, portalPartyHelpers) || ""),
+                String(getPortalAdvanceProjectName(entry, siteOptions) || ""),
+                String(Number(entry.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
             ]);
             autoTable(doc, {
-                head: staffAdvanceHead,
-                body: staffAdvanceBody,
-                startY: staffAdvanceY - 20,
+                head: tableHead,
+                body: tableBody,
+                startY: tableY - 20,
                 margin: { left: newTableX },
                 tableWidth: 310,
                 theme: "grid",
@@ -3317,11 +3339,13 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                     }
                 },
                 didDrawPage: () => {
-                    drawHeader(doc);
+                    drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
                 }
             });
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
-        }
+        };
+        appendPortalAdvanceTable("SALARY ADVANCE", salaryAdvancePortalEntries);
+        appendPortalAdvanceTable("WAGE ADVANCE", wageAdvancePortalEntries);
         const staffSalaryEntries = expenses.filter(e => e.type === "Staff Salary");
         if (staffSalaryEntries.length > 0) {
             const staffSalaryCount = staffSalaryEntries.length;
@@ -4327,29 +4351,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                             <div className="flex flex-col gap-1">
                                                                 <div className="flex items-center gap-2">
                                                                     <span>{row.type}</span>
-                                                                    {row.type !== "Daily" && (
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                setCurrentProjectAdvanceRow(row);
-                                                                                setPaymentPopupData({
-                                                                                    date: new Date().toISOString().split('T')[0],
-                                                                                    amount: "",
-                                                                                    paymentMode: "",
-                                                                                    chequeNo: "",
-                                                                                    chequeDate: "",
-                                                                                    transactionNumber: "",
-                                                                                    accountNumber: ""
-                                                                                });
-                                                                                const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
-                                                                                setPreviousPayments(previousPaymentsForExpense);
-                                                                                setShowPaymentPopup(true);
-                                                                            }}
-                                                                            className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
-                                                                            title="Add Payment"
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    )}
                                                                 </div>
                                                                 {(() => {
                                                                     const payments = getPaymentsByExpenseId(row.id);
@@ -4399,6 +4400,29 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                                                 )}
                                                             </div>
                                                             <div className="mr-6 flex items-center gap-3">
+                                                                {row.type !== "Daily" && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setCurrentProjectAdvanceRow(row);
+                                                                            setPaymentPopupData({
+                                                                                date: new Date().toISOString().split('T')[0],
+                                                                                amount: "",
+                                                                                paymentMode: "",
+                                                                                chequeNo: "",
+                                                                                chequeDate: "",
+                                                                                transactionNumber: "",
+                                                                                accountNumber: ""
+                                                                            });
+                                                                            const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                            setPreviousPayments(previousPaymentsForExpense);
+                                                                            setShowPaymentPopup(true);
+                                                                        }}
+                                                                        className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
+                                                                        title="Add Payment"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                )}
                                                                 {row.type === "Project Advance" ? (
                                                                     <button
                                                                         onClick={async () => {
@@ -5303,6 +5327,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                lockAccountTypePrefill
                                 disableWeeklyExpensesSave
                                 onSuccess={async () => {
                                     setShowBillExpenseEntryModal(false);
@@ -5350,6 +5375,7 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                                 username={username}
                                 userRoles={userRoles}
                                 embedded
+                                lockTypePrefill
                                 onSuccess={async () => {
                                     setShowBillSettlementAdvanceModal(false);
                                     try {

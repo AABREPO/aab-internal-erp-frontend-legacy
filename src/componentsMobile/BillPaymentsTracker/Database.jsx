@@ -644,7 +644,9 @@ const DatabaseMobile = () => {
 
 		const matchingExpenses = (expensesData || [])
 			.filter((expense) => {
-				const expenseDate = new Date(expense?.timestamp ?? expense?.date);
+				const ts = expense?.timestamp ?? expense?.timeStamp;
+				if (!ts) return false;
+				const expenseDate = new Date(ts);
 				if (isNaN(expenseDate.getTime())) return false;
 				const iso = expenseDate.toISOString().split('T')[0];
 				return billEnteredDates.includes(iso);

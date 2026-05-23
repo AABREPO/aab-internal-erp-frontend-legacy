@@ -37,6 +37,14 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             return localStorage.getItem("username") || localStorage.getItem("userName") || "";
         }
     };
+
+    /** Match ExpensesEntry/Form.js: send branch + entered-by in camelCase and snake_case. */
+    const buildRentalFormAuditFields = (enteredBy, branchId) => ({
+        enteredBy: enteredBy || null,
+        entered_by: enteredBy || null,
+        branchId: branchId ?? null,
+        branch_id: branchId ?? null,
+    });
     const [selectedRentType, setSelectedRentType] = useState("Rent");
     const getPreviousMonth = () => {
         const now = new Date();
@@ -76,6 +84,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     const [rentalFormsData, setRentalFormsData] = useState([]);
     const [amountError, setAmountError] = useState('');
     const [closureDate, setClosureDate] = useState('');
+    const [closureDateError, setClosureDateError] = useState('');
     const [rentHistoryData, setRentHistoryData] = useState([]);
     const [shopClosureToggle, setShopClosureToggle] = useState(false);
     const [accountDetails, setAccountDetails] = useState([]);
@@ -200,7 +209,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
-                
+
                 const shopNoIdMap = {};
                 projects
                     .filter(project => project.projectReferenceName)
@@ -230,7 +239,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                     shopNoId: shopNoId
                 }));
                 setShopNoOptions(shopOptions);
-                
+
                 if (selectedRentType === "Refund") {
                     const vacatedTenants = data.filter(t =>
                         t.shopNos?.some(shop => shop.shopClosureDate)
@@ -298,7 +307,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                     }
                                 });
                             });
-                        
+
                         newShopInfoMap[shopNo] = {
                             doorNo: doorNo,
                             projectReferenceName: projectReferenceName,
@@ -523,7 +532,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             ? firstHistoryMonthDate
             : startMonthDate;
         const end = new Date(calculationEndDate);
-        
+
         const formsMatchingTenantShop = rentalFormsData.filter(form => {
             const matchesShopLink = formShopNoId != null && form.shopNoId != null && form.shopNoId.toString() === formShopNoId.toString();
             const matchesFallback = form.tenantName === formTenantName && form.shopNo === formShopNo;
@@ -535,7 +544,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             const year = currentDate.getFullYear();
             const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
             const currentMonth = `${year}-${month}`;
-            
+
             let monthlyRentDue = 0;
             for (let i = 0; i < sortedRentHistory.length; i++) {
                 const historyEntry = sortedRentHistory[i];
@@ -553,7 +562,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 currentDate.setMonth(currentDate.getMonth() + 1);
                 continue;
             }
-            
+
             const formsMatchingMonth = formsMatchingTenantShop.filter(form => {
                 const normalizedFormMonth = normalizeMonthFormat(form.forTheMonthOf);
                 return normalizedFormMonth === currentMonth;
@@ -568,7 +577,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             });
             const excludedForms = formsMatchingMonth.filter(form =>
                 !(form.formType === "Rent" || form.formType === "Pending Rent")
-            );            
+            );
             const originalMonthlyRentDue = monthlyRentDue;
             if (
                 tenantStartDate &&
@@ -595,7 +604,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 totalPendingRent += pendingForMonth;
             }
             currentDate.setMonth(currentDate.getMonth() + 1);
-        }        
+        }
         return totalPendingRent;
     };
     const calculatePendingRentForPendingType = () => {
@@ -604,7 +613,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         }
         const tenantInfo = shopInfoMap[formShopNo];
         const formShopNoId = tenantInfo?.shopNoId || null;
-        
+
         let shopClosureDate = null;
         const matchingTenant = tenantShopData.find(tenant => tenant.tenantName === formTenantName);
         if (matchingTenant) {
@@ -670,7 +679,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             }
         }
         const allFormsForTenantShop = rentalFormsData.filter(form =>
-            form.tenantName === formTenantName && 
+            form.tenantName === formTenantName &&
             (form.shopNoId === formShopNoId || form.shopNo === formShopNo)
         );
         let totalPendingRent = 0;
@@ -680,7 +689,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
             const currentMonth = `${year}-${month}`;
             const monthName = currentDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-            
+
             let monthlyRentDue = 0;
             for (let i = 0; i < sortedRentHistory.length; i++) {
                 const historyEntry = sortedRentHistory[i];
@@ -697,16 +706,16 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 currentDate.setMonth(currentDate.getMonth() + 1);
                 continue;
             }
-            
+
             const formsMatchingTenantShop = rentalFormsData.filter(form =>
-                form.tenantName === formTenantName && 
+                form.tenantName === formTenantName &&
                 (form.shopNoId === formShopNoId || form.shopNo === formShopNo)
             );
             const formsMatchingMonth = formsMatchingTenantShop.filter(form => {
                 const normalizedFormMonth = normalizeMonthFormat(form.forTheMonthOf);
                 return normalizedFormMonth === currentMonth;
             });
-            
+
             const allRentPayments = rentalFormsData.filter(form => {
                 const normalizedFormMonth = normalizeMonthFormat(form.forTheMonthOf);
                 return form.tenantName === formTenantName &&
@@ -714,7 +723,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                     normalizedFormMonth === currentMonth &&
                     (form.formType === "Rent" || form.formType === "Pending Rent");
             });
-            
+
             const excludedForms = formsMatchingMonth.filter(form =>
                 !(form.formType === "Rent" || form.formType === "Pending Rent")
             );
@@ -741,7 +750,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             }
             currentDate.setMonth(currentDate.getMonth() + 1);
         }
-        
+
         return totalPendingRent;
     };
     const handlePaymentModeChange = (e) => {
@@ -811,6 +820,17 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             });
             return;
         }
+        if (selectedRentType === "Shop Closure" && !closureDate?.trim()) {
+            setClosureDateError('Closure date is required.');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Closure Date',
+                text: 'Please select a Closure Date before submitting Shop Closure.',
+                confirmButtonColor: '#bf9853'
+            });
+            return;
+        }
+        setClosureDateError('');
         if (selectedRentType === "Refund") {
             if (!shopDetails || (shopDetails.isActive && !shopDetails.shopClosureDate)) {
                 Swal.fire({
@@ -1065,16 +1085,16 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         };
         const now = new Date();
         const timestamp = now.toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        hour12: true
-                    })
-                        .replace(",", "")
-                        .replace(/\s/g, "-");
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        })
+            .replace(",", "")
+            .replace(/\s/g, "-");
         const date = `${month} ${getOrdinal(day)} ${year}`;
         const formattedPaidOnDate = convertToDDMMYYYY(paidOnDate);
         const rentFormsRes = await fetch("https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll");
@@ -1116,6 +1136,9 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         };
         const cleanedAmount = parseFloat((amount || "").replace(/[^0-9.]/g, ""));
         let remainingAmount = isNaN(cleanedAmount) ? 0 : cleanedAmount;
+        const enteredBy = resolveEnteredBy();
+        const activeBranchId = resolveActiveBranchId();
+        const auditFields = buildRentalFormAuditFields(enteredBy, activeBranchId);
         const submissions = [];
         if ((selectedRentType === "Rent" || selectedRentType === "Pending Rent") && baseMonthlyRent > 0) {
             let currentDate = new Date(selectedMonth);
@@ -1196,6 +1219,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                     forTheMonthOf: currentMonthStr,
                     attachedFile: pdfUrl,
                     shopClosureDate: closureValueForForm,
+                    ...auditFields,
                 };
                 submissions.push(rentalForm);
                 remainingAmount -= amountToPay;
@@ -1208,7 +1232,6 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             const paymentMode = isClosure && shopClosureToggle
                 ? formPaymentMode + " From Cash Register"
                 : formPaymentMode;
-            const enteredBy = resolveEnteredBy();
             const form = {
                 formType: selectedRentType,
                 shopNo: formShopNo,
@@ -1223,8 +1246,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 forTheMonthOf: selectedRentType === "Rent" || selectedRentType === "Pending Rent" ? selectedMonth : "",
                 attachedFile: pdfUrl,
                 shopClosureDate: closureValueForForm,
-                enteredBy: enteredBy,
-                branchId: resolveActiveBranchId(),
+                ...auditFields,
             };
             submissions.push(form);
         }
@@ -1241,7 +1263,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             } else {
                 try {
                     const contentType = response.headers.get("content-type");
-                    let savedForm = null;                    
+                    let savedForm = null;
                     if (contentType && contentType.includes("application/json")) {
                         savedForm = await response.json();
                     } else {
@@ -1254,7 +1276,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                 savedForm = { id: numericId };
                             }
                         }
-                    }                    
+                    }
                     if (savedForm && savedForm.id) {
                         submittedFormIds.push(savedForm.id);
                     }
@@ -1262,7 +1284,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                     // Silently continue - will use fallback method
                 }
             }
-        }        
+        }
         if (submittedFormIds.length === 0 && submissions.length > 0) {
             try {
                 const allFormsRes = await fetch("https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll");
@@ -1273,7 +1295,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                         const matchesTenant = f.tenantName === formTenantName;
                         const matchesShop = (f.shopNoId === formShopNoId || f.shopNo === formShopNo);
                         const matchesType = f.formType === selectedRentType;
-                        const matchesDate = f.paidOnDate === formattedPaidOnDate || f.paidOnDate === paidOnDate;                        
+                        const matchesDate = f.paidOnDate === formattedPaidOnDate || f.paidOnDate === paidOnDate;
                         return matchesEno && matchesTenant && matchesShop && matchesType && matchesDate;
                     });
                     matchingForms
@@ -1513,7 +1535,10 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 <div>
                     <h2 className="text-[#E4572E] font-bold mb-2 text-sm sm:text-base">Select Type</h2>
                     <select className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 mt-1 w-full sm:w-[170px] h-[45px]"
-                        value={selectedRentType} onChange={(e) => setSelectedRentType(e.target.value)} >
+                        value={selectedRentType} onChange={(e) => {
+                            setSelectedRentType(e.target.value);
+                            if (e.target.value !== "Shop Closure") setClosureDateError('');
+                        }} >
                         <option value="Rent">Rent</option>
                         <option value="Advance">Advance</option>
                         <option value="Shop Closure">Shop Closure</option>
@@ -1535,7 +1560,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                 setFormShopNo(selectedShopNo);
                                 if (selectedRentType !== "Pending Rent") {
                                     const selectedShopOption = filteredShopNoOptions.find(opt => opt.value === selectedShopNo);
-                                    const selectedShopNoId = selectedShopOption?.shopNoId || null;                                    
+                                    const selectedShopNoId = selectedShopOption?.shopNoId || null;
                                     const matchingTenant = [...tenantShopData].reverse().find(t =>
                                         t.shopNos?.some(shop => {
                                             if (!shop || shop.shopNoId !== selectedShopNoId) return false;
@@ -1572,7 +1597,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                 } else {
                                     const selectedShopOption = filteredShopNoOptions.find(opt => opt.value === selectedShopNo);
                                     const selectedShopNoId = selectedShopOption?.shopNoId || null;
-                                    
+
                                     const tenantsForShop = tenantShopData.filter(t =>
                                         t.shopNos?.some(shop => shop.shopNoId === selectedShopNoId)
                                     );
@@ -1582,12 +1607,12 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                         tenantId: t.id
                                     }));
                                     setTenantOptions(shopTenantOptions);
-                                    
+
                                     const vacatedTenant = tenantsForShop.find(t =>
-                                        t.shopNos?.some(shop => 
+                                        t.shopNos?.some(shop =>
                                             shop.shopNoId === selectedShopNoId && shop.shopClosureDate
                                         )
-                                    );                                    
+                                    );
                                     if (vacatedTenant) {
                                         setFormTenantName(vacatedTenant.tenantName);
                                         setSelectedTenantId(vacatedTenant.id);
@@ -1768,15 +1793,15 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                     }
                                 } else {
                                     const tenantMatch = tenantShopData.find(t => t.tenantName === selectedOption.value);
-                                    
+
                                     if (formShopNo && selectedRentType === "Pending Rent") {
                                         const selectedShopOption = filteredShopNoOptions.find(opt => opt.value === formShopNo);
                                         const selectedShopNoId = selectedShopOption?.shopNoId || null;
-                                        
-                                        const hasShopClosureDate = tenantMatch?.shopNos?.some(shop => 
+
+                                        const hasShopClosureDate = tenantMatch?.shopNos?.some(shop =>
                                             shop.shopNoId === selectedShopNoId && shop.shopClosureDate
                                         );
-                                        
+
                                         if (!hasShopClosureDate) {
                                             Swal.fire({
                                                 icon: 'warning',
@@ -1785,7 +1810,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                                 confirmButtonColor: '#bf9853'
                                             });
                                             const vacatedTenant = tenantShopData.find(t =>
-                                                t.shopNos?.some(shop => 
+                                                t.shopNos?.some(shop =>
                                                     shop.shopNoId === selectedShopNoId && shop.shopClosureDate
                                                 )
                                             );
@@ -1930,13 +1955,22 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                 </div>
                 {selectedRentType === "Shop Closure" && (
                     <div className="w-full lg:w-auto">
-                        <label className="block font-semibold mb-2 text-sm sm:text-base">Closure Date</label>
+                        <label className="block font-semibold mb-2 text-sm sm:text-base">
+                            Closure Date <span className="text-[#E4572E]">*</span>
+                        </label>
                         <input
                             type="date"
+                            required
                             value={closureDate}
-                            onChange={(e) => setClosureDate(e.target.value)}
-                            className="border-2 border-opacity-[0.18] focus:outline-none border-[#BF9853] rounded-lg p-2 w-full sm:w-[170px] h-[45px]"
+                            onChange={(e) => {
+                                setClosureDate(e.target.value);
+                                if (e.target.value) setClosureDateError('');
+                            }}
+                            className={`border-2 border-opacity-[0.18] focus:outline-none rounded-lg p-2 w-full sm:w-[170px] h-[45px] ${closureDateError ? 'border-[#E4572E]' : 'border-[#BF9853]'}`}
                         />
+                        {closureDateError && (
+                            <p className="mt-1 text-xs text-[#E4572E]">{closureDateError}</p>
+                        )}
                     </div>
                 )}
                 {selectedRentType === "Shop Closure" && (
@@ -2019,7 +2053,6 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
                                         </div>
                                     </div>
                                 </div>
-
                                 {(weeklyPaymentData.paymentMode === "Gpay" || weeklyPaymentData.paymentMode === "GPay" || weeklyPaymentData.paymentMode === "PhonePe" ||
                                     weeklyPaymentData.paymentMode === "Net Banking" || weeklyPaymentData.paymentMode === "Cheque") && (
                                         <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">

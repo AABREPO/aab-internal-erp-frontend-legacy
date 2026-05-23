@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
+import { getDefaultAmcFilters } from './utilityHubTabFilters';
 
 const getTenantLinkPhone = (tenant) =>
     String(
@@ -28,19 +29,7 @@ const AMCTab = ({ username, userRoles = [] }) => {
         { value: 'vacated', label: 'Vacated Shop' }
     ];
 
-    const [filters, setFilters] = useState({
-        year: new Date().getFullYear().toString(),
-        month: '',
-        paymentStatus: '',
-        vendor: '',
-        service: '',
-        shop: '',
-        doorNo: '',
-        projectName: '',
-        projectType: '',
-        tenant: '',
-        occupancyStatus: ''
-    });
+    const [filters, setFilters] = useState(getDefaultAmcFilters);
     const [tenantShopData, setTenantShopData] = useState([]);
 
     useEffect(() => {
@@ -122,6 +111,8 @@ const AMCTab = ({ username, userRoles = [] }) => {
             [filterType]: selectedOption ? selectedOption.value : ''
         }));
     };
+
+    const clearFilters = () => setFilters(getDefaultAmcFilters());
 
     const amcFilterFieldLabels = {
         year: 'Year',
@@ -219,7 +210,8 @@ const AMCTab = ({ username, userRoles = [] }) => {
                             Export XL
                         </button>
                     </div>
-                    <div className="grid grid-cols-6 gap-4 text-left">
+                    <div className="flex flex-wrap gap-4 text-left items-end">
+                    <div className="grid grid-cols-6 gap-4 flex-1 min-w-0">
                         <div>
                             <label className="block font-semibold mb-1">Year</label>
                             <Select
@@ -378,6 +370,14 @@ const AMCTab = ({ username, userRoles = [] }) => {
                                 className="w-full"
                             />
                         </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="px-5 py-2 h-[45px] border-2 border-[#BF9853] text-[#BF9853] rounded-lg font-semibold hover:bg-[#FAF6ED] transition-colors whitespace-nowrap shrink-0"
+                    >
+                        Clear
+                    </button>
                     </div>
                 </div>
                 </div>

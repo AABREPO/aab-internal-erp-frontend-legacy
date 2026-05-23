@@ -657,6 +657,15 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     contractorOptions.find(c => c.id === id)?.value || "";
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
+  const getAdvanceRecordId = (entry) =>
+    Number(entry?.advancePortalId ?? entry?.id ?? 0);
+  const compareByAdvanceIdDesc = (a, b) =>
+    getAdvanceRecordId(b) - getAdvanceRecordId(a);
+  const entryHasProjectName = (entry) => !isBlankish(getSiteName(entry?.project_id));
+  const canUserEditEntry = (entry) => {
+    if (!entryHasProjectName(entry)) return isAdmin;
+    return true;
+  };
   const getBranchName = (id) =>
     branchOptions.find(b => String(b.id) === String(id))?.branch || "";
   const filteredData = advanceData.filter((entry) => {
@@ -910,38 +919,22 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           default:
             return 0;
         }
-        const entryA = Number(a.entry_no) || 0;
-        const entryB = Number(b.entry_no) || 0;
         if (sortConfig.key === 'date') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
+          return compareByAdvanceIdDesc(a, b);
         }
         if (sortConfig.key === 'entryNo') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          // tie-break: newer date first, then entry_no desc
-          const dateA = new Date(a.date);
-          const dateB = new Date(b.date);
-          const dateDiff = dateB - dateA;
-          if (dateDiff !== 0) return dateDiff;
-          return entryB - entryA;
+          return compareByAdvanceIdDesc(a, b);
         }
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return entryA - entryB;
+        return compareByAdvanceIdDesc(a, b);
       });
     } else {
-      sortableData.sort((a, b) => {
-        // Default: latest entry_no first (descending)
-        const entryA = Number(a.entry_no) || 0;
-        const entryB = Number(b.entry_no) || 0;
-        if (entryB !== entryA) return entryB - entryA;
-        // tie-break: newer date first
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA;
-      });
+      sortableData.sort(compareByAdvanceIdDesc);
     }
     return sortableData;
   }, [filteredData, sortConfig, branchOptions]);
@@ -986,6 +979,10 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     return sum;
   }, 0);
   const handleEditClick = (entry) => {
+    if (!canUserEditEntry(entry)) {
+      alert('Entries without a project name can only be edited by admin users.');
+      return;
+    }
     if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
       setRequestingEntry(entry);
       setIsRequestModalOpen(true);
@@ -1118,6 +1115,10 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const handleUpdate = async () => {
     try {
       const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
+      if (currentEntry && !canUserEditEntry(currentEntry)) {
+        alert('Entries without a project name can only be edited by admin users.');
+        return;
+      }
       if (currentEntry && currentEntry.not_allow_to_edit) {
         alert('Editing is not allowed for this record. Please request permission to edit.');
         return;
@@ -1763,17 +1764,31 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                           )}
                         </td>
                         <td className=" py-1.5">
-                          <button
-                            className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit && !isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={entry.not_allow_to_edit && !isAdmin}
-                            onClick={entry.not_allow_to_edit && !isAdmin ? undefined : () => handleEditClick(entry)}
-                          >
-                            <img
-                              src={edit}
-                              alt="Edit"
-                              className={` w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 ${entry.not_allow_to_edit && !isAdmin ? '' : ''}`}
-                            />
-                          </button>
+                          {(() => {
+                            const editDisabled =
+                              !canUserEditEntry(entry) ||
+                              (entry.not_allow_to_edit && !isAdmin);
+                            return (
+                              <button
+                                className={`rounded-full transition duration-200 ml-2 mr-3 ${editDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={editDisabled}
+                                title={
+                                  !entryHasProjectName(entry) && !isAdmin
+                                    ? 'Only admins can edit'
+                                    : entry.not_allow_to_edit && !isAdmin
+                                      ? 'Edit requires admin approval'
+                                      : 'Edit'
+                                }
+                                onClick={editDisabled ? undefined : () => handleEditClick(entry)}
+                              >
+                                <img
+                                  src={edit}
+                                  alt="Edit"
+                                  className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                />
+                              </button>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))

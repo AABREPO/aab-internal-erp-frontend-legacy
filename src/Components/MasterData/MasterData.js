@@ -293,6 +293,12 @@ const MasterData = ({ username, userRoles = [] }) => {
   // State for Project Management
   const [isProjectManagementOpen, setIsProjectManagementOpen] = useState(false);
   const [projectManagementSearch, setProjectManagementSearch] = useState('');
+  const [showOnGoingProjectsOnly, setShowOnGoingProjectsOnly] = useState(false);
+  const PROJECT_STATUS_OPTIONS = ['On Going', 'Completed'];
+  const isOnGoingProject = (project) => {
+    const status = String(project?.status || '').trim().toLowerCase();
+    return status === 'on going' || status === 'ongoing';
+  };
   const [newProject, setNewProject] = useState({
     projectName: '',
     projectAddress: '',
@@ -300,6 +306,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     projectCategory: '',
     projectReferenceName: '',
     branch: '',
+    status: '',
     ownerDetailsList: [{
       clientName: "",
       fatherName: "",
@@ -333,6 +340,18 @@ const MasterData = ({ username, userRoles = [] }) => {
     });
     return Array.from(categories);
   }, [projects]);
+  const filteredProjectsForTable = useMemo(() => {
+    const search = projectManagementSearch.trim().toLowerCase();
+    return projects.filter((project) => {
+      const matchesSearch =
+        !search ||
+        project.projectName?.toLowerCase().includes(search) ||
+        project.projectAddress?.toLowerCase().includes(search) ||
+        project.projectId?.toLowerCase().includes(search);
+      const matchesStatus = !showOnGoingProjectsOnly || isOnGoingProject(project);
+      return matchesSearch && matchesStatus;
+    });
+  }, [projects, projectManagementSearch, showOnGoingProjectsOnly]);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [editProject, setEditProject] = useState({
@@ -342,6 +361,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     projectCategory: '',
     projectReferenceName: '',
     branch: '',
+    status: '',
     ownerDetailsList: [{
       clientName: "",
       fatherName: "",
@@ -448,6 +468,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const [exportDataType, setExportDataType] = useState(''); // 'vendor' or 'contractor'
   const [exportSearchTerm, setExportSearchTerm] = useState('');
   const [exportProjectCategory, setExportProjectCategory] = useState('');
+  const [exportProjectStatus, setExportProjectStatus] = useState('');
   const [selectedExportItems, setSelectedExportItems] = useState([]);
 
   // State for Master Table functionality
@@ -708,6 +729,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       projectCategory: '',
       projectReferenceName: '',
       branch: '',
+      status: '',
       siteEngineerId: '',
       ownerDetailsList: [{
         clientName: "",
@@ -732,10 +754,15 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     });
   };
+  // GET requests bypass browser/CDN cache (production often caches getAll; localhost dev server does not)
+  const fetchMasterDataGet = (url) => {
+    const bustUrl = `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
+    return fetch(bustUrl, { cache: 'no-store' });
+  };
   // Fetch functions
   const fetchSiteNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/project_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setSiteNames(data);
@@ -746,7 +773,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchVendorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setVendorNames(data);
@@ -760,7 +787,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   const fetchContractorNames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll');
       if (response.ok) {
         const data = await response.json();
         setContractorNames(data);
@@ -771,7 +798,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchCategories = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll');
       if (response.ok) {
         const data = await response.json();
         setExpensesCategory(data);
@@ -782,7 +809,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchMachinTools = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/machine_tools/getAll');
       if (response.ok) {
         const data = await response.json();
         setMachineToolsOptions(data);
@@ -793,7 +820,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchEmployeeList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll');
       if (response.ok) {
         const data = await response.json();
         setEmployeeList(data);
@@ -805,13 +832,12 @@ const MasterData = ({ username, userRoles = [] }) => {
 
   const fetchUsernames = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/user/usernames');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/user/usernames');
       if (!response.ok) {
         console.error('Failed to fetch usernames:', response.status, response.statusText);
         return;
       }
       const data = await response.json();
-
       const raw =
         Array.isArray(data)
           ? data
@@ -820,7 +846,6 @@ const MasterData = ({ username, userRoles = [] }) => {
             : Array.isArray(data?.data)
               ? data.data
               : [];
-
       const options = raw
         .map((u) => {
           if (typeof u === 'string') return u;
@@ -831,7 +856,6 @@ const MasterData = ({ username, userRoles = [] }) => {
         })
         .map((s) => String(s).trim())
         .filter(Boolean);
-
       setUsernamesOptions(Array.from(new Set(options)));
     } catch (error) {
       console.error('Error fetching usernames:', error);
@@ -839,7 +863,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchLaboursList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll');
       if (response.ok) {
         const data = await response.json();
         setLaboursList(data);
@@ -850,7 +874,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchAccountDetails = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
       if (response.ok) {
         const data = await response.json();
         setAccountDetails(data);
@@ -861,7 +885,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchBankAccountTypes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/bank_type/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/bank_type/getAll');
       if (response.ok) {
         const data = await response.json();
         setBankAccountTypes(data);
@@ -872,7 +896,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchEbServiceLinks = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/eb-service-no/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/eb-service-no/getAll');
       if (response.ok) {
         const data = await response.json();
         setEbServiceLinks(data);
@@ -883,7 +907,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchSupportStaffNameList = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/support_staff/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/support_staff/getAll');
       if (response.ok) {
         const data = await response.json();
         setSupportStaffNameList(data);
@@ -894,7 +918,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchPropertyTypes = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/property_types/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuildersDash/api/property_types/getAll');
       if (response.ok) {
         const data = await response.json();
         setPropertyTypes(Array.isArray(data) ? data : []);
@@ -909,7 +933,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   };
   const fetchProjects = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
+      const response = await fetchMasterDataGet('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
       if (response.ok) {
         const data = await response.json();
         setProjects(data);
@@ -918,7 +942,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const refetchAllMasterData = async () => {
     await Promise.all([
       fetchSiteNames(),
@@ -937,59 +960,19 @@ const MasterData = ({ username, userRoles = [] }) => {
       fetchProjects(),
     ]);
   };
-
   const refetchCurrentTableData = async () => {
-    switch (selectedTable) {
-      case 'project-management':
-        await Promise.all([fetchProjects(), fetchSiteNames()]);
-        return;
-      case 'vendor-names':
-        await fetchVendorNames();
-        return;
-      case 'contractor-names':
-        await fetchContractorNames();
-        return;
-      case 'categories':
-        await fetchCategories();
-        return;
-      case 'machine-tools':
-        await fetchMachinTools();
-        return;
-      case 'employee-details':
-        await Promise.all([fetchEmployeeList(), fetchUsernames()]);
-        return;
-      case 'labours-list':
-        await fetchLaboursList();
-        return;
-      case 'Account Details':
-        await fetchAccountDetails();
-        return;
-      case 'bank-account-type':
-        await fetchBankAccountTypes();
-        return;
-      case 'support-staff-name':
-        await fetchSupportStaffNameList();
-        return;
-      case 'property-type':
-        await fetchPropertyTypes();
-        return;
-      default:
-        await refetchAllMasterData();
-    }
+    await refetchAllMasterData();
   };
-
   useEffect(() => {
     void refetchAllMasterData();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount load + explicit refetch after mutations
   }, []);
-
   // Project Management Handler Functions
   const handleNewOwnerChange = (index, field, value) => {
     const updatedOwners = [...newProject.ownerDetailsList];
     updatedOwners[index][field] = value;
     setNewProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners }));
   };
-
   const sortPropertyDetailsByShopNo = (details = []) => {
     const parseShopNo = (shopNo = '') => {
       const trimmed = shopNo.trim().toUpperCase();
@@ -997,7 +980,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (!trimmed) {
         return { isEmpty: true, prefix: '', number: Number.MAX_SAFE_INTEGER, remainder: '' };
       }
-
       const alphaNumericMatch = sanitized.match(/^([A-Z]+)(\d+)/);
       if (alphaNumericMatch) {
         const [, prefix, numberPart] = alphaNumericMatch;
@@ -1008,7 +990,6 @@ const MasterData = ({ username, userRoles = [] }) => {
           remainder: sanitized.slice(alphaNumericMatch[0].length),
         };
       }
-
       const numericMatch = sanitized.match(/^(\d+)/);
       if (numericMatch) {
         return {
@@ -1018,14 +999,11 @@ const MasterData = ({ username, userRoles = [] }) => {
           remainder: sanitized.slice(numericMatch[1].length),
         };
       }
-
       return { isEmpty: false, prefix: sanitized || trimmed, number: Number.MAX_SAFE_INTEGER, remainder: '' };
     };
-
     return [...details].sort((a, b) => {
       const shopA = parseShopNo(a.shopNo);
       const shopB = parseShopNo(b.shopNo);
-
       if (shopA.isEmpty !== shopB.isEmpty) {
         return shopA.isEmpty ? 1 : -1;
       }
@@ -1038,13 +1016,11 @@ const MasterData = ({ username, userRoles = [] }) => {
       return shopA.remainder.localeCompare(shopB.remainder);
     });
   };
-
   const handleNewDetailChange = (index, field, value) => {
     const updatedDetails = [...newProject.propertyDetailsList];
     updatedDetails[index][field] = value;
     setNewProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
   };
-
   const addNewOwner = () => {
     setNewProject((prev) => ({
       ...prev,
@@ -1057,7 +1033,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
-
   const addNewPropertyDetail = () => {
     setNewProject((prev) => ({
       ...prev,
@@ -1076,20 +1051,17 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
-
   // Edit form handler functions
   const handleEditOwnerChange = (index, field, value) => {
     const updatedOwners = [...editProject.ownerDetailsList];
     updatedOwners[index][field] = value;
     setEditProject((prev) => ({ ...prev, ownerDetailsList: updatedOwners }));
   };
-
   const handleEditDetailChange = (index, field, value) => {
     const updatedDetails = [...editProject.propertyDetailsList];
     updatedDetails[index][field] = value;
     setEditProject((prev) => ({ ...prev, propertyDetailsList: updatedDetails }));
   };
-
   const addEditOwner = () => {
     setEditProject((prev) => ({
       ...prev,
@@ -1102,7 +1074,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
-
   const addEditPropertyDetail = () => {
     setEditProject((prev) => ({
       ...prev,
@@ -1121,7 +1092,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       }]
     }));
   };
-
   // Submit functions
   const handleSubmitSiteNames = async (e) => {
     e.preventDefault();
@@ -1140,7 +1110,6 @@ const MasterData = ({ username, userRoles = [] }) => {
       console.error('Error:', error);
     }
   };
-
   const handleSubmitVendorName = async (e) => {
     e.preventDefault(); // prevent page reload
     try {
@@ -1557,6 +1526,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         projectCategory: newProject.projectCategory,
         projectReferenceName: newProject.projectReferenceName,
         branch: newProject.branch,
+        status: newProject.status || '',
         siteEngineerId: normalizeSiteEngineerIdForProjectApi(newProject.siteEngineerId),
         ownerDetails: newProject.ownerDetailsList,      // map to backend
         propertyDetails: newProject.propertyDetailsList // map to backend
@@ -1868,6 +1838,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       projectCategory: item.projectCategory || '',
       projectReferenceName: item.projectReferenceName || '',
       branch: item.branch || '',
+      status: PROJECT_STATUS_OPTIONS.includes(item.status) ? item.status : '',
       siteEngineerId: rawSeId === '' || rawSeId == null ? '' : String(rawSeId),
       ownerDetailsList: item.ownerDetails && item.ownerDetails.length > 0 ? item.ownerDetails : [{
         clientName: "",
@@ -1948,6 +1919,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         projectCategory: editProject.projectCategory,
         projectReferenceName: editProject.projectReferenceName,
         branch: editProject.branch,
+        status: editProject.status || '',
         siteEngineerId: normalizeSiteEngineerIdForProjectApi(editProject.siteEngineerId),
         ownerDetails: editProject.ownerDetailsList,       // mapped for backend
         propertyDetails: sortedPropertyDetails  // mapped for backend - sorted before submit
@@ -2213,9 +2185,7 @@ const MasterData = ({ username, userRoles = [] }) => {
 
       if (response.ok) {
         setMessage(`${tableType} bulk upload successful!`);
-        if (refreshFunction) {
-          refreshFunction(); // Refresh the list
-        }
+        void refetchAllMasterData();
       } else {
         const errorData = await response.json();
         setMessage(`${tableType} bulk upload failed: ${errorData.message || 'Unknown error'}`);
@@ -2246,7 +2216,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         const result = await response.text();
         setMessage(`Project Management bulk upload successful! ${result}`);
-        fetchProjects(); // Refresh the project list
+        void refetchAllMasterData();
       } else {
         const errorData = await response.text();
         setMessage(`Project Management bulk upload failed: ${errorData}`);
@@ -2846,6 +2816,7 @@ const MasterData = ({ username, userRoles = [] }) => {
   const handleDownloadIconClick = (dataType) => {
     setExportDataType(dataType);
     setExportProjectCategory('');
+    setExportProjectStatus('');
     setIsExportTypeModalOpen(true);
   };
 
@@ -2856,6 +2827,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     setSelectedExportItems([]);
     setExportSearchTerm('');
     setExportProjectCategory('');
+    setExportProjectStatus('');
   };
 
   const handleExportItemToggle = (itemId) => {
@@ -2889,6 +2861,38 @@ const MasterData = ({ username, userRoles = [] }) => {
     setSelectedExportItems([]);
   };
 
+  const filterProjectsForExport = (statusValue = exportProjectStatus) => {
+    const search = exportSearchTerm.trim().toLowerCase();
+    const filterStatus = String(statusValue || '').trim().toLowerCase();
+    return projects.filter((item) => {
+      const matchesSearch =
+        !search ||
+        (item.projectName || '').toLowerCase().includes(search) ||
+        (item.projectId || '').toString().toLowerCase().includes(search) ||
+        (item.projectReferenceName || '').toLowerCase().includes(search);
+      const matchesCategory =
+        !exportProjectCategory ||
+        (item.projectCategory || '').toLowerCase() === exportProjectCategory.toLowerCase();
+      const matchesStatus =
+        !filterStatus ||
+        (filterStatus === 'on going'
+          ? isOnGoingProject(item)
+          : String(item.status || '').trim().toLowerCase() === filterStatus);
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  };
+
+  const handleExportProjectStatusChange = (e) => {
+    const nextStatus = e.target.value;
+    setExportProjectStatus(nextStatus);
+    if (!nextStatus) {
+      setSelectedExportItems([]);
+      return;
+    }
+    const filtered = filterProjectsForExport(nextStatus);
+    setSelectedExportItems(filtered.map((item) => item.id));
+  };
+
   const getFilteredExportData = () => {
     if (exportDataType === 'vendor') {
       return vendorNames.filter(item =>
@@ -2905,16 +2909,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         (item.role_of_employee || '').toLowerCase().includes(exportSearchTerm.toLowerCase())
       );
     } else if (exportDataType === 'project') {
-      const search = exportSearchTerm.toLowerCase();
-      return projects.filter(item => {
-        const matchesSearch =
-          (item.projectName || '').toLowerCase().includes(search) ||
-          (item.projectId || '').toString().toLowerCase().includes(search) ||
-          (item.projectReferenceName || '').toLowerCase().includes(search);
-        const matchesCategory = !exportProjectCategory ||
-          (item.projectCategory || '').toLowerCase() === exportProjectCategory.toLowerCase();
-        return matchesSearch && matchesCategory;
-      });
+      return filterProjectsForExport();
     } else if (exportDataType === 'ebServiceLink') {
       return ebServiceLinks.filter(item =>
         (item.project_id?.toString() || '').toLowerCase().includes(exportSearchTerm.toLowerCase()) ||
@@ -3258,6 +3253,7 @@ const MasterData = ({ username, userRoles = [] }) => {
           'Project Name': project.projectName || '',
           'Project Reference Name': project.projectReferenceName || '',
           'Project Category': project.projectCategory || '',
+          'Status': project.status || '',
           'Project Type': detail?.projectType || '',
           'Floor Name': detail?.floorName || '',
           'Shop No': detail?.shopNo || '',
@@ -3448,7 +3444,29 @@ const MasterData = ({ username, userRoles = [] }) => {
                         <thead className='bg-[#FAF6ED]'>
                           <tr className="border-b">
                             <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                            <th className="p-2 text-left lg:w-72 text-xl font-bold">Project Name</th>
+                            <th className="p-2 text-left lg:w-72 text-xl font-bold">
+                              <div className="flex items-center gap-2">
+                                <span>Project Name</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowOnGoingProjectsOnly((prev) => !prev)}
+                                  title={
+                                    showOnGoingProjectsOnly
+                                      ? 'Show all projects'
+                                      : 'Show On Going projects only'
+                                  }
+                                  className={`text-xl leading-none transition-colors ${
+                                    showOnGoingProjectsOnly
+                                      ? 'text-[#BF9853]'
+                                      : 'text-gray-400 hover:text-[#BF9853]'
+                                  }`}
+                                  aria-pressed={showOnGoingProjectsOnly}
+                                  aria-label="Filter On Going projects"
+                                >
+                                  ★
+                                </button>
+                              </div>
+                            </th>
                             <th>
                               <div>
                                 <button onClick={() => handleDownloadIconClick('project')}>
@@ -3463,17 +3481,24 @@ const MasterData = ({ username, userRoles = [] }) => {
                     <div className="overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                       <table className="table-auto lg:w-full w-full">
                         <tbody>
-                          {projects.filter(project =>
-                            project.projectName?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
-                            project.projectAddress?.toLowerCase().includes(projectManagementSearch.toLowerCase()) ||
-                            project.projectId?.toLowerCase().includes(projectManagementSearch.toLowerCase())
-                          ).map((item, index) => (
+                          {filteredProjectsForTable.map((item, index) => (
                             <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED] group">
                               <td className="p-2 text-left font-semibold">
-                                {(projects.findIndex(p => p.id === item.id) + 1).toString().padStart(2, '0')}
+                                {(index + 1).toString().padStart(2, '0')}
                               </td>
                               <td className="p-2 text-left font-semibold">
-                                {item.projectName || ''}
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span>{item.projectName || ''}</span>
+                                  {isOnGoingProject(item) && (
+                                    <span
+                                      className="text-[#BF9853] text-base leading-none"
+                                      title="On Going"
+                                      aria-hidden
+                                    >
+                                      ★
+                                    </span>
+                                  )}
+                                </span>
                               </td>
                               <td className="p-2 text-left font-semibold">
                                 {item.projectCategory === 'Client Project' && (
@@ -6589,15 +6614,34 @@ const MasterData = ({ username, userRoles = [] }) => {
                     />
                   </div>
                 </div>
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Address"
-                    type="text"
-                    value={newProject.projectAddress}
-                    onChange={(e) =>
-                      setNewProject((prev) => ({ ...prev, projectAddress: e.target.value }))
-                    }></input>
+                <div className="flex gap-10 items-end mb-4 pl-5 flex-wrap">
+                  <div className="w-[62rem]">
+                    <label className="block text-lg font-medium mb-2">Project Address</label>
+                    <input
+                      className="w-full border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project Address"
+                      type="text"
+                      value={newProject.projectAddress}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, projectAddress: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-lg font-medium mb-2">Status</label>
+                    <select
+                      className="w-[15rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
+                      value={newProject.status}
+                      onChange={(e) =>
+                        setNewProject((prev) => ({ ...prev, status: e.target.value }))
+                      }
+                    >
+                      <option value="">Select Status</option>
+                      {PROJECT_STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 {newProject.ownerDetailsList.map((owner, index) => (
                   <div key={index} className="mb-2">
@@ -6915,15 +6959,34 @@ const MasterData = ({ username, userRoles = [] }) => {
                     />
                   </div>
                 </div>
-                <div className="mb-4 pl-5">
-                  <label className="block text-lg font-medium mb-2">Project Address</label>
-                  <input className="w-[62rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
-                    placeholder="Enter Project Address"
-                    type="text"
-                    value={editProject.projectAddress}
-                    onChange={(e) =>
-                      setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
-                    }></input>
+                <div className="flex gap-10 items-end mb-4 pl-5 flex-wrap">
+                  <div className="w-[62rem]">
+                    <label className="block text-lg font-medium mb-2">Project Address</label>
+                    <input
+                      className="w-full border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
+                      placeholder="Enter Project Address"
+                      type="text"
+                      value={editProject.projectAddress}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, projectAddress: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-lg font-medium mb-2">Status</label>
+                    <select
+                      className="w-[15rem] border-2 border-[#BF9853] border-opacity-30 p-2 rounded-lg h-14 focus:outline-none"
+                      value={editProject.status}
+                      onChange={(e) =>
+                        setEditProject((prev) => ({ ...prev, status: e.target.value }))
+                      }
+                    >
+                      <option value="">Select Status</option>
+                      {PROJECT_STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 {editProject.ownerDetailsList.map((owner, index) => (
                   <div key={index} className="mb-2">
@@ -8062,13 +8125,27 @@ const MasterData = ({ username, userRoles = [] }) => {
                     </select>
                   </div>
                 )}
-                <div className="flex space-x-3 mb-4">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
                   <button onClick={handleSelectAllExportItems} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-yellow-800 font-semibold text-sm transition-colors" >
                     Select All
                   </button>
                   <button onClick={handleDeselectAllExportItems} className="px-4 py-2 border-2 border-[#BF9853] text-[#BF9853] rounded-lg hover:bg-[#FAF6ED] font-semibold text-sm transition-colors" >
                     Deselect All
                   </button>
+                  {exportDataType === 'project' && (
+                    <select
+                      className="min-w-[10rem] border-2 border-[#BF9853] border-opacity-35 rounded-lg px-3 py-2 focus:outline-none focus:border-[#BF9853] text-sm font-medium"
+                      value={exportProjectStatus}
+                      onChange={handleExportProjectStatusChange}
+                    >
+                      <option value="">All Status</option>
+                      {PROJECT_STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div className="flex-1 overflow-y-auto border-2 border-[#BF9853] border-opacity-35 rounded-lg p-3">
                   {(exportDataType === 'vendor' ? filteredExportVendors : exportDataType === 'contractor' ? filteredExportContractors : exportDataType === 'employee' ? getFilteredExportData() : exportDataType === 'project' ? filteredExportProjects : filteredExportEbServiceLinks).length === 0 ? (

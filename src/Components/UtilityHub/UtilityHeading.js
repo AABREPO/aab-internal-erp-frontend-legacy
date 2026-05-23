@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PropertyTab from './PropertyTab';
 import WaterTab from './WaterTab';
+import ProfessionTab from './ProfessionTab';
 import TelecomTab from './TelecomTab';
 import SubscriptionTab from './SubscriptionTab';
 import AMCTab from './AMCTab';
@@ -31,6 +32,8 @@ const UtilityHeading = ({ username, userRoles = [] }) => {
                 return <PropertyTab username={username} userRoles={userRoles} />;
             case 'water':
                 return <WaterTab username={username} userRoles={userRoles} />;
+            case 'profession':
+                return <ProfessionTab username={username} userRoles={userRoles} />;
             case 'telecom':
                 return <TelecomTab username={username} userRoles={userRoles} />;
             case 'subscription':
@@ -78,6 +81,12 @@ const UtilityHeading = ({ username, userRoles = [] }) => {
                     onClick={() => setActiveTab('water')}
                 >
                     Water
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'profession' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('profession')}
+                >
+                    Profession
                 </h2>
                 <h2
                     className={`link ${activeTab === 'telecom' ? 'active' : ''}`}

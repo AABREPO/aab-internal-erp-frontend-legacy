@@ -726,6 +726,10 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
 
   const getSiteName = (id) =>
     siteOptions.find(s => String(s.id) === String(id))?.value || "";
+  const getAdvanceRecordId = (entry) =>
+    Number(entry?.advancePortalId ?? entry?.id ?? 0);
+  const compareByAdvanceIdDesc = (a, b) =>
+    getAdvanceRecordId(b) - getAdvanceRecordId(a);
 
   const getBranchName = (id) =>
     branchOptions.find(b => String(b.id) === String(id))?.branch || "";
@@ -1015,27 +1019,27 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           default:
             return 0;
         }
-        const entryA = Number(a.entry_no) || 0;
-        const entryB = Number(b.entry_no) || 0;
         if (sortConfig.key === 'timestamp') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
+          return compareByAdvanceIdDesc(a, b);
         }
         if (sortConfig.key === 'date') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-          return sortConfig.direction === 'asc' ? entryA - entryB : entryB - entryA;
+          return compareByAdvanceIdDesc(a, b);
         }
         if (sortConfig.key === 'entry_no') {
-          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          return compareByAdvanceIdDesc(a, b);
         }
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return entryA - entryB;
+        return compareByAdvanceIdDesc(a, b);
       });
     } else {
-      sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
+      sortableData.sort(compareByAdvanceIdDesc);
     }
     return sortableData;
   }, [filteredData, sortConfig, branchOptions]);

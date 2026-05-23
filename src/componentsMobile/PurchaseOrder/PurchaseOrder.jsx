@@ -110,6 +110,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
   const hasLoadedNetStockItems = useRef(false); // Track if NetStock items have been loaded
   const [isPdfGenerated, setIsPdfGenerated] = useState(false); // track if PDF has been generated
   const [pdfBlob, setPdfBlob] = useState(null); // store generated PDF blob
+  const [pdfPoEno, setPdfPoEno] = useState(null); // eno used in generated PDF (for download/share filenames)
   const [isGenerating, setIsGenerating] = useState(false); // track if PO is being generated
   const [isGeneratePrecheckRunning, setIsGeneratePrecheckRunning] = useState(false); // instant loading state before API save starts
   const generatePoClickLockRef = useRef(false); // immediate lock to prevent rapid duplicate clicks
@@ -1588,6 +1589,31 @@ const PurchaseOrder = ({ user, onLogout }) => {
     const match = str.match(/\d+/);
     return match ? parseInt(match[0], 10) : 0;
   };
+  const formatPoNumberDisplay = (eno) => {
+    const numeric = getNumericEno({ eno });
+    return numeric > 0 ? `#${numeric}` : '';
+  };
+  const getPoPdfFilename = (eno, date, projectName) => {
+    const poNumber = String(eno ?? '').replace('#', '').trim();
+    const dateForFilename = formatDateOnly(date).replace(/\//g, '-');
+    const project = projectName || 'Purchase Order';
+    return `#${poNumber} - ${dateForFilename} - ${project}.pdf`;
+  };
+  // Resolve correct vendor-specific eno before save/PDF (recheck on Generate PO click)
+  const resolvePoEnoForVendor = async (vendorId, { isEditing = false, displayedPoNumber = '' } = {}) => {
+    if (isEditing) {
+      const existing = getNumericEno({ eno: displayedPoNumber });
+      return existing > 0 ? existing : 1;
+    }
+    const correctEno = await fetchNextPoNumberForVendor(vendorId);
+    const displayedEno = getNumericEno({ eno: displayedPoNumber });
+    if (displayedEno > 0 && displayedEno !== correctEno) {
+      console.info(
+        `PO eno corrected for vendor ${vendorId}: displayed #${displayedEno}, using #${correctEno}`
+      );
+    }
+    return correctEno;
+  };
   // Fetch next PO number for vendor
   const fetchNextPoNumberForVendor = async (vendorId) => {
     if (!vendorId) {
@@ -2167,12 +2193,14 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setIsGenerating(true);
     try {
       const username = (user && user.username) || poData.created_by || '';
-      let currentPoNo;
-      if (isEditMode && poData.originalId) {
-        currentPoNo = getNumericEno({ eno: poData.poNumber || '' });
-      } else {
-        currentPoNo = await fetchNextPoNumberForVendor(selectedVendor.id);
-        setPoData(prev => ({ ...prev, poNumber: `#${currentPoNo}` }));
+      const isEditingExistingPo = isEditMode && poData.originalId;
+      const currentPoNo = await resolvePoEnoForVendor(selectedVendor.id, {
+        isEditing: isEditingExistingPo,
+        displayedPoNumber: poData.poNumber,
+      });
+      const poNumberDisplay = formatPoNumberDisplay(currentPoNo);
+      if (poNumberDisplay) {
+        setPoData((prev) => ({ ...prev, poNumber: poNumberDisplay }));
       }
       const clientIdForPayload =
         selectedSite?.id ??
@@ -2254,7 +2282,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
           };
         })
       };
-      const isEditingExistingPo = isEditMode && poData.originalId;
       // `/save` is only used for creating new PO; block it if user lacks `Create`.
       if (!isEditingExistingPo && !canCreate) {
         alert("You don't have permission to create a new Purchase Order.");
@@ -2273,13 +2300,23 @@ const PurchaseOrder = ({ user, onLogout }) => {
       });
       if (response.ok) {
         const result = await response.json();
+        const savedEno =
+          result?.eno != null
+            ? getNumericEno({ eno: result.eno })
+            : currentPoNo;
+        const finalEno = savedEno || currentPoNo;
+        const finalPayload = { ...payload, eno: finalEno };
+        const finalPoNumberDisplay = formatPoNumberDisplay(finalEno);
+        if (finalPoNumberDisplay) {
+          setPoData((prev) => ({ ...prev, poNumber: finalPoNumberDisplay }));
+        }
         await Promise.all([
           fetchPoItemName(),
           fetchPoModel(),
           fetchPoBrand(),
           fetchPoType()
         ]);
-        generatePDF(payload);
+        generatePDF(finalPayload);
         setSelectedCategory('');
         alert(isEditingExistingPo ? "Purchase Order Updated!" : "Purchase Order Generated!");
       } else {
@@ -2305,8 +2342,19 @@ const PurchaseOrder = ({ user, onLogout }) => {
         alert("Please select a Vendor before generating a PO.");
         return;
       }
+      const isCreatingNewPo = !isEditMode || !poData.originalId;
+      if (isCreatingNewPo) {
+        const correctEno = await resolvePoEnoForVendor(selectedVendor.id, {
+          isEditing: false,
+          displayedPoNumber: poData.poNumber,
+        });
+        const poNumberDisplay = formatPoNumberDisplay(correctEno);
+        if (poNumberDisplay && poNumberDisplay !== poData.poNumber) {
+          setPoData((prev) => ({ ...prev, poNumber: poNumberDisplay }));
+        }
+      }
       // Check for duplicate PO only when creating new PO (not editing)
-      if (!isEditMode || !poData.originalId) {
+      if (isCreatingNewPo) {
         const clientIdForCheck = selectedSite?.id ?? poData.originalClientId ?? null;
 
         if (clientIdForCheck && items.length > 0) {
@@ -2685,19 +2733,25 @@ const PurchaseOrder = ({ user, onLogout }) => {
       }
     });
     const pdfBlob = doc.output('blob');
+    const resolvedEno = getNumericEno({ eno: payload.eno });
+    setPdfPoEno(resolvedEno);
     setPdfBlob(pdfBlob);
     setIsPdfGenerated(true);
     if (!skipSaveAndDownload) {
-      savePurchaseOrderToHistory(pdfBlob);
-      doc.save(`#${payload.eno} - ${formatDateOnly(payload.date).replace(/\//g, '-')} - ${clientName}.pdf`);
+      savePurchaseOrderToHistory(pdfBlob, resolvedEno);
+      doc.save(getPoPdfFilename(resolvedEno, payload.date, clientName));
     }
   };
-  const savePurchaseOrderToHistory = (pdfBlob) => {
+  const savePurchaseOrderToHistory = (pdfBlob, enoForHistory = null) => {
     try {
       const createdBy = poData.created_by || (user && user.username) || '';
+      const historyPoNumber =
+        enoForHistory != null
+          ? formatPoNumberDisplay(enoForHistory)
+          : poData.poNumber;
       const poToSave = {
         id: isEditMode && poData.originalId ? poData.originalId : Date.now().toString(), // Preserve ID if editing
-        poNumber: poData.poNumber,
+        poNumber: historyPoNumber,
         date: poData.date,
         vendorName: poData.vendorName,
         projectName: poData.projectName,
@@ -2743,9 +2797,8 @@ const PurchaseOrder = ({ user, onLogout }) => {
   };
   const downloadPDF = () => {
     if (pdfBlob) {
-      const dateForFilename = formatDateOnly(poData.date).replace(/\//g, '-');
-      const poNumber = poData.poNumber.replace('#', '').trim();
-      const filename = `#${poNumber} - ${dateForFilename} - ${poData.projectName}.pdf`;
+      const enoForFile = pdfPoEno ?? getNumericEno({ eno: poData.poNumber });
+      const filename = getPoPdfFilename(enoForFile, poData.date, poData.projectName);
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
@@ -2776,6 +2829,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
     setIsViewOnlyFromHistory(false);
     setIsPdfGenerated(false);
     setPdfBlob(null);
+    setPdfPoEno(null);
     setEditingItem(null);
     setExpandedItemId(null);
     setSwipeStates({});
@@ -2786,15 +2840,15 @@ const PurchaseOrder = ({ user, onLogout }) => {
   };
   const shareViaWhatsApp = () => {
     if (pdfBlob) {
-      const message = `Purchase Order ${poData.poNumber}\nDate: ${poData.date}\nVendor: ${poData.vendorName}\nProject: ${poData.projectName}\n\nPlease find the attached PDF.`;
-      const dateForFilename = formatDateOnly(poData.date).replace(/\//g, '-');
-      const poNumber = poData.poNumber.replace('#', '').trim();
-      const filename = `#${poNumber} - ${dateForFilename} - ${poData.projectName}.pdf`;
+      const enoForFile = pdfPoEno ?? getNumericEno({ eno: poData.poNumber });
+      const poNumberDisplay = formatPoNumberDisplay(enoForFile) || poData.poNumber;
+      const message = `Purchase Order ${poNumberDisplay}\nDate: ${poData.date}\nVendor: ${poData.vendorName}\nProject: ${poData.projectName}\n\nPlease find the attached PDF.`;
+      const filename = getPoPdfFilename(enoForFile, poData.date, poData.projectName);
       const file = new File([pdfBlob], filename, { type: 'application/pdf' });
       if (navigator.share && navigator.canShare) {
         const shareData = {
           files: [file],
-          title: `Purchase Order ${poData.poNumber}`,
+          title: `Purchase Order ${poNumberDisplay}`,
           text: message
         };
         if (navigator.canShare(shareData)) {

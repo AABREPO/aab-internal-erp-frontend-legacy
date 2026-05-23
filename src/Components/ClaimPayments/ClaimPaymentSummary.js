@@ -110,7 +110,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       })
       .then((data) => {
         // Filter only items with accountType = 'Claim'
-        const filteredData = data.filter(item => item.accountType === 'Claim' || item.accountType === 'Bill Payments + Claim');
+        const filteredData = data.filter(item => item.accountType === 'Claim Payment' || item.accountType === 'Bill Payments + Claim');
         setClaimDataList(filteredData);
       })
       .catch((err) => {

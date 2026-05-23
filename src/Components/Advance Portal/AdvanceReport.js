@@ -541,7 +541,6 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     ? new Date(Math.max(...filteredData.map((r) => new Date(r.date)))).toLocaleDateString("en-GB")
     : "-";
   const totalAdvance = filteredData
-    .filter((r) => r.type === "Advance" && r.payment_mode === "Cash")
     .reduce((sum, r) => {
       const amount = r.amount || 0;
       return sum + (amount);

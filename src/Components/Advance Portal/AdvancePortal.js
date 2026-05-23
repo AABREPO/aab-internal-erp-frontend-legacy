@@ -13,8 +13,38 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
-
-const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embedded = false, onSuccess  }) => {
+const advancePortalReadonlyFieldClass =
+  'min-h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg bg-[#FAF6ED] px-3 flex items-center text-sm font-medium text-[#202020]';
+const AdvancePortalReadonlyField = ({ value, className = '' }) => (
+  <div className={`${advancePortalReadonlyFieldClass} ${className}`.trim()} aria-readonly="true">
+    {value || '—'}
+  </div>
+);
+const getNetBillAmount = (entry) => {
+  const bill = parseFloat(entry?.bill_amount) || 0;
+  const discount = parseFloat(entry?.discount_amount) || 0;
+  return bill - discount;
+};
+const computeAdvanceBalanceDelta = (entry) => {
+  const amount = parseFloat(entry?.amount) || 0;
+  const refund = parseFloat(entry?.refund_amount) || 0;
+  return amount - getNetBillAmount(entry) - refund;
+};
+/** One table row per entry; discount_amount is shown on the main row only. */
+const expandPortalTableRows = (entries) =>
+  (entries || []).map((entry, index) => ({
+    entry,
+    isDiscountRow: false,
+    rowKey: `${entry.advancePortalId ?? entry.entry_no ?? index}`,
+  }));
+const AdvancePortal = ({
+  username,
+  userRoles = [],
+  paymentModeOptions = [],
+  embedded = false,
+  onSuccess,
+  lockTypePrefill = false,
+}) => {
   const resolveEnteredBy = () => {
     const propUsername = typeof username === 'string' ? username.trim() : '';
     if (propUsername) return propUsername;
@@ -26,7 +56,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     }
   };
   const enteredBy = resolveEnteredBy();
-  console.log("enteredBy", enteredBy);
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -65,7 +94,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
   ];
   const [backendPaymentModeOptions, setBackendPaymentModeOptions] = useState([]);
   const finalPaymentModeOptions = backendPaymentModeOptions.length > 0 ? backendPaymentModeOptions : paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
-
   useEffect(() => {
     const fetchPaymentModes = async () => {
       try {
@@ -85,7 +113,6 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     };
     fetchPaymentModes();
   }, []);
-
   const [selectedType, setSelectedType] = useState('Advance')
   const [selectedOption, setSelectedOption] = useState(null);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -215,21 +242,18 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     sessionStorage.removeItem('description');
   };
   useEffect(() => {
+    if (lockTypePrefill) return;
     if (selectedType) sessionStorage.setItem('selectedType', JSON.stringify(selectedType));
     else sessionStorage.removeItem('selectedType');
-
     if (selectedOption) sessionStorage.setItem('selectedOption', JSON.stringify(selectedOption));
     else sessionStorage.removeItem('selectedOption');
-
     if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
     else sessionStorage.removeItem('selectedSite');
-
     if (overallAdvance !== null && overallAdvance !== undefined && String(overallAdvance).trim() !== '') {
       sessionStorage.setItem('overallAdvance', JSON.stringify(overallAdvance));
     } else {
       sessionStorage.removeItem('overallAdvance');
     }
-
     if (billAmount !== null && billAmount !== undefined && String(billAmount).trim() !== '') {
       sessionStorage.setItem('billAmount', JSON.stringify(billAmount));
     } else {
@@ -265,7 +289,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     } else {
       sessionStorage.removeItem('description');
     }
-  }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, discountAmount, advanceAmount, transferSiteId, paymentMode, description]);
+  }, [selectedType, selectedOption, selectedSite, overallAdvance, billAmount, discountAmount, advanceAmount, transferSiteId, paymentMode, description, lockTypePrefill]);
   const formatWithCommas = (value) => {
     if (value === '' || value === null || value === undefined) return "";
     const numericValue = typeof value === 'number' ? value : Number(value);
@@ -284,6 +308,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     const rawValue = e.target.value.replace(/,/g, "");
     if (!isNaN(rawValue)) {
       setDiscountAmount(rawValue);
+    }
+  };
+  const handleBillAmountChange = (e) => {
+    const rawValue = e.target.value.replace(/,/g, "");
+    if (rawValue === "" || /^\d*\.?\d*$/.test(rawValue)) {
+      setBillAmount(rawValue);
     }
   };
   const handleProjectChange = (selected) => {
@@ -530,12 +560,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
               ? item.contractor_id === selected.id
               : false;
         })
-        .reduce((sum, curr) => {
-          const amount = parseFloat(curr.amount) || 0;
-          const billAmount = parseFloat(curr.bill_amount) || 0;
-          const refundAmount = parseFloat(curr.refund_amount) || 0;
-          return sum + amount - billAmount - refundAmount;
-        }, 0);
+        .reduce((sum, curr) => sum + computeAdvanceBalanceDelta(curr), 0);
       setOverallAdvance(total);
     } catch (error) {
       console.error('Error fetching or processing advance data:', error);
@@ -557,13 +582,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       const relevantData = data.filter(
         item => item[idField] === vendorOrContractor.id && item.project_id === project.id
       );
-      // Sum amounts, subtract bill_amount & refund_amount
-      const total = relevantData.reduce((sum, entry) => {
-        const amount = parseFloat(entry.amount) || 0;
-        const billAmount = parseFloat(entry.bill_amount) || 0;
-        const refundAmount = parseFloat(entry.refund_amount) || 0;
-        return sum + amount - billAmount - refundAmount;
-      }, 0);
+      const total = relevantData.reduce((sum, entry) => sum + computeAdvanceBalanceDelta(entry), 0);
       setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
     } catch (error) {
       console.error('Error calculating project advance:', error);
@@ -1174,12 +1193,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
             ? item.contractor_id === selectedOption.id
             : false
       ))
-      .reduce((sum, curr) => {
-        const amount = parseFloat(curr.amount) || 0;
-        const billAmount = parseFloat(curr.bill_amount) || 0;
-        const refundAmount = parseFloat(curr.refund_amount) || 0;
-        return sum + amount - billAmount - refundAmount;
-      }, 0);
+      .reduce((sum, curr) => sum + computeAdvanceBalanceDelta(curr), 0);
     setOverallAdvance(total);
   }, [advanceData, selectedOption]);
   useEffect(() => {
@@ -1280,6 +1294,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       "Date",
       "Advance",
       "Bill Amount",
+      "Discount",
       "Refund Amount",
       "Transfer",
       "Type",
@@ -1292,12 +1307,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
         date,
         amount,
         bill_amount,
+        discount_amount,
         type,
         transfer_site_id,
         payment_mode,
         refund_amount,
-        contractor_vendor,
-        project_name,
         description
       } = entry;
       const advanceAmount =
@@ -1305,6 +1319,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       const billAmount =
         type === 'Bill Settlement'
           ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
+          : '';
+      const discountDisplay =
+        type === 'Bill Settlement' && (parseFloat(discount_amount) || 0) > 0
+          ? parseFloat(discount_amount).toLocaleString('en-IN')
           : '';
       const refundAmount =
         type === 'Refund'
@@ -1323,6 +1341,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
         new Date(date).toLocaleDateString('en-GB'),
         advanceAmount,
         billAmount,
+        discountDisplay,
         refundAmount,
         transferText,
         type,
@@ -1345,7 +1364,8 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       columnStyles: {
         2: { halign: 'right' }, // Advance
         3: { halign: 'right' }, // Bill Amount
-        4: { halign: 'right' }  // Refund Amount
+        4: { halign: 'right' }, // Discount
+        5: { halign: 'right' }  // Refund Amount
       }
     });
     doc.save("Advance_Report.pdf");
@@ -1366,7 +1386,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       return isMatchingVendor && isForCurrentProject;
     });
     const rows = filteredData.map((entry, index) => {
-      const { date, amount, bill_amount, type, transfer_site_id, payment_mode, refund_amount } = entry;
+      const { date, amount, bill_amount, discount_amount, type, transfer_site_id, payment_mode, refund_amount } = entry;
       const advanceAmount = (() => {
         if (type === 'Refund') {
           return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
@@ -1376,6 +1396,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       const billAmount =
         type === 'Bill Settlement'
           ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
+          : '';
+      const discountCsv =
+        type === 'Bill Settlement' && (parseFloat(discount_amount) || 0) > 0
+          ? parseFloat(discount_amount).toLocaleString('en-IN')
           : '';
       let transferOrRefund = '';
       if (type === 'Refund') {
@@ -1392,6 +1416,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
         "Date": new Date(date).toLocaleDateString('en-GB'),
         "Advance": advanceAmount,
         "Bill": billAmount,
+        "Discount": discountCsv,
         "Transfer/Refund": transferOrRefund,
         "Mode": payment_mode || ''
       };
@@ -1415,7 +1440,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       (acc, entry) => {
         acc.totalAmount += parseFloat(entry.amount) || 0;
         acc.totalRefund += parseFloat(entry.refund_amount) || 0;
-        acc.totalBill += parseFloat(entry.bill_amount) || 0;
+        acc.totalBill += getNetBillAmount(entry);
         return acc;
       },
       { totalAmount: 0, totalRefund: 0, totalBill: 0 }
@@ -1447,8 +1472,10 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
     { label: 'Project ID', value: selectedSite?.id || '-' },
   ];
   if (selectedType === 'Bill Settlement') {
+    const formattedDiscountAmount = discountAmount ? formatWithCommas(discountAmount) : '-';
     reviewDetails.push(
       { label: 'Bill Amount', value: formattedBillAmount },
+      { label: 'Discount Amount', value: formattedDiscountAmount },
       { label: 'Category', value: selectedCategory?.label || '-' }
     );
   }
@@ -1517,6 +1544,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
       file_url: entry.file_url || '',
       description: entry.description || '',
       bill_amount: entry.bill_amount || '',
+      discount_amount: entry.discount_amount || '',
       type: entry.type || '',
       transfer_site_id: entry.transfer_site_id || '',
       payment_mode: entry.payment_mode || '',
@@ -1930,6 +1958,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-left'>
                   <div className='space-y-1 flex items-center max-w-[300px]'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base xl:w-40 w-20'>Select Type</label>
+                    {lockTypePrefill ? (
+                      <AdvancePortalReadonlyField
+                        value={selectedType}
+                        className="w-full max-w-[330px]"
+                      />
+                    ) : (
                     <Select
                       options={[
                         { value: 'Advance', label: 'Advance' },
@@ -1950,6 +1984,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                       styles={customStyles}
                       className='w-full max-w-[330px] rounded-lg focus:outline-none'
                     />
+                    )}
                   </div>
                   <div className='space-y-1 flex gap-3 items-center'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
@@ -2009,9 +2044,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                     <div className='space-y-1'>
                       <label className='font-semibold block text-sm sm:text-base'>Bill Amount<span className="text-red-500">*</span></label>
                       <input
-                        value={billAmount}
-                        onChange={(e) => setBillAmount(e.target.value)}
-                        className='w-full h-[45px] px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none text-sm'
+                        type="text"
+                        inputMode="decimal"
+                        value={formatWithCommas(billAmount)}
+                        onChange={handleBillAmountChange}
+                        className='w-full h-[45px] no-spinner px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none text-sm'
                       />
                     </div>
                   )}
@@ -2153,6 +2190,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                           <th className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
                           <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Advance</th>
                           <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Bill</th>
+                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Discount</th>
                           <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
                           <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
                           <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Activity</th>
@@ -2161,7 +2199,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                       <tbody>
                         {!selectedOption || !selectedSite ? (
                           <tr>
-                            <td colSpan="6" className="text-center py-4 text-sm text-gray-500">
+                            <td colSpan="7" className="text-center py-4 text-sm text-gray-500">
                               Please select a contractor/vendor and project to view advance records.
                             </td>
                           </tr>
@@ -2177,13 +2215,12 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                             return isMatchingVendor && isForCurrentProject;
                           })
                           .sort((a, b) => {
-                            // Sort by entry_no in descending order (latest entries first)
                             const entryNoA = a.entry_no || 0;
                             const entryNoB = b.entry_no || 0;
                             return entryNoB - entryNoA;
                           }).length === 0 ? (
                           <tr>
-                            <td colSpan="6" className="text-center py-4 text-sm text-gray-500">
+                            <td colSpan="7" className="text-center py-4 text-sm text-gray-500">
                               No records found for the selected contractor/vendor and project.
                             </td>
                           </tr>
@@ -2200,100 +2237,108 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                               return isMatchingVendor && isForCurrentProject;
                             })
                             .sort((a, b) => {
-                              // Sort by entry_no in descending order (latest entries first)
                               const entryNoA = a.entry_no || 0;
                               const entryNoB = b.entry_no || 0;
                               return entryNoB - entryNoA;
                             })
                             .map((entry, index) => {
-                              const {
-                                date,
-                                amount,
-                                bill_amount,
-                                type,
-                                transfer_site_id,
-                                payment_mode,
-                                refund_amount
-                              } = entry;
-                              const advanceAmount = (() => {
-                                if (type === 'Refund') {
-                                  return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
-                                }
-                                return parseFloat(amount || 0).toLocaleString('en-IN');
-                              })();
-                              const billAmount =
-                                type === 'Bill Settlement'
-                                  ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
-                                  : '';
-                              let transferOrRefund = '';
+                            const {
+                              date,
+                              amount,
+                              bill_amount,
+                              discount_amount,
+                              type,
+                              transfer_site_id,
+                              payment_mode,
+                              refund_amount
+                            } = entry;
+                            const discountAmt = parseFloat(discount_amount) || 0;
+                            const advanceAmount = (() => {
                               if (type === 'Refund') {
-                                transferOrRefund = 'Refund';
-                              } else if (type === 'Transfer') {
-                                const relatedSiteId = transfer_site_id;
-                                const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
-                                transferOrRefund =
-                                  parseFloat(amount) < 0
-                                    ? `Transfer to ${siteLabel || 'Unknown Site'}`
-                                    : `Transfer from ${siteLabel || 'Unknown Site'}`;
+                                return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
                               }
-                              return (
-                                <tr key={index} className="border-t hover:bg-gray-50">
-                                  <td className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
-                                    {new Date(date).toLocaleDateString('en-GB')}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
-                                    {advanceAmount}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
-                                    {billAmount}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
-                                    {transferOrRefund}
-                                  </td>
-                                  <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
-                                    {payment_mode || ''}
-                                  </td>
-                                  <td className="px-2 py-2 whitespace-nowrap">
-                                    <div className="flex items-center gap-1 sm:gap-2">
-                                      <button className="rounded-full transition duration-200">
+                              return parseFloat(amount || 0).toLocaleString('en-IN');
+                            })();
+                            const billAmount =
+                              type === 'Bill Settlement'
+                                ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
+                                : '';
+                            const discountDisplay =
+                              type === 'Bill Settlement' && discountAmt > 0
+                                ? discountAmt.toLocaleString('en-IN')
+                                : '';
+                            let transferOrRefund = '';
+                            if (type === 'Refund') {
+                              transferOrRefund = 'Refund';
+                            } else if (type === 'Transfer') {
+                              const relatedSiteId = transfer_site_id;
+                              const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
+                              transferOrRefund =
+                                parseFloat(amount) < 0
+                                  ? `Transfer to ${siteLabel || 'Unknown Site'}`
+                                  : `Transfer from ${siteLabel || 'Unknown Site'}`;
+                            }
+                            return (
+                              <tr key={entry.advancePortalId ?? index} className="border-t hover:bg-gray-50">
+                                <td className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
+                                  {new Date(date).toLocaleDateString('en-GB')}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
+                                  {advanceAmount}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
+                                  {billAmount}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
+                                  {discountDisplay}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
+                                  {transferOrRefund}
+                                </td>
+                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
+                                  {payment_mode || ''}
+                                </td>
+                                <td className="px-2 py-2 whitespace-nowrap">
+                                  <div className="flex items-center gap-1 sm:gap-2">
+                                    <button className="rounded-full transition duration-200">
+                                      <img
+                                        src={edit}
+                                        onClick={() => handleEditClick(entry)}
+                                        alt="Edit"
+                                        className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                      />
+                                    </button>
+                                    {entry.file_url ? (
+                                      <a
+                                        href={entry.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="cursor-pointer"
+                                        title="View File"
+                                      >
                                         <img
-                                          src={edit}
-                                          onClick={() => handleEditClick(entry)}
-                                          alt="Edit"
-                                          className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                          src={file}
+                                          className="w-5 h-4 transform hover:scale-110 transition duration-200"
+                                          alt="View File"
+                                          style={{ filter: 'invert(0%) brightness(0%)' }}
                                         />
-                                      </button>
-                                      {entry.file_url ? (
-                                        <a
-                                          href={entry.file_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="cursor-pointer"
-                                          title="View File"
-                                        >
-                                          <img
-                                            src={file}
-                                            className="w-5 h-4 transform hover:scale-110 transition duration-200"
-                                            alt="View File"
-                                            style={{ filter: 'invert(0%) brightness(0%)' }}
-                                          />
-                                        </a>
-                                      ) : (
-                                        <div className="opacity-30">
-                                          <img
-                                            src={file}
-                                            className="w-5 h-4"
-                                            alt="No File"
-                                            title="No file attached"
-                                            style={{ filter: 'invert(0%) brightness(0%)' }}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })
+                                      </a>
+                                    ) : (
+                                      <div className="opacity-30">
+                                        <img
+                                          src={file}
+                                          className="w-5 h-4"
+                                          alt="No File"
+                                          title="No file attached"
+                                          style={{ filter: 'invert(0%) brightness(0%)' }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
@@ -2335,6 +2380,15 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                       type="number"
                       value={editFormData.bill_amount}
                       onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
+                      className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg no-spinner focus:outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 font-semibold text-sm">Discount Amount</label>
+                    <input
+                      type="number"
+                      value={editFormData.discount_amount}
+                      onChange={(e) => setEditFormData({ ...editFormData, discount_amount: e.target.value })}
                       className="border-2 border-[#BF9853] border-opacity-30 w-full h-[45px] rounded-lg no-spinner focus:outline-none text-sm"
                     />
                   </div>
@@ -2632,6 +2686,9 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Type</label>
+                          {lockTypePrefill ? (
+                            <AdvancePortalReadonlyField value={selectedType} />
+                          ) : (
                           <Select
                             options={[
                               { value: 'Advance', label: 'Advance' },
@@ -2652,6 +2709,7 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                             styles={customStyles}
                             className="custom-select rounded-lg"
                           />
+                          )}
                         </div>
                         <div>
                           <label className="text-sm font-semibold mb-1 block">Date</label>
@@ -2692,9 +2750,11 @@ const AdvancePortal = ({ username, userRoles = [], paymentModeOptions = [], embe
                             <div>
                               <label className="text-sm font-semibold mb-1 block">Bill Amount</label>
                               <input
-                                value={billAmount}
-                                onChange={(e) => setBillAmount(e.target.value)}
-                                className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
+                                type="text"
+                                inputMode="decimal"
+                                value={formatWithCommas(billAmount)}
+                                onChange={handleBillAmountChange}
+                                className="w-full h-[45px] no-spinner border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20 focus:outline-none"
                               />
                             </div>
                             <div className="col-span-2">

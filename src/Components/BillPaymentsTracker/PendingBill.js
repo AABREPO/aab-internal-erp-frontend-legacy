@@ -464,7 +464,10 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 if (enteredDates.length > 0) {
                     const billEnteredDates = enteredDates.map(date => new Date(date).toISOString().split('T')[0]);
                     const dateMatchedExpenses = expensesData.filter((expense) => {
-                        const expenseDate = new Date(expense.timestamp || expense.date).toISOString().split('T')[0];
+                        // Match bill-entry entered_date against expenses_form timestamp only (not expense.date)
+                        const ts = expense?.timestamp ?? expense?.timeStamp;
+                        if (!ts) return false;
+                        const expenseDate = new Date(ts).toISOString().split('T')[0];
                         return billEnteredDates.includes(expenseDate);
                     });
                     const vendorMatchedExpenses = dateMatchedExpenses.filter((expense) => {
@@ -520,6 +523,11 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
     };
     const getEntryStatusText = (item) => {
         const baseStatus = item?.entry_status || item?.entryStatus || 'Entry';
+        if (baseStatus === 'Entry') return 'Entry';
+        const matchStatus = expenseMatchStatus[item?.id];
+        // ✓ Entered only when expenses_form timestamp matches bill-entry entered_date (complete_match)
+        if (matchStatus === 'complete_match') return '✓ Entered';
+        if (baseStatus === 'Entered' || baseStatus === '✓ Entered') return 'Entered';
         return baseStatus;
     };
     const fetchPurchaseOrders = async () => {
@@ -597,6 +605,10 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         setPaymentStatuses({});
         setLastPaymentDates({});
         setPaidTodayBills({});
+        setExpenseMatchStatus({});
+        setExpenseMatchDetails({});
+        expensesCacheRef.current = null;
+        billEntriesCacheRef.current = null;
         fetchTrackerData();
         fetchAllTrackerDataForChecks();
     }, [activeBranchId]);
@@ -609,6 +621,25 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             fetchTrackerData();
         }
     }, [billPaymentsTabActive]);
+    useEffect(() => {
+        if (!billPaymentsTabActive) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const [billEntries, expenses] = await Promise.all([
+                    fetchAllBillEntries(),
+                    fetchExpensesData()
+                ]);
+                if (cancelled) return;
+                billEntriesCacheRef.current = billEntries;
+                expensesCacheRef.current = expenses;
+                calculateExpenseMatchStatus(expenses || [], billEntries || []);
+            } catch {
+                // ignore
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [activeBranchId, billPaymentsTabActive]);
     useEffect(() => {
         // Backend pending endpoint returns computed `payment_status` + `paid_today`.
         const statusMap = {};
@@ -2865,6 +2896,22 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 ? Number(totalRaw)
                 : null
 
+        const rawBillArrival =
+            selectedEntryBill.bill_arrival_date ??
+            selectedEntryBill.billArrivalDate ??
+            selectedEntryBill.bill_arrivalDate ??
+            ''
+        let billArrivalYmd = ''
+        if (rawBillArrival) {
+            const s = String(rawBillArrival).trim()
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+                billArrivalYmd = s.slice(0, 10)
+            } else {
+                const d = new Date(s)
+                if (!Number.isNaN(d.getTime())) billArrivalYmd = d.toISOString().slice(0, 10)
+            }
+        }
+
         const prefill = {
             accountType: 'Bill Payments',
             siteName: '', // user selects project manually
@@ -2873,6 +2920,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             contractorId: null,
             contractorName: '',
             date: entryFormData?.date || new Date().toISOString().split('T')[0],
+            billArrivalDate: billArrivalYmd,
             amount: '',
             // Reuse Summary Bill split-entry behavior (remaining tracker)
             summaryBillTotal: totalNum,
@@ -3037,8 +3085,6 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             alert('No matching expenses found for this bill')
             return
         }
-        // After editing entered_date in the popup, "Check" must use the CURRENT entered date
-        // (latest saved bill-entry date for this tracker, or the in-progress edit date).
         const normalizeToYyyyMmDd = (raw) => {
             const s = String(raw || '').trim();
             if (!s) return '';
@@ -3054,39 +3100,27 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             return `${yyyy}-${mm}-${dd}`;
         };
         const getExpenseDateOnly = (expense) => {
-            const raw =
-                expense?.timestamp ??
-                expense?.timeStamp ??
-                expense?.created_at ??
-                expense?.createdAt ??
-                expense?.date ??
-                null;
+            const raw = expense?.timestamp ?? expense?.timeStamp ?? null;
             return normalizeToYyyyMmDd(raw);
         };
-        const resolveCheckDateOnly = () => {
-            if (editingPreviousEntry) return normalizeToYyyyMmDd(previousEntryEditData?.date);
-            if (Array.isArray(existingBillEntryDetails) && existingBillEntryDetails.length > 0) {
-                const sorted = [...existingBillEntryDetails].sort((a, b) => {
-                    const da = a?.entered_date ? new Date(a.entered_date).getTime() : 0;
-                    const db = b?.entered_date ? new Date(b.entered_date).getTime() : 0;
-                    return db - da;
-                });
-                return normalizeToYyyyMmDd(sorted?.[0]?.entered_date);
+        // Default: show expenses for ALL bill-entry entered_date values (already aggregated in matchingExpenses).
+        // Only narrow to one date when editing a specific previous entry row.
+        let expensesToShow = matchDetails.matchingExpenses;
+        if (editingPreviousEntry) {
+            const checkDateOnly = normalizeToYyyyMmDd(previousEntryEditData?.date);
+            if (checkDateOnly) {
+                expensesToShow = matchDetails.matchingExpenses.filter(
+                    (e) => getExpenseDateOnly(e) === checkDateOnly
+                );
             }
-            // Last fallback: use the computed enteredDates (if present)
-            return normalizeToYyyyMmDd(matchDetails?.enteredDates?.[0] || '');
-        };
-        const checkDateOnly = resolveCheckDateOnly();
-        const filteredByEditedDate = checkDateOnly
-            ? matchDetails.matchingExpenses.filter((e) => getExpenseDateOnly(e) === checkDateOnly)
-            : matchDetails.matchingExpenses;
+        }
 
-        if (!filteredByEditedDate || filteredByEditedDate.length === 0) {
+        if (!expensesToShow || expensesToShow.length === 0) {
             alert('No matching expenses found for this bill')
             return
         }
 
-        setCheckFilteredExpenses(filteredByEditedDate)
+        setCheckFilteredExpenses(expensesToShow)
         setShowCheckModal(true)
     }
 
@@ -4227,8 +4261,11 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             const matchStatus = expenseMatchStatus[billId];
             if (matchStatus === 'complete_match') {
                 return 'px-4 py-2 rounded-full text-sm font-semibold bg-[#E2F9E1] border cursor-pointer transition-all duration-200 hover:bg-green-200'
-            } else if (matchStatus === 'partial_match') {
-                return 'px-4 py-2 rounded-full text-sm font-semibold bg-[#FFD39E] border cursor-pointer transition-all duration-200'
+            }
+            if (matchStatus === 'partial_match' || matchStatus === 'no_match') {
+                if (status === 'Entered' || status === '✓ Entered') {
+                    return 'px-6 py-2 rounded-full text-sm font-semibold bg-[#FFD39E] border cursor-pointer transition-all duration-200'
+                }
             }
         }
         if (status === '✓ Verified') {
@@ -5114,7 +5151,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                 onMouseEnter={() => ensureExpenseMatchForBill(item.id)}
                                             >
                                                 <button
-                                                    className={`${getButtonClass(item.entry_status || 'Entry', item.id)} ${(() => {
+                                                    className={`${getButtonClass(getEntryStatusText(item), item.id)} ${(() => {
                                                         const status = item.entry_status || 'Entry'
                                                         const canOpen = status !== 'Entry' || isAllBillsVerified(item)
                                                         return !canOpen ? 'opacity-50 cursor-not-allowed' : ''
@@ -5207,7 +5244,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                         <td className="px-2 py-3 text-sm font-semibold border-b border-gray-100 align-middle">
                                             <div className="relative group">
                                                 <button
-                                                    className={`${getButtonClass(bill.entryStatus, bill.id)} ${!isAllBillsVerified(bill) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    className={`${getButtonClass(getEntryStatusText(bill), bill.id)} ${!isAllBillsVerified(bill) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                     onClick={() => {
                                                         if (bill.entryStatus === 'Entry' && isAllBillsVerified(bill)) {
                                                             handleEntryClick(bill)

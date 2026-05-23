@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DirectoryTelecom from './DirectoryTelecom';
 import DirectorySubscription from './DirectorySubscription';
 import DirectoryAmc from './DirectoryAmc';
+import DirectoryProfession from './DirectoryProfession';
 
 
 const DirectoryHeading = ({ username, userRoles = [] }) => {
@@ -22,6 +23,8 @@ const DirectoryHeading = ({ username, userRoles = [] }) => {
                 return <DirectorySubscription username={username} userRoles={userRoles} />;
             case 'directoryamc':
                 return <DirectoryAmc username={username} userRoles={userRoles} />;
+            case 'directoryprofession':
+                return <DirectoryProfession username={username} userRoles={userRoles} />;
             default:
                 return <DirectoryTelecom username={username} userRoles={userRoles} />;
         }
@@ -48,6 +51,12 @@ const DirectoryHeading = ({ username, userRoles = [] }) => {
                     onClick={() => setActiveTab('directoryamc')}
                 >
                     AMC
+                </h2>
+                <h2
+                    className={`link ${activeTab === 'directoryprofession' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('directoryprofession')}
+                >
+                    Profession
                 </h2>
             </div>
 

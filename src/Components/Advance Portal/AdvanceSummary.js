@@ -412,7 +412,8 @@ const AdvanceSummary = ({ refreshSignal }) => {
           project_id,
           amount = 0,
           bill_amount = 0,
-          refund_amount = 0
+          refund_amount = 0,
+          discount_amount = 0
         } = curr;
         if (!grouped[project_id]) {
           grouped[project_id] = {
@@ -420,21 +421,25 @@ const AdvanceSummary = ({ refreshSignal }) => {
             projectId: project_id,
             totalAdvance: 0,
             totalBill: 0,
+            totalDiscount: 0,
             totalRefund: 0
           };
         }
         grouped[project_id].totalAdvance += parseFloat(amount) || 0;
         grouped[project_id].totalBill += parseFloat(bill_amount) || 0;
+        grouped[project_id].totalDiscount += parseFloat(discount_amount) || 0;
         grouped[project_id].totalRefund += parseFloat(refund_amount) || 0;
       });
       const projectArray = Object.values(grouped).map(p => {
-        const pending = p.totalAdvance - p.totalBill - p.totalRefund;
+        // Net bill = bill_amount - discount_amount
+        const netBill = p.totalBill - p.totalDiscount;
+        const pending = p.totalAdvance - netBill - p.totalRefund;
         totalPendingAll += pending;
-        totalBillAll += p.totalBill;
+        totalBillAll += netBill;
         return {
           projectName: p.projectName,
           pendingAdvance: pending,
-          billAmount: p.totalBill,
+          billAmount: netBill,
           projectId: p.projectId
         };
       });
@@ -451,7 +456,8 @@ const AdvanceSummary = ({ refreshSignal }) => {
           project_id,
           amount = 0,
           bill_amount = 0,
-          refund_amount = 0
+          refund_amount = 0,
+          discount_amount = 0
         } = curr;
 
         if (project_id) {
@@ -461,23 +467,27 @@ const AdvanceSummary = ({ refreshSignal }) => {
               projectId: project_id,
               totalAdvance: 0,
               totalBill: 0,
+              totalDiscount: 0,
               totalRefund: 0
             };
           }
           grouped[project_id].totalAdvance += parseFloat(amount) || 0;
           grouped[project_id].totalBill += parseFloat(bill_amount) || 0;
+          grouped[project_id].totalDiscount += parseFloat(discount_amount) || 0;
           grouped[project_id].totalRefund += parseFloat(refund_amount) || 0;
         }
       });
 
       const projectArray = Object.values(grouped).map(p => {
-        const pending = p.totalAdvance - p.totalBill - p.totalRefund;
+        // Net bill = bill_amount - discount_amount
+        const netBill = p.totalBill - p.totalDiscount;
+        const pending = p.totalAdvance - netBill - p.totalRefund;
         totalPendingAll += pending;
-        totalBillAll += p.totalBill;
+        totalBillAll += netBill;
         return {
           projectName: p.projectName,
           pendingAdvance: pending,
-          billAmount: p.totalBill,
+          billAmount: netBill,
           projectId: p.projectId
         };
       });
@@ -553,29 +563,46 @@ const AdvanceSummary = ({ refreshSignal }) => {
           ? item.contractor_id === contractorVendorId
           : item.vendor_id === contractorVendorId)
         : true;
-      return matchesProject && matchesEntity && item.bill_amount > 0;
-    }).map(item => {
-      // Debug: log to see actual data structure
-      if (item.bill_amount > 0) {
-        console.log('Bill item from API:', {
-          advancePortalId: item.advancePortalId,
-          bill_amount: item.bill_amount,
-          file_url: item.file_url,
-          type: item.type,
-          allKeys: Object.keys(item)
+      const billAmt = parseFloat(item.bill_amount) || 0;
+      const discountAmt = parseFloat(item.discount_amount) || 0;
+      return matchesProject && matchesEntity && (billAmt > 0 || discountAmt > 0);
+    }).flatMap(item => {
+      const date = new Date(item.date).toLocaleDateString('en-GB');
+      const billAmt = parseFloat(item.bill_amount) || 0;
+      const discountAmt = parseFloat(item.discount_amount) || 0;
+      const projectName = siteOptions.find(s => String(s.id) === String(item.project_id))?.label || "Unknown Site";
+      const contractorVendorName = item.contractor_id
+        ? contractorOptions.find(c => c.id === item.contractor_id)?.label || "-"
+        : vendorOptions.find(v => v.id === item.vendor_id)?.label || "-";
+      const fileUrl = (item.file_url && typeof item.file_url === 'string' && item.file_url.trim() !== '') ? item.file_url : null;
+
+      const rows = [];
+      if (billAmt > 0) {
+        rows.push({
+          kind: 'main',
+          advancePortalId: item.advancePortalId || 0,
+          date,
+          amount: billAmt,
+          projectName,
+          contractorVendorName,
+          type: item.type || "Bill",
+          file_url: fileUrl
         });
       }
-      return {
-        advancePortalId: item.advancePortalId || 0,
-        date: new Date(item.date).toLocaleDateString('en-GB'),
-        amount: parseFloat(item.bill_amount) || 0,
-        projectName: siteOptions.find(s => String(s.id) === String(item.project_id))?.label || "Unknown Site",
-        contractorVendorName: item.contractor_id
-          ? contractorOptions.find(c => c.id === item.contractor_id)?.label || "-"
-          : vendorOptions.find(v => v.id === item.vendor_id)?.label || "-",
-        type: item.type || "Bill",
-        file_url: (item.file_url && typeof item.file_url === 'string' && item.file_url.trim() !== '') ? item.file_url : null
-      };
+      if (discountAmt > 0) {
+        // Discount reduces the effective bill amount, so show it as a negative entry
+        rows.push({
+          kind: 'discount',
+          advancePortalId: item.advancePortalId || 0,
+          date,
+          amount: -discountAmt,
+          projectName,
+          contractorVendorName,
+          type: "Discount",
+          file_url: null
+        });
+      }
+      return rows;
     });
   };
   const getAdvanceDetails = (projectId, contractorVendorId, contractorVendorType) => {
@@ -614,6 +641,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
       }
 
       return {
+        kind: 'main',
         advancePortalId: item.advancePortalId || 0,
         date: new Date(item.date).toLocaleDateString('en-GB'),
         amount: amount,
@@ -793,7 +821,8 @@ const AdvanceSummary = ({ refreshSignal }) => {
           type,
           amount = 0,
           bill_amount = 0,
-          refund_amount = 0
+          refund_amount = 0,
+          discount_amount = 0
         } = curr;
         const entityId = contractor_id || vendor_id;
         const entityType = contractor_id ? "Contractor" : "Vendor";
@@ -811,8 +840,9 @@ const AdvanceSummary = ({ refreshSignal }) => {
           };
         }
         grouped[entityId].pendingAdvance += parseFloat(amount) || 0;
-        grouped[entityId].billAmount += parseFloat(bill_amount) || 0;
-        grouped[entityId].pendingAdvance -= (parseFloat(bill_amount) || 0) + (parseFloat(refund_amount) || 0);
+        // Net bill = bill_amount - discount_amount
+        grouped[entityId].billAmount += (parseFloat(bill_amount) || 0) - (parseFloat(discount_amount) || 0);
+        grouped[entityId].pendingAdvance -= ((parseFloat(bill_amount) || 0) - (parseFloat(discount_amount) || 0)) + (parseFloat(refund_amount) || 0);
       });
       const detailsArray = Object.values(grouped);
       detailsArray.forEach(d => {
@@ -835,7 +865,8 @@ const AdvanceSummary = ({ refreshSignal }) => {
           type,
           amount = 0,
           bill_amount = 0,
-          refund_amount = 0
+          refund_amount = 0,
+          discount_amount = 0
         } = curr;
         const entityId = contractor_id || vendor_id;
         const entityType = contractor_id ? "Contractor" : "Vendor";
@@ -855,8 +886,9 @@ const AdvanceSummary = ({ refreshSignal }) => {
             };
           }
           grouped[entityId].pendingAdvance += parseFloat(amount) || 0;
-          grouped[entityId].billAmount += parseFloat(bill_amount) || 0;
-          grouped[entityId].pendingAdvance -= (parseFloat(bill_amount) || 0) + (parseFloat(refund_amount) || 0);
+          // Net bill = bill_amount - discount_amount
+          grouped[entityId].billAmount += (parseFloat(bill_amount) || 0) - (parseFloat(discount_amount) || 0);
+          grouped[entityId].pendingAdvance -= ((parseFloat(bill_amount) || 0) - (parseFloat(discount_amount) || 0)) + (parseFloat(refund_amount) || 0);
         }
       });
 
@@ -1269,7 +1301,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
     const dateMap = new Map();
 
     billStatusPopupData.advances.forEach(adv => {
-      const key = `${adv.date}-${adv.advancePortalId}`;
+      const key = `${adv.date}-${adv.advancePortalId}-${adv.kind || 'main'}`;
       dateMap.set(key, {
         date: adv.date,
         advancePortalId: adv.advancePortalId,
@@ -1284,10 +1316,11 @@ const AdvanceSummary = ({ refreshSignal }) => {
     });
 
     billStatusPopupData.bills.forEach(bill => {
-      const key = `${bill.date}-${bill.advancePortalId}`;
+      const key = `${bill.date}-${bill.advancePortalId}-${bill.kind || 'main'}`;
       if (dateMap.has(key)) {
         dateMap.get(key).billAmount = bill.amount;
         dateMap.get(key).file_url = bill.file_url || null;
+        dateMap.get(key).type = bill.type || dateMap.get(key).type;
       } else {
         dateMap.set(key, {
           date: bill.date,
@@ -2223,7 +2256,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
                     const combinedData = [];
                     const dateMap = new Map();
                     billStatusPopupData.advances.forEach(adv => {
-                      const key = `${adv.date}-${adv.advancePortalId}`;
+                      const key = `${adv.date}-${adv.advancePortalId}-${adv.kind || 'main'}`;
                       dateMap.set(key, {
                         date: adv.date,
                         advancePortalId: adv.advancePortalId,
@@ -2237,11 +2270,12 @@ const AdvanceSummary = ({ refreshSignal }) => {
                       });
                     });
                     billStatusPopupData.bills.forEach(bill => {
-                      const key = `${bill.date}-${bill.advancePortalId}`;
+                      const key = `${bill.date}-${bill.advancePortalId}-${bill.kind || 'main'}`;
                       const fileUrl = bill.file_url && bill.file_url.trim() !== '' ? bill.file_url : null;
                       if (dateMap.has(key)) {
                         dateMap.get(key).billAmount = bill.amount;
                         dateMap.get(key).file_url = fileUrl;
+                        dateMap.get(key).type = bill.type || dateMap.get(key).type;
                       } else {
                         dateMap.set(key, {
                           date: bill.date,

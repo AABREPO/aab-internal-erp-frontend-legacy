@@ -23,6 +23,9 @@ import {
     splitStaffAdvancePortalByPurpose,
     getPortalAdvancePartyName,
     getPortalAdvanceProjectName,
+    UTILITY_BILL_TYPES,
+    UTILITY_BILLS_SUMMARY_TYPE,
+    getExpenseSummaryType,
 } from '../../utils/weeklyPaymentStaffAdvancePdf';
 import { i } from 'mathjs';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
@@ -2722,6 +2725,9 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             acc[typeObj.type] = { count: 0, total: 0 };
             return acc;
         }, {});
+        if (!summaryMap[UTILITY_BILLS_SUMMARY_TYPE]) {
+            summaryMap[UTILITY_BILLS_SUMMARY_TYPE] = { count: 0, total: 0 };
+        }
         const allExpenseTypes = [...new Set(
             expenses
                 .filter(expense => expense.type)
@@ -2730,14 +2736,16 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         )];
         const fixedTypes = weeklyTypes.map(typeObj => typeObj.type);
         allExpenseTypes.forEach(type => {
-            if (!fixedTypes.includes(type)) {
-                summaryMap[type] = { count: 0, total: 0 };
+            if (UTILITY_BILL_TYPES.includes(type)) return;
+            const summaryType = getExpenseSummaryType(type);
+            if (!fixedTypes.includes(summaryType) && !summaryMap[summaryType]) {
+                summaryMap[summaryType] = { count: 0, total: 0 };
             }
         });
         expenses
             .filter(expense => Number(expense.amount) > 0)
             .forEach(expense => {
-                const type = expense.type;
+                const type = getExpenseSummaryType(expense.type);
                 const amount = Number(expense.amount);
                 if (summaryMap[type]) {
                     summaryMap[type].count += 1;
@@ -2746,6 +2754,9 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                     }
                 }
             });
+        UTILITY_BILL_TYPES.forEach((utilityType) => {
+            delete summaryMap[utilityType];
+        });
         if (summaryMap["Staff Advance"]) {
             summaryMap["Staff Advance"].total = staffAdvanceTotalFromPortal;
             summaryMap["Staff Advance"].count = salaryAdvancePortalEntries.length;
@@ -2987,7 +2998,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             });
             newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
         }
-        const excludedTypes = ["Bill Payment", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus", "Bill Settlement"];
+        const excludedTypes = ["Bill Payment", "Wage", "Project Advance", "Staff Advance", "Staff Salary", "Daily", "Diwali Bonus", "Bill Settlement", "Utility Bills", ...UTILITY_BILL_TYPES];
         const otherExpenseTypes = [...new Set(expenses.map(e => e.type).filter(type => type && !excludedTypes.includes(type)))];
         otherExpenseTypes.forEach((expenseType) => {
             const typeEntries = expenses.filter(e => e.type === expenseType);
@@ -2998,6 +3009,56 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text(expenseType.toUpperCase(), newTableX, typeY - 25);
+            const typeHead = [[
+                String(typeCount || "0"),
+                "PARTY",
+                "PROJECT NAME",
+                String(typeTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]];
+            const typeBody = typeEntries.map(e => [
+                String(e.date ? formatDateOnly(e.date) : ""),
+                String(getPartyDisplayName(e) || ""),
+                String(siteOptions.find(opt => opt.id === Number(e.project_id))?.label || ""),
+                String(Number(e.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00")
+            ]);
+            if (newTableY > doc.internal.pageSize.getHeight() - 150) {
+                doc.addPage();
+                drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                newTableY = baseY;
+            }
+            autoTable(doc, {
+                head: typeHead,
+                body: typeBody,
+                startY: typeY - 20,
+                margin: { left: newTableX },
+                tableWidth: 310,
+                theme: "grid",
+                styles: { fontSize: 8, cellPadding: 3, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.5 },
+                headStyles: { textColor: [0, 0, 0], fillColor: [255, 230, 230], lineColor: [0, 0, 0], lineWidth: 1, fontStyle: 'bold' },
+                bodyStyles: { fontStyle: 'bold' },
+                columnStyles: {
+                    3: { halign: 'right' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.index === 3) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                didDrawPage: () => {
+                    drawHeader(doc, "WEEKLY PAYMENT STATEMENT");
+                }
+            });
+            newTableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : newTableY + 50;
+        });
+        UTILITY_BILL_TYPES.forEach((utilityType) => {
+            const typeEntries = expenses.filter((e) => e.type === utilityType);
+            if (typeEntries.length === 0) return;
+            const typeCount = typeEntries.length;
+            const typeTotal = typeEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+            const typeY = newTableY + 30;
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(utilityType.toUpperCase(), newTableX, typeY - 25);
             const typeHead = [[
                 String(typeCount || "0"),
                 "PARTY",

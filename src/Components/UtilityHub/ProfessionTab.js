@@ -15,7 +15,10 @@ import {
     getDefaultPropertyStyleFilters,
     getPropertyStyleFilterOptions,
     getTenantOptionsFromFiltered,
+    expandPropertyStyleRowsByVendor,
+    findPaymentForServiceMonth,
     getVendorOptionsFromFiltered,
+    getUtilityHubExportYear,
 } from './utilityHubTabFilters';
 
 const getTenantLinkPhone = (tenant) =>
@@ -282,27 +285,30 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         [filteredProjects]
     );
 
+    const getServiceNo = getProfessionServiceNo;
+
     const professionTableRows = useMemo(() => {
-        const rows = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => getProfessionServiceNo(property) !== '')
-                .map((property) => ({ project, property }))
-        );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [sortedFilteredProjects]);
+        const rows = flattenPropertyStyleRows(sortedFilteredProjects, getServiceNo, comparePropertyShopNoAsc);
+        return expandPropertyStyleRowsByVendor(rows, professionPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [sortedFilteredProjects, professionPayments, filters.year, filters.month, filters.vendor]);
 
     const hiddenProfessionTableRows = useMemo(() => {
-        const rows = sortProjectsPropertyDetailsByShopNo(hiddenProjects).flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => getProfessionServiceNo(property) !== '')
-                .map((property) => ({ project, property }))
+        const rows = flattenPropertyStyleRows(
+            sortProjectsPropertyDetailsByShopNo(hiddenProjects),
+            getServiceNo,
+            comparePropertyShopNoAsc
         );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [hiddenProjects]);
+        return expandPropertyStyleRowsByVendor(rows, professionPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [hiddenProjects, professionPayments, filters.year, filters.month, filters.vendor]);
 
-    const getServiceNo = getProfessionServiceNo;
     const tenantLinksByPropertyId = useMemo(() => buildTenantLinksMap(tenantShopData), [tenantShopData]);
     const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(String(propertyId)) || [];
 
@@ -311,7 +317,13 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         const selectedStatus = filterState.paymentStatus;
         if (!selectedMonth && !selectedStatus) return true;
         const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(getProfessionServiceNo(property), month, property.id, filterState.year);
+            const paymentData = getPaymentData(
+                getProfessionServiceNo(property),
+                month,
+                property.id,
+                filterState.year,
+                filterState.vendor || undefined
+            );
             const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
             const isUnpaid = paymentData.amount === '0';
             if (selectedStatus === 'Paid') return isPaid;
@@ -371,7 +383,13 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
     const clearFilters = () => setFilters(getDefaultPropertyStyleFilters(MONTH_LABELS));
 
     const vendorFilterOptions = useMemo(
-        () => getVendorOptionsFromFiltered(filters, computeFiltered, (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc), professionPayments),
+        () => getVendorOptionsFromFiltered(
+            filters,
+            computeFiltered,
+            (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc),
+            professionPayments,
+            projects
+        ),
         [filters, projects, selectedCategory, professionPayments, tenantLinksByPropertyId]
     );
 
@@ -498,7 +516,7 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         );
     };
 
-    function getPaymentData(professionServiceNo, month, propertyId, yearOverride) {
+    function getPaymentData(professionServiceNo, month, propertyId, yearOverride, rowVendor) {
         const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -511,9 +529,11 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
 
         const yearMonth = `${selectedYear}-${monthNumber}`;
         // If a payment exists for this month, always show it (even when frequency=0).
-        const existingPayment = professionPayments.find(p =>
-            p.utilityTypeNumber === professionServiceNo &&
-            p.utilityForTheMonth === yearMonth
+        const existingPayment = findPaymentForServiceMonth(
+            professionPayments,
+            professionServiceNo,
+            yearMonth,
+            rowVendor
         );
         if (existingPayment) {
             return {
@@ -566,9 +586,11 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         const freqValue = freqData?.waterFrequencyNo;
         const freqMissing = freqValue === undefined || freqValue === null;
         if (!freqData || freqMissing || !freqData.startingMonthOfWaterFrequency) {
-            const payment = professionPayments.find(p =>
-                p.utilityTypeNumber === professionServiceNo &&
-                p.utilityForTheMonth === yearMonth
+            const payment = findPaymentForServiceMonth(
+                professionPayments,
+                professionServiceNo,
+                yearMonth,
+                rowVendor
             );
             if (payment) {
                 return {
@@ -611,7 +633,7 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         }
     }
     // Get unpaid count for a Profession Tax number
-    const getUnpaidCount = (professionServiceNo, propertyId) => {
+    const getUnpaidCount = (professionServiceNo, propertyId, rowVendor) => {
         // Use selected year or current year as fallback
         const selectedYear = filters.year || new Date().getFullYear().toString();
         const monthMap = {
@@ -625,9 +647,11 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
             const monthNumber = monthMap[month];
             if (shouldPayInMonth(propertyId, monthNumber, selectedYear)) {
                 const yearMonth = `${selectedYear}-${monthNumber}`;
-                const payment = professionPayments.find(p =>
-                    p.utilityTypeNumber === professionServiceNo &&
-                    p.utilityForTheMonth === yearMonth
+                const payment = findPaymentForServiceMonth(
+                    professionPayments,
+                    professionServiceNo,
+                    yearMonth,
+                    rowVendor
                 );
                 if (!payment) {
                     unpaidCount++;
@@ -637,16 +661,12 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         return unpaidCount;
     };
 
-    const buildExportRows = () => {
-        const pairs = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => getProfessionServiceNo(property) !== '')
-                .map((property) => ({ project, property }))
-        );
-        pairs.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+    const resolveExportYear = () => getUtilityHubExportYear(filters);
 
-        return pairs.map(({ project, property }, index) => {
+    const buildExportRows = (exportYear = resolveExportYear()) =>
+        professionTableRows.map(({ project, property, rowVendor }, index) => {
             const rowNumber = index + 1;
+            const serviceNo = getProfessionServiceNo(property) || '-';
             const row = {
                 slNo: rowNumber,
                 pid: project.projectId || '-',
@@ -654,26 +674,32 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
                 category: property.projectType || project.projectCategory || '-',
                 doorNo: property.doorNo || '-',
                 shopNo: property.shopNo || '-',
-                serviceNo: getProfessionServiceNo(property) || '-'
+                serviceNo,
             };
 
             monthLabels.forEach((month) => {
-                const paymentData = getPaymentData(getProfessionServiceNo(property), month, property.id);
+                const paymentData = getPaymentData(
+                    getProfessionServiceNo(property),
+                    month,
+                    property.id,
+                    exportYear,
+                    rowVendor
+                );
                 row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
             });
 
-            row.unpaid = getUnpaidCount(getProfessionServiceNo(property), property.id);
+            row.unpaid = getUnpaidCount(getProfessionServiceNo(property), property.id, rowVendor);
             return row;
         });
-    };
 
     const handleExportPDF = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(14);
-        doc.text('Profession Tax Projects Overview', 14, 20);
+        doc.text(`Profession Tax Projects Overview - ${exportYear}`, 14, 20);
 
         const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'D.No', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map((row) => [
@@ -705,11 +731,12 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
             }
         });
 
-        doc.save('ProfessionTaxProjects.pdf');
+        doc.save(`ProfessionTaxProjects_${exportYear}.pdf`);
     };
 
     const handleExportExcel = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const worksheetData = rows.map((row) => {
@@ -734,10 +761,11 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'ProfessionTax');
-        XLSX.writeFile(workbook, 'ProfessionTaxProjects.xlsx');
+        XLSX.writeFile(workbook, `ProfessionTaxProjects_${exportYear}.xlsx`);
     };
 
     const hasExportableData = professionTableRows.length > 0;
+    const displayYear = resolveExportYear();
 
     const toggleProjectHideStatus = async (projectId, isHide) => {
         try {
@@ -1171,6 +1199,9 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
+                    <h2 className="text-center text-lg font-semibold text-gray-800 mb-3">
+                        Profession Tax Projects Overview - {displayYear}
+                    </h2>
                     <div className="rounded-lg">
                         <div
                             ref={scrollRef}
@@ -1227,9 +1258,9 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        professionTableRows.map(({ project, property }, index) => {
+                                        professionTableRows.map(({ project, property, rowVendor, rowKey }, index) => {
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2 text-left">{project.projectName}</td>
@@ -1263,7 +1294,7 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
                                                                 {getProfessionServiceNo(property)}
                                                             </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
-                                                                const paymentData = getPaymentData(getProfessionServiceNo(property), month, property.id);
+                                                                const paymentData = getPaymentData(getProfessionServiceNo(property), month, property.id, undefined, rowVendor);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
                                                                 const isNotRequired = paymentData.isNotRequired;
                                                                 return (
@@ -1287,7 +1318,7 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
                                                             })}
                                                             <td className="px-4 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
-                                                                    {getUnpaidCount(getProfessionServiceNo(property), property.id)}
+                                                                    {getUnpaidCount(getProfessionServiceNo(property), property.id, rowVendor)}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-2">
@@ -1348,9 +1379,9 @@ const ProfessionTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {hiddenProfessionTableRows.map(({ project, property }, index) => {
+                                        {hiddenProfessionTableRows.map(({ project, property, rowVendor, rowKey }, index) => {
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>

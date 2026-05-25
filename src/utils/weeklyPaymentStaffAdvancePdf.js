@@ -1,5 +1,22 @@
 /** Staff advance portal helpers for Weekly Payment PDF (Salary vs Wage Advance by from_purpose). */
 
+export const UTILITY_BILL_TYPES = ['Telecom', 'Electricity', 'Property', 'Water', 'Subscription', 'Profession'];
+export const UTILITY_BILLS_SUMMARY_TYPE = 'Utility Bills';
+
+export function isUtilityBillExpenseType(type) {
+    return UTILITY_BILL_TYPES.includes(type);
+}
+
+export function isUtilityBillEntry(entry) {
+    const type = entry?.type;
+    return isUtilityBillExpenseType(type) || type === UTILITY_BILLS_SUMMARY_TYPE;
+}
+
+export function getExpenseSummaryType(type) {
+    if (isUtilityBillExpenseType(type)) return UTILITY_BILLS_SUMMARY_TYPE;
+    return type;
+}
+
 const SALARY_ADVANCE_PURPOSE = 'salary advance';
 const WAGE_ADVANCE_PURPOSE = 'wage advance';
 

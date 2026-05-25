@@ -10,10 +10,14 @@ import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 import {
   buildSubscriptionAutoFill,
   computeSubscriptionStyleFilteredProjects,
+  expandSubscriptionRowsByProvider,
   flattenSubscriptionRows,
   getDefaultSubscriptionFilters,
   getProviderOptionsFromFiltered,
   getSubscriptionFilterOptions,
+  getSubscriptionPaymentServiceNo,
+  paymentMatchesRowVendor,
+  getUtilityHubExportYear,
 } from './utilityHubTabFilters';
 
 const SUBSCRIPTION_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-subscription/getAll';
@@ -449,29 +453,24 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
     return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
   };
 
-  const getPaymentData = (serviceNumber, month, subscriptionId, yearOverride) => {
+  const getPaymentData = (serviceNumber, month, subscriptionId, yearOverride, rowProvider) => {
     const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
     const monthNumber = monthMap[month];
     if (!monthNumber) return { amount: '-', date: null };
     const yearMonth = `${selectedYear}-${monthNumber}`;
+    const normalizedServiceNo = String(serviceNumber ?? '').trim();
     const payment = subscriptionPayments.find((p) => {
-      const payNumber =
-        p.utilityTypeNumber ??
-        p.utility_type_number ??
-        p.utilityTypeNo ??
-        p.utility_type_no ??
-        p.subscriptionServiceNumber ??
-        p.subscription_service_number ??
-        p.subscriptionNumber ??
-        p.subscription_number ??
-        p.serviceNumber ??
-        p.service_number;
+      const payNumber = getSubscriptionPaymentServiceNo(p);
       const monthValue =
         p.utilityForTheMonth ??
         p.utility_for_the_month ??
         p.subscriptionForTheMonth ??
         p.subscription_for_the_month;
-      return payNumber === serviceNumber && monthValue === yearMonth;
+      return (
+        payNumber === normalizedServiceNo &&
+        monthValue === yearMonth &&
+        paymentMatchesRowVendor(p, rowProvider)
+      );
     });
     if (payment) {
       return {
@@ -492,7 +491,13 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
     if (!selectedMonth && !selectedStatus) return true;
     const subscriptionKey = detail.utilitySubscriptionId ?? detail.id;
     const evaluateMonth = (month) => {
-      const paymentData = getPaymentData(detail.serviceNumber, month, subscriptionKey, filterState.year);
+      const paymentData = getPaymentData(
+        detail.serviceNumber,
+        month,
+        subscriptionKey,
+        filterState.year,
+        filterState.provider || undefined
+      );
       const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
       const isUnpaid = paymentData.amount === '0';
       if (selectedStatus === 'Paid') return isPaid;
@@ -511,6 +516,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
       excludeField,
       matchesPaymentFiltersFor,
       compareDetailSort: comparePropertyShopNoAsc,
+      payments: subscriptionPayments,
     });
 
   useEffect(() => {
@@ -540,38 +546,38 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
   const clearFilters = () => setFilters(getDefaultSubscriptionFilters(monthLabels));
 
   const providerFilterOptions = useMemo(
-    () => getProviderOptionsFromFiltered(filters, computeFiltered, (list) => flattenSubscriptionRows(list, comparePropertyShopNoAsc)),
+    () => getProviderOptionsFromFiltered(
+      filters,
+      computeFiltered,
+      (list) => flattenSubscriptionRows(list, comparePropertyShopNoAsc),
+      subscriptionPayments
+    ),
     [filters, projects, selectedCategory, subscriptionPayments]
   );
 
   const getFilterOptions = (fieldKey, excludeField) =>
     getSubscriptionFilterOptions(filters, fieldKey, excludeField, computeFiltered);
 
-  const getUnpaidCount = (serviceNumber, subscriptionId) => {
+  const getUnpaidCount = (serviceNumber, subscriptionId, rowProvider) => {
     const selectedYear = filters.year || new Date().getFullYear().toString();
+    const normalizedServiceNo = String(serviceNumber ?? '').trim();
     let unpaidCount = 0;
     monthLabels.forEach((month) => {
       const monthNumber = monthMap[month];
       if (shouldPayInMonth(subscriptionId, monthNumber, selectedYear)) {
         const yearMonth = `${selectedYear}-${monthNumber}`;
         const payment = subscriptionPayments.find((p) => {
-          const payNumber =
-            p.utilityTypeNumber ??
-            p.utility_type_number ??
-            p.utilityTypeNo ??
-            p.utility_type_no ??
-            p.subscriptionServiceNumber ??
-            p.subscription_service_number ??
-            p.subscriptionNumber ??
-            p.subscription_number ??
-            p.serviceNumber ??
-            p.service_number;
+          const payNumber = getSubscriptionPaymentServiceNo(p);
           const monthValue =
             p.utilityForTheMonth ??
             p.utility_for_the_month ??
             p.subscriptionForTheMonth ??
             p.subscription_for_the_month;
-          return payNumber === serviceNumber && monthValue === yearMonth;
+          return (
+            payNumber === normalizedServiceNo &&
+            monthValue === yearMonth &&
+            paymentMatchesRowVendor(p, rowProvider)
+          );
         });
         if (!payment) {
           unpaidCount++;
@@ -587,34 +593,30 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
   );
 
   const subscriptionTableRows = useMemo(() => {
-    const rows = sortedFilteredProjects.flatMap((project) =>
-      (project.subscriptionDetails || [])
-        .filter((detail) => detail.serviceNumber && detail.serviceNumber.trim() !== '')
-        .map((detail) => ({ project, detail }))
-    );
-    rows.sort((a, b) => comparePropertyShopNoAsc(a.detail, b.detail));
-    return rows;
-  }, [sortedFilteredProjects]);
+    const rows = flattenSubscriptionRows(sortedFilteredProjects, comparePropertyShopNoAsc);
+    return expandSubscriptionRowsByProvider(rows, subscriptionPayments, {
+      year: filters.year,
+      month: filters.month,
+      providerFilter: filters.provider,
+    });
+  }, [sortedFilteredProjects, subscriptionPayments, filters.year, filters.month, filters.provider]);
 
   const hiddenSubscriptionTableRows = useMemo(() => {
-    const rows = sortProjectsSubscriptionDetailsByShopNo(hiddenProjects).flatMap((project) =>
-      (project.subscriptionDetails || [])
-        .filter((detail) => detail.serviceNumber && detail.serviceNumber.trim() !== '')
-        .map((detail) => ({ project, detail }))
+    const rows = flattenSubscriptionRows(
+      sortProjectsSubscriptionDetailsByShopNo(hiddenProjects),
+      comparePropertyShopNoAsc
     );
-    rows.sort((a, b) => comparePropertyShopNoAsc(a.detail, b.detail));
-    return rows;
-  }, [hiddenProjects]);
+    return expandSubscriptionRowsByProvider(rows, subscriptionPayments, {
+      year: filters.year,
+      month: filters.month,
+      providerFilter: filters.provider,
+    });
+  }, [hiddenProjects, subscriptionPayments, filters.year, filters.month, filters.provider]);
 
-  const buildExportRows = () => {
-    const pairs = sortedFilteredProjects.flatMap((project) =>
-      (project.subscriptionDetails || [])
-        .filter((detail) => detail.serviceNumber && detail.serviceNumber.trim() !== '')
-        .map((detail) => ({ project, detail }))
-    );
-    pairs.sort((a, b) => comparePropertyShopNoAsc(a.detail, b.detail));
+  const resolveExportYear = () => getUtilityHubExportYear(filters);
 
-    return pairs.map(({ project, detail }, index) => {
+  const buildExportRows = (exportYear = resolveExportYear()) =>
+    subscriptionTableRows.map(({ project, detail, rowProvider }, index) => {
       const rowNumber = index + 1;
       const subscriptionKey = detail.utilitySubscriptionId ?? detail.id;
       const row = {
@@ -629,22 +631,28 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
       };
 
       monthLabels.forEach((month) => {
-        const paymentData = getPaymentData(detail.serviceNumber, month, subscriptionKey);
+        const paymentData = getPaymentData(
+          detail.serviceNumber,
+          month,
+          subscriptionKey,
+          exportYear,
+          rowProvider
+        );
         row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
       });
 
-      row.unpaid = getUnpaidCount(detail.serviceNumber, subscriptionKey);
+      row.unpaid = getUnpaidCount(detail.serviceNumber, subscriptionKey, rowProvider);
       return row;
     });
-  };
 
   const handleExportPDF = () => {
-    const rows = buildExportRows();
+    const exportYear = resolveExportYear();
+    const rows = buildExportRows(exportYear);
     if (!rows.length) return;
 
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(14);
-    doc.text('Subscription Services Overview', 14, 20);
+    doc.text(`Subscription Services Overview - ${exportYear}`, 14, 20);
 
     const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'D.No', 'Registered', 'Service No', ...monthLabels, 'Unpaid'];
     const body = rows.map((row) => [
@@ -677,11 +685,12 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
       }
     });
 
-    doc.save('SubscriptionServices.pdf');
+    doc.save(`SubscriptionServices_${exportYear}.pdf`);
   };
 
   const handleExportExcel = () => {
-    const rows = buildExportRows();
+    const exportYear = resolveExportYear();
+    const rows = buildExportRows(exportYear);
     if (!rows.length) return;
 
     const worksheetData = rows.map((row) => {
@@ -707,10 +716,11 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'SubscriptionServices');
-    XLSX.writeFile(workbook, 'SubscriptionServices.xlsx');
+    XLSX.writeFile(workbook, `SubscriptionServices_${exportYear}.xlsx`);
   };
 
   const hasExportableData = subscriptionTableRows.length > 0;
+  const displayYear = resolveExportYear();
 
   const toggleProjectHideStatus = (projectId, isHide) => {
     if (isHide) {
@@ -1147,6 +1157,9 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
             </button>
           </div>
         </div>
+        <h2 className="text-center text-lg font-semibold text-gray-800 mb-3">
+          Subscription Services Overview - {displayYear}
+        </h2>
         <div className="rounded-lg">
           <div
             ref={scrollRef}
@@ -1198,10 +1211,11 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
                     </td>
                   </tr>
                 ) : (
-                  subscriptionTableRows.map(({ project, detail }, index) => {
+                  subscriptionTableRows.map(({ project, detail, rowProvider, rowKey }, index) => {
                         const subscriptionKey = detail.utilitySubscriptionId ?? detail.id;
+                        const providerLabel = rowProvider || detail.serviceProvider || '-';
                         return (
-                          <tr key={`${project.id}-${detail.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                          <tr key={rowKey || `${project.id}-${detail.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                             <td className="px-4 py-2">{index + 1}</td>
                             <td className="px-4 py-2">{project.projectId}</td>
                             <td className="px-4 py-2 text-left">{project.projectName}</td>
@@ -1238,8 +1252,8 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
                                   <div className="space-y-2">
                                     <div className="flex">
                                       <span className="w-20 font-medium text-black">Provider :</span>
-                                      <span className="flex-1 font-semibold text-[#E4572E] truncate" title={detail.serviceProvider}>
-                                        {detail.serviceProvider || '-'}
+                                      <span className="flex-1 font-semibold text-[#E4572E] truncate" title={providerLabel}>
+                                        {providerLabel}
                                       </span>
                                     </div>
                                     <div className="flex">
@@ -1265,7 +1279,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
                               </div>
                             </td>
                             {monthLabels.map((month) => {
-                              const paymentData = getPaymentData(detail.serviceNumber, month, subscriptionKey);
+                              const paymentData = getPaymentData(detail.serviceNumber, month, subscriptionKey, undefined, rowProvider);
                               const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
                               const isNotRequired = paymentData.isNotRequired;
                               return (
@@ -1296,7 +1310,7 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
                             })}
                             <td className="px-4 py-2">
                               <span className="text-sm font-medium text-gray-700">
-                                {getUnpaidCount(detail.serviceNumber, subscriptionKey)}
+                                {getUnpaidCount(detail.serviceNumber, subscriptionKey, rowProvider)}
                               </span>
                             </td>
                             <td className="px-4 py-2">
@@ -1351,9 +1365,9 @@ const SubscriptionTab = ({ username, userRoles = [] }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {hiddenSubscriptionTableRows.map(({ project, detail }, index) => {
+                    {hiddenSubscriptionTableRows.map(({ project, detail, rowKey }, index) => {
                           return (
-                            <tr key={`${project.id}-${detail.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                            <tr key={rowKey || `${project.id}-${detail.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                               <td className="px-4 py-2">{index + 1}</td>
                               <td className="px-4 py-2">{project.projectId}</td>
                               <td className="px-4 py-2">{project.projectName}</td>

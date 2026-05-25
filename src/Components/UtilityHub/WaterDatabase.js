@@ -1,78 +1,75 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const WaterDatabase = ({ username, userRoles = [] }) => {
-    const [projects, setProjects] = useState([]);
-    const [filteredProjects, setFilteredProjects] = useState([]);
+    const [waterData, setWaterData] = useState([]);
+    const [filteredData, setFilteredData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [filters, setFilters] = useState({
-        projectName: '',
-        doorNo: '',
-        serviceNo: '',
-        projectType: ''
+        siteName: '',
+        vendor: '',
+        utilityTypeNumber: '',
+        contractor: '',
+        paymentMode: ''
     });
 
-    // Fetch projects data
     useEffect(() => {
-        const fetchProjects = async () => {
+        const fetchWaterData = async () => {
             try {
-                const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
-                // Filter projects that have waterNo in propertyDetails
-                const projectsWithWaterNo = response.data.filter(project =>
-                    project.propertyDetails &&
-                    project.propertyDetails.some(property => property.waterNo && property.waterNo.trim() !== '')
-                );
-                setProjects(projectsWithWaterNo);
-                setFilteredProjects(projectsWithWaterNo);
-            } catch (error) {
-                console.error('Error fetching projects:', error);
-                setError('Failed to fetch projects data');
+                const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/water');
+                setWaterData(response.data || []);
+                setFilteredData(response.data || []);
+            } catch (err) {
+                console.error('Error fetching water data:', err);
+                setError('Failed to fetch water data');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchProjects();
+        fetchWaterData();
     }, []);
 
-    // Apply filters
     useEffect(() => {
-        let filtered = projects;
+        let filtered = waterData;
 
-        if (filters.projectName) {
-            filtered = filtered.filter(project =>
-                project.projectName.toLowerCase().includes(filters.projectName.toLowerCase())
+        if (filters.siteName) {
+            filtered = filtered.filter(item =>
+                item.siteName && item.siteName.toLowerCase().includes(filters.siteName.toLowerCase())
             );
         }
 
-        if (filters.doorNo) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.doorNo && property.doorNo.toLowerCase().includes(filters.doorNo.toLowerCase())
-                )
+        if (filters.vendor) {
+            filtered = filtered.filter(item =>
+                item.vendor && item.vendor.toLowerCase().includes(filters.vendor.toLowerCase())
             );
         }
 
-        if (filters.serviceNo) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.waterNo && property.waterNo.toLowerCase().includes(filters.serviceNo.toLowerCase())
-                )
+        if (filters.utilityTypeNumber) {
+            filtered = filtered.filter(item =>
+                item.utilityTypeNumber && item.utilityTypeNumber.toLowerCase().includes(filters.utilityTypeNumber.toLowerCase())
             );
         }
 
-        if (filters.projectType) {
-            filtered = filtered.filter(project =>
-                project.propertyDetails.some(property =>
-                    property.projectType && property.projectType.toLowerCase().includes(filters.projectType.toLowerCase())
-                )
+        if (filters.contractor) {
+            filtered = filtered.filter(item =>
+                item.contractor && item.contractor.toLowerCase().includes(filters.contractor.toLowerCase())
             );
         }
 
-        setFilteredProjects(filtered);
-    }, [filters, projects]);
+        if (filters.paymentMode) {
+            filtered = filtered.filter(item =>
+                item.paymentMode && item.paymentMode.toLowerCase().includes(filters.paymentMode.toLowerCase())
+            );
+        }
+
+        setFilteredData(filtered);
+    }, [filters, waterData]);
 
     const handleFilterChange = (filterType, value) => {
         setFilters(prev => ({
@@ -81,7 +78,165 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
         }));
     };
 
-    // Custom styles for react-select
+    const formatTimestamp = (timestamp) => {
+        if (!timestamp) return '-';
+
+        try {
+            const date = new Date(timestamp);
+            const formattedDate = date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const formattedTime = date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            return `${formattedDate} ${formattedTime}`;
+        } catch {
+            return '-';
+        }
+    };
+
+    const formatDate = (dateValue) => {
+        if (!dateValue) return '-';
+
+        try {
+            return new Date(dateValue).toLocaleDateString('en-GB');
+        } catch {
+            return '-';
+        }
+    };
+
+    const formatAmountDisplay = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return '₹0';
+        }
+
+        const amountNumber = Number(value);
+
+        if (Number.isFinite(amountNumber)) {
+            return `₹${amountNumber.toLocaleString()}`;
+        }
+
+        return `₹${value}`;
+    };
+
+    const getAmountExportValue = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return 0;
+        }
+
+        const amountNumber = Number(value);
+
+        if (Number.isFinite(amountNumber)) {
+            return amountNumber;
+        }
+
+        return value;
+    };
+
+    const formatUtilityMonth = (utilityForTheMonth) => {
+        if (!utilityForTheMonth) return '-';
+
+        try {
+            const [year, month] = utilityForTheMonth.split('-');
+            const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+
+            const monthIndex = parseInt(month, 10) - 1;
+            if (monthIndex >= 0 && monthIndex < 12) {
+                return `${monthNames[monthIndex]} ${year}`;
+            }
+            return utilityForTheMonth;
+        } catch {
+            return utilityForTheMonth;
+        }
+    };
+
+    const handleExportPDF = () => {
+        if (!filteredData.length) return;
+
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text('Water Expenses', 14, 20);
+
+        const tableColumn = [
+            'Sl.No',
+            'Timestamp',
+            'Date',
+            'Site Name',
+            'Vendor',
+            'Contractor',
+            'Water Number',
+            'Category',
+            'Amount',
+            'Payment Mode',
+            'For The Month',
+            'ENo',
+            'Bill Copy'
+        ];
+
+        const tableRows = filteredData.map((item, index) => [
+            index + 1,
+            formatTimestamp(item.timestamp),
+            formatDate(item.date),
+            item.siteName || '-',
+            item.vendor || '-',
+            item.contractor || '-',
+            item.utilityTypeNumber || '-',
+            item.category || '-',
+            formatAmountDisplay(item.amount),
+            item.paymentMode || '-',
+            formatUtilityMonth(item.utilityForTheMonth),
+            item.eno || '-',
+            item.billCopy ? 'Available' : '-'
+        ]);
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 28,
+            styles: {
+                fontSize: 8
+            },
+            headStyles: {
+                fillColor: [191, 152, 83]
+            }
+        });
+
+        doc.save('WaterExpenses.pdf');
+    };
+
+    const handleExportExcel = () => {
+        if (!filteredData.length) return;
+
+        const worksheetData = filteredData.map((item, index) => ({
+            'Sl.No': index + 1,
+            Timestamp: formatTimestamp(item.timestamp),
+            Date: formatDate(item.date),
+            'Site Name': item.siteName || '-',
+            Vendor: item.vendor || '-',
+            Contractor: item.contractor || '-',
+            'Water Number': item.utilityTypeNumber || '-',
+            Category: item.category || '-',
+            Amount: getAmountExportValue(item.amount),
+            'Payment Mode': item.paymentMode || '-',
+            'For The Month': formatUtilityMonth(item.utilityForTheMonth),
+            ENo: item.eno || '-',
+            'Bill Copy URL': item.billCopy || '-'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'WaterExpenses');
+        XLSX.writeFile(workbook, 'WaterExpenses.xlsx');
+    };
+
     const customSelectStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -109,39 +264,34 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
         }),
     };
 
-    // Get unique values for filter options
     const getUniqueValues = (key) => {
         const values = new Set();
-        projects.forEach(project => {
-            if (key === 'projectName') {
-                values.add(project.projectName);
-            } else if (key === 'doorNo') {
-                project.propertyDetails.forEach(property => {
-                    if (property.doorNo) values.add(property.doorNo);
-                });
-            } else if (key === 'serviceNo') {
-                project.propertyDetails.forEach(property => {
-                    if (property.waterNo) values.add(property.waterNo);
-                });
-            } else if (key === 'projectType') {
-                project.propertyDetails.forEach(property => {
-                    if (property.projectType) values.add(property.projectType);
-                });
+        waterData.forEach(item => {
+            if (key === 'siteName' && item.siteName) {
+                values.add(item.siteName);
+            } else if (key === 'vendor' && item.vendor) {
+                values.add(item.vendor);
+            } else if (key === 'utilityTypeNumber' && item.utilityTypeNumber) {
+                values.add(item.utilityTypeNumber);
+            } else if (key === 'contractor' && item.contractor) {
+                values.add(item.contractor);
+            } else if (key === 'paymentMode' && item.paymentMode) {
+                values.add(item.paymentMode);
             }
         });
         return Array.from(values).sort().map(value => ({
-            value: value,
+            value,
             label: value
         }));
     };
 
-    // Clear all filters
     const clearFilters = () => {
         setFilters({
-            projectName: '',
-            doorNo: '',
-            serviceNo: '',
-            projectType: ''
+            siteName: '',
+            vendor: '',
+            utilityTypeNumber: '',
+            contractor: '',
+            paymentMode: ''
         });
     };
 
@@ -151,12 +301,12 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                 <div className="p-6">
                     <div className="flex text-left gap-4">
                         <div>
-                            <label className="block font-semibold mb-1">Project Name</label>
+                            <label className="block font-semibold mb-1">Site Name</label>
                             <Select
-                                options={getUniqueValues('projectName')}
-                                value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
-                                onChange={(selectedOption) => handleFilterChange('projectName', selectedOption ? selectedOption.value : '')}
-                                placeholder="Select Project"
+                                options={getUniqueValues('siteName')}
+                                value={filters.siteName ? { value: filters.siteName, label: filters.siteName } : null}
+                                onChange={(selectedOption) => handleFilterChange('siteName', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Site Name"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -164,12 +314,12 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Door No</label>
+                            <label className="block font-semibold mb-1">Vendor</label>
                             <Select
-                                options={getUniqueValues('doorNo')}
-                                value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
-                                onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption ? selectedOption.value : '')}
-                                placeholder="Select Door No"
+                                options={getUniqueValues('vendor')}
+                                value={filters.vendor ? { value: filters.vendor, label: filters.vendor } : null}
+                                onChange={(selectedOption) => handleFilterChange('vendor', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Vendor"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -177,12 +327,12 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Service No</label>
+                            <label className="block font-semibold mb-1">Utility Type Number</label>
                             <Select
-                                options={getUniqueValues('serviceNo')}
-                                value={filters.serviceNo ? { value: filters.serviceNo, label: filters.serviceNo } : null}
-                                onChange={(selectedOption) => handleFilterChange('serviceNo', selectedOption ? selectedOption.value : '')}
-                                placeholder="Select Service No"
+                                options={getUniqueValues('utilityTypeNumber')}
+                                value={filters.utilityTypeNumber ? { value: filters.utilityTypeNumber, label: filters.utilityTypeNumber } : null}
+                                onChange={(selectedOption) => handleFilterChange('utilityTypeNumber', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Utility Type Number"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -190,12 +340,25 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div>
-                            <label className="block font-semibold mb-1">Project Type</label>
+                            <label className="block font-semibold mb-1">Contractor</label>
                             <Select
-                                options={getUniqueValues('projectType')}
-                                value={filters.projectType ? { value: filters.projectType, label: filters.projectType } : null}
-                                onChange={(selectedOption) => handleFilterChange('projectType', selectedOption ? selectedOption.value : '')}
-                                placeholder="Select Project Type"
+                                options={getUniqueValues('contractor')}
+                                value={filters.contractor ? { value: filters.contractor, label: filters.contractor } : null}
+                                onChange={(selectedOption) => handleFilterChange('contractor', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Contractor"
+                                isClearable
+                                isSearchable
+                                styles={customSelectStyles}
+                                className="w-full"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Payment Mode</label>
+                            <Select
+                                options={getUniqueValues('paymentMode')}
+                                value={filters.paymentMode ? { value: filters.paymentMode, label: filters.paymentMode } : null}
+                                onChange={(selectedOption) => handleFilterChange('paymentMode', selectedOption ? selectedOption.value : '')}
+                                placeholder="Select Payment Mode"
                                 isClearable
                                 isSearchable
                                 styles={customSelectStyles}
@@ -204,6 +367,7 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                         </div>
                         <div className="flex items-end">
                             <button
+                                type="button"
                                 onClick={clearFilters}
                                 className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
                             >
@@ -214,18 +378,27 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                 </div>
             </div>
 
-            {/* Data Table */}
             <div className="bg-white rounded-md ml-5 mr-5 p-6">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Water Connections</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">Water Expenses</h3>
                     <div className="flex items-center gap-4 text-sm text-black">
-                        <button className="flex items-center font-semibold gap-2 hover:text-blue-600">
+                        <button
+                            type="button"
+                            onClick={handleExportPDF}
+                            disabled={!filteredData.length}
+                            className="flex items-center font-semibold gap-2 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                        >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                             </svg>
                             Export PDF
                         </button>
-                        <button className="flex items-center font-semibold gap-2 hover:text-green-600">
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            disabled={!filteredData.length}
+                            className="flex items-center font-semibold gap-2 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
+                        >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
@@ -240,72 +413,81 @@ const WaterDatabase = ({ username, userRoles = [] }) => {
                             <thead>
                                 <tr className="bg-[#FAF6ED]">
                                     <td className="px-4 py-2 text-left font-semibold">Sl.No</td>
-                                    <td className="px-4 py-2 text-left font-semibold">PID</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Project Name</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Project Type</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Door No</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Service No (Water)</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Shop No</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Status</td>
-                                    <td className="px-4 py-2 text-left font-semibold">Created Date</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Date</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Site Name</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Vendor</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Contractor</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Water Number</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Category</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Amount</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Payment Mode</td>
+                                    <td className="px-4 py-2 text-left font-semibold">For The Month</td>
+                                    <td className="px-4 py-2 text-left font-semibold">ENo</td>
+                                    <td className="px-4 py-2 text-left font-semibold">Bill Copy</td>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="9" className="text-center py-4">
+                                        <td colSpan="13" className="text-center py-4">
                                             Loading...
                                         </td>
                                     </tr>
                                 ) : error ? (
                                     <tr>
-                                        <td colSpan="9" className="text-center py-4 text-red-500">
+                                        <td colSpan="13" className="text-center py-4 text-red-500">
                                             {error}
                                         </td>
                                     </tr>
-                                ) : filteredProjects.length === 0 ? (
+                                ) : filteredData.length === 0 ? (
                                     <tr>
-                                        <td colSpan="9" className="text-center py-4">
-                                            No water connections found
+                                        <td colSpan="13" className="text-center py-4">
+                                            No water expenses found
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredProjects.map((project, projectIndex) =>
-                                        project.propertyDetails
-                                            .filter(property => property.waterNo && property.waterNo.trim() !== '')
-                                            .map((property, propertyIndex) => {
-                                                const rowIndex = projectIndex * project.propertyDetails.length + propertyIndex;
-                                                return (
-                                                    <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                        <td className="px-4 py-2">{rowIndex + 1}</td>
-                                                        <td className="px-4 py-2">{project.projectId}</td>
-                                                        <td className="px-4 py-2 text-left">{project.projectName}</td>
-                                                        <td className="px-4 py-2">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                                project.projectCategory === 'Client Project'
-                                                                    ? 'bg-orange-100 text-orange-800'
-                                                                    : project.projectCategory === 'Own Project'
-                                                                        ? 'bg-green-100 text-green-800'
-                                                                        : 'bg-gray-100 text-gray-800'
-                                                            }`}>
-                                                                {property.projectType || project.projectCategory || '-'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-2">{property.doorNo || '-'}</td>
-                                                        <td className="px-4 py-2 text-left font-mono">{property.waterNo}</td>
-                                                        <td className="px-4 py-2">{property.shopNo || '-'}</td>
-                                                        <td className="px-4 py-2">
-                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                                Active
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-2">
-                                                            {project.createdAt ? new Date(project.createdAt).toLocaleDateString('en-GB') : '-'}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                    )
+                                    filteredData.map((item, index) => (
+                                        <tr key={item.id ?? index} className="odd:bg-white even:bg-[#FAF6ED]">
+                                            <td className="px-4 py-2">{index + 1}</td>
+                                            <td className="px-4 py-2 text-left">
+                                                {formatDate(item.date)}
+                                            </td>
+                                            <td className="px-4 py-2 text-left">{item.siteName || '-'}</td>
+                                            <td className="px-4 py-2 text-left">{item.vendor || '-'}</td>
+                                            <td className="px-4 py-2 text-left">{item.contractor || '-'}</td>
+                                            <td className="px-4 py-2 text-left font-mono">{item.utilityTypeNumber || '-'}</td>
+                                            <td className="px-4 py-2 text-left">
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    {item.category || '-'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                <span className="font-semibold text-green-600">
+                                                    {formatAmountDisplay(item.amount)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {item.paymentMode || '-'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2">{formatUtilityMonth(item.utilityForTheMonth)}</td>
+                                            <td className="px-4 py-2">{item.eno || '-'}</td>
+                                            <td className="px-4 py-2">
+                                                {item.billCopy ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.open(item.billCopy, '_blank')}
+                                                        className="text-blue-600 hover:text-blue-800 underline text-sm"
+                                                    >
+                                                        View Bill
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-400">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
                                 )}
                             </tbody>
                         </table>

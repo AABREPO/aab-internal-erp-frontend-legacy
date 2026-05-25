@@ -6,6 +6,9 @@ import ExpenseEntryForm from '../ExpensesEntry/Form'
 /** Show upcoming payments only when the next due date is within this many days (inclusive). */
 const UPCOMING_PAYMENT_DAYS_WINDOW = 10
 
+/** Show expired services from day 1 through day 30 after the due date (day 31+ hidden). */
+const EXPIRED_DAYS_WINDOW = 30
+
 /** Accent colors for utility cards (dark enough for readable text on white). */
 const UTILITY_SECTION_COLORS = {
   property: {
@@ -308,6 +311,27 @@ const UtilityDashboard = () => {
     const two = toDateOnly(to).getTime()
     return Math.round((two - one) / (1000 * 60 * 60 * 24))
   }
+  /** Days since due date: 1 = expired yesterday, 30 = expired 30 days ago; 0 if due is today or later. */
+  const getDaysOverdue = (dueDate, reference = new Date()) => {
+    const due = toDateOnly(dueDate)
+    const ref = toDateOnly(reference)
+    if (due.getTime() >= ref.getTime()) return 0
+    return daysBetween(due, ref)
+  }
+  /** Days until due date: 0 = due today, 1 = due tomorrow; 0 if due is already in the past. */
+  const getDaysUntilDue = (dueDate, reference = new Date()) => {
+    const due = toDateOnly(dueDate)
+    const ref = toDateOnly(reference)
+    if (due.getTime() < ref.getTime()) return 0
+    return daysBetween(ref, due)
+  }
+  const isExpiredWithinWindow = (dueDate, maxDays = EXPIRED_DAYS_WINDOW, reference = new Date()) => {
+    const overdue = getDaysOverdue(dueDate, reference)
+    return overdue >= 1 && overdue <= maxDays
+  }
+
+  const normalizeUtilityServiceNo = (value) => (value == null ? '' : String(value).trim())
+
   /** Calendar-day compare: due today counts as upcoming (0 days), due yesterday as expired (1 day). */
   const isSameDayOrAfter = (date, reference = new Date()) =>
     toDateOnly(date).getTime() >= toDateOnly(reference).getTime()
@@ -400,15 +424,117 @@ const UtilityDashboard = () => {
     return map
   }, [tenantShopData])
 
-  const getLatestTelecomExpensePayment = (serviceNumber) => {
-    if (!serviceNumber) return null
-    const s = String(serviceNumber).trim()
-    const payments = Array.isArray(telecomExpensePayments) ? telecomExpensePayments : []
-    const candidates = payments
-      .filter(p => String(p?.utilityTypeNumber || '').trim() === s)
-      .filter(p => p?.date || p?.timestamp)
-      .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))
-    return candidates[0] || null
+  const toYearMonth = (value) => {
+    if (!value) return null
+    if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value.trim())) return value.trim()
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return null
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  const yearMonthToIndex = (ym) => {
+    if (!ym || typeof ym !== 'string') return null
+    const [y, m] = ym.split('-').map((x) => parseInt(x, 10))
+    if (!Number.isFinite(y) || !Number.isFinite(m)) return null
+    return y * 12 + (m - 1)
+  }
+
+  const lastDayOfYearMonthIndex = (idx) => {
+    const year = Math.floor(idx / 12)
+    const month = (idx % 12) + 1
+    const daysInMonth = new Date(year, month, 0).getDate()
+    return toDateOnly(new Date(year, month - 1, daysInMonth))
+  }
+
+  const getTelecomValidityFields = (source, dirEntry) => {
+    const countRaw =
+      source?.utilityValidityDays ??
+      source?.validityDays ??
+      source?.validity ??
+      dirEntry?.utilityValidityDays ??
+      dirEntry?.validityDays ??
+      dirEntry?.validity ??
+      null
+    const typeRaw =
+      source?.utilityValidityType ??
+      source?.validityType ??
+      source?.validity_type ??
+      source?.validityUnit ??
+      dirEntry?.utilityValidityType ??
+      dirEntry?.validityType ??
+      dirEntry?.validity_type ??
+      null
+    return { countRaw, typeRaw }
+  }
+
+  /** Matches TelecomTab getLatestCoverageMonths unit conversion. */
+  const getTelecomCoverageMonths = (countRaw, typeRaw) => {
+    const count = countRaw != null && String(countRaw).trim() !== '' ? Number(countRaw) : 0
+    const type = typeRaw != null ? String(typeRaw).trim().toLowerCase() : ''
+    if (!Number.isFinite(count) || count <= 0) return 0
+    if (type === 'year' || type === 'years') return Math.max(1, count * 12)
+    if (type === 'month' || type === 'months') return Math.max(1, count)
+    if (type === 'day' || type === 'days') return Math.max(1, Math.ceil(count / 30))
+    return 0
+  }
+
+  const getDirectoryTelecomPlanMeta = (dirEntry, serviceNumber) => {
+    if (!dirEntry) return null
+    const normalized = normalizeUtilityServiceNo(serviceNumber)
+    if (!normalized) return null
+    const entryService = dirEntry.service_number ?? dirEntry.serviceNumber ?? null
+    if (entryService && normalizeUtilityServiceNo(entryService) !== normalized) return null
+
+    const ymCandidate =
+      dirEntry.service_starting_date ??
+      dirEntry.serviceStartingDate ??
+      dirEntry.serviceStarting ??
+      dirEntry.service_starting ??
+      dirEntry.payment_date ??
+      dirEntry.paymentDate ??
+      dirEntry.utilityForTheMonth ??
+      dirEntry.utility_for_the_month ??
+      dirEntry.startingMonth ??
+      dirEntry.startMonth ??
+      dirEntry.createdAt ??
+      dirEntry.created_at ??
+      null
+    const ym = toYearMonth(ymCandidate)
+    const idx = yearMonthToIndex(ym)
+    if (!ym || idx == null) return null
+
+    return { ym, idx, source: dirEntry }
+  }
+
+  /** Latest recharge at/before today (by utility month), same as TelecomTab coverage anchor. */
+  const getLatestTelecomCoverageSource = (serviceNumber, dirEntry, payments, referenceDate = new Date()) => {
+    const normalized = normalizeUtilityServiceNo(serviceNumber)
+    if (!normalized) return null
+
+    const ref = toDateOnly(referenceDate)
+    const refYm = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`
+    const refIdx = yearMonthToIndex(refYm)
+    if (refIdx == null) return null
+
+    const paymentList = Array.isArray(payments) ? payments : []
+    const eligible = paymentList
+      .filter((p) => normalizeUtilityServiceNo(p?.utilityTypeNumber) === normalized)
+      .map((p) => {
+        const ym = toYearMonth(p?.utilityForTheMonth || p?.date || p?.timestamp)
+        const idx = yearMonthToIndex(ym)
+        return { source: p, ym, idx, isDirectory: false }
+      })
+      .filter((x) => x.ym && x.idx != null && x.idx <= refIdx)
+      .sort((a, b) => b.idx - a.idx)
+
+    if (eligible.length > 0) return eligible[0]
+
+    const dirPlan = getDirectoryTelecomPlanMeta(dirEntry, normalized)
+    if (dirPlan && dirPlan.idx != null && dirPlan.idx <= refIdx) {
+      return { source: dirPlan.source, ym: dirPlan.ym, idx: dirPlan.idx, isDirectory: true }
+    }
+
+    return null
   }
 
   const getTelecomBaseDate = (expenseEntry, dirEntry) => {
@@ -426,45 +552,61 @@ const UtilityDashboard = () => {
     return baseDate && !Number.isNaN(baseDate.getTime()) ? baseDate : null
   }
 
+  /**
+   * Expiry from plan start + validity (days/months/years), aligned with TelecomTab month coverage.
+   * Month/year validity ends on the last day of the final covered month.
+   */
+  const computeTelecomCoverageExpiry = (dirEntry, serviceNumber, payments) => {
+    const explicitEndRaw = dirEntry?.service_end_date ?? dirEntry?.serviceEndDate ?? null
+    if (explicitEndRaw) {
+      const explicitEnd = new Date(explicitEndRaw)
+      if (!Number.isNaN(explicitEnd.getTime())) return toDateOnly(explicitEnd)
+    }
+
+    const coverage = getLatestTelecomCoverageSource(serviceNumber, dirEntry, payments)
+    const { countRaw, typeRaw } = getTelecomValidityFields(coverage?.source ?? null, dirEntry)
+    const unit = typeRaw != null ? String(typeRaw).trim().toLowerCase() : ''
+    const count = countRaw != null && String(countRaw).trim() !== '' ? Number(countRaw) : 0
+    if (!Number.isFinite(count) || count <= 0) return null
+
+    if (unit === 'day' || unit === 'days') {
+      const baseDate = getTelecomBaseDate(coverage?.isDirectory ? null : coverage?.source, dirEntry)
+      const expiry = addDurationToDate(baseDate, count, typeRaw)
+      return expiry ? toDateOnly(expiry) : null
+    }
+
+    const coverMonths = getTelecomCoverageMonths(countRaw, typeRaw)
+    if (!coverMonths) return null
+
+    let startIdx = coverage?.idx ?? null
+    if (startIdx == null) {
+      const dirPlan = getDirectoryTelecomPlanMeta(dirEntry, serviceNumber)
+      startIdx = dirPlan?.idx ?? null
+    }
+    if (startIdx == null) {
+      const baseDate = getTelecomBaseDate(null, dirEntry)
+      const expiry = addDurationToDate(baseDate, count, typeRaw)
+      return expiry ? toDateOnly(expiry) : null
+    }
+
+    return lastDayOfYearMonthIndex(startIdx + coverMonths - 1)
+  }
+
   const getTelecomExpiryMeta = (dirEntry) => {
     if (!dirEntry) return null
-    const serviceNumber = dirEntry.service_number ?? dirEntry.serviceNumber ?? dirEntry.service_number ?? null
-    if (!serviceNumber || !String(serviceNumber).trim()) return null
+    const serviceNumber = dirEntry.service_number ?? dirEntry.serviceNumber ?? null
+    const normalizedService = normalizeUtilityServiceNo(serviceNumber)
+    if (!normalizedService) return null
 
-    const latestExpense = getLatestTelecomExpensePayment(serviceNumber)
-    const expenseBaseDate = getTelecomBaseDate(latestExpense, null)
-    const expenseValidityCount = latestExpense?.utilityValidityDays ?? null
-    const expenseValidityType = latestExpense?.utilityValidityType ?? null
-
-    let expiry =
-      expenseBaseDate && expenseValidityCount && expenseValidityType
-        ? addDurationToDate(expenseBaseDate, expenseValidityCount, expenseValidityType)
-        : null
-
-    if (!expiry) {
-      const endDateRaw = dirEntry.service_end_date ?? dirEntry.serviceEndDate ?? null
-      const endDate = endDateRaw ? new Date(endDateRaw) : null
-      expiry = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null
-    }
-
-    if (!expiry) {
-      const fallbackBaseDate = getTelecomBaseDate(null, dirEntry)
-      const validityCount =
-        dirEntry.validity ??
-        dirEntry.utilityValidityDays ??
-        null
-      const validityType =
-        dirEntry.validity_type ??
-        dirEntry.validityType ??
-        dirEntry.utilityValidityType ??
-        null
-      expiry = addDurationToDate(fallbackBaseDate, validityCount, validityType)
-    }
-
-    if (!expiry || Number.isNaN(expiry.getTime())) return null
+    const expiry = computeTelecomCoverageExpiry(
+      dirEntry,
+      normalizedService,
+      telecomExpensePayments
+    )
+    if (!expiry) return null
 
     return {
-      serviceNumber: String(serviceNumber).trim(),
+      serviceNumber: normalizedService,
       projectId: dirEntry.project_id ?? dirEntry.projectId ?? null,
       projectName: getProjectNameById(dirEntry.project_id ?? dirEntry.projectId ?? null),
       vendor: dirEntry.service_provider ?? dirEntry.serviceProvider ?? '-',
@@ -491,14 +633,22 @@ const UtilityDashboard = () => {
     )
     const items = uniqueItems
       .map(meta => {
-        const daysLeft = daysBetween(today, meta.expiry)
-        return { ...meta, daysLeft }
+        const daysUntilDue = getDaysUntilDue(meta.expiry, today)
+        const daysOverdue = getDaysOverdue(meta.expiry, today)
+        return { ...meta, daysUntilDue, daysOverdue }
       })
       .filter(item => {
-        if (telecomView === 'upcoming') return item.daysLeft >= 0 && item.daysLeft <= UPCOMING_PAYMENT_DAYS_WINDOW
-        return item.daysLeft < 0 && item.daysLeft >= -30
+        if (telecomView === 'upcoming') {
+          return item.daysOverdue === 0 && item.daysUntilDue <= UPCOMING_PAYMENT_DAYS_WINDOW
+        }
+        return isExpiredWithinWindow(item.expiry, EXPIRED_DAYS_WINDOW, today)
       })
-      .sort((a, b) => a.expiry - b.expiry)
+      .sort((a, b) => {
+        if (telecomView === 'expired') {
+          return a.daysOverdue - b.daysOverdue || b.expiry - a.expiry
+        }
+        return a.daysUntilDue - b.daysUntilDue || a.expiry - b.expiry
+      })
       .slice(0, 6)
     return items
   }, [telecomDirectory, telecomExpensePayments, allProjectRecords, telecomView])
@@ -532,7 +682,7 @@ const UtilityDashboard = () => {
     if (!Array.isArray(frequencyHistory) || frequencyHistory.length === 0) return null
 
     const records = frequencyHistory
-      .filter(f => f.projectNamePropertyDetailsId === propertyId)
+      .filter(f => String(f.projectNamePropertyDetailsId) === String(propertyId))
       .map(record => {
         const startingMonth = getFirstAvailableField(record, config.startingMonthKeys)
         if (!startingMonth) return null
@@ -567,20 +717,108 @@ const UtilityDashboard = () => {
     const frequency = parseInt(active.frequencyRaw, 10)
     return {
       frequency: Number.isFinite(frequency) && frequency > 0 ? frequency : null,
+      frequencyRaw: active.frequencyRaw,
       startingMonth: active.startingMonth,
       record: active.record,
     }
   }
 
+  const getPaymentsForService = (payments, identifier) => {
+    if (!Array.isArray(payments)) return []
+    const normalized = normalizeUtilityServiceNo(identifier)
+    if (!normalized) return []
+    return payments.filter(
+      (payment) => normalizeUtilityServiceNo(payment?.utilityTypeNumber) === normalized
+    )
+  }
+
+  const getDueDayOfMonthFromPayments = (payments, identifier) => {
+    const servicePayments = getPaymentsForService(payments, identifier)
+    const latestWithDate = servicePayments
+      .filter((payment) => payment?.date || payment?.timestamp)
+      .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))[0]
+    if (!latestWithDate) return 1
+    const paymentDate = new Date(latestWithDate.date || latestWithDate.timestamp)
+    if (Number.isNaN(paymentDate.getTime())) return 1
+    return paymentDate.getDate()
+  }
+
+  const buildDueDateForBillingMonth = (year, month, dueDay) => {
+    const daysInMonth = new Date(year, month, 0).getDate()
+    return toDateOnly(new Date(year, month - 1, Math.min(dueDay, daysInMonth)))
+  }
+
+  /** Matches Electricity/Property/Water tab billing-month rules. */
+  const shouldPayInBillingMonth = (propertyId, year, monthNumber, config) => {
+    const freqDetails = getActiveFrequencyDetails(propertyId, year, monthNumber, config)
+    if (!freqDetails?.startingMonth || !freqDetails.frequency) return false
+    const [startYear, startMonth] = freqDetails.startingMonth.split('-').map(Number)
+    const monthsSinceStart = (year - startYear) * 12 + (parseInt(monthNumber, 10) - startMonth)
+    return monthsSinceStart >= 0 && monthsSinceStart % freqDetails.frequency === 0
+  }
+
+  const hasPaymentForBillingMonth = (payments, identifier, year, monthNumber) => {
+    const yearMonth = `${year}-${String(monthNumber).padStart(2, '0')}`
+    return getPaymentsForService(payments, identifier).some(
+      (payment) => String(payment?.utilityForTheMonth || '').trim() === yearMonth
+    )
+  }
+
+  const calculateMostRecentDueDateFromBillingSchedule = (payments, identifier, propertyId, config) => {
+    const today = toDateOnly(new Date())
+    const dueDay = getDueDayOfMonthFromPayments(payments, identifier)
+    let mostRecentDue = null
+
+    for (let offset = 0; offset < 36; offset += 1) {
+      const ref = addMonthsClamped(new Date(today.getFullYear(), today.getMonth(), 1), -offset)
+      const year = ref.getFullYear()
+      const month = ref.getMonth() + 1
+      if (!shouldPayInBillingMonth(propertyId, year, month, config)) continue
+      if (hasPaymentForBillingMonth(payments, identifier, year, month)) continue
+
+      const dueDate = buildDueDateForBillingMonth(year, month, dueDay)
+      if (dueDate.getTime() >= today.getTime()) continue
+      if (!mostRecentDue || dueDate.getTime() > mostRecentDue.getTime()) {
+        mostRecentDue = dueDate
+      }
+    }
+
+    return mostRecentDue
+  }
+
+  const calculateNextDueDateFromBillingSchedule = (payments, identifier, propertyId, config) => {
+    const today = toDateOnly(new Date())
+    const dueDay = getDueDayOfMonthFromPayments(payments, identifier)
+
+    for (let offset = 0; offset < 36; offset += 1) {
+      const ref = addMonthsClamped(new Date(today.getFullYear(), today.getMonth(), 1), offset)
+      const year = ref.getFullYear()
+      const month = ref.getMonth() + 1
+      if (!shouldPayInBillingMonth(propertyId, year, month, config)) continue
+      if (hasPaymentForBillingMonth(payments, identifier, year, month)) continue
+
+      const dueDate = buildDueDateForBillingMonth(year, month, dueDay)
+      if (dueDate.getTime() >= today.getTime()) {
+        return dueDate
+      }
+    }
+
+    return null
+  }
+
   const calculateNextDueDate = (payments, identifier, propertyId, config) => {
+    const fromSchedule = calculateNextDueDateFromBillingSchedule(payments, identifier, propertyId, config)
+    if (fromSchedule) return fromSchedule
+
     if (!Array.isArray(payments) || payments.length === 0) return null
 
     const currentDate = new Date()
     const currentYear = currentDate.getFullYear()
     const currentMonth = currentDate.getMonth() + 1
 
-    const latestPayment = payments
-      .filter(payment => payment.utilityTypeNumber === identifier && (payment.date || payment.timestamp))
+    const servicePayments = getPaymentsForService(payments, identifier)
+    const latestPayment = servicePayments
+      .filter(payment => payment.date || payment.timestamp)
       .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))[0]
 
     if (!latestPayment) {
@@ -632,14 +870,18 @@ const UtilityDashboard = () => {
   }
 
   const calculateMostRecentDueDate = (payments, identifier, propertyId, config) => {
+    const fromSchedule = calculateMostRecentDueDateFromBillingSchedule(payments, identifier, propertyId, config)
+    if (fromSchedule) return fromSchedule
+
     if (!Array.isArray(payments) || payments.length === 0) return null
 
     const currentDate = new Date()
     const currentYear = currentDate.getFullYear()
     const currentMonth = currentDate.getMonth() + 1
 
-    const latestPayment = payments
-      .filter(payment => payment.utilityTypeNumber === identifier && (payment.date || payment.timestamp))
+    const servicePayments = getPaymentsForService(payments, identifier)
+    const latestPayment = servicePayments
+      .filter(payment => payment.date || payment.timestamp)
       .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))[0]
 
     if (!latestPayment) return null
@@ -678,8 +920,8 @@ const UtilityDashboard = () => {
       ? calculateMostRecentDueDate(waterTaxData, waterTaxNo, propertyId, frequencyConfigs.water)
       : calculateNextDueDate(waterTaxData, waterTaxNo, propertyId, frequencyConfigs.water)
 
-  const buildUpcomingItems = ({ payments, identifierKey, projectsList, calculateDue, view, upcomingLimitDays = UPCOMING_PAYMENT_DAYS_WINDOW, expiredLimitDays = 30 }) => {
-    if (!Array.isArray(payments) || payments.length === 0 || !projectsList.length) return []
+  const buildUpcomingItems = ({ payments, identifierKey, projectsList, calculateDue, view, upcomingLimitDays = UPCOMING_PAYMENT_DAYS_WINDOW, expiredLimitDays = EXPIRED_DAYS_WINDOW }) => {
+    if (!projectsList.length) return []
 
     const items = []
     const processed = new Set()
@@ -702,11 +944,12 @@ const UtilityDashboard = () => {
           const nextDue = calculateDue(identifierValue, propertyDetailsId ?? property.id)
           if (!nextDue) return
 
-          const daysLeft = daysBetween(today, nextDue)
+          const daysUntilDue = getDaysUntilDue(nextDue, today)
+          const daysOverdue = getDaysOverdue(nextDue, today)
           if (view === 'upcoming') {
-            if (daysLeft < 0 || daysLeft > upcomingLimitDays) return
-          } else {
-            if (daysLeft >= 0 || daysLeft < -Math.abs(expiredLimitDays)) return
+            if (daysUntilDue > upcomingLimitDays) return
+          } else if (!isExpiredWithinWindow(nextDue, expiredLimitDays, today)) {
+            return
           }
 
           const pidKey = propertyDetailsId != null ? String(propertyDetailsId) : ''
@@ -723,7 +966,8 @@ const UtilityDashboard = () => {
             identifierKey,
             siteName: project.projectName || property.siteName || '-',
             nextDue,
-            daysLeft,
+            daysUntilDue,
+            daysOverdue,
             projectId: project.id,
             propertyId: property.id,
             shopNo: shopNoStr,
@@ -735,7 +979,14 @@ const UtilityDashboard = () => {
         })
     })
 
-    return items.sort((a, b) => a.nextDue - b.nextDue).slice(0, 6)
+    return items
+      .sort((a, b) => {
+        if (view === 'expired') {
+          return a.daysOverdue - b.daysOverdue || b.nextDue - a.nextDue
+        }
+        return a.daysUntilDue - b.daysUntilDue || a.nextDue - b.nextDue
+      })
+      .slice(0, 6)
   }
   const upcomingElectricity = useMemo(() => {
     return buildUpcomingItems({
@@ -745,7 +996,7 @@ const UtilityDashboard = () => {
       calculateDue: calculateElectricityDueDate,
       view: electricityView,
       upcomingLimitDays: UPCOMING_PAYMENT_DAYS_WINDOW,
-      expiredLimitDays: 30,
+      expiredLimitDays: EXPIRED_DAYS_WINDOW,
     })
   }, [electricityData, frequencyHistory, projects, electricityView, tenantMetaByPropertyId])
 
@@ -757,7 +1008,7 @@ const UtilityDashboard = () => {
       calculateDue: calculatePropertyDueDate,
       view: propertyView,
       upcomingLimitDays: UPCOMING_PAYMENT_DAYS_WINDOW,
-      expiredLimitDays: 30,
+      expiredLimitDays: EXPIRED_DAYS_WINDOW,
     })
   }, [propertyTaxData, frequencyHistory, projects, propertyView, tenantMetaByPropertyId])
 
@@ -769,7 +1020,7 @@ const UtilityDashboard = () => {
       calculateDue: calculateWaterDueDate,
       view: waterView,
       upcomingLimitDays: UPCOMING_PAYMENT_DAYS_WINDOW,
-      expiredLimitDays: 30,
+      expiredLimitDays: EXPIRED_DAYS_WINDOW,
     })
   }, [waterTaxData, frequencyHistory, projects, waterView, tenantMetaByPropertyId])
 
@@ -906,7 +1157,9 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.nextDue)}</div>
-                        <div className={`text-xs font-medium ${electricityView === 'expired' ? 'text-red-500' : 'text-[#BF9853]'}`}>{Math.abs(item.daysLeft)} Days</div>
+                        <div className={`text-xs font-medium ${electricityView === 'expired' ? 'text-red-500' : 'text-[#BF9853]'}`}>
+                          {electricityView === 'expired' ? item.daysOverdue : item.daysUntilDue} Days
+                        </div>
                       </div>
                     </div>
                   ))
@@ -976,7 +1229,9 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.nextDue)}</div>
-                        <div className={`text-xs font-medium ${propertyView === 'expired' ? 'text-red-600' : UTILITY_SECTION_COLORS.property.accent}`}>{Math.abs(item.daysLeft)} Days</div>
+                        <div className={`text-xs font-medium ${propertyView === 'expired' ? 'text-red-600' : UTILITY_SECTION_COLORS.property.accent}`}>
+                          {propertyView === 'expired' ? item.daysOverdue : item.daysUntilDue} Days
+                        </div>
                       </div>
                     </div>
                   ))
@@ -1046,7 +1301,9 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.nextDue)}</div>
-                        <div className={`text-xs font-medium ${waterView === 'expired' ? 'text-red-600' : UTILITY_SECTION_COLORS.water.accent}`}>{Math.abs(item.daysLeft)} Days</div>
+                        <div className={`text-xs font-medium ${waterView === 'expired' ? 'text-red-600' : UTILITY_SECTION_COLORS.water.accent}`}>
+                          {waterView === 'expired' ? item.daysOverdue : item.daysUntilDue} Days
+                        </div>
                       </div>
                     </div>
                   ))
@@ -1115,7 +1372,9 @@ const UtilityDashboard = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-black">{formatDDMMYYYY(item.expiry)}</div>
-                        <div className={`text-xs font-medium ${telecomView === 'expired' ? 'text-red-600' : UTILITY_SECTION_COLORS.telecom.accent}`}>{Math.abs(item.daysLeft)} Days</div>
+                        <div className={`text-xs font-medium ${telecomView === 'expired' ? 'text-red-600' : UTILITY_SECTION_COLORS.telecom.accent}`}>
+                          {telecomView === 'expired' ? item.daysOverdue : item.daysUntilDue} Days
+                        </div>
                       </div>
                     </div>
                   ))

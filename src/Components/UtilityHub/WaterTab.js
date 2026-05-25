@@ -15,7 +15,10 @@ import {
     getDefaultPropertyStyleFilters,
     getPropertyStyleFilterOptions,
     getTenantOptionsFromFiltered,
+    expandPropertyStyleRowsByVendor,
+    findPaymentForServiceMonth,
     getVendorOptionsFromFiltered,
+    getUtilityHubExportYear,
 } from './utilityHubTabFilters';
 
 const getTenantLinkPhone = (tenant) =>
@@ -62,6 +65,34 @@ const sortProjectsPropertyDetailsByShopNo = (projects) => {
     }));
 };
 
+const normalizeServiceNo = (value) => (value == null ? '' : String(value).trim());
+
+/** Match Property/Electricity tabs and UtilityDashboard — water may be stored as waterTaxNo or waterNo. */
+const getWaterServiceNo = (property) =>
+    normalizeServiceNo(
+        property?.waterTaxNo ||
+        property?.water_tax_no ||
+        property?.waterNo ||
+        property?.water_no
+    );
+
+const hasWaterConnection = (property) => Boolean(getWaterServiceNo(property));
+
+const paymentMatchesService = (payment, serviceNo) =>
+    normalizeServiceNo(payment?.utilityTypeNumber) === normalizeServiceNo(serviceNo);
+
+const getWaterFrequencyStartingMonth = (record) =>
+    record?.startingMonthOfWaterTaxFrequency ||
+    record?.startingMonthOfWaterFrequency ||
+    record?.startingMonthOfPropertyFrequency ||
+    '';
+
+const getWaterFrequencyNo = (record) =>
+    record?.waterTaxFrequencyNo ??
+    record?.waterFrequencyNo ??
+    record?.propertyFrequencyNo ??
+    record?.propertyTaxFrequencyNo;
+
 const WaterTab = ({ username, userRoles = [] }) => {
     
     const [filters, setFilters] = useState(() => getDefaultPropertyStyleFilters(MONTH_LABELS));
@@ -104,10 +135,11 @@ const WaterTab = ({ username, userRoles = [] }) => {
         const fetchProjects = async () => {
             try {
                 const response = await axios.get('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
-                // Filter projects that have waterTaxNo in propertyDetails
-                const projectsWithWaterTaxNo = response.data.filter(project =>
-                    project.propertyDetails &&
-                    project.propertyDetails.some(property => property.waterTaxNo && property.waterTaxNo.trim() !== '')
+                const projectList = Array.isArray(response.data) ? response.data : [];
+                const projectsWithWaterTaxNo = projectList.filter(
+                    (project) =>
+                        project.propertyDetails &&
+                        project.propertyDetails.some((property) => hasWaterConnection(property))
                 );
 
                 // Separate hidden and visible projects
@@ -131,7 +163,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
         const fetchWaterTaxPayments = async () => {
             try {
                 const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/utility/water');
-                setWaterTaxPayments(response.data || []);
+                setWaterTaxPayments(Array.isArray(response.data) ? response.data : []);
             } catch (error) {
                 console.error('Error fetching water tax payments:', error);
                 // Don't set error for this as it might not be critical
@@ -271,27 +303,30 @@ const WaterTab = ({ username, userRoles = [] }) => {
         [filteredProjects]
     );
 
+    const getServiceNo = (property) => getWaterServiceNo(property);
+
     const waterTaxTableRows = useMemo(() => {
-        const rows = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.waterTaxNo && property.waterTaxNo.trim() !== '')
-                .map((property) => ({ project, property }))
-        );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [sortedFilteredProjects]);
+        const rows = flattenPropertyStyleRows(sortedFilteredProjects, getServiceNo, comparePropertyShopNoAsc);
+        return expandPropertyStyleRowsByVendor(rows, waterTaxPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [sortedFilteredProjects, waterTaxPayments, filters.year, filters.month, filters.vendor]);
 
     const hiddenWaterTaxTableRows = useMemo(() => {
-        const rows = sortProjectsPropertyDetailsByShopNo(hiddenProjects).flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.waterTaxNo && property.waterTaxNo.trim() !== '')
-                .map((property) => ({ project, property }))
+        const rows = flattenPropertyStyleRows(
+            sortProjectsPropertyDetailsByShopNo(hiddenProjects),
+            getServiceNo,
+            comparePropertyShopNoAsc
         );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [hiddenProjects]);
+        return expandPropertyStyleRowsByVendor(rows, waterTaxPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [hiddenProjects, waterTaxPayments, filters.year, filters.month, filters.vendor]);
 
-    const getServiceNo = (property) => property?.waterTaxNo;
     const tenantLinksByPropertyId = useMemo(() => buildTenantLinksMap(tenantShopData), [tenantShopData]);
     const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(String(propertyId)) || [];
 
@@ -300,7 +335,13 @@ const WaterTab = ({ username, userRoles = [] }) => {
         const selectedStatus = filterState.paymentStatus;
         if (!selectedMonth && !selectedStatus) return true;
         const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(property.waterTaxNo, month, property.id, filterState.year);
+            const paymentData = getPaymentData(
+                getWaterServiceNo(property),
+                month,
+                property.id,
+                filterState.year,
+                filterState.vendor || undefined
+            );
             const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
             const isUnpaid = paymentData.amount === '0';
             if (selectedStatus === 'Paid') return isPaid;
@@ -354,7 +395,13 @@ const WaterTab = ({ username, userRoles = [] }) => {
     const clearFilters = () => setFilters(getDefaultPropertyStyleFilters(MONTH_LABELS));
 
     const vendorFilterOptions = useMemo(
-        () => getVendorOptionsFromFiltered(filters, computeFiltered, (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc), waterTaxPayments),
+        () => getVendorOptionsFromFiltered(
+            filters,
+            computeFiltered,
+            (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc),
+            waterTaxPayments,
+            projects
+        ),
         [filters, projects, selectedCategory, waterTaxPayments, tenantLinksByPropertyId]
     );
 
@@ -414,7 +461,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
             const freqPropertyIdStr = freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
             return (
                 freqPropertyIdStr === propertyIdStr &&
-                f.startingMonthOfWaterFrequency
+                getWaterFrequencyStartingMonth(f)
             );
         });
         if (records.length === 0) return true;
@@ -425,23 +472,23 @@ const WaterTab = ({ username, userRoles = [] }) => {
 
         const currentVal = currentYear * 12 + currentMonth;
         const sorted = records.slice().sort((a, b) => {
-            const [aY, aM] = a.startingMonthOfWaterFrequency.split('-').map(Number);
-            const [bY, bM] = b.startingMonthOfWaterFrequency.split('-').map(Number);
+            const [aY, aM] = getWaterFrequencyStartingMonth(a).split('-').map(Number);
+            const [bY, bM] = getWaterFrequencyStartingMonth(b).split('-').map(Number);
             return aY * 12 + aM - (bY * 12 + bM);
         });
 
         let active = null;
         for (const rec of sorted) {
-            const [rY, rM] = rec.startingMonthOfWaterFrequency.split('-').map(Number);
+            const [rY, rM] = getWaterFrequencyStartingMonth(rec).split('-').map(Number);
             const recVal = rY * 12 + rM;
             if (recVal <= currentVal) active = rec;
             else break;
         }
         if (!active) return true;
 
-        const activeFreqRaw = active.waterFrequencyNo;
+        const activeFreqRaw = getWaterFrequencyNo(active);
         const activeFreqMissing = activeFreqRaw === undefined || activeFreqRaw === null;
-        const activeStart = active.startingMonthOfWaterFrequency;
+        const activeStart = getWaterFrequencyStartingMonth(active);
         if (activeFreqMissing || !activeStart) return true;
 
         const frequency = parseInt(activeFreqRaw, 10);
@@ -458,13 +505,12 @@ const WaterTab = ({ username, userRoles = [] }) => {
 
     // Check if payment is made for a specific waterTaxNo and month
     const isPaymentMade = (waterTaxNo, month) => {
-        return waterTaxPayments.some(payment =>
-            payment.utilityTypeNumber === waterTaxNo &&
-            payment.utilityForTheMonth === month
+        return waterTaxPayments.some(
+            (payment) => paymentMatchesService(payment, waterTaxNo) && payment.utilityForTheMonth === month
         );
     };
 
-    function getPaymentData(waterTaxNo, month, propertyId, yearOverride) {
+    function getPaymentData(waterTaxNo, month, propertyId, yearOverride, rowVendor) {
         const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -477,9 +523,11 @@ const WaterTab = ({ username, userRoles = [] }) => {
 
         const yearMonth = `${selectedYear}-${monthNumber}`;
         // If a payment exists for this month, always show it (even when frequency=0).
-        const existingPayment = waterTaxPayments.find(p =>
-            p.utilityTypeNumber === waterTaxNo &&
-            p.utilityForTheMonth === yearMonth
+        const existingPayment = findPaymentForServiceMonth(
+            waterTaxPayments,
+            waterTaxNo,
+            yearMonth,
+            rowVendor
         );
         if (existingPayment) {
             return {
@@ -499,7 +547,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                 const freqPropertyIdStr = freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
                 return (
                     freqPropertyIdStr === propertyIdStr &&
-                    f.startingMonthOfWaterFrequency
+                    getWaterFrequencyStartingMonth(f)
                 );
             });
 
@@ -509,15 +557,15 @@ const WaterTab = ({ username, userRoles = [] }) => {
 
             // Sort ascending
             const sorted = records.sort((a, b) => {
-                const [aY, aM] = a.startingMonthOfWaterFrequency.split('-').map(Number);
-                const [bY, bM] = b.startingMonthOfWaterFrequency.split('-').map(Number);
+                const [aY, aM] = getWaterFrequencyStartingMonth(a).split('-').map(Number);
+                const [bY, bM] = getWaterFrequencyStartingMonth(b).split('-').map(Number);
                 return aY * 12 + aM - (bY * 12 + bM);
             });
 
             // Pick the most recent record before or equal to current month
             let active = sorted[0];
             for (const rec of sorted) {
-                const [rY, rM] = rec.startingMonthOfWaterFrequency.split('-').map(Number);
+                const [rY, rM] = getWaterFrequencyStartingMonth(rec).split('-').map(Number);
                 const recVal = rY * 12 + rM;
                 if (recVal <= currentVal) {
                     active = rec;
@@ -529,12 +577,15 @@ const WaterTab = ({ username, userRoles = [] }) => {
         };
         // ✅ Get the correct frequency record
         const freqData = getActiveFrequencyData(propertyId, parseInt(selectedYear), parseInt(monthNumber));
-        const freqValue = freqData?.waterFrequencyNo;
+        const freqValue = getWaterFrequencyNo(freqData);
         const freqMissing = freqValue === undefined || freqValue === null;
-        if (!freqData || freqMissing || !freqData.startingMonthOfWaterFrequency) {
-            const payment = waterTaxPayments.find(p =>
-                p.utilityTypeNumber === waterTaxNo &&
-                p.utilityForTheMonth === yearMonth
+        const startingMonthField = getWaterFrequencyStartingMonth(freqData);
+        if (!freqData || freqMissing || !startingMonthField) {
+            const payment = findPaymentForServiceMonth(
+                waterTaxPayments,
+                waterTaxNo,
+                yearMonth,
+                rowVendor
             );
             if (payment) {
                 return {
@@ -546,7 +597,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
             return { amount: '0', date: null }; // Default: monthly
         }
         const frequency = parseInt(freqValue, 10);
-        const startingMonth = freqData.startingMonthOfWaterFrequency.trim();
+        const startingMonth = startingMonthField.trim();
         // Parse YYYY-MM safely
         const [startYear, startMonth] = startingMonth.split('-').map(Number);
         const currentMonth = parseInt(monthNumber);
@@ -577,7 +628,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
         }
     }
     // Get unpaid count for a Water Tax number
-    const getUnpaidCount = (waterTaxNo, propertyId) => {
+    const getUnpaidCount = (waterTaxNo, propertyId, rowVendor) => {
         // Use selected year or current year as fallback
         const selectedYear = filters.year || new Date().getFullYear().toString();
         const monthMap = {
@@ -591,9 +642,11 @@ const WaterTab = ({ username, userRoles = [] }) => {
             const monthNumber = monthMap[month];
             if (shouldPayInMonth(propertyId, monthNumber, selectedYear)) {
                 const yearMonth = `${selectedYear}-${monthNumber}`;
-                const payment = waterTaxPayments.find(p =>
-                    p.utilityTypeNumber === waterTaxNo &&
-                    p.utilityForTheMonth === yearMonth
+                const payment = findPaymentForServiceMonth(
+                    waterTaxPayments,
+                    waterTaxNo,
+                    yearMonth,
+                    rowVendor
                 );
                 if (!payment) {
                     unpaidCount++;
@@ -603,16 +656,12 @@ const WaterTab = ({ username, userRoles = [] }) => {
         return unpaidCount;
     };
 
-    const buildExportRows = () => {
-        const pairs = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.waterTaxNo && property.waterTaxNo.trim() !== '')
-                .map((property) => ({ project, property }))
-        );
-        pairs.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+    const resolveExportYear = () => getUtilityHubExportYear(filters);
 
-        return pairs.map(({ project, property }, index) => {
+    const buildExportRows = (exportYear = resolveExportYear()) =>
+        waterTaxTableRows.map(({ project, property, rowVendor }, index) => {
             const rowNumber = index + 1;
+            const serviceNo = getWaterServiceNo(property) || '-';
             const row = {
                 slNo: rowNumber,
                 pid: project.projectId || '-',
@@ -620,26 +669,32 @@ const WaterTab = ({ username, userRoles = [] }) => {
                 category: property.projectType || project.projectCategory || '-',
                 doorNo: property.doorNo || '-',
                 shopNo: property.shopNo || '-',
-                serviceNo: property.waterTaxNo || '-'
+                serviceNo,
             };
 
             monthLabels.forEach((month) => {
-                const paymentData = getPaymentData(property.waterTaxNo, month, property.id);
+                const paymentData = getPaymentData(
+                    getWaterServiceNo(property),
+                    month,
+                    property.id,
+                    exportYear,
+                    rowVendor
+                );
                 row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
             });
 
-            row.unpaid = getUnpaidCount(property.waterTaxNo, property.id);
+            row.unpaid = getUnpaidCount(getWaterServiceNo(property), property.id, rowVendor);
             return row;
         });
-    };
 
     const handleExportPDF = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(14);
-        doc.text('Water Tax Projects Overview', 14, 20);
+        doc.text(`Water Tax Projects Overview - ${exportYear}`, 14, 20);
 
         const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'D.No', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map((row) => [
@@ -671,11 +726,12 @@ const WaterTab = ({ username, userRoles = [] }) => {
             }
         });
 
-        doc.save('WaterTaxProjects.pdf');
+        doc.save(`WaterTaxProjects_${exportYear}.pdf`);
     };
 
     const handleExportExcel = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const worksheetData = rows.map((row) => {
@@ -700,10 +756,11 @@ const WaterTab = ({ username, userRoles = [] }) => {
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'WaterTax');
-        XLSX.writeFile(workbook, 'WaterTaxProjects.xlsx');
+        XLSX.writeFile(workbook, `WaterTaxProjects_${exportYear}.xlsx`);
     };
 
     const hasExportableData = waterTaxTableRows.length > 0;
+    const displayYear = resolveExportYear();
 
     const toggleProjectHideStatus = async (projectId, isHide) => {
         try {
@@ -800,14 +857,15 @@ const WaterTab = ({ username, userRoles = [] }) => {
         }
     };
 
-    const handleOpenExpenseEntryPopup = ({ waterTaxNo, project, property }) => {
+    const handleOpenExpenseEntryPopup = ({ project, property }) => {
+        const serviceNo = getWaterServiceNo(property);
         const prefillData = {
             utilityType: 'Water',
             siteName: project?.projectName || project?.siteName || '',
             projectId: project?.id ?? project?.projectId ?? null,
             propertyId: property?.id ?? null,
-            utilityIdentifier: { key: 'waterTaxNo', value: waterTaxNo },
-            waterTaxNo
+            utilityIdentifier: { key: 'waterTaxNo', value: serviceNo },
+            waterTaxNo: serviceNo
         };
         try {
             localStorage.setItem('expenseEntryPrefill', JSON.stringify(prefillData));
@@ -1131,6 +1189,9 @@ const WaterTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
+                    <h2 className="text-center text-lg font-semibold text-gray-800 mb-3">
+                        Water Tax Projects Overview - {displayYear}
+                    </h2>
                     <div className="rounded-lg">
                         <div
                             ref={scrollRef}
@@ -1187,9 +1248,9 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        waterTaxTableRows.map(({ project, property }, index) => {
+                                        waterTaxTableRows.map(({ project, property, rowVendor, rowKey }, index) => {
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2 text-left">{project.projectName}</td>
@@ -1213,17 +1274,13 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                             <td
                                                                 className="px-4 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
                                                                 onClick={() =>
-                                                                    handleOpenExpenseEntryPopup({
-                                                                        waterTaxNo: property.waterTaxNo,
-                                                                        project,
-                                                                        property
-                                                                    })
+                                                                    handleOpenExpenseEntryPopup({ project, property })
                                                                 }
                                                             >
-                                                                {property.waterTaxNo}
+                                                                {getWaterServiceNo(property) || '-'}
                                                             </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
-                                                                const paymentData = getPaymentData(property.waterTaxNo, month, property.id);
+                                                                const paymentData = getPaymentData(getWaterServiceNo(property), month, property.id, undefined, rowVendor);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
                                                                 const isNotRequired = paymentData.isNotRequired;
                                                                 return (
@@ -1247,7 +1304,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                             })}
                                                             <td className="px-4 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
-                                                                    {getUnpaidCount(property.waterTaxNo, property.id)}
+                                                                    {getUnpaidCount(getWaterServiceNo(property), property.id, rowVendor)}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-2">
@@ -1308,9 +1365,9 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {hiddenWaterTaxTableRows.map(({ project, property }, index) => {
+                                        {hiddenWaterTaxTableRows.map(({ project, property, rowVendor, rowKey }, index) => {
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>
@@ -1324,14 +1381,10 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                             <td
                                                                 className="px-4 py-2 text-left text-sm font-semibold text-black cursor-pointer hover:text-[#BF9853] hover:underline"
                                                                 onClick={() =>
-                                                                    handleOpenExpenseEntryPopup({
-                                                                        waterTaxNo: property.waterTaxNo,
-                                                                        project,
-                                                                        property
-                                                                    })
+                                                                    handleOpenExpenseEntryPopup({ project, property })
                                                                 }
                                                             >
-                                                                {property.waterTaxNo}
+                                                                {getWaterServiceNo(property) || '-'}
                                                             </td>
                                                             <td className="px-4 py-2">
                                                                 <button onClick={() => toggleProjectHideStatus(project.id, false)} className="text-red-600 hover:text-red-800" >
@@ -1372,7 +1425,7 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                         <span className="font-medium">Project:</span> {selectedRowData.project.projectName}
                                     </p>
                                     <p className="text-sm text-gray-600">
-                                        <span className="font-medium">Service No:</span> {selectedRowData.property.waterTaxNo}
+                                        <span className="font-medium">Service No:</span> {getWaterServiceNo(selectedRowData.property) || '-'}
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         <span className="font-medium">Door No:</span> {selectedRowData.property.doorNo || '-'}
@@ -1387,14 +1440,14 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                  const freqPropertyId = freq?.projectNamePropertyDetailsId;
                                                  const freqPropertyIdStr =
                                                      freqPropertyId !== undefined && freqPropertyId !== null ? String(freqPropertyId) : null;
-                                                 const freqRaw = freq?.waterFrequencyNo;
+                                                 const freqRaw = getWaterFrequencyNo(freq);
                                                  const hasFreq = freqRaw !== undefined && freqRaw !== null; // allow 0
-                                                 const hasStart = !!freq?.startingMonthOfWaterFrequency;
+                                                 const hasStart = !!getWaterFrequencyStartingMonth(freq);
                                                  return !!propertyIdStr && freqPropertyIdStr === propertyIdStr && hasFreq && hasStart;
                                              })
                                              .sort((a, b) => {
-                                                 const aKey = String(a.startingMonthOfWaterFrequency || '');
-                                                 const bKey = String(b.startingMonthOfWaterFrequency || '');
+                                                 const aKey = String(getWaterFrequencyStartingMonth(a) || '');
+                                                 const bKey = String(getWaterFrequencyStartingMonth(b) || '');
                                                  return aKey.localeCompare(bKey);
                                              });
                                          const submittedData = submittedFrequencyData[selectedRowData.property.id];
@@ -1416,8 +1469,8 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                  })
                                              ).values()
                                          ).sort((a, b) => {
-                                             const aKey = String(a.startingMonthOfWaterFrequency || '');
-                                             const bKey = String(b.startingMonthOfWaterFrequency || '');
+                                             const aKey = String(getWaterFrequencyStartingMonth(a) || '');
+                                             const bKey = String(getWaterFrequencyStartingMonth(b) || '');
                                              return aKey.localeCompare(bKey);
                                          });
                                          if (allFrequencyData.length > 0) {
@@ -1433,8 +1486,8 @@ const WaterTab = ({ username, userRoles = [] }) => {
                                                          <tbody>
                                                              {dedupedFrequencyData.map((freqData, index) => (
                                                                  <tr key={index}>
-                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{freqData.waterFrequencyNo}</td>
-                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{new Date((freqData.startingMonthOfWaterFrequency) + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>
+                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{getWaterFrequencyNo(freqData)}</td>
+                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{new Date((getWaterFrequencyStartingMonth(freqData)) + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>
                                                                  </tr>
                                                              ))}
                                                          </tbody>

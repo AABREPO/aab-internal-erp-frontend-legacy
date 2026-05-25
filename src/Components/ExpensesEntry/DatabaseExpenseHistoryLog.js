@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
-import Reload from '../Images/rotate-right.png';
+import Reload from '../Images/Clear.svg';
+import Search from '../Images/Searchnew.svg';
 
 const GET_FORM_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form/get_form';
 /** Bulk audit log — single response (see ExpensesController GET /expenses_form/get/full_history). */
@@ -28,13 +29,60 @@ const formatInr = (value) => {
     return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const isEmptyValue = (value) => value === null || value === undefined || value === '';
+
+const valuesEqual = (oldVal, newVal, mode = 'text') => {
+    if (isEmptyValue(oldVal) && isEmptyValue(newVal)) return true;
+    if (mode === 'amount') {
+        const oldNum = Number(oldVal);
+        const newNum = Number(newVal);
+        if (!Number.isNaN(oldNum) && !Number.isNaN(newNum)) return oldNum === newNum;
+    }
+    const o = isEmptyValue(oldVal) ? '—' : String(oldVal).trim();
+    const n = isEmptyValue(newVal) ? '—' : String(newVal).trim();
+    return o === n;
+};
+
+const renderSiteChangeCell = (value) => {
+    const text = value == null || value === '' ? '—' : String(value);
+    const arrow = ' → ';
+    if (text.includes(arrow)) {
+        const arrowIdx = text.indexOf(arrow);
+        const oldPart = text.slice(0, arrowIdx);
+        const newPart = text.slice(arrowIdx + arrow.length);
+        if (oldPart !== newPart) {
+            return (
+                <span
+                    className="block w-full whitespace-normal break-words leading-[1.25] line-clamp-2 py-0.5"
+                    title={text}
+                >
+                    {oldPart}
+                    <span className="whitespace-nowrap"> → </span>
+                    {newPart}
+                </span>
+            );
+        }
+    }
+    return (
+        <span className="block w-full whitespace-normal break-words leading-[1.25] line-clamp-2 py-0.5" title={text}>
+            {text}
+        </span>
+    );
+};
+
 const formatPair = (oldVal, newVal, mode = 'text') => {
-    const o = oldVal === null || oldVal === undefined || oldVal === '' ? '—' : String(oldVal);
-    const n = newVal === null || newVal === undefined || newVal === '' ? '—' : String(newVal);
+    if (valuesEqual(oldVal, newVal, mode)) {
+        if (mode === 'amount') {
+            if (isEmptyValue(oldVal) && isEmptyValue(newVal)) return '—';
+            return formatInr(newVal ?? oldVal);
+        }
+        return isEmptyValue(newVal) ? '—' : String(newVal);
+    }
     if (mode === 'amount') {
         return `${formatInr(oldVal)} → ${formatInr(newVal)}`;
     }
-    if (o === n) return n;
+    const o = isEmptyValue(oldVal) ? '—' : String(oldVal);
+    const n = isEmptyValue(newVal) ? '—' : String(newVal);
     return `${o} → ${n}`;
 };
 
@@ -75,7 +123,9 @@ const mapAuditToDisplayRow = (audit, idx, enoByExpenseId) => {
         const ocs = oc != null ? String(oc) : '';
         const ncs = nc != null ? String(nc) : '';
         if (!ocs && !ncs) return '—';
-        return `${ocs.slice(0, 40)}${ocs.length > 40 ? '…' : ''} → ${ncs.slice(0, 40)}${ncs.length > 40 ? '…' : ''}`;
+        const trimSnippet = (s) => `${s.slice(0, 40)}${s.length > 40 ? '…' : ''}`;
+        if (ocs === ncs) return trimSnippet(ncs);
+        return `${trimSnippet(ocs)} → ${trimSnippet(ncs)}`;
     })();
 
     return {
@@ -113,10 +163,15 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
+    const [expandedCells, setExpandedCells] = useState({});
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
+
+    const toggleExpandedCell = (key) => {
+        setExpandedCells((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
 
     useEffect(() => {
         const syncBranch = () => setActiveBranchId(resolveActiveBranchId());
@@ -207,170 +262,230 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
         setCurrentPage(1);
     }, [search, itemsPerPage, logRows.length]);
 
-    const onMouseDown = (e) => {
+    const handleMouseDown = (e) => {
         if (!scrollRef.current) return;
         isDragging.current = true;
         start.current = { x: e.clientX, y: e.clientY };
-        scroll.current = { left: scrollRef.current.scrollLeft, top: scrollRef.current.scrollTop };
+        scroll.current = {
+            left: scrollRef.current.scrollLeft,
+            top: scrollRef.current.scrollTop,
+        };
         scrollRef.current.style.cursor = 'grabbing';
         scrollRef.current.style.userSelect = 'none';
     };
-    const onMouseMove = (e) => {
+    const handleMouseMove = (e) => {
         if (!isDragging.current || !scrollRef.current) return;
         const dx = e.clientX - start.current.x;
         const dy = e.clientY - start.current.y;
         scrollRef.current.scrollLeft = scroll.current.left - dx;
         scrollRef.current.scrollTop = scroll.current.top - dy;
     };
-    const endDrag = () => {
+    const handleMouseUp = () => {
+        if (!isDragging.current || !scrollRef.current) return;
         isDragging.current = false;
-        if (scrollRef.current) {
-            scrollRef.current.style.cursor = 'grab';
-            scrollRef.current.style.userSelect = '';
-        }
+        scrollRef.current.style.cursor = '';
+        scrollRef.current.style.userSelect = '';
     };
 
+    const endIndex = Math.min(startIdx + itemsPerPage, filteredRows.length);
+
     return (
-        <div className="bg-[#FAF6ED] px-6 pb-8">
-            <div className="w-full p-6 bg-white shadow-lg overflow-x-auto rounded-lg">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                    <div>
-                        <h1 className="text-xl font-bold text-left text-[#202020]">Database history log</h1>
-                        
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {loading && (
-                            <span className="text-sm text-gray-600">Loading…</span>
-                        )}
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search user, E.No, site, amount…"
-                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 text-sm w-[min(100%,280px)] focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => void loadHistory()}
-                            disabled={loading}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-[#BF9853] border-opacity-40 text-sm font-semibold text-[#BF9853] hover:bg-[#FAF6ED] disabled:opacity-50"
-                        >
-                            <img src={Reload} alt="" className="w-4 h-4" />
-                            Reload
-                        </button>
-                    </div>
-                </div>
-
-                {error && <div className="mb-3 text-sm text-red-600 text-left">{error}</div>}
-
-                <div
-                    ref={scrollRef}
-                    className="overflow-auto max-h-[70vh] border border-l-8 border-l-[#BF9853] rounded-lg thin-scrollbar cursor-grab select-none"
-                    onMouseDown={onMouseDown}
-                    onMouseMove={onMouseMove}
-                    onMouseUp={endDrag}
-                    onMouseLeave={endDrag}
-                >
-                    <table className="w-full min-w-[1100px] border-collapse text-left">
-                        <thead className="bg-[#FAF6ED] sticky top-0 z-10">
-                            <tr>
-                                <th className="px-3 py-3 text-sm font-bold whitespace-nowrap border-b">#</th>
-                                <th className="px-3 py-3 text-sm font-bold whitespace-nowrap border-b">Edited (log time)</th>
-                                <th className="px-3 py-3 text-sm font-bold whitespace-nowrap border-b">Edited by</th>
-                                <th className="px-3 py-3 text-sm font-bold whitespace-nowrap border-b">E.No</th>
-                                <th className="px-3 py-3 text-sm font-bold whitespace-nowrap border-b">Expense id</th>
-                                <th className="px-3 py-3 text-sm font-bold border-b min-w-[200px]">Site (old → new)</th>
-                                <th className="px-3 py-3 text-sm font-bold whitespace-nowrap border-b">A/C type</th>
-                                <th className="px-3 py-3 text-sm font-bold border-b min-w-[200px]">Amount (old → new)</th>
-                                <th className="px-3 py-3 text-sm font-bold border-b min-w-[160px]">Entry date (old → new)</th>
-                                <th className="px-3 py-3 text-sm font-bold border-b min-w-[160px]">Category (old → new)</th>
-                                <th className="px-3 py-3 text-sm font-bold border-b min-w-[200px]">Comments (trimmed)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading && logRows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
-                                        Loading expense audit log…
-                                    </td>
-                                </tr>
-                            ) : filteredRows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
-                                        {logRows.length === 0
-                                            ? 'No audit entries returned for current branch (edits may not be logged yet).'
-                                            : 'No rows match your search.'}
-                                    </td>
-                                </tr>
-                            ) : (
-                                pageRows.map((row, i) => (
-                                    <tr key={row.key} className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td className="px-3 py-2 text-sm">{startIdx + i + 1}</td>
-                                        <td className="px-3 py-2 text-sm whitespace-nowrap">{formatLogTimestamp(row.editedDate)}</td>
-                                        <td className="px-3 py-2 text-sm">{row.editedBy}</td>
-                                        <td className="px-3 py-2 text-sm font-semibold">{row.eno}</td>
-                                        <td className="px-3 py-2 text-sm text-gray-600">{row.expenseId}</td>
-                                        <td className="px-3 py-2 text-sm break-words max-w-[280px]">{row.siteChange}</td>
-                                        <td className="px-3 py-2 text-sm">{row.accountType}</td>
-                                        <td className="px-3 py-2 text-sm whitespace-nowrap">{row.amountChange}</td>
-                                        <td className="px-3 py-2 text-sm">{row.dateChange}</td>
-                                        <td className="px-3 py-2 text-sm break-words">{row.categoryChange}</td>
-                                        <td className="px-3 py-2 text-sm text-gray-700 break-words max-w-[320px]" title={row.commentsSnippet}>
-                                            {row.commentsSnippet}
-                                        </td>
-                                    </tr>
-                                ))
+        <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+            <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+                <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div className="flex flex-row justify-between items-center mb-[12px] gap-[6px]">
+                        <h1 className="text-[18px] font-bold text-left text-[#202020]">Database history log</h1>
+                        <div className="flex items-end gap-[6px]">
+                            {loading && (
+                                <span className="text-sm text-gray-600 pb-1">Loading…</span>
                             )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {filteredRows.length > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 mt-4 px-1">
-                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                            <span>Rows per page:</span>
-                            <select
-                                value={itemsPerPage}
-                                onChange={(e) => {
-                                    setItemsPerPage(Number(e.target.value));
-                                    setCurrentPage(1);
-                                }}
-                                className="border border-gray-300 rounded px-2 py-1 text-sm"
-                            >
-                                {[25, 50, 100, 200].map((n) => (
-                                    <option key={n} value={n}>
-                                        {n}
-                                    </option>
-                                ))}
-                            </select>
-                            <span>
-                                Showing {filteredRows.length === 0 ? 0 : startIdx + 1}–
-                                {Math.min(startIdx + itemsPerPage, filteredRows.length)} of {filteredRows.length}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-1">
                             <button
                                 type="button"
-                                disabled={page <= 1}
-                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                className="px-3 py-1 text-sm border rounded disabled:opacity-40 hover:bg-[#BF9853] hover:text-white border-gray-300"
+                                onClick={() => void loadHistory()}
+                                disabled={loading}
+                                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center disabled:opacity-50"
                             >
-                                Previous
+                                <img className="w-full h-full" src={Reload} alt="Reload" />
                             </button>
-                            <span className="text-sm text-gray-600 px-2">
-                                Page {page} / {totalPages}
-                            </span>
-                            <button
-                                type="button"
-                                disabled={page >= totalPages}
-                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                className="px-3 py-1 text-sm border rounded disabled:opacity-40 hover:bg-[#BF9853] hover:text-white border-gray-300"
-                            >
-                                Next
-                            </button>
+                            <div className="w-[286px] min-w-[286px] translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search Transactions..."
+                                    className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                                />
+                                <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+                            </div>
                         </div>
                     </div>
-                )}
+
+                    {error && <div className="mb-3 text-sm text-red-600 text-left">{error}</div>}
+
+                    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                        <div
+                            ref={scrollRef}
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                        >
+                            <table className="table-fixed w-full min-w-[1920px] border-collapse">
+                                <thead className="sticky top-0 z-10 bg-white">
+                                    <tr className="bg-[#FAF6ED] h-[40px] text-[16px] font-bold text-center">
+                                        <th className="pl-[12px] w-[50px] font-bold text-left">#</th>
+                                        <th className="pl-[1px] pr-[1px] w-[168px] font-bold text-left">Edited (log time)</th>
+                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-left">Edited by</th>
+                                        <th className="pl-[1px] pr-[1px] w-[80px] font-bold text-right">E.No</th>
+                                        <th className="pl-[1px] pr-[12px] w-[120px] font-bold text-right">Expense id</th>
+                                        <th className="pl-[4px] pr-[1px] w-[298px] font-bold text-left">Site (old → new)</th>
+                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">A/C type</th>
+                                        <th className="pl-[1px] pr-[12px] w-[158px] font-bold text-right">Amount (old → new)</th>
+                                        <th className="pl-[4px] pr-[1px] w-[170px] font-bold text-left">Entry date (old → new)</th>
+                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">Category (old → new)</th>
+                                        <th className="pl-[9px] pr-[12px] w-[248px] font-bold text-left">Comments (trimmed)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && logRows.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={11} className="px-4 py-8 text-center text-[14px] text-gray-500">
+                                                Loading expense audit log…
+                                            </td>
+                                        </tr>
+                                    ) : filteredRows.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={11} className="px-4 py-8 text-center text-[14px] text-gray-500">
+                                                {logRows.length === 0
+                                                    ? 'No audit entries returned for current branch (edits may not be logged yet).'
+                                                    : 'No rows match your search.'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        pageRows.map((row, i) => {
+                                            const rowId = row.key || `${startIdx + i}`;
+                                            const cell = (field, value, className = 'text-left') => (
+                                                <span
+                                                    onClick={() => toggleExpandedCell(`${rowId}-${field}`)}
+                                                    className={`block w-full cursor-pointer ${expandedCells[`${rowId}-${field}`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'} ${className}`}
+                                                    title={value}
+                                                >
+                                                    {value}
+                                                </span>
+                                            );
+                                            return (
+                                                <tr key={row.key} className="odd:bg-white even:bg-[#FAF6ED] text-[14px] font-semibold min-h-[40px]">
+                                                    <td className="pl-[12px] w-[50px] text-left">{startIdx + i + 1}</td>
+                                                    <td className="pl-[1px] pr-[1px] w-[168px] text-left">
+                                                        {cell('editedDate', formatLogTimestamp(row.editedDate))}
+                                                    </td>
+                                                    <td className="pl-[1px] pr-[1px] w-[120px] text-left">
+                                                        {cell('editedBy', row.editedBy)}
+                                                    </td>
+                                                    <td className="pl-[1px] pr-[1px] w-[80px] text-right">
+                                                        {cell('eno', String(row.eno), 'text-right')}
+                                                    </td>
+                                                    <td className="pl-[1px] pr-[12px] w-[120px] text-right text-gray-600">
+                                                        {cell('expenseId', String(row.expenseId), 'text-right')}
+                                                    </td>
+                                                    <td className="pl-[4px] pr-[1px] w-[298px] text-left align-top py-1">
+                                                        {renderSiteChangeCell(row.siteChange)}
+                                                    </td>
+                                                    <td className="pl-[1px] pr-[1px] w-[158px] text-left">
+                                                        {cell('accountType', row.accountType)}
+                                                    </td>
+                                                    <td className="pl-[1px] pr-[12px] w-[120px] text-right">
+                                                        {cell('amountChange', row.amountChange, 'text-right')}
+                                                    </td>
+                                                    <td className="pl-[4px] pr-[1px] w-[170px] text-left">
+                                                        {cell('dateChange', row.dateChange)}
+                                                    </td>
+                                                    <td className="pl-[1px] pr-[1px] w-[158px] text-left">
+                                                        {cell('categoryChange', row.categoryChange)}
+                                                    </td>
+                                                    <td className="pl-[9px] pr-[12px] w-[248px] text-left text-gray-700">
+                                                        {cell('commentsSnippet', row.commentsSnippet)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">Items per page:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    {[25, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((n) => (
+                                        <option key={n} value={n}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-700">
+                                    Showing {filteredRows.length === 0 ? 0 : startIdx + 1} to {endIndex} of{' '}
+                                    {filteredRows.length} entries
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                                <button
+                                    type="button"
+                                    disabled={page <= 1}
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Previous
+                                </button>
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) {
+                                        pageNum = idx + 1;
+                                    } else if (page <= 3) {
+                                        pageNum = idx + 1;
+                                    } else if (page >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + idx;
+                                    } else {
+                                        pageNum = page - 2 + idx;
+                                    }
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            type="button"
+                                            onClick={() => setCurrentPage(pageNum)}
+                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${
+                                                page === pageNum
+                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    type="button"
+                                    disabled={page >= totalPages}
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

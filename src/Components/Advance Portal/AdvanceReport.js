@@ -546,6 +546,21 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       return sum + (amount);
     }, 0)
     .toLocaleString("en-IN");
+  const getFilteredReportTotalAmount = (rows) =>
+    rows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+  const getFilteredReportTotalLabel = () => {
+    if (paymentModeFilter && typeFilter) {
+      return `Total ${typeFilter} (${paymentModeFilter})`;
+    }
+    if (paymentModeFilter) {
+      return `Total ${paymentModeFilter} Advance`;
+    }
+    if (typeFilter) {
+      return `Total ${typeFilter}`;
+    }
+    return "Total Advance";
+  };
+  const getFilteredReportModeLabel = () => paymentModeFilter || "All Modes";
   const normStr = (v) => (v ?? "").toString().trim().toLowerCase();
   const dateKey = (val) => {
     if (!val) return -Infinity;
@@ -744,9 +759,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       if (modeA !== modeB) return modeA.localeCompare(modeB);
       return dateKey(a.date) - dateKey(b.date);
     });
-    const totalAdvanceCash = sortedData
-      .filter(row => normStr(row.type) === "advance" && normStr(row.payment_mode) === "cash")
-      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+    const filteredReportTotal = getFilteredReportTotalAmount(sortedData);
+    const filteredReportTotalLabel = getFilteredReportTotalLabel();
+    const filteredReportModeLabel = getFilteredReportModeLabel();
     const reportStartTs = filteredData.length
       ? Math.min(...filteredData.map((r) => new Date(r.date).getTime()))
       : null;
@@ -769,7 +784,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
         bill: row.bill_amount?.toLocaleString("en-IN") || "0",
         refund: row.refund_amount?.toLocaleString("en-IN") || "0",
         transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
-        mode: row.payment_mode || "",
+        mode: row.payment_mode || "-",
       };
       if (isAccounts) {
         return {
@@ -795,8 +810,10 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
           fromDate,
           { content: "End Date", styles: { fontStyle: 'bold' } },
           toDate,
-          { content: "Total Cash Advance", styles: { fontStyle: 'bold' } },
-          totalAdvanceCash.toLocaleString("en-IN"),
+          { content: "Mode", styles: { fontStyle: 'bold' } },
+          filteredReportModeLabel,
+          { content: filteredReportTotalLabel, styles: { fontStyle: 'bold' } },
+          { content: filteredReportTotal.toLocaleString("en-IN"), styles: { halign: 'right' } },
         ],
       ],
       theme: 'grid',
@@ -809,13 +826,15 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       },
       columnStyles: {
         0: { cellWidth: 40 },
-        1: { cellWidth: 90 },
-        2: { cellWidth: 88 },
-        3: { cellWidth: 106 },
-        4: { cellWidth: 88 },
-        5: { cellWidth: 106 },
-        6: { cellWidth: 120 },
-        7: { cellWidth: 104 },
+        1: { cellWidth: 54 },
+        2: { cellWidth: 70 },
+        3: { cellWidth: 76 },
+        4: { cellWidth: 70 },
+        5: { cellWidth: 76 },
+        6: { cellWidth: 50 },
+        7: { cellWidth: 70 },
+        8: { cellWidth: 140 },
+        9: { cellWidth: 98, halign: 'right' },
       }
     });
     doc.autoTable({
@@ -973,7 +992,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
             bill: row.bill_amount?.toLocaleString("en-IN") || "0",
             refund: row.refund_amount?.toLocaleString("en-IN") || "0",
             transfer: siteOptions.find(s => s.id === row.transfer_site_id)?.label || "",
-            mode: row.payment_mode || "",
+            mode: row.payment_mode || "-",
           };
           if (isAccounts) {
             return {
@@ -1069,9 +1088,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       if (modeA !== modeB) return modeA.localeCompare(modeB);
       return dateKey(a.date) - dateKey(b.date);
     });
-    const totalAdvanceCash = sortedData
-      .filter(row => normStr(row.type) === "advance" && normStr(row.payment_mode) === "cash")
-      .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+    const filteredReportTotal = getFilteredReportTotalAmount(sortedData);
+    const filteredReportTotalLabel = getFilteredReportTotalLabel();
+    const filteredReportModeLabel = getFilteredReportModeLabel();
     const header = [
       "S.No",
       "Date",
@@ -1088,8 +1107,8 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     ];
     const summaryRow = [
       "", "", "", "",
-      `Total Cash Advance: ${totalAdvanceCash.toLocaleString("en-IN")}`,
-      "", "", "", "", "", "", ""
+      `${filteredReportTotalLabel}: ${filteredReportTotal.toLocaleString("en-IN")}`,
+      "", "", "", "", `Mode: ${filteredReportModeLabel}`, "", ""
     ];
     const rows = sortedData.map((row, idx) => {
       const contractor = contractorOptions.find((c) => c.id === row.contractor_id)?.label;

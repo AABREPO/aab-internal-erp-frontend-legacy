@@ -5,8 +5,8 @@ import home from '../Images/dashboard.svg';
 import homeWhite from '../Images/dashboard1.svg';
 import billing from '../Images/Billing.svg';
 import billingWhite from '../Images/Billing1.svg';
-import crm from '../Images/CRM.svg';
-import crmWhite from '../Images/CRM1.svg';
+import crm from '../Images/CRM 1.1 B.svg';
+import crmWhite from '../Images/CRM 1.1 W.svg';
 import account from '../Images/Accounts.svg';
 import accountWhite from '../Images/Accounts1.svg';
 import procurement from '../Images/Procurement.svg'
@@ -23,6 +23,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
   const [activeMenu, setActiveMenu] = useState('');
   const [activeSubmenuItem, setActiveSubmenuItem] = useState('');
   const [roleModels, setRoleModels] = useState([]);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const location = useLocation();
   useEffect(() => {
     const fetchUserRoles = async () => {
@@ -83,6 +84,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
       '/expense-entry': { menu: 'account', submenu: 'Expense Entry' },
       '/expense-dashboard': { menu: 'account', submenu: 'Expense Dashboard' },
       '/bankreconciliation': { menu: 'account', submenu: 'Bank Reconciliation' },
+      '/orbit-erp/bill-payment': { menu: 'account', submenu: 'Orbit ERP' },
 
       // Procurement routes
       '/purchaseorder': { menu: 'procurement', submenu: 'Purchase Order' },
@@ -129,7 +131,28 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
       }
     }
   }, [location.pathname]);
+  useEffect(() => {
+    // Collapse expanded sidebar after route navigation.
+    setIsSidebarExpanded(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!isSidebarExpanded) return;
+      if (sidebarRef?.current && !sidebarRef.current.contains(event.target)) {
+        setIsSidebarExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isSidebarExpanded, sidebarRef]);
   const handleMenuClick = (menu) => {
+    if (!isSidebarExpanded) {
+      setIsSidebarExpanded(true);
+      setActiveMenu(menu);
+      return;
+    }
     setActiveMenu(menu === activeMenu ? '' : menu);
   };
   const handleSubmenuItemClick = (itemName) => {
@@ -141,29 +164,168 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
     return roleModels.some(model => model.models === modelName);
   };
   return (
-    <aside ref={sidebarRef}
-      className={`fixed h-screen w-[250px] bg-[#FFFFFF] mt-14 z-40 overflow-y-auto transition-transform duration-1000 ease-in-out transform ${isVisible ? 'translate-x-0' : '-translate-x-full'
-        }`}>
-      <nav className="h-full flex flex-col">
+    <>
+      <style>{`
+        @keyframes erp-orbit-drawer-bg-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .erp-orbit-drawer-bg {
+          animation: erp-orbit-drawer-bg-fade-in 0.15s ease;
+          background: rgba(33, 33, 33, 0.45);
+          backdrop-filter: blur(2px);
+        }
+        .erp-orbit-drawer {
+          transition: transform 0.10s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.04s ease;
+          box-shadow: none;
+          border-right: 1px solid #f1e8d9;
+        }
+        .erp-orbit-drawer .sidebar-primary-item {
+          border-radius: 10px;
+          min-height: 40px;
+          height: 40px;
+          margin: 8px 8px !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          transition: background-color 0.1s ease, color 0.1s ease, margin 0.04s ease, padding 0.08s ease, width 0.04s ease;
+        }
+        .erp-orbit-drawer .sidebar-primary-label,
+        .erp-orbit-drawer .sidebar-submenu,
+        .erp-orbit-drawer .sidebar-brand-copy,
+        .erp-orbit-drawer .sidebar-build-info {
+          transition: opacity 0.04s ease, max-height 0.04s ease;
+        }
+        .erp-orbit-drawer .sidebar-submenu {
+          margin-left: 0 !important;
+          padding-left: 39px;
+        }
+        .erp-orbit-drawer .sidebar-submenu .submenu-link li {
+          list-style-position: inside;
+          margin-left: 0;
+          padding-left: 0;
+        }
+        #root {
+          padding-left: 62px;
+        }
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-item {
+          width: 40px;
+          height: 40px;
+          min-height: 40px !important;
+          margin: 8px auto;
+          justify-content: center;
+          gap: 0 !important;
+          padding: 0 !important;
+          border-radius: 9999px;
+        }
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-item img {
+          margin: 0 auto;
+          display: block;
+        }
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-label {
+          width: 0 !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-item.text-white {
+          background: #BF9853 !important;
+          border-radius: 9999px !important;
+        }
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-label,
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-submenu,
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-brand-copy,
+        .erp-orbit-drawer.sidebar-collapsed .sidebar-build-info {
+          opacity: 0;
+          max-height: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        @media (min-width: 1024px) {
+          #root {
+            padding-left: 62px;
+          }
+          .navbar {
+            left: 56px !important;
+            width: calc(100% - 56px) !important;
+          }
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-header-row {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+          }
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-item {
+            width: 40px;
+            height: 40px;
+            min-height: 40px !important;
+            margin: 8px auto;
+            justify-content: center;
+            gap: 0 !important;
+            padding: 0 !important;
+            border-radius: 9999px;
+          }
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-item img {
+            margin: 0 auto;
+            display: block;
+          }
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-label {
+            width: 0 !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-item.text-white {
+            background: #BF9853 !important;
+            border-radius: 9999px !important;
+          }
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-primary-label,
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-submenu,
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-brand-copy,
+          .erp-orbit-drawer.sidebar-collapsed .sidebar-build-info {
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            pointer-events: none;
+          }
+        }
+      `}</style>
+      {isVisible && (
+        <div
+          className="erp-orbit-drawer-bg fixed left-0 right-0 bottom-0 top-[55px] z-[259] lg:hidden"
+          onClick={() => onCloseSidebar && onCloseSidebar()}
+          role="presentation"
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        ref={sidebarRef}
+        className={`erp-orbit-drawer fixed left-0 bottom-0 top-[65px] z-[260] flex ${isSidebarExpanded ? "w-[280px] sidebar-expanded" : "w-[62px] sidebar-collapsed"} flex-col overflow-hidden bg-[#FFFFFF] translate-x-0`}
+      >
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar scrollbar-none pt-[6px]">
         <Link
           to="/"
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'home' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
-          onClick={() => {
+          title="Home"
+          className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'home' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+          onClick={(e) => {
+            if (!isSidebarExpanded) {
+              e.preventDefault();
+              handleMenuClick('home');
+              return;
+            }
             handleMenuClick('home');
             if (onCloseSidebar) onCloseSidebar();
           }}>
           <img src={activeMenu === 'home' ? homeWhite : home}
-            alt="home" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Home</p>
+            alt="home" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Home</p>
         </Link>
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'billing' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div title="Billing" className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'billing' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('billing')} >
           <img src={activeMenu === 'billing' ? billingWhite : billing}
-            alt="billing" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Billing</p>
+            alt="billing" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Billing</p>
         </div>
         {activeMenu === 'billing' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link
               to={hasAccessToModel('Bill Payments Tracker') ? '/tracker/pendingbill' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Bill Payments Tracker' ? 'text-red-500' : ''}`}
@@ -236,14 +398,15 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
           </div>
         )}
         <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'crm' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+          title="CRM"
+          className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-[16px] cursor-pointer ${activeMenu === 'crm' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('crm')}
         >
-          <img src={activeMenu === 'crm' ? crmWhite : crm} alt="crm" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base ">CRM</p>
+          <img src={activeMenu === 'crm' ? crmWhite : crm} alt="crm" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base ">CRM</p>
         </div>
         {activeMenu === 'crm' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link to={hasAccessToModel('Enquiry') ? '/enquiry' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Enquiry' ? 'text-red-500' : ''}`}
               onClick={(e) => {
@@ -272,14 +435,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'account' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div title="Account" className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'account' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('account')}
         >
-          <img src={activeMenu === 'account' ? accountWhite : account} alt="account" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Account</p>
+          <img src={activeMenu === 'account' ? accountWhite : account} alt="account" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Account</p>
         </div>
         {activeMenu === 'account' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link
               to={hasAccessToModel('Vendor Payments Tracker') ? '/tracker/pendingbill' : '#'}
               state={{ sidebarMenu: 'account', sidebarSubmenu: 'Vendor Payments Tracker' }}
@@ -431,17 +594,33 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             >
               <p className="text-sm cursor-pointer"><li>Bank Reconciliation</li></p>
             </Link>
+            <Link
+              to={hasAccessToModel('Bank Register') ? '/orbit-erp/bill-payment' : '#'}
+              className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Orbit ERP' ? 'text-red-500' : ''}`}
+              onClick={(e) => {
+                if (!hasAccessToModel('Bank Register')) {
+                  e.preventDefault();
+                  alert("No permissions for this page");
+                  return;
+                }
+                handleSubmenuItemClick('Orbit ERP');
+                if (onCloseSidebar) onCloseSidebar();
+              }}
+            >
+              <p className="text-sm cursor-pointer"><li>Testing</li></p>
+            </Link>
           </div>
         )}
         <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'procurement' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+          title="Procurement"
+          className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'procurement' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('procurement')}
         >
-          <img src={activeMenu === 'procurement' ? procurementWhite : procurement} alt="procurement" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Procurement</p>
+          <img src={activeMenu === 'procurement' ? procurementWhite : procurement} alt="procurement" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Procurement</p>
         </div>
         {activeMenu === 'procurement' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link to={hasAccessToModel('Purchase Order') ? '/purchaseorder' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Purchase Order' ? 'text-red-500' : ''
               }`}
               onClick={(e) => {
@@ -482,14 +661,15 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
           </div>
         )}
         <div
-          className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'designtools' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+          title="Design Tools"
+          className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'designtools' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('designtools')}
         >
-          <img src={activeMenu === 'designtools' ? designtoolsWhite : designtools} alt="designtools" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Design Tools</p>
+          <img src={activeMenu === 'designtools' ? designtoolsWhite : designtools} alt="designtools" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Design Tools</p>
         </div>
         {activeMenu === 'designtools' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link to={hasAccessToModel('Tile Calculator') ? '/designtool/tileCalculate' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Tile Calculator' ? 'text-red-500' : ''}`}
               onClick={(e) => {
@@ -580,14 +760,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div title="HRM" className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'hr' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('hr')}
         >
-          <img src={activeMenu === 'hr' ? hrWhite : hr} alt="hr" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">HRM</p>
+          <img src={activeMenu === 'hr' ? hrWhite : hr} alt="hr" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">HRM</p>
         </div>
         {activeMenu === 'hr' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link to={hasAccessToModel('Onboarding') ? 'billView' : '#'} className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'onboarding' ? 'text-red-500' : ''}`}
               onClick={(e) => {
                 if (!hasAccessToModel('Onboarding')) {
@@ -640,14 +820,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div title="Utility Hub" className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'utility' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('utility')}
         >
-          <img src={activeMenu === 'utility' ? sideUtilityHub : sidesetting} alt="utility" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Utility Hub</p>
+          <img src={activeMenu === 'utility' ? sideUtilityHub : sidesetting} alt="utility" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Utility Hub</p>
         </div>
         {activeMenu === 'utility' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link
               to={hasAccessToModel('Dashboard') ? 'utility/dashboard' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Dashboard' ? 'text-red-500' : ''}`}
@@ -680,14 +860,14 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div className={`flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
+        <div title="Master Data" className={`sidebar-primary-item flex items-center gap-[11px] py-[15px] px-3 cursor-pointer ${activeMenu === 'masterdata' ? 'bg-[#BF9853] text-white' : 'text-black'}`}
           onClick={() => handleMenuClick('masterdata')}
         >
-          <img src={activeMenu === 'masterdata' ? sideMasterData : sidesaving} alt="masterdata" className="h-4 w-4" />
-          <p className="text-[12px] leading-[15px] font-medium text-base">Master Data</p>
+          <img src={activeMenu === 'masterdata' ? sideMasterData : sidesaving} alt="masterdata" className="h-[20px] w-[20px]" />
+          <p className="sidebar-primary-label text-[12px] leading-[15px] font-medium text-base">Master Data</p>
         </div>
         {activeMenu === 'masterdata' && (
-          <div className="ml-6">
+          <div className="sidebar-submenu ml-6">
             <Link
               to={hasAccessToModel('Master Data') ? '/master-data' : '#'}
               className={`submenu-link flex items-center gap-[1px] p-2 ${activeSubmenuItem === 'Master Data' ? 'text-red-500' : ''}`}
@@ -705,7 +885,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
             </Link>
           </div>
         )}
-        <div className="mt-[6rem] ml-4 w-44">
+        <div className="sidebar-build-info mt-[6rem] ml-4 w-44">
           <p style={{ fontSize: '16px', marginTop: '1rem' }}>
             <span className="font-semibold">Last Updated:</span>{' '}
             <span className="font-light">{buildTime || 'Not available'}</span>
@@ -713,6 +893,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
         </div>
       </nav>
     </aside>
+    </>
   );
 }
 export default Sidebar;

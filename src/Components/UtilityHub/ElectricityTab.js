@@ -7,6 +7,13 @@ import * as XLSX from 'xlsx';
 import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
+import {
+    flattenPropertyStyleRows,
+    expandPropertyStyleRowsByVendor,
+    findPaymentForServiceMonth,
+    propertyHasVendorForFilter,
+    getUtilityHubExportYear,
+} from './utilityHubTabFilters';
 
 const getTenantLinkPhone = (tenant) =>
     String(
@@ -285,25 +292,29 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         [filteredProjects]
     );
 
+    const getServiceNo = (property) => property?.ebNo;
+
     const electricityTableRows = useMemo(() => {
-        const rows = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
-                .map((property) => ({ project, property }))
-        );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [sortedFilteredProjects]);
+        const rows = flattenPropertyStyleRows(sortedFilteredProjects, getServiceNo, comparePropertyShopNoAsc);
+        return expandPropertyStyleRowsByVendor(rows, electricityPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [sortedFilteredProjects, electricityPayments, filters.year, filters.month, filters.vendor]);
 
     const hiddenElectricityTableRows = useMemo(() => {
-        const rows = sortProjectsPropertyDetailsByShopNo(hiddenProjects).flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
-                .map((property) => ({ project, property }))
+        const rows = flattenPropertyStyleRows(
+            sortProjectsPropertyDetailsByShopNo(hiddenProjects),
+            getServiceNo,
+            comparePropertyShopNoAsc
         );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [hiddenProjects]);
+        return expandPropertyStyleRowsByVendor(rows, electricityPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [hiddenProjects, electricityPayments, filters.year, filters.month, filters.vendor]);
 
     const customSelectStyles = {
         control: (provided, state) => ({
@@ -385,7 +396,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         }
         return monthsSinceStart >= 0 && monthsSinceStart % frequency === 0;
     };
-    const getPaymentData = (ebNo, month, propertyId, yearOverride) => {
+    const getPaymentData = (ebNo, month, propertyId, yearOverride, rowVendor) => {
         const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -396,9 +407,11 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         if (!monthNumber) return { amount: '-', date: null };
         const yearMonth = `${selectedYear}-${monthNumber}`;
         // If a payment exists for this month, always show it (even when frequency=0).
-        const existingPayment = electricityPayments.find(p =>
-            p.utilityTypeNumber === ebNo &&
-            p.utilityForTheMonth === yearMonth
+        const existingPayment = findPaymentForServiceMonth(
+            electricityPayments,
+            ebNo,
+            yearMonth,
+            rowVendor
         );
         if (existingPayment) {
             return {
@@ -439,9 +452,11 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         const freqData = getActiveFrequencyData(propertyId, parseInt(selectedYear), parseInt(monthNumber));
         const freqMissing = freqData?.electricityFrequencyNo === undefined || freqData?.electricityFrequencyNo === null;
         if (!freqData || freqMissing || !freqData.startingMonthOfElectricityFrequency) {
-            const payment = electricityPayments.find(p =>
-                p.utilityTypeNumber === ebNo &&
-                p.utilityForTheMonth === yearMonth
+            const payment = findPaymentForServiceMonth(
+                electricityPayments,
+                ebNo,
+                yearMonth,
+                rowVendor
             );
             if (payment) {
                 return {
@@ -474,7 +489,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             return { amount: '-', date: null, isNotRequired: true }; 
         }
     };
-    const getUnpaidCount = (ebNo, propertyId) => {
+    const getUnpaidCount = (ebNo, propertyId, rowVendor) => {
         const selectedYear = filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -487,9 +502,11 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             const monthNumber = monthMap[month];
             if (shouldPayInMonth(propertyId, monthNumber, selectedYear)) {
                 const yearMonth = `${selectedYear}-${monthNumber}`;
-                const payment = electricityPayments.find(p =>
-                    p.utilityTypeNumber === ebNo &&
-                    p.utilityForTheMonth === yearMonth
+                const payment = findPaymentForServiceMonth(
+                    electricityPayments,
+                    ebNo,
+                    yearMonth,
+                    rowVendor
                 );
                 if (!payment) {
                     unpaidCount++;
@@ -507,7 +524,13 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         }
 
         const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(property.ebNo, month, property.id, filterState.year);
+            const paymentData = getPaymentData(
+                property.ebNo,
+                month,
+                property.id,
+                filterState.year,
+                filterState.vendor || undefined
+            );
             const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
             const isUnpaid = paymentData.amount === '0';
 
@@ -548,24 +571,15 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         const selectedYearForFilters = effective.year || new Date().getFullYear().toString();
         const selectedMonthNumber = effective.month ? MONTH_NUMBER_MAP[effective.month] : null;
         const selectedYearMonthForFilters = selectedMonthNumber ? `${selectedYearForFilters}-${selectedMonthNumber}` : null;
-        const getPaymentVendorValue = (payment) => toLower(
-            payment?.vendorName ??
-            payment?.vendor ??
-            payment?.vendor_name ??
-            payment?.vendorNameLabel ??
-            payment?.party ??
-            ''
-        );
-        const propertyMatchesVendorFromPayments = (property) => {
-            if (!vendorFilter) return true;
-            const ebNo = property?.ebNo;
-            if (!ebNo) return false;
-            const paymentsForService = electricityPayments.filter((p) => p?.utilityTypeNumber === ebNo);
-            const scopedPayments = selectedYearMonthForFilters
-                ? paymentsForService.filter((p) => p?.utilityForTheMonth === selectedYearMonthForFilters)
-                : paymentsForService.filter((p) => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${selectedYearForFilters}-`));
-            return scopedPayments.some((p) => getPaymentVendorValue(p).includes(vendorFilter));
-        };
+        const propertyMatchesVendorFromPayments = (property) =>
+            propertyHasVendorForFilter(
+                property,
+                electricityPayments,
+                (p) => p?.ebNo,
+                effective.vendor,
+                selectedYearForFilters,
+                effective.month || null
+            );
         const matchesTenantFromLinks = (propertyId) => {
             if (!tenantFilter) return true;
             const links = getLinksForProperty(propertyId);
@@ -662,7 +676,13 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
 
         const monthForStatus = filterState.month || MONTH_LABELS[new Date().getMonth()];
         if (property.ebNo && monthForStatus) {
-            const paymentData = getPaymentData(property.ebNo, monthForStatus, property.id, filterState.year);
+            const paymentData = getPaymentData(
+                property.ebNo,
+                monthForStatus,
+                property.id,
+                filterState.year,
+                filterState.vendor || undefined
+            );
             if (paymentData.amount === '0') filled.paymentStatus = 'Unpaid';
             else if (paymentData.amount !== '-') filled.paymentStatus = 'Paid';
 
@@ -762,16 +782,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return Array.from(names).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
     }, [filters, projects, selectedCategory, electricityPayments, tenantLinksByPropertyId]);
 
-    const buildExportRows = () => {
-        const pairs = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
-                .map((property) => ({ project, property }))
-        );
-        pairs.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+    const resolveExportYear = () => getUtilityHubExportYear(filters);
 
-        return pairs.map(({ project, property }, index) => {
+    const buildExportRows = (exportYear = resolveExportYear()) =>
+        electricityTableRows.map(({ project, property, rowVendor }, index) => {
             const rowNumber = index + 1;
+            const serviceNo = property.ebNo || '-';
             const row = {
                 slNo: rowNumber,
                 pid: project.projectId || '-',
@@ -780,26 +796,26 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 shopNo: property.shopNo || '-',
                 doorNo: property.doorNo || '-',
                 phase: property.ebNoPhase ? `Phase ${property.ebNoPhase.replace('P', '')}` : '-',
-                serviceNo: property.ebNo || '-'
+                serviceNo,
             };
 
             monthLabels.forEach(month => {
-                const paymentData = getPaymentData(property.ebNo, month, property.id);
+                const paymentData = getPaymentData(property.ebNo, month, property.id, exportYear, rowVendor);
                 row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
             });
 
-            row.unpaid = getUnpaidCount(property.ebNo, property.id);
+            row.unpaid = getUnpaidCount(property.ebNo, property.id, rowVendor);
             return row;
         });
-    };
 
     const handleExportPDF = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(14);
-        doc.text('Electricity Projects Overview', 14, 20);
+        doc.text(`Electricity Projects Overview - ${exportYear}`, 14, 20);
 
         const headers = ['Sl.No', 'PID', 'Project Name', 'Category', 'Shop No', 'Door No', 'Phase', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map(row => [
@@ -832,11 +848,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             }
         });
 
-        doc.save('ElectricityProjects.pdf');
+        doc.save(`ElectricityProjects_${exportYear}.pdf`);
     };
 
     const handleExportExcel = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const worksheetData = rows.map(row => {
@@ -862,9 +879,10 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'ElectricityProjects');
-        XLSX.writeFile(workbook, 'ElectricityProjects.xlsx');
+        XLSX.writeFile(workbook, `ElectricityProjects_${exportYear}.xlsx`);
     };
 
+    const displayYear = resolveExportYear();
     const hasExportableData = sortedFilteredProjects.some(project =>
         Array.isArray(project.propertyDetails) &&
         project.propertyDetails.some(property => property.ebNo && property.ebNo.trim() !== '')
@@ -1290,6 +1308,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
+                    <h2 className="text-center text-lg font-semibold text-gray-800 mb-3">
+                        Electricity Projects Overview - {displayYear}
+                    </h2>
                     <div className="rounded-lg">
                         <div
                             ref={scrollRef}
@@ -1348,9 +1369,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     ) : (
                                         electricityTableRows
-                                            .map(({ project, property }, index) => {
+                                            .map(({ project, property, rowVendor, rowKey }, index) => {
                                                 return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-2 py-2">{index + 1}</td>
                                                             <td className="px-2 py-2">{project.projectId}</td>
                                                             <td className="px-2 py-2 text-left whitespace-normal break-words max-w-[220px]">
@@ -1392,7 +1413,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                 {property.ebNo}
                                                             </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
-                                                                const paymentData = getPaymentData(property.ebNo, month, property.id);
+                                                                const paymentData = getPaymentData(property.ebNo, month, property.id, undefined, rowVendor);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
                                                                 const isNotRequired = paymentData.isNotRequired;
                                                                 return (
@@ -1416,7 +1437,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                             })}
                                                             <td className="px-2 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
-                                                                    {getUnpaidCount(property.ebNo, property.id)}
+                                                                    {getUnpaidCount(property.ebNo, property.id, rowVendor)}
                                                                 </span>
                                                             </td>
                                                             <td className="px-2 py-2">
@@ -1481,9 +1502,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                     </thead>
                                     <tbody>
                                         {hiddenElectricityTableRows
-                                            .map(({ project, property }, index) => {
+                                            .map(({ project, property, rowVendor, rowKey }, index) => {
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2 whitespace-normal break-words max-w-[220px]">

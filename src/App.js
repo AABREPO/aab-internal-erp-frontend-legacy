@@ -2,7 +2,7 @@ import './App.css';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './Components/Bars/Navbar';
-import { SidebarProvider, useSidebar } from './context/SidebarContext';
+import { SidebarProvider } from './context/SidebarContext';
 import Home from './Components/Home/HomePage';
 import Heading from './Components/Heading';
 import DHeading from './Components/TileCalculation/DHeading';
@@ -31,6 +31,8 @@ import MasterData from './Components/MasterData/MasterData';
 import BankReconciliation from './Components/Bank Reconciliation/BankReconciliation .js';
 import UtilityHeading from './Components/UtilityHub/UtilityHeading';
 import BankRegisterHeading from './Components/Bank Register/BankRegisterHeading';
+import OrbitBillPaymentShell from './Components/OrbitERP/OrbitBillPaymentShell';
+import OrbitAppChrome from './Components/OrbitERP/OrbitAppChrome';
 import QuotationHeading from './Components/Quotation/QuotationHeading';
 import DirectoryHeading from './Components/Directory/DirectoryHeading';
 import ToolsTrackerHeading from './Components/ToolsTracker/ToolsTrackerHeading';
@@ -42,12 +44,8 @@ import GoodsRecievedNotesVerify from './componentsMobile/Goods Recieved Notes/Ve
 import MobileMasterData from './componentsMobile/MasterData/MasterData';
 
 function MainContentWithSidebarMargin({ children }) {
-  const { isSidebarVisible } = useSidebar();
-  return (
-    <div className={`min-h-screen transition-all duration-1000 ease-in-out ${isSidebarVisible ? 'ml-[250px]' : ''}`}>
-      {children}
-    </div>
-  );
+  /** Sidebar is fixed + translated (see Sidebar.js); do not shift layout — matches Orbit ERP drawer over content. */
+  return <div className="min-h-screen">{children}</div>;
 }
 
 function AppContent({ user, handleLogout }) {
@@ -78,6 +76,13 @@ function AppContent({ user, handleLogout }) {
     location.pathname.startsWith('/master-data');
   const shouldHideDesktopBars = isMobile && isMobileRoute;
 
+  const wrapOrbitChrome = (node) =>
+    shouldHideDesktopBars ? node : (
+      <OrbitAppChrome username={user.username} onLogout={handleLogout}>
+        {node}
+      </OrbitAppChrome>
+    );
+
   return (
     <SidebarProvider>
       <div>
@@ -95,19 +100,19 @@ function AppContent({ user, handleLogout }) {
         <MainContentWithSidebarMargin>
           <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/expense-entry/*" element={<Heading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/designtool/*" element={<DHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/invoice-bill/*" element={<InHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/paints/*" element={<PHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/rccal/*" element={<RcHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/bath/*" element={<BHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/switch/*" element={<SHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/weekly-payment/*" element={<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/rent/*" element={<RHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/masonary/*" element={<MHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/carpentry/*" element={<CHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/entrychecklist/*" element={<BillHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/purchaseorder/*' element={<PurchaseHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/expense-entry/*" element={wrapOrbitChrome(<Heading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/designtool/*" element={wrapOrbitChrome(<DHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/invoice-bill/*" element={wrapOrbitChrome(<InHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/paints/*" element={wrapOrbitChrome(<PHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/rccal/*" element={wrapOrbitChrome(<RcHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/bath/*" element={wrapOrbitChrome(<BHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/switch/*" element={wrapOrbitChrome(<SHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/weekly-payment/*" element={wrapOrbitChrome(<WeeklyPaymentHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/rent/*" element={wrapOrbitChrome(<RHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/masonary/*" element={wrapOrbitChrome(<MHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/carpentry/*" element={wrapOrbitChrome(<CHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/entrychecklist/*" element={wrapOrbitChrome(<BillHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/purchaseorder/*' element={wrapOrbitChrome(<PurchaseHeading username={user.username} userRoles={user?.userRoles || []} />)} />
         <Route
           path="/rfq-login"
           element={
@@ -152,32 +157,33 @@ function AppContent({ user, handleLogout }) {
             />
           }
         />
-        <Route path='/inventory/*' element={<InventoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/testpurchaseorder' element={<TestPurchaseOrder />} />
-        <Route path='/user_manage/*' element={<ManageHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/attendance' element={<Attendancelog username={user.username} />} />
-        <Route path='/portal/*' element={<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/Claim/*' element={<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/staffadvance/*' element={<StaffHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/loan/*' element={<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path='/tracker/*' element={<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path='/inventory/*' element={wrapOrbitChrome(<InventoryHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/testpurchaseorder' element={wrapOrbitChrome(<TestPurchaseOrder />)} />
+        <Route path='/user_manage/*' element={wrapOrbitChrome(<ManageHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/attendance' element={wrapOrbitChrome(<Attendancelog username={user.username} />)} />
+        <Route path='/portal/*' element={wrapOrbitChrome(<AdvanceHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/Claim/*' element={wrapOrbitChrome(<ClaimPaymentHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/staffadvance/*' element={wrapOrbitChrome(<StaffHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/loan/*' element={wrapOrbitChrome(<LoanPoratlHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path='/tracker/*' element={wrapOrbitChrome(<BillPaymentsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />)} />
         <Route
           path='/master-data'
           element={
             isMobile ? (
               <MobileMasterData user={user} onLogout={handleLogout} />
             ) : (
-              <MasterData username={user.username} userRoles={user?.userRoles || []} />
+              wrapOrbitChrome(<MasterData username={user.username} userRoles={user?.userRoles || []} />)
             )
           }
         />
-        <Route path="/bankreconciliation" element={<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/utility/*" element={<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/bank-register" element={<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/quotation/*" element={<QuotationHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/directory/*" element={<DirectoryHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/toolsTracker/*" element={<ToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
-        <Route path="/testtoolsTracker/*" element={<TestToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />} />
+        <Route path="/bankreconciliation" element={wrapOrbitChrome(<BankReconciliation username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/orbit-erp/bill-payment" element={wrapOrbitChrome(<OrbitBillPaymentShell username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/utility/*" element={wrapOrbitChrome(<UtilityHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/bank-register" element={wrapOrbitChrome(<BankRegisterHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/quotation/*" element={wrapOrbitChrome(<QuotationHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/directory/*" element={wrapOrbitChrome(<DirectoryHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/toolsTracker/*" element={wrapOrbitChrome(<ToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />)} />
+        <Route path="/testtoolsTracker/*" element={wrapOrbitChrome(<TestToolsTrackerHeading username={user.username} userRoles={user?.userRoles || []} />)} />
         <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </MainContentWithSidebarMargin>

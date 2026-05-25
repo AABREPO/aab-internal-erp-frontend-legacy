@@ -11,10 +11,17 @@ import {
     buildPropertyStyleAutoFill,
     buildTenantLinksMap,
     computePropertyStyleFilteredProjects,
+    expandPropertyStyleRowsByVendor,
+    findPaymentForServiceMonth,
     flattenPropertyStyleRows,
+    getDistinctPaymentVendorsForService,
+    paymentMatchesRowVendor,
+    propertyHasVendorForFilter,
+    vendorNamesMatch,
     getDefaultPropertyStyleFilters,
     getPropertyStyleFilterOptions,
     getTenantOptionsFromFiltered,
+    getUtilityHubExportYear,
 } from './utilityHubTabFilters';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -81,7 +88,7 @@ const getTelecomServiceProviderDisplay = (property) => {
 };
 
 const TelecomTab = ({ username, userRoles = [] }) => {
-    const [filters, setFilters] = useState(() => getDefaultPropertyStyleFilters(MONTH_LABELS, { month: '' }));
+    const [filters, setFilters] = useState(() => getDefaultPropertyStyleFilters(MONTH_LABELS));
     const [projects, setProjects] = useState([]);
     const [telecomPayments, setTelecomPayments] = useState([]);
     const [frequencyHistory, setFrequencyHistory] = useState([]);
@@ -661,7 +668,29 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         return diff >= 0 && diff < coverMonths;
     };
 
-    const getPaymentData = (serviceNumber, month, telecomId, property, yearOverride) => {
+    const findTelecomPaymentForMonth = (serviceNumber, yearMonth, rowVendor) => {
+        const payment = findPaymentForServiceMonth(
+            telecomPayments,
+            serviceNumber,
+            yearMonth,
+            rowVendor
+        );
+        if (payment) return payment;
+
+        const normalized = String(serviceNumber || '').trim();
+        if (!normalized) return null;
+
+        return (
+            (telecomPayments || []).find((p) => {
+                if (String(p?.utilityTypeNumber || '').trim() !== normalized) return false;
+                if (!paymentMatchesRowVendor(p, rowVendor)) return false;
+                const ym = toYearMonth(p?.utilityForTheMonth || p?.date || p?.timestamp);
+                return ym === yearMonth;
+            }) || null
+        );
+    };
+
+    const getPaymentData = (serviceNumber, month, telecomId, property, yearOverride, rowVendor) => {
         const selectedYear = yearOverride || filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -671,10 +700,8 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         const monthNumber = monthMap[month];
         if (!monthNumber) return { amount: '-', date: null };
         const yearMonth = `${selectedYear}-${monthNumber}`;
-        const payment = telecomPayments.find(p =>
-            String(p.utilityTypeNumber || '').trim() === String(serviceNumber || '').trim() &&
-            String(p.utilityForTheMonth || '').trim() === String(yearMonth).trim()
-        );
+        const vendorForPayment = rowVendor || property?.vendorName || undefined;
+        const payment = findTelecomPaymentForMonth(serviceNumber, yearMonth, vendorForPayment);
         if (payment) {
             return {
                 amount: payment.amount || '0',
@@ -695,7 +722,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
         // If covered by validity, do not show unpaid "0"
         if (isMonthCoveredByValidity(serviceNumber, yearMonth, property)) {
-            return { amount: '-', date: null, isNotRequired: true };
+            return { amount: '-', date: null, isNotRequired: true, coveredByValidity: true };
         }
         if (!shouldPayInMonth(telecomId, monthNumber, selectedYear)) {
             return { amount: '-', date: null, isNotRequired: true };
@@ -703,7 +730,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         return { amount: '0', date: null };
     };
 
-    const getUnpaidCount = (serviceNumber, telecomId, property) => {
+    const getUnpaidCount = (serviceNumber, telecomId, property, rowVendor) => {
         const selectedYear = filters.year || new Date().getFullYear().toString();
         const monthMap = {
             'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
@@ -719,9 +746,11 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                 if (isMonthCoveredByValidity(serviceNumber, yearMonth, property)) {
                     return;
                 }
-                const hasExpensePayment = telecomPayments.some(p =>
-                    String(p?.utilityTypeNumber || '').trim() === String(serviceNumber || '').trim() &&
-                    String(p?.utilityForTheMonth || '').trim() === String(yearMonth).trim()
+                const hasExpensePayment = !!findPaymentForServiceMonth(
+                    telecomPayments,
+                    serviceNumber,
+                    yearMonth,
+                    rowVendor || property?.vendorName
                 );
                 const dirFirst = getDirectoryFirstPaymentMeta(serviceNumber, property);
                 const hasDirectoryFirst = !!(dirFirst && dirFirst.ym === yearMonth);
@@ -742,21 +771,58 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
     const toLower = (value) => (value ? value.toString().toLowerCase() : '');
 
+    const paymentStatusMatchesRow = (property, rowVendor, filterState) => {
+        const selectedStatus = filterState.paymentStatus;
+        if (!selectedStatus) return true;
+
+        const monthToCheck = filterState.month || monthLabels[new Date().getMonth()];
+        const telecomKey = property?.utilityTelecomId ?? property?.id;
+        const paymentData = getPaymentData(
+            property.ebNo,
+            monthToCheck,
+            telecomKey,
+            property,
+            filterState.year,
+            rowVendor || filterState.vendor || property?.vendorName
+        );
+
+        if (selectedStatus === 'Paid') {
+            if (paymentData.amount === '0') return false;
+            if (paymentData.amount !== '-') return true;
+            return Boolean(paymentData.coveredByValidity);
+        }
+        if (selectedStatus === 'Unpaid') {
+            return paymentData.amount === '0';
+        }
+        return true;
+    };
+
     const matchesPaymentFiltersFor = (property, filterState) => {
         const selectedMonth = filterState.month;
         const selectedStatus = filterState.paymentStatus;
         if (!selectedMonth && !selectedStatus) return true;
-        const telecomKey = property?.utilityTelecomId ?? property?.id;
-        const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(property.ebNo, month, telecomKey, property, filterState.year);
-            const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
-            const isUnpaid = paymentData.amount === '0';
-            if (selectedStatus === 'Paid') return isPaid;
-            if (selectedStatus === 'Unpaid') return isUnpaid;
-            return true;
-        };
-        if (selectedMonth) return evaluateMonth(selectedMonth);
-        return monthLabels.some((month) => evaluateMonth(month));
+        if (!selectedStatus) return true;
+
+        const monthToCheck = selectedMonth || monthLabels[new Date().getMonth()];
+        const year = filterState.year || new Date().getFullYear().toString();
+        const vendorFilter = String(filterState.vendor ?? '').trim();
+
+        const vendorsToCheck = vendorFilter
+            ? [vendorFilter]
+            : getDistinctPaymentVendorsForService(telecomPayments, property.ebNo, year, monthToCheck);
+
+        const vendorCandidates =
+            vendorsToCheck.length > 0
+                ? vendorsToCheck
+                : [property?.vendorName].filter(Boolean);
+
+        if (!vendorCandidates.length) {
+            return paymentStatusMatchesRow(property, undefined, { ...filterState, month: monthToCheck });
+        }
+
+        return vendorCandidates.some((vendorName) =>
+            paymentStatusMatchesRow(property, vendorName, { ...filterState, month: monthToCheck })
+        );
     };
 
     const computeFiltered = (filterState, excludeField = null) =>
@@ -770,11 +836,26 @@ const TelecomTab = ({ username, userRoles = [] }) => {
             matchesPaymentFiltersFor,
             payments: telecomPayments,
             comparePropertyShopNoAsc,
-            matchVendor: (property, vendorFilter) => {
+            matchVendor: (property, vendorFilter, effective) => {
                 if (!vendorFilter) return true;
-                const raw = property?.vendorName || getTelecomServiceProviderDisplay(property);
-                const vendorValue = toLower(raw === '-' ? '' : raw);
-                return vendorValue.includes(vendorFilter);
+                if (
+                    propertyHasVendorForFilter(
+                        property,
+                        telecomPayments,
+                        getServiceNo,
+                        effective.vendor,
+                        effective.year || new Date().getFullYear().toString(),
+                        effective.month || null
+                    )
+                ) {
+                    return true;
+                }
+                const display = getTelecomServiceProviderDisplay(property);
+                const providerLabel = display === '-' ? '' : display;
+                return (
+                    vendorNamesMatch(providerLabel, vendorFilter) ||
+                    vendorNamesMatch(property?.vendorName, vendorFilter)
+                );
             },
         });
 
@@ -808,7 +889,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         });
     };
 
-    const clearFilters = () => setFilters(getDefaultPropertyStyleFilters(MONTH_LABELS, { month: '' }));
+    const clearFilters = () => setFilters(getDefaultPropertyStyleFilters(MONTH_LABELS));
 
     const vendorFilterOptions = useMemo(() => {
         const subset = computeFiltered(filters, 'vendor');
@@ -838,42 +919,43 @@ const TelecomTab = ({ username, userRoles = [] }) => {
     );
 
     const telecomTableRows = useMemo(() => {
-        const rows = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
-                .map((property) => ({ project, property }))
+        const rows = flattenPropertyStyleRows(sortedFilteredProjects, getServiceNo, comparePropertyShopNoAsc);
+        const expanded = expandPropertyStyleRowsByVendor(rows, telecomPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+        if (!filters.paymentStatus) return expanded;
+        return expanded.filter(({ property, rowVendor }) =>
+            paymentStatusMatchesRow(property, rowVendor, filters)
         );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [sortedFilteredProjects]);
+    }, [sortedFilteredProjects, telecomPayments, filters.year, filters.month, filters.vendor, filters.paymentStatus]);
 
     const hiddenTelecomTableRows = useMemo(() => {
-        const rows = sortProjectsPropertyDetailsByShopNo(hiddenProjects).flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
-                .map((property) => ({ project, property }))
+        const rows = flattenPropertyStyleRows(
+            sortProjectsPropertyDetailsByShopNo(hiddenProjects),
+            getServiceNo,
+            comparePropertyShopNoAsc
         );
-        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
-        return rows;
-    }, [hiddenProjects]);
+        return expandPropertyStyleRowsByVendor(rows, telecomPayments, getServiceNo, {
+            year: filters.year,
+            month: filters.month,
+            vendorFilter: filters.vendor,
+        });
+    }, [hiddenProjects, telecomPayments, filters.year, filters.month, filters.vendor]);
 
     // Validity is used to hide "0" in covered months (no column).
 
-    const buildExportRows = () => {
-        const pairs = sortedFilteredProjects.flatMap((project) =>
-            (project.propertyDetails || [])
-                .filter((property) => property.ebNo && property.ebNo.trim() !== '')
-                .map((property) => ({ project, property }))
-        );
-        pairs.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+    const resolveExportYear = () => getUtilityHubExportYear(filters);
 
-        return pairs.map(({ project, property }, index) => {
+    const buildExportRows = (exportYear = resolveExportYear()) =>
+        telecomTableRows.map(({ project, property, rowVendor }, index) => {
             const rowNumber = index + 1;
             const row = {
                 slNo: rowNumber,
                 pid: project.projectId || '-',
                 projectName: project.projectName || '-',
-                serviceProvider: getTelecomServiceProviderDisplay(property),
+                serviceProvider: rowVendor || getTelecomServiceProviderDisplay(property),
                 shopNo: property.shopNo || '-',
                 doorNo: property.doorNo || '-',
                 serviceNo: property.ebNo || '-',
@@ -881,22 +963,29 @@ const TelecomTab = ({ username, userRoles = [] }) => {
 
             const telecomKey = property.utilityTelecomId ?? property.id;
             monthLabels.forEach(month => {
-                const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
+                const paymentData = getPaymentData(
+                    property.ebNo,
+                    month,
+                    telecomKey,
+                    property,
+                    exportYear,
+                    rowVendor
+                );
                 row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
             });
 
-            row.unpaid = getUnpaidCount(property.ebNo, telecomKey, property);
+            row.unpaid = getUnpaidCount(property.ebNo, telecomKey, property, rowVendor);
             return row;
         });
-    };
 
     const handleExportPDF = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(14);
-        doc.text('Telecom Services Overview', 14, 20);
+        doc.text(`Telecom Services Overview - ${exportYear}`, 14, 20);
 
         const headers = ['Sl.No', 'PID', 'Project Name', 'Service provider', 'Shop No', 'Door No', 'Service No', ...monthLabels, 'Unpaid'];
         const body = rows.map(row => [
@@ -928,11 +1017,12 @@ const TelecomTab = ({ username, userRoles = [] }) => {
             }
         });
 
-        doc.save('TelecomServices.pdf');
+        doc.save(`TelecomServices_${exportYear}.pdf`);
     };
 
     const handleExportExcel = () => {
-        const rows = buildExportRows();
+        const exportYear = resolveExportYear();
+        const rows = buildExportRows(exportYear);
         if (!rows.length) return;
 
         const worksheetData = rows.map(row => {
@@ -957,10 +1047,11 @@ const TelecomTab = ({ username, userRoles = [] }) => {
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'TelecomServices');
-        XLSX.writeFile(workbook, 'TelecomServices.xlsx');
+        XLSX.writeFile(workbook, `TelecomServices_${exportYear}.xlsx`);
     };
 
     const hasExportableData = telecomTableRows.length > 0;
+    const displayYear = resolveExportYear();
 
     const toggleProjectHideStatus = (projectId, isHide) => {
         if (isHide) {
@@ -1354,6 +1445,9 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                             </button>
                         </div>
                     </div>
+                    <h2 className="text-center text-lg font-semibold text-gray-800 mb-3">
+                        Telecom Services Overview - {displayYear}
+                    </h2>
                     <div className="rounded-lg">
                         <div
                             ref={scrollRef}
@@ -1411,11 +1505,11 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     ) : (
                                             telecomTableRows
-                                                .map(({ project, property }, index) => {
-                                                    const serviceProviderLabel = getTelecomServiceProviderDisplay(property);
+                                                .map(({ project, property, rowVendor, rowKey }, index) => {
+                                                    const serviceProviderLabel = rowVendor || getTelecomServiceProviderDisplay(property);
                                                     const telecomKey = property.utilityTelecomId ?? property.id;
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-2 py-2">{index + 1}</td>
                                                             <td className="px-2 py-2">{project.projectId}</td>
                                                             <td className="px-2 py-2 text-left whitespace-normal break-words max-w-[220px]">
@@ -1450,9 +1544,11 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                                 {property.ebNo}
                                                             </td>
                                                             {monthLabels.map(month => {
-                                                                const paymentData = getPaymentData(property.ebNo, month, telecomKey, property);
-                                                                const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
-                                                                const isNotRequired = paymentData.isNotRequired;
+                                                                const paymentData = getPaymentData(property.ebNo, month, telecomKey, property, undefined, rowVendor);
+                                                                const isPaid =
+                                                                    paymentData.amount !== '0' &&
+                                                                    (paymentData.amount !== '-' || paymentData.coveredByValidity);
+                                                                const isNotRequired = paymentData.isNotRequired && !paymentData.coveredByValidity;
                                                                 return (
                                                                     <td key={month} className="px-4 py-2">
                                                                         <span
@@ -1474,7 +1570,7 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                                             })}
                                                             <td className="px-2 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
-                                                                    {getUnpaidCount(property.ebNo, telecomKey, property)}
+                                                                    {getUnpaidCount(property.ebNo, telecomKey, property, rowVendor)}
                                                                 </span>
                                                             </td>
                                                             <td className="px-2 py-2">
@@ -1538,9 +1634,9 @@ const TelecomTab = ({ username, userRoles = [] }) => {
                                     </thead>
                                     <tbody>
                                         {hiddenTelecomTableRows
-                                            .map(({ project, property }, index) => {
+                                            .map(({ project, property, rowKey }, index) => {
                                                     return (
-                                                        <tr key={`${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
+                                                        <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
                                                             <td className="px-4 py-2">{project.projectId}</td>
                                                             <td className="px-4 py-2">{project.projectName}</td>

@@ -59,30 +59,26 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                 </h2>
             </div>
             <div className="content">
-                <div className={activeTab === 'pendingbill' ? 'block' : 'hidden'}>
+                {activeTab === 'pendingbill' && (
                     <PendingBill
                         username={username}
                         userRoles={userRoles}
-                        billPaymentsTabActive={activeTab === 'pendingbill'}
+                        billPaymentsTabActive
                     />
-                </div>
-                {canAccessDatabase && (
-                    <div className={activeTab === 'billdatabase' ? 'block' : 'hidden'}>
-                        <BillDatabase
-                            username={username}
-                            userRoles={userRoles}
-                            billPaymentsTabActive={activeTab === 'billdatabase'}
-                        />
-                    </div>
                 )}
-                {statementMounted && (
-                    <div className={activeTab === 'billstatement' ? 'block' : 'hidden'}>
-                        <BillStatement
-                            username={username}
-                            userRoles={userRoles}
-                            billPaymentsTabActive={activeTab === 'billstatement'}
-                        />
-                    </div>
+                {canAccessDatabase && activeTab === 'billdatabase' && (
+                    <BillDatabase
+                        username={username}
+                        userRoles={userRoles}
+                        billPaymentsTabActive
+                    />
+                )}
+                {statementMounted && activeTab === 'billstatement' && (
+                    <BillStatement
+                        username={username}
+                        userRoles={userRoles}
+                        billPaymentsTabActive
+                    />
                 )}
             </div>
         </div>

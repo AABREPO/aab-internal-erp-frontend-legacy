@@ -1104,6 +1104,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         setMessage('Site name saved successfully!');
+        closeSiteNames();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1239,6 +1240,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Category saved successfully!');
         setCategory('');
+        closeCategory();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1257,6 +1259,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Machine tool saved successfully!');
         setMachineTool('');
+        closeMachineTools();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1356,7 +1359,6 @@ const MasterData = ({ username, userRoles = [] }) => {
         body: formData,
       });
       if (response.ok) {
-        console.log('Employee data saved successfully!');
         setMessage('Employee Details saved successfully!');
         // Reset all form fields
         setEmployeeName('');
@@ -1376,6 +1378,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setAadhaarPdfFile(null);
         setAadhaarImageUrl('');
         setIsSiteEngineer(false);
+        closeEmployeeDetails();
         void refetchCurrentTableData();
       } else {
         console.error('Save request failed:', response.status, response.statusText);
@@ -1399,6 +1402,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setMessage('Labour details saved successfully!');
         setLabourName('');
         setLabourSalary('');
+        closeLabourDetails();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1442,6 +1446,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setAccountType('');
         setQrImage(null);
         setQrImagePreview(null);
+        closeAccountDetails();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1460,6 +1465,7 @@ const MasterData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Bank Account Type saved successfully!');
         setBankAccountType('');
+        closeBankAccountType();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1485,6 +1491,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setSelectedProject(null);
         setDoorNo('');
         setEbServiceNo('');
+        closeEbServiceLink();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -1507,6 +1514,7 @@ const MasterData = ({ username, userRoles = [] }) => {
         setMessage('Support Staff Name saved successfully!');
         setSupportStaffName('');
         setSupportStaffMobileNumber('');
+        closeSupportStaffName();
         void refetchCurrentTableData();
       }
     } catch (error) {
@@ -6256,6 +6264,7 @@ const MasterData = ({ username, userRoles = [] }) => {
                   });
                   if (response.ok) {
                     setMessage('EB Service Link updated successfully!');
+                    setIsEbServiceLinkEditOpen(false);
                     void refetchCurrentTableData();
                   }
                 } catch (error) {

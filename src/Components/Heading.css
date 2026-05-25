@@ -1,121 +1,192 @@
 /* General link styling */
 .link {
-    text-decoration: none; /* Remove underline */
+    text-decoration: none;
+    /* Remove underline */
     color: black;
     padding: 0;
     position: relative;
     margin-left: 50px;
-    font-size: large;
-    font-weight: 500;
-
+    font-size: 14px;
+    font-weight: 400;
 }
+
 /* Active link styling */
 .link.active {
-    color: black; /* Ensure text color stays black */
-    font-size: large;
-    font-weight: 700;
+    color: black;
+    /* Ensure text color stays black */
+    font-size: 18px;
+    font-weight: 600;
     text-decoration: none;
     padding: 0;
 }
+
 /* Golden underline styling for the active link */
 .link.active::after {
     content: "";
     display: block;
-    width: 100%; 
+    width: 100%;
     height: 2px;
     background-color: goldenrod;
     position: absolute;
-    top: 100%; /* Position the underline directly below the text */
+    top: 100%;
+    /* Position the underline directly below the text */
     left: 0;
-    transition: width 0.3s ease-in-out; /* Smooth transition for the underline */
-    margin-left: 0; /* Center the underline under the text */
+    transition: width 0.3s ease-in-out;
+    /* Smooth transition for the underline */
+    margin-left: 0;
+    /* Center the underline under the text */
     margin-top: 10px;
-   
+
 }
+
 /* Remove underline on hover */
 .link:hover {
-    text-decoration: none; /* Ensure no underline on hover */
+    text-decoration: none;
+    /* Ensure no underline on hover */
 }
+
 /* Additional styling for h2 elements in the topbar */
-.topbar-title{
+.topbar-title {
     display: flex;
     gap: 0;
 }
+
 .expense-entry-tabs {
-    gap: 24px;
-    border-bottom: 2px solid #D1D1D1;
+    gap: 12px;
+    border-bottom: 1px solid #EADFC8 !important;
 }
+
 .expense-entry-tabs .link {
     margin-left: 0;
+    padding: 8px 18px !important;
+    border-bottom: 2.5px solid transparent;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 21px !important;
+    color: #000000 !important;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif !important;
 }
+
 .expense-entry-tabs .link.active::after {
-    top: auto;
-    bottom: -12px;
-    margin-top: 0;
-    z-index: 1;
+    content: none !important;
 }
+
+.expense-entry-tabs .link.active {
+    border-bottom-color: #D6AB60 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 21px !important;
+    color: #000000 !important;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif !important;
+}
+
+.expense-entry-tabs .link:hover:not(.active) {
+    color: #3a3a3a !important;
+}
+
 .topbar-title h2 {
-    margin-top: 80px; /* Reset margin */
+    margin-top: 80px;
+    /* Reset margin */
     padding: 0;
-    
+
 }
-@media (max-width:600px){
+
+@media (max-width:600px) {
     .link {
-        text-decoration: none; /* Remove underline */
+        text-decoration: none;
+        /* Remove underline */
         color: black;
         padding: 0 10px;
         position: relative;
         margin-left: 22px;
     }
+
     .topbar-title h2 {
-        margin: 12px; /* Reset margin */
-        padding: 0 10px; /* Add padding around the h2 elements */
+        margin: 12px;
+        /* Reset margin */
+        padding: 0 10px;
+        /* Add padding around the h2 elements */
         margin-left: 20px;
         margin-top: 80px;
-        margin-right: -50px;   
+        margin-right: -50px;
     }
+
     .link.active::after {
         content: "";
         display: block;
-        width: 70px; 
+        width: 70px;
         height: 2px;
         background-color: goldenrod;
         position: absolute;
-        top: 100%; /* Position the underline directly below the text */
+        top: 100%;
+        /* Position the underline directly below the text */
         left: 0px;
-        transition: width 0.3s ease-in-out; /* Smooth transition for the underline */
-        margin-left: 0; /* Center the underline under the text */
+        transition: width 0.3s ease-in-out;
+        /* Smooth transition for the underline */
+        margin-left: 0;
+        /* Center the underline under the text */
     }
 }
+
 .expense-entry-tabs h2 {
     margin: 0;
     padding: 0;
 }
-@media (max-width:480px){
+
+@media (max-width:480px) {
     .link {
-        text-decoration: none; /* Remove underline */
+        text-decoration: none;
+        /* Remove underline */
         color: black;
         padding: 0 10px;
         position: relative;
         margin-left: 20px;
     }
+
     .topbar-title h2 {
-        margin: 12px; /* Reset margin */
-        padding: 0 10px; /* Add padding around the h3 elements */
+        margin: 12px;
+        /* Reset margin */
+        padding: 0 10px;
+        /* Add padding around the h3 elements */
         margin-left: 16px;
         margin-top: 80px;
         margin-right: -50px;
     }
+
     .link.active::after {
         content: "";
         display: block;
-        width: 70px; 
+        width: 70px;
         height: 2px;
         background-color: goldenrod;
         position: absolute;
-        top: 100%; /* Position the underline directly below the text */
+        top: 100%;
+        /* Position the underline directly below the text */
         left: 10px;
-        transition: width 0.3s ease-in-out; /* Smooth transition for the underline */
-        margin-left: 0; /* Center the underline under the text */
+        transition: width 0.3s ease-in-out;
+        /* Smooth transition for the underline */
+        margin-left: 0;
+        /* Center the underline under the text */
     }
+}
+
+/* Keep Expense Entry tabs flush below top bar like Bank Register */
+.topbar-title.expense-entry-tabs {
+    align-items: flex-end;
+    gap: 0 !important;
+    padding: 0 18px !important;
+    position: sticky;
+    top: 56px;
+    z-index: 250;
+    background: #FAF6ED;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    min-height: 48px;
+    border-bottom: 1px solid #EADFC8 !important;
+}
+
+.topbar-title.expense-entry-tabs h2 {
+    margin: 0 !important;
+    padding: 10px 14px !important;
 }

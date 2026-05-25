@@ -1918,7 +1918,7 @@ const Form = ({
                     vendor_id: vendorId,
                     employee_id: null,
                     project_id: projectId,
-                    type: selectedAccountType === 'Claim Payment' ? "Claim Payment" : selectedAccountType === 'Sundry Payment' ? "Sundry Payment" : selectedAccountType === 'Bill Payments' ? "Bill" : selectedAccountType === 'Utility Bills' ? ("Utility Bills") : "Expense",
+                    type: selectedAccountType === 'Claim Payment' ? "Claim Payment" : selectedAccountType === 'Sundry Payment' ? "Sundry Payment" : selectedAccountType === 'Bill Payments' ? "Bill" : selectedAccountType === 'Utility Bills' ? ( utilityType || "Utility Bills") : "Expense",
                     amount: selectedAccountType === 'Bill Refund' ? -Math.abs(parseFloat(amount)) : parseFloat(amount),
                     status: weeklyExpenseStatus,
                     weekly_number: weeklyNumber,

@@ -4,8 +4,9 @@ import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
 import cross from '../Images/cross.png';
 import edit from '../Images/Edit.svg';
+import Add from '../Images/+Add.svg';
 import deleteIcon from '../Images/Delete.svg';
-const DTableView = ({username, userRoles = []}) => {
+const DTableView = ({ username, userRoles = [] }) => {
   const [isSiteNamesOpen, setIsSiteNamesOpen] = useState(false);
   const [isMachineToolsOpen, setIsMachineToolsOpen] = useState(false);
   const [isAccountTypesOpen, setAccountTypesOpen] = useState(false);
@@ -164,7 +165,7 @@ const DTableView = ({username, userRoles = []}) => {
     setSelectedAccountTypeId(item.id);
     setIsAccountTypeEditOpen(true);
   }
-  const openEditWeeklyTypePopup = (item) =>{
+  const openEditWeeklyTypePopup = (item) => {
     setEditWeeklyType(item.type);
     setSelectedWeeklyTypeId(item.id)
     setIsEditWeeklyTypeOpen(true);
@@ -871,7 +872,7 @@ const DTableView = ({username, userRoles = []}) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({type: editWeeklyType }),
+        body: JSON.stringify({ type: editWeeklyType }),
       });
       if (response.ok) {
         closeEditWeeklyTypePopup();
@@ -1040,977 +1041,1128 @@ const DTableView = ({username, userRoles = []}) => {
       setIsSiteNoInitialized(false); // Reset when popup is closed
     }
   }, [isSiteNamesOpen, filteredSiteNames]);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [expandedCells, setExpandedCells] = useState({});
+
+  const toggleExpandedCell = (cellKey) => {
+    setExpandedCells((prev) => ({
+      ...prev,
+      [cellKey]: !prev[cellKey],
+    }));
+  };
+
+  const interactiveDragSelectors =
+    'input, textarea, button, select, a, label, [role="button"], [contenteditable="true"], .prevent-drag-scroll';
+
+  const shouldSkipDragScroll = (target) => {
+    if (!target || typeof target.closest !== 'function') return false;
+    return Boolean(target.closest(interactiveDragSelectors));
+  };
+
+  const handleMouseDown = (e) => {
+    if (shouldSkipDragScroll(e.target)) {
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(true);
+    setStartX(e.pageX - e.currentTarget.offsetLeft);
+    setScrollLeft(e.currentTarget.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - e.currentTarget.offsetLeft;
+    const walk = (x - startX) * 2;
+    e.currentTarget.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleTouchStart = (e) => {
+    if (shouldSkipDragScroll(e.target)) {
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(true);
+    setStartX(e.touches[0].pageX - e.currentTarget.offsetLeft);
+    setScrollLeft(e.currentTarget.scrollLeft);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.touches[0].pageX - e.currentTarget.offsetLeft;
+    const walk = (x - startX) * 2;
+    e.currentTarget.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
-    <div className="p-4 bg-white ml-6 mr-8">
-      <div className=" lg:flex space-x-[2%] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto">
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Project Name.."
-              value={siteNameSearch}
-              onChange={(e) => setSiteNameSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openSiteNames}>
-              + Add
-            </button>
-          </div>
-          <button onClick={openSiteNamesModals} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button onClick={handleAllSiteNameDelete}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 lg:ml-[19rem] md:ml-[31rem] ml-52' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-80 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">P.ID</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Project Name</th>
-                  </tr>
-                </thead>
-              </table>
+    <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
+      <div className=" flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
+        <div
+          className=" lg:flex space-x-[18px] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto no-scrollbar scrollbar-none select-none"
+          style={{ cursor: isDragging ? 'grabbing' : 'default' }}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search Project Name.."
+                value={siteNameSearch}
+                onChange={(e) => setSiteNameSearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openSiteNames}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
             </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-80">
-                <tbody>
-                  {filteredSiteNames.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{item.siteNo}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.siteName}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditSiteNamePopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleSiteNameDelete(item.id)} />
+            <button onClick={openSiteNamesModals} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-fixed lg:w-[340px] w-full">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left w-[50px] text-[16px] font-bold">P.ID</th>
+                      <th className="pl-0 pr-[8px] text-left text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Project Name</span>
+                          <button type="button" onClick={handleAllSiteNameDelete} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
                           </button>
                         </div>
-                      </td>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[340px] w-full">
+                  <tbody>
+                    {filteredSiteNames.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[50px]">{item.siteNo}</td>
+                        <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex pr-[4px] items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-siteName`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-siteName`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.siteName}
+                            >
+                              {item.siteName}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditSiteNamePopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleSiteNameDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search Vendor Name.."
+                value={vendorNameSearch}
+                onChange={(e) => setVendorNameSearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openvendorNames}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
+            </div>
+            <button onClick={openVendorNamesModals} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' />
+              <h1 className='mt-1.5  text-[14px] font-semibold'>Import file</h1>
+            </button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-auto lg:w-[320px] ">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                      <th className="pl-0 pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Vendor Name</span>
+                          <button type="button" onClick={handleAllVendorNameDelete} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[320px] w-full">
+                  <tbody>
+                    {filteredVendorNames.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">
+                          {(vendorNames.findIndex(v => v.id === item.id) + 1).toString().padStart(2, '0')}
+                        </td>
+                        <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-vendorName`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-vendorName`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.vendorName}
+                            >
+                              {item.vendorName}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditVendorPopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleVendorNameDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search Contractor Name.."
+                value={contractorNameSearch}
+                onChange={(e) => setContractorNameSearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openContractorNames}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
+            </div>
+            <button onClick={openContractorNamesModals} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-auto lg:w-[320px] ">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                      <th className="pl-0 pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Contractor Name</span>
+                          <button type="button" onClick={handleAllContractorNameDelete} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[320px] w-full">
+                  <tbody>
+                    {filteredContractorNames.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(contractorNames.findIndex(c => c.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                        <td className="pl-0 pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-contractorName`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-contractorName`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.contractorName}
+                            >
+                              {item.contractorName}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditContractorPopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleContractorNameDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search Categories.."
+                value={expensesCategorySearch}
+                onChange={(e) => setExpensesCategorySearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openCategory}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
+            </div>
+            <button onClick={openCategoryModels} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-auto lg:w-[280px] ">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                      <th className="pl-[0px] pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Category</span>
+                          <button type="button" onClick={handleAllCategoryDelete} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[280px] w-full">
+                  <tbody>
+                    {filteredCategories.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(expensesCategory.findIndex(c => c.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                        <td className="pl-[0px] pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-category`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-category`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.category}
+                            >
+                              {item.category}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditCategoryPopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleCategoriesDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search Tools.."
+                value={machineToolsSearch}
+                onChange={(e) => setMachineToolsSearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openMachineTools}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
+            </div>
+            <button onClick={openMachineToolsModels} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-auto lg:w-[280px] ">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                      <th className="pl-[0px] pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Machine Tools</span>
+                          <button type="button" onClick={handleAllMachineToolDelete} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[280px] w-full">
+                  <tbody>
+                    {filteredMachineTools.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(machineToolsOptions.findIndex(tool => tool.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                        <td className="pl-[0px] pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-machineTool`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-machineTool`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.machineTool}
+                            >
+                              {item.machineTool}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditMachineToolsPopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleMachineToolsDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search account type.."
+                value={accountTypeSearch}
+                onChange={(e) => setAccountTypeSearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openAccountTypes}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
+            </div>
+            <button onClick={openAccountTypesModels} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-auto lg:w-[280px] ">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                      <th className="pl-[0px] pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Account Type</span>
+                          <button type="button" onClick={handleAllAccountTypes} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[280px] w-full">
+                  <tbody>
+                    {filteredAccountType.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(expensesAccountType.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                        <td className="pl-[0px] pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-accountType`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-accountType`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.accountType}
+                            >
+                              {item.accountType}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditAccountTypePopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleAccountTypeDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center mb-[6px] lg:mt-0 mt-3">
+              <input
+                type="text"
+                className=" border-[#BF9853] border-2 border-opacity-25 rounded-full text-[14px] p-2 flex-1 w-44 h-[40px] focus:outline-none"
+                placeholder="Search Weekly type.."
+                value={weeklyTypeSearch}
+                onChange={(e) => setWeeklyTypeSearch(e.target.value)}
+              />
+              <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
+                <img src={search} alt='search' className=' w-5 h-5' />
+              </button>
+              <button className="text-black font-bold px-1 ml-4"
+                onClick={openWeeklyTypes}>
+                <img src={Add} alt='add' className='w-[30px] h-[30px]' />
+              </button>
+            </div>
+            <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-[6px] text-[14px] font-semibold'>Import file</h1></button>
+            <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
+              <div className="bg-[#FAF6ED]">
+                <table className="table-auto lg:w-[280px] ">
+                  <thead className='bg-[#FAF6ED]'>
+                    <tr className="border-b h-[40px]">
+                      <th className="pl-[12px] pr-[12px] text-left lg:w-16 text-[16px] font-bold">S.No</th>
+                      <th className="pl-[0px] pr-[8px] text-left lg:w-72 text-[16px] font-bold">
+                        <div className="flex items-center justify-between gap-[12px]">
+                          <span>Type</span>
+                          <button type="button" onClick={handleDeleteAllWeeklyTypes} className="inline-flex shrink-0 items-center justify-center">
+                            <img src={deleteIcon} alt='del' className='w-4 h-4' />
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <table className="table-fixed lg:w-[280px] w-full">
+                  <tbody>
+                    {filteredWeeklyType.map((item, index) => (
+                      <tr key={item.id} className="border-b odd:bg-white text-[14px] even:bg-[#FAF6ED] h-[40px]">
+                        <td className="pl-[12px] pr-[12px] text-left font-semibold w-[64px]">{(weeklyTypes.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
+                        <td className="pl-[0px] pr-[8px] text-left group font-semibold max-w-0">
+                          <div className="flex items-center min-w-0">
+                            <span
+                              onClick={() => toggleExpandedCell(`${item.id}-weeklyType`)}
+                              className={`block min-w-0 flex-1 cursor-pointer ${expandedCells[`${item.id}-weeklyType`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                              title={item.type}
+                            >
+                              {item.type}
+                            </span>
+                          <div className="flex shrink-0 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
+                            <button type="button" >
+                              <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditWeeklyTypePopup(item)} />
+                            </button>
+                            <button >
+                              <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleWeeklyTypeDelete(item.id)} />
+                            </button>
+                          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Vendor Name.."
-              value={vendorNameSearch}
-              onChange={(e) => setVendorNameSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openvendorNames}>
-              + Add
-            </button>
-          </div>
-          <button onClick={openVendorNamesModals} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' />
-            <h1 className='mt-1.5 text-sm'>Import file</h1>
-          </button>
-          <button onClick={handleAllVendorNameDelete}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem] lg:ml-[17rem] md:ml-[30rem]' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Vendor Name</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
-                <tbody>
-                  {filteredVendorNames.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">
-                        {(vendorNames.findIndex(v => v.id === item.id) + 1).toString().padStart(2, '0')}
-                      </td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.vendorName}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditVendorPopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleVendorNameDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {isVendorEditOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditVendorPopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditVendorName}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[15.5rem]">Vendor Name</label>
+                  <input
+                    type="text"
+                    value={editVendorName}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Vendor Name"
+                    onChange={(e) => setEditVendorName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditVendorPopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Contractor Name.."
-              value={contractorNameSearch}
-              onChange={(e) => setContractorNameSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openContractorNames}>
-              + Add
-            </button>
-          </div>
-          <button onClick={openContractorNamesModals} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button onClick={handleAllContractorNameDelete}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Contractor Name</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
-                <tbody>
-                  {filteredContractorNames.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(contractorNames.findIndex(c => c.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.contractorName}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditContractorPopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleContractorNameDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        )}
+        {isEditSiteNameOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditSiteNamePopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditSiteName}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[17.5rem]">Site Name</label>
+                  <input
+                    type="text"
+                    value={editSiteName}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Site Name"
+                    onChange={(e) => setEditSiteName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="mb-4 ">
+                  <label className="block text-lg font-medium mb-2 -ml-[19rem]">Site No</label>
+                  <input
+                    type="text"
+                    value={editSiteNo}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Site No"
+                    onChange={(e) => setEditSiteNo(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12 mb-3">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditSiteNamePopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Categories.."
-              value={expensesCategorySearch}
-              onChange={(e) => setExpensesCategorySearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openCategory}>
-              + Add
-            </button>
-          </div>
-          <button onClick={openCategoryModels} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button onClick={handleAllCategoryDelete}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Category</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
-                <tbody>
-                  {filteredCategories.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(expensesCategory.findIndex(c => c.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.category}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditCategoryPopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleCategoriesDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        )}
+        {isContractorEditOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditContractorPopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditContractorName}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[13.5rem]">Contractor Name</label>
+                  <input
+                    type="text"
+                    value={editContractorName}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Contractor Name"
+                    onChange={(e) => setEditContractorName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditContractorPopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Tools.."
-              value={machineToolsSearch}
-              onChange={(e) => setMachineToolsSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openMachineTools}>
-              + Add
-            </button>
-          </div>
-          <button onClick={openMachineToolsModels} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button onClick={handleAllMachineToolDelete}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Machine Tools</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
-                <tbody>
-                  {filteredMachineTools.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(machineToolsOptions.findIndex(tool => tool.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.machineTool}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditMachineToolsPopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleMachineToolsDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        )}
+        {isCategoriesEditOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditCategoryPopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditCategoriesName}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[17.5rem]">Category</label>
+                  <input
+                    type="text"
+                    value={editCategory}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Category"
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditCategoryPopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search account type.."
-              value={accountTypeSearch}
-              onChange={(e) => setAccountTypeSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openAccountTypes}>
-              + Add
-            </button>
-          </div>
-          <button onClick={openAccountTypesModels} className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button onClick={handleAllAccountTypes}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Account Type</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
-                <tbody>
-                  {filteredAccountType.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(expensesAccountType.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.accountType}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditAccountTypePopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleAccountTypeDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        )}
+        {isAccountTypeEditOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditAccountTypePopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditAccountTypes}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[15rem]">Account Type</label>
+                  <input
+                    type="text"
+                    value={editAccountType}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Account Type"
+                    onChange={(e) => setEditAccountType(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditAccountTypePopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-        <div>
-          <div className="flex items-center mb-2 lg:mt-0 mt-3">
-            <input
-              type="text"
-              className="border border-[#FAF6ED] border-r-4 border-l-4 border-b-4 border-t-4 rounded-lg p-2 flex-1 w-44 h-12 focus:outline-none"
-              placeholder="Search Weekly type.."
-              value={weeklyTypeSearch}
-              onChange={(e) => setWeeklyTypeSearch(e.target.value)}
-            />
-            <button className="-ml-6 mt-5 transform -translate-y-1/2 text-gray-500">
-              <img src={search} alt='search' className=' w-5 h-5' />
-            </button>
-            <button className="text-black font-bold px-1 ml-4 border-dashed border-b-2 border-[#BF9853]"
-              onClick={openWeeklyTypes}>
-              + Add
-            </button>
-          </div>
-          <button className="text-[#E4572E] -mb-4 flex"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-1' /><h1 className='mt-1.5 text-sm'>Import file</h1></button>
-          <button onClick={handleDeleteAllWeeklyTypes}>
-            <img src={deleteIcon} alt='del' className='-mb-14 mt-5 ml-[15rem]' />
-          </button>
-          <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853]'>
-            <div className="bg-[#FAF6ED]">
-              <table className="table-auto lg:w-72 ">
-                <thead className='bg-[#FAF6ED]'>
-                  <tr className="border-b">
-                    <th className="p-2 text-left lg:w-16 text-xl font-bold">S.No</th>
-                    <th className="p-2 text-left lg:w-72 text-xl font-bold">Type</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            <div className="overflow-y-auto max-h-[660px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="table-auto lg:w-72 w-full">
-                <tbody>
-                  {filteredWeeklyType.map((item, index) => (
-                    <tr key={item.id} className="border-b odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="p-2 text-left font-semibold">{(weeklyTypes.findIndex(acc => acc.id === item.id) + 1).toString().padStart(2, '0')}</td>
-                      <td className="p-2 text-left group flex font-semibold">
-                        <div className="flex flex-grow">
-                          {item.type}
-                        </div>
-                        <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                          <button type="button" >
-                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditWeeklyTypePopup(item)} />
-                          </button>
-                          <button >
-                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleWeeklyTypeDelete(item.id)} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        )}
+        {isEditWeeklyTypeOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditWeeklyTypePopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditWeeklyTypes}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[15rem]">Type</label>
+                  <input
+                    type="text"
+                    value={editWeeklyType}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Account Type"
+                    onChange={(e) => setEditWeeklyType(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditWeeklyTypePopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
+        )}
+        {isMachineToolsEditOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
+            <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeEditMachineToolsPopup}>
+                  <img src={cross} alt='close' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleEditMachineTools}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[17rem]">Machine Tools</label>
+                  <input
+                    type="text"
+                    value={editMachineTool}
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
+                    placeholder="Enter Machine Tools"
+                    onChange={(e) => setEditMachineTool(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button
+                    type="submit"
+                    className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
+                    onClick={closeEditMachineToolsPopup}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isSiteNamesOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeSiteNames}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitSiteNames}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[17rem]">Site Name </label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Site Name"
+                    onChange={(e) => setSiteName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[18.5rem]">Site No </label>
+                  <input
+                    type="text"
+                    value={siteNo}
+                    onChange={(e) => setSiteNo(e.target.value)}
+                    placeholder="Enter Site No"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-8 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeSiteNames}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isMachineToolsOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeMachineTools}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitMachineTools}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[15rem]">Machine Tools </label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Tools Name"
+                    onChange={(e) => setMachineTool(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeMachineTools}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isAccountTypesOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeAccountTypes}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitAccountTypes}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-60">Account Type</label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Account Type"
+                    onChange={(e) => setAccountType(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeAccountTypes}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isWeeklyTypeOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeWeeklyTypes}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitWeeklyTypes}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-60">Type</label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Type"
+                    onChange={(e) => setWeeklyType(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeWeeklyTypes}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isVendorNameOpens && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closevendorNames}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitVendorName}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[16rem]">Vendor Name</label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Vendor Name"
+                    onChange={(e) => setVendorName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closevendorNames}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isContractorNameOpens && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeContractorNames}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitContractorName}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-[13.5rem]">Contractor Name</label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Contractor Name"
+                    onChange={(e) => setContractorName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeContractorNames}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {isCategoryOpens && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
+            <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
+              <div>
+                <button className="text-red-500 ml-[95%]" onClick={closeCategory}>
+                  <img src={cross} alt='cross' className='w-5 h-5' />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitCategory}>
+                <div className="mb-4">
+                  <label className="block text-lg font-medium mb-2 -ml-72">Category</label>
+                  <input
+                    type="text"
+                    className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
+                    placeholder="Enter Category"
+                    onChange={(e) => setCategory(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex space-x-2 mt-4 ml-12">
+                  <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
+                    Submit
+                  </button>
+                  <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeCategory}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {confirmDelete && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white p-4 rounded">
+              <h2>Confirm Deletion</h2>
+              <p>Are you sure you want to delete this tile?</p>
+              <div className="flex space-x-4">
+                <button className="bg-red-500 text-white p-2 rounded">
+                  Yes, Delete
+                </button>
+                <button className="bg-gray-300 p-2 rounded">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <ModalSiteName
+          isOpen={isSiteNamesModelOpens}
+          onClose={closeSiteNamesModals}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadSiteNames}
+        />
+        <ModalVendorName
+          isOpen={isVendorNameModelOpens}
+          onClose={closeVendorNamesModals}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadVendorNames}
+        />
+        <ModalContractorName
+          isOpen={isContractorNameModelOpens}
+          onClose={closeContractorNamesModals}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadContractorNames}
+        />
+        <ModalCategory
+          isOpen={isCategoryModelOpens}
+          onClose={closeCategoryModels}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadcategory}
+        />
+        <ModalMachineTools
+          isOpen={isMachineToolsModelOpen}
+          onClose={closeMachineToolModels}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadMachineTools}
+        />
+        <ModalAccountTypes
+          isOpen={isAccountTypesModelOpen}
+          onClose={closeAccountTypesModels}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadAccountType}
+        />
       </div>
-      {isVendorEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditVendorPopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditVendorName}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[15.5rem]">Vendor Name</label>
-                <input
-                  type="text"
-                  value={editVendorName}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Vendor Name"
-                  onChange={(e) => setEditVendorName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditVendorPopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isEditSiteNameOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditSiteNamePopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditSiteName}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[17.5rem]">Site Name</label>
-                <input
-                  type="text"
-                  value={editSiteName}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Site Name"
-                  onChange={(e) => setEditSiteName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="mb-4 ">
-                <label className="block text-lg font-medium mb-2 -ml-[19rem]">Site No</label>
-                <input
-                  type="text"
-                  value={editSiteNo}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Site No"
-                  onChange={(e) => setEditSiteNo(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12 mb-3">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditSiteNamePopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isContractorEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditContractorPopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditContractorName}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[13.5rem]">Contractor Name</label>
-                <input
-                  type="text"
-                  value={editContractorName}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Contractor Name"
-                  onChange={(e) => setEditContractorName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditContractorPopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isCategoriesEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditCategoryPopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditCategoriesName}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[17.5rem]">Category</label>
-                <input
-                  type="text"
-                  value={editCategory}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Category"
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditCategoryPopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isAccountTypeEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditAccountTypePopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditAccountTypes}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[15rem]">Account Type</label>
-                <input
-                  type="text"
-                  value={editAccountType}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Account Type"
-                  onChange={(e) => setEditAccountType(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditAccountTypePopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isEditWeeklyTypeOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditWeeklyTypePopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditWeeklyTypes}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[15rem]">Type</label>
-                <input
-                  type="text"
-                  value={editWeeklyType}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Account Type"
-                  onChange={(e) => setEditWeeklyType(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditWeeklyTypePopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isMachineToolsEditOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-          <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeEditMachineToolsPopup}>
-                <img src={cross} alt='close' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleEditMachineTools}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[17rem]">Machine Tools</label>
-                <input
-                  type="text"
-                  value={editMachineTool}
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                  placeholder="Enter Machine Tools"
-                  onChange={(e) => setEditMachineTool(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button
-                  type="submit"
-                  className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                  onClick={closeEditMachineToolsPopup}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isSiteNamesOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeSiteNames}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitSiteNames}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[17rem]">Site Name </label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Site Name"
-                  onChange={(e) => setSiteName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[18.5rem]">Site No </label>
-                <input
-                  type="text"
-                  value={siteNo}
-                  onChange={(e) => setSiteNo(e.target.value)}
-                  placeholder="Enter Site No"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-8 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeSiteNames}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isMachineToolsOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeMachineTools}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitMachineTools}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[15rem]">Machine Tools </label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Tools Name"
-                  onChange={(e) => setMachineTool(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeMachineTools}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isAccountTypesOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeAccountTypes}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitAccountTypes}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-60">Account Type</label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Account Type"
-                  onChange={(e) => setAccountType(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeAccountTypes}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isWeeklyTypeOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeWeeklyTypes}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitWeeklyTypes}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-60">Type</label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Type"
-                  onChange={(e) => setWeeklyType(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeWeeklyTypes}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isVendorNameOpens && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closevendorNames}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitVendorName}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[16rem]">Vendor Name</label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Vendor Name"
-                  onChange={(e) => setVendorName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closevendorNames}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isContractorNameOpens && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeContractorNames}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitContractorName}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-[13.5rem]">Contractor Name</label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Contractor Name"
-                  onChange={(e) => setContractorName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeContractorNames}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isCategoryOpens && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-          <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-            <div>
-              <button className="text-red-500 ml-[95%]" onClick={closeCategory}>
-                <img src={cross} alt='cross' className='w-5 h-5' />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitCategory}>
-              <div className="mb-4">
-                <label className="block text-lg font-medium mb-2 -ml-72">Category</label>
-                <input
-                  type="text"
-                  className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                  placeholder="Enter Category"
-                  onChange={(e) => setCategory(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex space-x-2 mt-4 ml-12">
-                <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                  Submit
-                </button>
-                <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeCategory}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {confirmDelete && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-4 rounded">
-            <h2>Confirm Deletion</h2>
-            <p>Are you sure you want to delete this tile?</p>
-            <div className="flex space-x-4">
-              <button className="bg-red-500 text-white p-2 rounded">
-                Yes, Delete
-              </button>
-              <button className="bg-gray-300 p-2 rounded">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ModalSiteName
-        isOpen={isSiteNamesModelOpens}
-        onClose={closeSiteNamesModals}
-        onFileChange={handleFileChange}
-        onUpload={handleUploadSiteNames}
-      />
-      <ModalVendorName
-        isOpen={isVendorNameModelOpens}
-        onClose={closeVendorNamesModals}
-        onFileChange={handleFileChange}
-        onUpload={handleUploadVendorNames}
-      />
-      <ModalContractorName
-        isOpen={isContractorNameModelOpens}
-        onClose={closeContractorNamesModals}
-        onFileChange={handleFileChange}
-        onUpload={handleUploadContractorNames}
-      />
-      <ModalCategory
-        isOpen={isCategoryModelOpens}
-        onClose={closeCategoryModels}
-        onFileChange={handleFileChange}
-        onUpload={handleUploadcategory}
-      />
-      <ModalMachineTools
-        isOpen={isMachineToolsModelOpen}
-        onClose={closeMachineToolModels}
-        onFileChange={handleFileChange}
-        onUpload={handleUploadMachineTools}
-      />
-      <ModalAccountTypes
-        isOpen={isAccountTypesModelOpen}
-        onClose={closeAccountTypesModels}
-        onFileChange={handleFileChange}
-        onUpload={handleUploadAccountType}
-      />
     </div>
   );
 };

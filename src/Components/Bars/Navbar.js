@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useSidebar } from '../../context/SidebarContext';
 import axios from "axios";
 import * as XLSX from 'xlsx';
-import logo from '../Images/aablogo.png';
+import logo from '../Images/AALogo.svg';
 import Sidebar from './Sidebar';
-import Logout from '../Images/Logout.png'
-import DownloadIcon from '../Images/download.png';
+import { isOrbitAppChromeRoute } from '../OrbitERP/orbitAppChromePaths';
 const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [], branchId, brachId }) => {
-  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+  const location = useLocation();
+  const hideMainNavForOrbitChrome = isOrbitAppChromeRoute(location.pathname);
+  /** Same pattern as Orbit ERP 1.6.html: one drawerOpen at app root — here SidebarProvider owns visibility for TopBar + legacy Navbar + OrbitAppChrome. */
+  const { isSidebarVisible, closeSidebar } = useSidebar();
   const [isProfileDropdownVisible, setIsProfileDropdownVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEditRequestsDropdownOpen, setIsEditRequestsDropdownOpen] = useState(false);
@@ -46,9 +50,6 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       fetchUserRoles();
     }
   }, [userRoles]);
-  const toggleSidebar = () => {
-    setIsSidebarVisible((prev) => !prev);
-  };
   const normalizedUsername = username?.trim().toLowerCase();
   const canDownloadExpenses = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
   const canViewEditRequests = normalizedUsername === 'admin' || normalizedUsername === 'mahalingam m';
@@ -884,7 +885,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
       sidebarRef.current && !sidebarRef.current.contains(event.target) &&
       profileRef.current && !profileRef.current.contains(event.target)
     ) {
-      setIsSidebarVisible(false);
+      closeSidebar();
       setIsProfileDropdownVisible(false);
       setIsEditRequestsDropdownOpen(false);
     }
@@ -1197,30 +1198,97 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@700&display=swap');
         .navbar-notification-scroll::-webkit-scrollbar { width: 8px; }
         .navbar-notification-scroll::-webkit-scrollbar-track { background: #e8e4dc; border-radius: 6px; margin: 4px 0; }
         .navbar-notification-scroll::-webkit-scrollbar-thumb { background: #b8b3a8; border-radius: 6px; }
         .navbar-notification-scroll::-webkit-scrollbar-thumb:hover { background: #9c968a; }
         .navbar-notification-scroll { scrollbar-width: thin; scrollbar-color: #b8b3a8 #e8e4dc; }
+        .navbar-orbit-end{
+          --gold:#D6AB60; --gold-soft:#E6C68A; --gold-deep:#B8924B; --gold-darker:#9C7A3A;
+          --ink:#212121; --ink-2:#3a3a3a; --muted:#8a8275; --muted-2:#a59c8a;
+          --cream:#FBF7F0; --cream-2:#F5EFE3; --cream-3:#FAF4E8;
+          --line:#EADFC8; --line-soft:#f0e9d8;
+          --green:#2f9e6e; --green-soft:#3eb37f; --green-bg:#E0F1E5;
+          --red:#d23b3b; --red-bg:#FFE7E7;
+          font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;
+          color:var(--ink);
+        }
+        .navbar-brand-button{
+          display:flex;
+          align-items:center;
+          gap:9px;
+          background:transparent;
+          border:none;
+          padding:3px 6px;
+          margin-left:-14px;
+          border-radius:8px;
+        }
+        .navbar-brand-text{
+          font-family:'Outfit',sans-serif;
+          font-weight:700;
+          font-size:15.5px;
+          color:#BF9853;
+          letter-spacing:0.16em;
+          line-height:1;
+          white-space:nowrap;
+          text-transform:uppercase;
+        }
+        .navbar.navbar-unified{
+          position:fixed !important;
+          top:0 !important;
+          left:0 !important;
+          width:100% !important;
+          background:#fff !important;
+        }
+        .navbar.navbar-unified::after{
+          content:"";
+          position:absolute;
+          left:0;
+          right:0;
+          bottom:-10px;
+          height:10px;
+          background:#fff;
+          pointer-events:none;
+        }
+        .navbar-orbit-end .ink{color:var(--ink);}
+        .navbar-orbit-end .muted{color:var(--muted);}
+        .navbar-brand-button{display:flex;align-items:center;gap:9px;background:transparent;border:none;padding:3px 6px;margin-left:-14px;border-radius:8px;}
+        .navbar-brand-text{font-family:'Outfit',sans-serif;font-weight:700;font-size:15.5px;color:var(--gold-deep);letter-spacing:0.16em;line-height:1;white-space:nowrap;text-transform:uppercase;}
+        .navbar-orbit-end .branch-select{background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 28px 5px 10px;font-size:12.5px;font-weight:600;color:var(--ink-2);appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' stroke='%238a8275' stroke-width='1.5' fill='none'/></svg>");background-repeat:no-repeat;background-position:right 9px center;cursor:pointer;min-width:128px;}
+        .navbar-orbit-end .branch-select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(214,171,96,0.15);}
+        .navbar-orbit-end .branch-select-static{display:inline-flex;align-items:center;background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:600;color:var(--ink-2);min-width:128px;}
+        .navbar-orbit-end .icon-btn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink-2);cursor:pointer;transition:all .15s;position:relative;}
+        .navbar-orbit-end .icon-btn:hover{background:var(--cream-2);}
+        .navbar-orbit-end .icon-btn:disabled{opacity:0.5;cursor:not-allowed;}
+        .navbar-orbit-end .icon-btn.gold{color:var(--gold-deep);}
+        .navbar-orbit-end .icon-btn .notif-dot{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:999px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #fff;line-height:1;}
+        .navbar-orbit-end .avatar-mark{width:30px;height:30px;border-radius:50%;background:var(--cream-2);border:1.5px solid var(--gold);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+        .navbar-orbit-end .user-pill{display:inline-flex;align-items:center;gap:7px;padding:2px 8px 2px 2px;}
+        .navbar-orbit-end .navbar-orbit-profile-hit{border-radius:8px;}
+        .navbar-orbit-end .navbar-orbit-profile-hit:hover{background:var(--cream-2);}
+        @media(max-width:768px){
+          .navbar-brand-text{display:none;}
+          .navbar-orbit-end .desktop-only{display:none;}
+        }
       `}</style>
-      <nav className="navbar fixed w-full top-0 z-50 bg-white h-14 shadow-md">
-        <div className="flex justify-between items-center h-full px-4">
-          <div className="flex items-center">
+      {!hideMainNavForOrbitChrome && (
+      <nav className="navbar navbar-unified fixed top-0 z-[300] flex w-full min-h-[64px] items-center border-b border-[#EADFC8] bg-white px-4 py-[5px]">
+        <div className="flex w-full items-center justify-start">
+          <div className="navbar-brand-button w-[147px] h-[32px]">
             <img
               src={logo}
-              alt="Logo"
-              className="cursor-pointer w-[42px] h-[40px] rounded-full"
-              onClick={toggleSidebar}
+              alt="AA Builders"
+              className=" object-cover"
             />
-            <p className="hidden md:block text-[#BF9853] ml-2 font-medium text-lg">BUILDERS</p>
           </div>
-          <div className="relative flex items-center space-x-4" ref={profileRef}>
+          <div className="navbar-orbit-end relative ml-auto flex shrink-0 flex-wrap items-center gap-2" ref={profileRef}>
             {canSelectBranch ? (
               <div className="flex items-center">
                 <select
                   value={selectedBranchId}
                   onChange={handleBranchChange}
-                  className="h-9 px-2 rounded-md border border-[#BF9853] text-[#5B4636] text-sm focus:outline-none focus:ring-1 focus:ring-[#BF9853]"
+                  className="branch-select"
                   title="Select Branch"
                 >
                   <option value="">Select Branch</option>
@@ -1233,21 +1301,26 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
               </div>
             ) : selectedBranchId ? (
               <div className="flex items-center">
-                <span className="h-9 px-3 flex items-center rounded-md border border-[#BF9853] text-[#5B4636] text-sm bg-gray-50">
+                <span className="branch-select-static">
                   {branchOptions.find((b) => String(b.id) === String(selectedBranchId))?.branch || ''}
                 </span>
               </div>
             ) : null}
             {canDownloadExpenses && (
-              <button type="button" onClick={handleDownloadExpenses} disabled={isDownloading}
-                className="hidden md:flex items-center border border-[#BF9853] rounded-md text-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
+              <button
+                type="button"
+                onClick={handleDownloadExpenses}
+                disabled={isDownloading}
+                className="icon-btn desktop-only"
                 title={isDownloading ? "Preparing download..." : "Download expenses and master data"}
               >
-                <img src={DownloadIcon} alt="Download expenses" className="w-5 h-5" />
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path d="M12 4v12M6 11l6 6 6-6M5 21h14" />
+                </svg>
               </button>
             )}
             {canViewEditRequests && (
-              <div className="hidden md:block relative">
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => {
@@ -1258,23 +1331,16 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
                       fetchEditRequests();
                     }
                   }}
-                  className="relative flex h-9 w-9 items-center justify-center rounded-md border border-[#BF9853] text-[#BF9853] transition-colors duration-150 hover:bg-[#BF9853] hover:text-white"
+                  className="icon-btn gold"
                   title="Notifications"
                   aria-label="Notifications"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path
-                      d="M12 3a5 5 0 00-5 5v3.5L5 18h14l-2-6.5V8a5 5 0 00-5-5z"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinejoin="round"
-                    />
-                    <path d="M10 18a2 2 0 004 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                    <path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10 21a2 2 0 004 0" />
                   </svg>
                   {pendingRequestsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white">
-                      {pendingRequestsCount}
-                    </span>
+                    <span className="notif-dot">{pendingRequestsCount > 9 ? "9+" : pendingRequestsCount}</span>
                   )}
                 </button>
                 {isEditRequestsDropdownOpen && (
@@ -1353,36 +1419,43 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
                 )}
               </div>
             )}
-            {userImage ? (
-              <img
-                src={`data:image/jpeg;base64,${userImage}`}
-                alt="Profile"
-                className="w-10 h-10 rounded-full object-cover cursor-pointer"
+            <span className="user-pill">
+              <button
+                type="button"
+                className="navbar-orbit-profile-hit flex items-center gap-[7px] border-0 bg-transparent p-0"
                 onClick={() => {
                   setIsProfileDropdownVisible((prev) => !prev);
                   setIsEditRequestsDropdownOpen(false);
                 }}
-              />
-            ) : (
-              <div
-                className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold cursor-pointer"
-                onClick={() => {
-                  setIsProfileDropdownVisible((prev) => !prev);
-                  setIsEditRequestsDropdownOpen(false);
-                }}
+                aria-expanded={isProfileDropdownVisible}
+                aria-haspopup="true"
               >
-                {username?.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <span className="text-gray-700 font-medium">{username}</span>
-            <img
-              src={Logout}
-              alt="Logout"
-              onClick={onLogout}
-              className="w-8 h-8 cursor-pointer"
-            />
+                <span className="avatar-mark">
+                  {userImage ? (
+                    <img
+                      src={`data:image/jpeg;base64,${userImage}`}
+                      alt=""
+                      width={18}
+                      height={18}
+                      className="block rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[11px] font-bold leading-none text-[#3a3a3a]">{username?.charAt(0).toUpperCase()}</span>
+                  )}
+                </span>
+                <span className="hidden sm:flex flex-col leading-tight text-left">
+                  <span className="text-[12px] font-semibold ink">{username}</span>
+                  <span className="text-[9.5px] muted">AA Builders</span>
+                </span>
+              </button>
+              <button type="button" className="icon-btn ml-1" title="Sign out" onClick={onLogout} aria-label="Sign out">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                  <path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 17l-5-5 5-5M5 12h11" />
+                </svg>
+              </button>
+            </span>
             {isProfileDropdownVisible && (
-              <div className="absolute right-0 top-14 bg-white shadow-lg rounded-md p-4 w-72 z-20">
+              <div className="absolute right-0 top-full z-20 mt-1 w-72 rounded-md bg-white p-4 shadow-lg">
                 <div className="items-center">
                   {userImage ? (
                     <img
@@ -1406,6 +1479,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
           </div>
         </div>
       </nav>
+      )}
       {selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-[90%]  overflow-hidden">
@@ -1501,7 +1575,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
           </div>
         </div>
       )}
-      <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles} onCloseSidebar={() => setIsSidebarVisible(false)} />
+      <Sidebar isVisible={isSidebarVisible} sidebarRef={sidebarRef} userRoles={userRoles} onCloseSidebar={closeSidebar} />
     </>
   );
 };

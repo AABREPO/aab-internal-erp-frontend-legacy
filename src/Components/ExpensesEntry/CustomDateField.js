@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Calendar } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import SingleDatePicker from "./SingleDatePicker";
+import CalendarIcon from "../Images/Calendoricon.png";
+
 
 /** Parse manual entry: yyyy-MM-dd, dd-MM-yyyy, dd/MM/yyyy, dd.MM.yyyy. Returns "" if empty, null if invalid, else yyyy-MM-dd. */
 function parseTypedDate(str) {
@@ -49,8 +50,18 @@ function formatDigitsAsDdMmYyyy(digits, val, prevText) {
     if (p.endsWith("-") && !v.includes("-")) return d;
     return `${d}-`;
   }
-  if (d.length === 3) return `${d.slice(0, 2)}-${d.slice(2)}`;
+  if (d.length === 3) {
+    const monthFirstDigit = d.slice(2);
+    if (monthFirstDigit === "0") return `${d.slice(0, 2)}-0`;
+    return `${d.slice(0, 2)}-0${monthFirstDigit}`;
+  }
   if (d.length === 4) {
+    const monthNum = Number(d.slice(2, 4));
+    if (monthNum > 12) {
+      const monthFirst = d.slice(2, 3);
+      const yearFirst = d.slice(3, 4);
+      return `${d.slice(0, 2)}-0${monthFirst}-${yearFirst}`;
+    }
     const ddmm = `${d.slice(0, 2)}-${d.slice(2, 4)}`;
     if (/^\d{2}-\d{2}-$/.test(p) && v.replace(/\s/g, "") === ddmm) return v.replace(/\s/g, "");
     return `${ddmm}-`;
@@ -99,6 +110,18 @@ export default function CustomDateField({
 
   const handleInputChange = (e) => {
     const val = e.target.value;
+    const compactVal = String(val || "").replace(/\s/g, "");
+    const monthCarryMatch = compactVal.match(/^(\d{2})-0([1-9])(\d)$/);
+    if (monthCarryMatch) {
+      const [, dayPart, monthFirstDigit, nextDigit] = monthCarryMatch;
+      const candidateMonth = Number(`${monthFirstDigit}${nextDigit}`);
+      if (candidateMonth >= 10 && candidateMonth <= 12) {
+        setText(`${dayPart}-${String(candidateMonth).padStart(2, "0")}-`);
+        return;
+      }
+      setText(`${dayPart}-0${monthFirstDigit}-${nextDigit}`);
+      return;
+    }
     if (ISO_DATE_TYPING.test(val)) {
       const y = parseInt(val.slice(0, 4), 10);
       const plausibleYear = y >= 1900 && y <= 2100;
@@ -120,8 +143,8 @@ export default function CustomDateField({
   return (
     <div className={`relative ${className}`}>
       <div
-        className={`flex w-full min-h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-white shadow-sm overflow-hidden ${
-          disabled ? "opacity-70 cursor-not-allowed bg-gray-100" : ""
+        className={`relative flex items-center w-[120px] h-[36px] rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-[#FFFFFF] shadow-sm overflow-hidden ${
+          disabled ? "opacity-70 cursor-not-allowed bg-gray-100" : "hover:border-[rgba(191,152,83,0.4)]"
         }`}
       >
         <input
@@ -142,9 +165,9 @@ export default function CustomDateField({
           autoComplete="off"
           spellCheck={false}
           className={[
-            "min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none focus:ring-0",
+            "min-w-0 flex-1 border-0 bg-transparent pl-[12px] pt-[2px] pb-[2px] text-sm outline-none focus:ring-0",
             inputLooksEmpty
-              ? String(placeholderButtonClassName || "").trim() || "text-[12px] text-black font-semibold placeholder:text-gray-400"
+              ? String(placeholderButtonClassName || "").trim() || "text-[12px] text-black font-normal placeholder:text-[#A6A5A6]"
               : "!text-black !font-normal",
             disabled ? "cursor-not-allowed" : "",
           ].join(" ")}
@@ -153,12 +176,12 @@ export default function CustomDateField({
           type="button"
           disabled={disabled}
           onClick={() => !disabled && setOpen((v) => !v)}
-          className={`shrink-0 px-2.5 flex items-center justify-center ${
+          className={`shrink-0 self-center ml-auto mr-[6px] w-[18px] h-[18px] p-0 flex items-center justify-center ${
             disabled ? "cursor-not-allowed" : "cursor-pointer hover:bg-amber-50/80"
           }`}
           aria-label="Open calendar"
         >
-          <Calendar className="w-4 h-4 text-gray-400 pointer-events-none" />
+          <img src={CalendarIcon} alt="#" className="w-[16px] h-[16px]  pointer-events-none" />
         </button>
       </div>
 

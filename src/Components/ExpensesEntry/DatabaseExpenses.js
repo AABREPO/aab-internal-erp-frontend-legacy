@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar } from 'lucide-react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import DateRangePicker from './DateRangePicker';
 import CustomDateField from './CustomDateField';
+import SingleDatePicker from './SingleDatePicker';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 import Select from 'react-select';
-import Filter from '../Images/filter (3).png'
-import Reload from '../Images/rotate-right.png'
+import Filter from '../Images/TableFilter.svg'
+import Search from '../Images/Searchnew.svg'
+import CalendarIcon from "../Images/Calendoricon.png";
+import Reload from '../Images/Clear.svg'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -21,6 +25,31 @@ import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
+const NON_CASH_PAYMENT_MODES = ['GPay', 'Gpay', 'PhonePe', 'Net Banking', 'Cheque'];
+const BLANK_VALUE = 'BLANK';
+const BLANK_LABEL = 'Blank';
+const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
+const isBlankish = (value) =>
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim() === '');
+
+const fetchWeeklyPaymentBillsByExpensesEntryId = async (expensesEntryId) => {
+    const listResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/all`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    if (!listResponse.ok) {
+        throw new Error('Failed to fetch bill payments');
+    }
+    const billPayments = await listResponse.json();
+    return (Array.isArray(billPayments) ? billPayments : []).filter(
+        (bill) =>
+            bill.expenses_entry_id != null &&
+            String(bill.expenses_entry_id) === String(expensesEntryId)
+    );
+};
 
 const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
@@ -41,7 +70,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [totalAmount, setTotalAmount] = useState(0);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [editId, setEditId] = useState(null);
-    const sentToWeeklyPaymentBillsRef = useRef(new Set());
     const [showModal, setShowModal] = useState(false);
     const [audits, setAudits] = useState([]);
     const [siteOptions, setSiteOptions] = useState([]);
@@ -81,6 +109,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [selectedEno, setSelectedEno] = useState(() => {
         return localStorage.getItem('expenseFilter_eno') || '';
     });
+    const [overallSearch, setOverallSearch] = useState('');
     const [accountTypeOptions, setAccountTypeOptions] = useState([]);
     const [selectedMachineTools, setSelectedMachineTools] = useState(() => {
         return localStorage.getItem('expenseFilter_machineTools') || '';
@@ -112,6 +141,14 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [selectedEnteredBy, setSelectedEnteredBy] = useState(() => {
         return localStorage.getItem('expenseFilter_enteredBy') || '';
     });
+    const [staffOptions, setStaffOptions] = useState([]);
+    const [selectedStaff, setSelectedStaff] = useState('');
+    const [selectedQuantity, setSelectedQuantity] = useState('');
+    const [selectedDescription, setSelectedDescription] = useState('');
+    const [selectedBillArrival, setSelectedBillArrival] = useState('');
+    const [showBillArrivalCalendar, setShowBillArrivalCalendar] = useState(false);
+    const [billArrivalCalendarPos, setBillArrivalCalendarPos] = useState({ top: 0, left: 0 });
+    const billArrivalFilterRef = useRef(null);
     const [showFilters, setShowFilters] = useState(false);
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -166,6 +203,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     }, [userRoles]);
     const scrollRef = useRef(null);
     const filterRowRef = useRef(null);
+    const filterNudgeUsedRef = useRef(false);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -201,6 +239,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         };
         scrollRef.current.scrollLeft = scroll.current.left - dx;
         scrollRef.current.scrollTop = scroll.current.top - dy;
+        filterNudgeUsedRef.current = false;
         lastMove.current = {
             time: now,
             x: e.clientX,
@@ -242,6 +281,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     useEffect(() => {
         return () => cancelMomentum();
     }, []);
+    useEffect(() => {
+        if (!showBillArrivalCalendar) return undefined;
+        const closeCalendar = () => setShowBillArrivalCalendar(false);
+        window.addEventListener('scroll', closeCalendar, true);
+        return () => window.removeEventListener('scroll', closeCalendar, true);
+    }, [showBillArrivalCalendar]);
     useEffect(() => {
         localStorage.setItem('expenseFilter_siteName', selectedSiteName);
     }, [selectedSiteName]);
@@ -345,6 +390,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [projectData, setProjectData] = useState(null);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [selectedEbNumber, setSelectedEbNumber] = useState(null);
+    const [expandedCells, setExpandedCells] = useState({});
     const customStyles = useMemo(() => ({
         control: (provided, state) => ({
             ...provided,
@@ -352,9 +398,8 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             lineHeight: '20px',
             fontSize: '14px',
             fontWeight: 'normal',
-            height: '45px',
+            height: '36px',
             borderRadius: '8px',
-            padding: '0.15rem',
             textAlign: 'left',
             borderColor: 'rgba(191, 152, 83, 0.2)',
             boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
@@ -391,6 +436,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }),
         valueContainer: (provided) => ({
             ...provided,
+            paddingLeft: '12px',
             paddingRight: '2px',
         }),
         indicatorsContainer: (provided) => ({
@@ -399,7 +445,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }),
         dropdownIndicator: (provided) => ({
             ...provided,
-            padding: '4px',
+            paddingTop: '0px',
+            paddingBottom: '0px',
+            paddingRight: '6px',
+            paddingLeft: '3px',
         }),
         option: (provided, state) => ({
             ...provided,
@@ -417,9 +466,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }),
         placeholder: (provided) => ({
             ...provided,
-            color: '#d3d5db',
+            color: '#A6A5A6',
             textAlign: 'left',
             fontWeight: 'normal',
+            paddingLeft: '0px',
+            paddingTop: '0px',
+            paddingBottom: '0px',
         }),
         indicatorSeparator: (provided) => ({
             ...provided,
@@ -953,22 +1005,96 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 const expenseTs = expense.timestamp ? new Date(expense.timestamp) : null;
                 if (!expenseTs || expenseTs > te) return false;
             }
+            if (overallSearch.trim()) {
+                const q = overallSearch.toLowerCase().trim();
+                const searchable = [
+                    formatDate(expense.timestamp),
+                    formatDateOnly(expense.date),
+                    getDisplaySiteName(expense),
+                    getDisplayVendorName(expense),
+                    getDisplayContractorName(expense),
+                    getDisplayStaffName(expense),
+                    expense.quantity,
+                    expense.amount,
+                    expense.comments,
+                    expense.category,
+                    expense.accountType,
+                    getMachineToolsItemIdDisplay(expense.machineTools),
+                    expense.source,
+                    getBranchName(expense.branch_id ?? expense.branchId),
+                    expense.enteredBy || 'Sivaprakasm',
+                    expense.eno
+                ]
+                    .map((v) => String(v ?? '').toLowerCase())
+                    .join(' ');
+                if (!searchable.includes(q)) return false;
+            }
             return (
-                (selectedSiteName ? expense.siteName === selectedSiteName : true) &&
-                (selectedVendor ? expense.vendor === selectedVendor : true) &&
-                (selectedContractor ? expense.contractor === selectedContractor : true) &&
-                (selectedCategory ? expense.category === selectedCategory : true) &&
-                (selectedMachineTools ? String(expense.machineTools ?? '') === String(selectedMachineTools) : true) &&
-                (selectedSource ? expense.source === selectedSource : true) &&
-                (selectedBranch ? String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch) : true) &&
-                (selectedEnteredBy ? (expense.enteredBy || 'Sivaprakasm') === selectedEnteredBy : true) &&
+                (selectedSiteName
+                    ? (selectedSiteName === BLANK_VALUE
+                        ? isBlankish(expense.siteName)
+                        : expense.siteName === selectedSiteName)
+                    : true) &&
+                (selectedVendor
+                    ? (selectedVendor === BLANK_VALUE
+                        ? isBlankish(expense.vendor)
+                        : expense.vendor === selectedVendor)
+                    : true) &&
+                (selectedContractor
+                    ? (selectedContractor === BLANK_VALUE
+                        ? isBlankish(expense.contractor)
+                        : expense.contractor === selectedContractor)
+                    : true) &&
+                (selectedCategory
+                    ? (selectedCategory === BLANK_VALUE
+                        ? isBlankish(expense.category)
+                        : expense.category === selectedCategory)
+                    : true) &&
+                (selectedMachineTools
+                    ? (selectedMachineTools === BLANK_VALUE
+                        ? isBlankish(expense.machineTools)
+                        : String(expense.machineTools ?? '') === String(selectedMachineTools))
+                    : true) &&
+                (selectedSource
+                    ? (selectedSource === BLANK_VALUE
+                        ? isBlankish(expense.source)
+                        : expense.source === selectedSource)
+                    : true) &&
+                (selectedBranch
+                    ? (selectedBranch === BLANK_VALUE
+                        ? isBlankish(expense.branch_id ?? expense.branchId)
+                        : String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch))
+                    : true) &&
+                (selectedEnteredBy
+                    ? (selectedEnteredBy === BLANK_VALUE
+                        ? isBlankish(expense.enteredBy)
+                        : (expense.enteredBy || 'Sivaprakasm') === selectedEnteredBy)
+                    : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === 'Unknown' ?
                         (!expense.accountType || expense.accountType === '') :
                         expense.accountType === selectedAccountType
                     ) : true) &&
                 (selectedDate ? expense.date === selectedDate : true) &&
-                (selectedEno ? String(expense.eno) === String(selectedEno) : true)
+                (selectedEno
+                    ? (selectedEno === BLANK_VALUE
+                        ? isBlankish(expense.eno)
+                        : String(expense.eno) === String(selectedEno))
+                    : true) &&
+                (selectedStaff
+                    ? (selectedStaff === BLANK_VALUE
+                        ? isBlankish(getDisplayStaffName(expense))
+                        : getDisplayStaffName(expense) === selectedStaff)
+                    : true) &&
+                (selectedQuantity.trim()
+                    ? String(expense.quantity ?? '').toLowerCase().includes(selectedQuantity.toLowerCase().trim())
+                    : true) &&
+                (selectedDescription.trim()
+                    ? String(expense.comments ?? '').toLowerCase().includes(selectedDescription.toLowerCase().trim())
+                    : true) &&
+                (selectedBillArrival
+                    ? expenseBillArrivalToInput(expense) === selectedBillArrival
+                    : true)
             );
         });
         setFilteredExpenses(filtered);
@@ -977,37 +1103,135 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
         setTotalAmount(total);
         // Dynamically update dropdown options from filtered data
-        const getOptions = (data, key) => {
-            const unique = [...new Set(data.map(item => item[key]).filter(Boolean))];
-            return unique.map(val => ({ value: val, label: val }));
+        const getOptions = (data, key, includeBlank = true) => {
+            const unique = [];
+            const seen = new Set();
+            let hasBlank = false;
+            data.forEach((item) => {
+                const value = item[key];
+                if (isBlankish(value)) {
+                    hasBlank = true;
+                    return;
+                }
+                const normalized = String(value);
+                if (!seen.has(normalized)) {
+                    seen.add(normalized);
+                    unique.push(value);
+                }
+            });
+            const options = unique.map(val => ({ value: val, label: val }));
+            if (includeBlank && hasBlank) options.unshift(blankOption);
+            return options;
         };
         setSiteOptions(getOptions(filtered, "siteName"));
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
         setSourceOptions(getOptions(filtered, "source"));
-        const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(Boolean))];
-        setBranchFilterOptions(
-            uniqueBranchIds.map(id => ({
-                value: String(id),
-                label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
-            }))
-        );
-        setEnteredByOptions([...new Set(filtered.map(item => item.enteredBy || 'Sivaprakasm').filter(Boolean))].map(val => ({ value: val, label: val })));
-        const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter((v) => v != null && v !== ''))];
-        setMachineToolsOptions(
-            uniqueToolIds.map((id) => ({
-                value: String(id),
-                label:
-                    machineToolsIdToLabel[id] ??
-                    machineToolsIdToLabel[String(id)] ??
-                    String(id),
-            }))
-        );
-        setAccountTypeOptions(getOptions(filtered, "accountType"));
-        setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
+        const uniqueStaff = [];
+        const seenStaff = new Set();
+        let hasBlankStaff = false;
+        filtered.forEach((item) => {
+            const staff = getDisplayStaffName(item);
+            if (isBlankish(staff)) {
+                hasBlankStaff = true;
+                return;
+            }
+            if (!seenStaff.has(staff)) {
+                seenStaff.add(staff);
+                uniqueStaff.push(staff);
+            }
+        });
+        const staffOptionsBuilt = uniqueStaff.map((staff) => ({ value: staff, label: staff }));
+        if (hasBlankStaff) staffOptionsBuilt.unshift(blankOption);
+        setStaffOptions(staffOptionsBuilt);
+        const uniqueBranchIds = [];
+        const seenBranchIds = new Set();
+        let hasBlankBranch = false;
+        filtered.forEach((item) => {
+            const rawId = item.branch_id ?? item.branchId;
+            if (isBlankish(rawId)) {
+                hasBlankBranch = true;
+                return;
+            }
+            const id = String(rawId);
+            if (!seenBranchIds.has(id)) {
+                seenBranchIds.add(id);
+                uniqueBranchIds.push(id);
+            }
+        });
+        const branchFilterOptionsBuilt = uniqueBranchIds.map(id => ({
+            value: String(id),
+            label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
+        }));
+        if (hasBlankBranch) branchFilterOptionsBuilt.unshift(blankOption);
+        setBranchFilterOptions(branchFilterOptionsBuilt);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedBranch, selectedEnteredBy, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, expenses, machineToolsIdToLabel, branchOptions]);
+        const uniqueEnteredBy = [];
+        const seenEnteredBy = new Set();
+        let hasBlankEnteredBy = false;
+        filtered.forEach((item) => {
+            const enteredBy = item.enteredBy;
+            if (isBlankish(enteredBy)) {
+                hasBlankEnteredBy = true;
+                return;
+            }
+            const key = String(enteredBy);
+            if (!seenEnteredBy.has(key)) {
+                seenEnteredBy.add(key);
+                uniqueEnteredBy.push(String(enteredBy));
+            }
+        });
+        const enteredByOptionsBuilt = uniqueEnteredBy.map(val => ({ value: val, label: val }));
+        if (hasBlankEnteredBy) enteredByOptionsBuilt.unshift(blankOption);
+        setEnteredByOptions(enteredByOptionsBuilt);
+
+        const uniqueToolIds = [];
+        const seenToolIds = new Set();
+        let hasBlankTools = false;
+        filtered.forEach((item) => {
+            const toolId = item.machineTools;
+            if (isBlankish(toolId)) {
+                hasBlankTools = true;
+                return;
+            }
+            const key = String(toolId);
+            if (!seenToolIds.has(key)) {
+                seenToolIds.add(key);
+                uniqueToolIds.push(toolId);
+            }
+        });
+        const machineToolsOptionsBuilt = uniqueToolIds.map((id) => ({
+            value: String(id),
+            label:
+                machineToolsIdToLabel[id] ??
+                machineToolsIdToLabel[String(id)] ??
+                String(id),
+        }));
+        if (hasBlankTools) machineToolsOptionsBuilt.unshift(blankOption);
+        setMachineToolsOptions(machineToolsOptionsBuilt);
+
+        setAccountTypeOptions(getOptions(filtered, "accountType", false));
+
+        const uniqueEno = [];
+        const seenEno = new Set();
+        let hasBlankEno = false;
+        filtered.forEach((item) => {
+            const eno = item.eno;
+            if (isBlankish(eno)) {
+                hasBlankEno = true;
+                return;
+            }
+            const key = String(eno);
+            if (!seenEno.has(key)) {
+                seenEno.add(key);
+                uniqueEno.push(eno);
+            }
+        });
+        if (hasBlankEno) uniqueEno.unshift(BLANK_VALUE);
+        setEnoOptions(uniqueEno);
+
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedBranch, selectedEnteredBy, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -1107,16 +1331,17 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             billCopy: updatedBillCopy,
             editedBy: username,
         };
-        const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
-        const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
-        const previousPaymentMode = expenses.find(e => e.id === editId)?.paymentMode || '';
-        const isChangingFromCashToOnline = previousPaymentMode === 'Cash' && isNonCashPaymentMode;
-        if (isPaymentType && isNonCashPaymentMode && isChangingFromCashToOnline) {
-            pendingUpdateFormDataRef.current = updatedFormData;
-            setPaymentModalData({ chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
-            setShowPaymentModal(true);
-            setIsSubmitting(false);
-            return;
+        const isPaymentType = (updatedFormData.accountType === 'Claim Payment' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Sundry Payment');
+        const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
+        if (isPaymentType && isNonCashPaymentMode && editId) {
+            const existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
+            if (existingWeeklyBills.length === 0) {
+                pendingUpdateFormDataRef.current = updatedFormData;
+                setPaymentModalData({ chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
+                setShowPaymentModal(true);
+                setIsSubmitting(false);
+                return;
+            }
         }
         try {
             await performUpdateAndWeeklyBills(updatedFormData);
@@ -1147,12 +1372,16 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             billArrivalDate: billArrivalForApi
         };
         const updateUrl = `https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`;
-        const isPaymentTypeForWeekly = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
+        const isPaymentTypeForWeekly = (updatedFormData.accountType === 'Claim Payment' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Sundry Payment');
+        const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
+        let existingWeeklyBills = [];
+        if (editId && isPaymentTypeForWeekly && isNonCashPaymentMode) {
+            existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
+        }
+        const shouldSendWeeklyBill = isPaymentTypeForWeekly && isNonCashPaymentMode && editId && existingWeeklyBills.length === 0;
         if (
-            isPaymentTypeForWeekly &&
-            isPaymentModeRequiringBankRegisterLog(updatedFormData.paymentMode) &&
-            editId &&
-            !sentToWeeklyPaymentBillsRef.current.has(editId)
+            shouldSendWeeklyBill &&
+            isPaymentModeRequiringBankRegisterLog(updatedFormData.paymentMode)
         ) {
             await postBankRegisterLogSave(
                 bankRegisterLogSaveUrlMatchingRequest(updateUrl),
@@ -1169,9 +1398,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             body: JSON.stringify(updatePayload)
         });
         if (!response.ok) throw new Error('Failed to update expense');
-        const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
-        const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
-        if (isPaymentType && isNonCashPaymentMode && editId && !sentToWeeklyPaymentBillsRef.current.has(editId)) {
+        if (shouldSendWeeklyBill) {
             try {
                 const weeklyPaymentBillPayload = {
                     date: updatedFormData.date,
@@ -1180,7 +1407,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     vendor_id: updatedFormData.vendorId || null,
                     employee_id: null,
                     project_id: updatedFormData.projectId || null,
-                    type: updatedFormData.accountType === 'Claim' ? 'Claim Payment' : updatedFormData.accountType === 'Weekly Payment' ? 'Weekly Payment' : 'Utility Payment',
+                    type: updatedFormData.accountType === 'Claim Payment' ? 'Claim Payment' : updatedFormData.accountType === 'Sundry Payment' ? 'Sundry Payment' : 'Utility Payment',
                     bill_payment_mode: updatedFormData.paymentMode,
                     amount: parseFloat(updatedFormData.amount) || 0,
                     status: true,
@@ -1192,15 +1419,19 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     cheque_number: (modalPaymentData && modalPaymentData.chequeNo) || null,
                     cheque_date: (modalPaymentData && modalPaymentData.chequeDate) || null,
                     transaction_number: (modalPaymentData && modalPaymentData.transactionNumber) || null,
-                    account_number: (modalPaymentData && modalPaymentData.accountNumber) || null
+                    account_number: (modalPaymentData && modalPaymentData.accountNumber) || null,
+                    branch_id: activeBranchId,
+                    enteredBy: username,
                 };
-                const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
+                const weeklyResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/save`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify(weeklyPaymentBillPayload)
                 });
-                if (weeklyResponse.ok) sentToWeeklyPaymentBillsRef.current.add(editId);
+                if (!weeklyResponse.ok) {
+                    console.error('Weekly payment bills save failed:', await weeklyResponse.text());
+                }
             } catch (weeklyErr) {
                 console.error('Weekly payment bills save error:', weeklyErr);
             }
@@ -1412,7 +1643,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     };
     const getBranchName = (id) =>
         branchOptions.find(b => String(b.id) === String(id))?.branch || "";
-    const getExpenseBillArrivalRaw = (e) => e?.billArrivalDate ?? e?.bill_arrival_date ?? '';
+    function getExpenseBillArrivalRaw(e) { return e?.billArrivalDate ?? e?.bill_arrival_date ?? ''; }
     const expenseBillArrivalToInput = (e) => {
         const raw = getExpenseBillArrivalRaw(e);
         if (!raw) return '';
@@ -1423,11 +1654,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     };
     const formatBillArrivalDisplay = (e) => {
         const raw = getExpenseBillArrivalRaw(e);
-        if (!raw) return '—';
+        if (!raw) return '';
         const head = String(raw).trim().slice(0, 10);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return formatChipDateDMY(head) || '—';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return formatChipDateDMY(head) || '';
         try {
-            return formatDateOnly(raw) || '—';
+            return formatDateOnly(raw) || '';
         } catch {
             return String(raw);
         }
@@ -1450,6 +1681,27 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         });
         setModalIsOpen(true);
     };
+    const deleteRelatedWeeklyPaymentBills = async (expensesEntryId) => {
+        const matchingBills = await fetchWeeklyPaymentBillsByExpensesEntryId(expensesEntryId);
+        if (matchingBills.length === 0) {
+            return { deletedCount: 0, failedCount: 0 };
+        }
+        const deleteResults = await Promise.all(
+            matchingBills.map(async (bill) => {
+                const deleteResponse = await fetch(
+                    `${TOOLS_API_BASE}/api/weekly-payment-bills/delete/${bill.id}`,
+                    {
+                        method: 'DELETE',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                    }
+                );
+                return deleteResponse.ok;
+            })
+        );
+        const deletedCount = deleteResults.filter(Boolean).length;
+        return { deletedCount, failedCount: deleteResults.length - deletedCount };
+    };
     const handleDelete = async (id, username) => {
         if (window.confirm('Are you sure you want to delete this expense?')) {
             try {
@@ -1460,7 +1712,21 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     }
                 );
                 if (response.ok) {
-                    alert('Expenses deleted successfully!!!');
+                    let billDeleteMessage = '';
+                    try {
+                        const { deletedCount, failedCount } = await deleteRelatedWeeklyPaymentBills(id);
+                        if (deletedCount > 0 && failedCount === 0) {
+                            billDeleteMessage = ' Related bill payment record(s) were also deleted.';
+                        } else if (deletedCount > 0 && failedCount > 0) {
+                            billDeleteMessage = ' Some related bill payment record(s) could not be deleted.';
+                        } else if (failedCount > 0) {
+                            billDeleteMessage = ' Failed to delete related bill payment record(s).';
+                        }
+                    } catch (billDeleteError) {
+                        console.error('Failed to delete related bill payments:', billDeleteError);
+                        billDeleteMessage = ' Failed to delete related bill payment record(s).';
+                    }
+                    alert(`Expenses deleted successfully!!!${billDeleteMessage}`);
                     try {
                         await refetchExpenses();
                     } catch (err) {
@@ -1504,6 +1770,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setTimestampStartDate('');
         setTimestampEndDate('');
         setSelectedEno('');
+        setSelectedStaff('');
+        setSelectedQuantity('');
+        setSelectedDescription('');
+        setSelectedBillArrival('');
+        setOverallSearch('');
         setFilteredExpenses(expenses);
         setCurrentPage(1);
         setSortField('');
@@ -1524,6 +1795,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.removeItem('expenseFilter_timestampStartDate');
         localStorage.removeItem('expenseFilter_timestampEndDate');
         localStorage.removeItem('expenseFilter_eno');
+    };
+    const toggleExpandedCell = (cellKey) => {
+        setExpandedCells((prev) => ({
+            ...prev,
+            [cellKey]: !prev[cellKey],
+        }));
     };
     const exportToCSV = () => {
         const headers = [
@@ -1604,1001 +1881,856 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         doc.save(`Filtered_Expenses_${dateStr}.pdf`);
     };
     return (
-        <body className=' bg-[#FAF6ED] px-6'>
-            <div>
-
-                {Object.keys(accountTypeSummary).length > 0 && (
-                    <div className="w-full p-6 bg-white shadow-lg mb-4">
-                        <div className="flex flex-wrap gap-5 items-end text-left">
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <div className="w-[168px]">
-                                    <CustomDateField
-                                        value={startDate}
-                                        onChange={setStartDate}
-                                        placeholder="dd/mm/yyyy"
-                                        alwaysOpenBelow
-                                        className={`[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!startDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-normal' : ''}`}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <div className="w-[168px]">
-                                    <CustomDateField
-                                        value={endDate}
-                                        onChange={setEndDate}
-                                        placeholder="dd/mm/yyyy"
-                                        alwaysOpenBelow
-                                        className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!endDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-normal' : ''}`}
-                                    />
-                                </div>
-                            </div>
-                            {Object.entries(accountTypeSummary)
-                                .sort(([a], [b]) => {
-                                    if (a === 'Unknown') return 1;
-                                    if (b === 'Unknown') return -1;
-                                    return a.localeCompare(b);
-                                })
-                                .map(([accountType, data]) => (
-                                    <div key={accountType} className="cursor-pointer transition-all duration-200 hover:scale-105" onClick={() => setSelectedAccountType(accountType)}>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className={`font-semibold transition-colors duration-200 ${selectedAccountType === accountType ? 'text-[#E4572E]' : 'text-[#BF9853] hover:text-[#E4572E]'}`}>
-                                                {accountType}
-                                            </label>
-                                            <span className="text-sm text-red-500 font-medium">
-                                                {data.entryCount}
-                                            </span>
+        <>
+            <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+                <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+                    {Object.keys(accountTypeSummary).length > 0 ? (
+                        <div className="w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px]">
+                            <div className="flex flex-wrap gap-[12px] items-end text-left">
+                                {Object.entries(accountTypeSummary)
+                                    .sort(([a], [b]) => {
+                                        if (a === 'Unknown') return 1;
+                                        if (b === 'Unknown') return -1;
+                                        return a.localeCompare(b);
+                                    })
+                                    .map(([accountType, data]) => (
+                                        <div key={accountType} className="cursor-pointer transition-all duration-200 hover:scale-105" onClick={() => setSelectedAccountType(accountType)}>
+                                            <div className="flex items-center justify-between mb-[8px]">
+                                                <label className={`font-semibold text-[16px] transition-colors duration-200 ${selectedAccountType === accountType ? 'text-[#BF9853]' : 'text-[#000000]'}`}>
+                                                    {accountType}
+                                                </label>
+                                                <span className="text-[14px] text-red-500 font-medium">
+                                                    {data.entryCount}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                readOnly
+                                                className={`${accountType === 'Bill Payments + Claim' || accountType === 'Sundry Payment' ? 'w-[220px]' : 'w-[150px]'} h-[40px] cursor-pointer rounded-lg border-2 focus:outline-none pl-[12px] text-[14px] font-medium transition-all duration-200 ${selectedAccountType === accountType
+                                                    ? 'border-[#BF9853] bg-[#FFFFFF] text-[#000000] shadow-md'
+                                                    : 'border-[#BF9853] border-opacity-25 bg-[#FFFFFF] text-[#000000] hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm'
+                                                    }`}
+                                            />
                                         </div>
-                                        <input
-                                            type="text"
-                                            value={`₹${Number(data.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                            readOnly
-                                            className={`w-[200px] h-[45px] cursor-pointer rounded-lg border-2 focus:outline-none p-2 text-lg font-bold text-center transition-all duration-200 ${selectedAccountType === accountType
-                                                ? 'border-[#E4572E] bg-[#FEF2F2] text-[#E4572E] shadow-md'
-                                                : 'border-[#BF9853] border-opacity-25 text-gray-800 hover:border-[#BF9853] hover:border-opacity-75 hover:shadow-sm hover:bg-[#FAF6ED]'
-                                                }`}
-                                        />
-                                    </div>
-                                ))}
-                        </div>
-                    </div>
-                )}
-                {Object.keys(accountTypeSummary).length === 0 && (
-                    <div className="w-full p-6 pb-10 bg-white shadow-lg mb-4">
-                        <div className="flex flex-wrap gap-5 items-end text-left">
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">Start Date</label>
-                                <div className="w-[168px]">
-                                    <CustomDateField
-                                        value={startDate}
-                                        onChange={setStartDate}
-                                        placeholder="dd/mm/yyyy"
-                                        alwaysOpenBelow
-                                        className={`[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!startDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-normal' : ''}`}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block mb-2 font-semibold text-[#BF9853]">End Date</label>
-                                <div className="w-[168px]">
-                                    <CustomDateField
-                                        value={endDate}
-                                        onChange={setEndDate}
-                                        placeholder="dd/mm/yyyy"
-                                        alwaysOpenBelow
-                                        className={`[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]${!endDate ? ' [&>button]:![font-size:14px] [&>button]:!text-[#d3d5db] [&>button]:!font-normal' : ''}`}
-                                    />
-                                </div>
+                                    ))}
                             </div>
                         </div>
-                    </div>
-                )}
-                <div className="w-full p-6 bg-white shadow-lg overflow-x-auto">
-                    <div
-                        className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
-                            ? 'flex-col sm:flex-row sm:justify-between'
-                            : 'flex-row justify-between items-center'
-                            } mb-3 gap-2`}>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
-                            <button
-                                className='pl-2'
-                                onClick={() => {
-                                    const willOpen = !showFilters;
-                                    setShowFilters(willOpen);
-                                    if (!willOpen) return;
-                                    const scroller = scrollRef.current;
-                                    if (!scroller) return;
-                                    if (scroller.scrollTop <= 0) return;
-                                    requestAnimationFrame(() => {
-                                        const h = filterRowRef.current?.offsetHeight || 0;
-                                        if (h > 0) scroller.scrollTop = scroller.scrollTop + h;
-                                    });
-                                }}
-                            >
-                                <img
-                                    src={Filter}
-                                    alt="Toggle Filter"
-                                    className="w-7 h-7 border border-[#BF9853] rounded-md"
-                                />
-                            </button>
-                            {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
-                                <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
-                                    {timestampStartDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Timestamp: </span>
-                                            <span className="font-bold">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
-                                            <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                                        </span>
-                                    )}
-                                    {timestampEndDate && !timestampStartDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Timestamp until: </span>
-                                            <span className="font-bold">{formatChipDateDMY(timestampEndDate)}</span>
-                                            <button onClick={() => setTimestampEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                                        </span>
-                                    )}
-                                    {startDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Start Date: </span>
-                                            <span className="font-bold">{formatChipDateDMY(startDate)}</span>
-                                            <button onClick={() => setStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                                        </span>
-                                    )}
-                                    {endDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">End Date: </span>
-                                            <span className="font-bold">{formatChipDateDMY(endDate)}</span>
-                                            <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                                        </span>
-                                    )}
-                                    {selectedDate && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                                            <span className="font-normal">Date: </span>
-                                            <span className="font-bold">{formatChipDateDMY(selectedDate)}</span>
-                                            <button onClick={() => setSelectedDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
-                                        </span>
-                                    )}
-                                    {selectedSiteName && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Site Name: </span>
-                                            <span className="font-bold">{selectedSiteName}</span>
-                                            <button onClick={() => setSelectedSiteName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedVendor && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Vendor Name: </span>
-                                            <span className="font-bold">{selectedVendor}</span>
-                                            <button onClick={() => setSelectedVendor('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedContractor && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Contractor Name: </span>
-                                            <span className="font-bold">{selectedContractor}</span>
-                                            <button onClick={() => setSelectedContractor('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedCategory && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Category: </span>
-                                            <span className="font-bold">{selectedCategory}</span>
-                                            <button onClick={() => setSelectedCategory('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedAccountType && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Mode: </span>
-                                            <span className="font-bold">{selectedAccountType}</span>
-                                            <button onClick={() => setSelectedAccountType('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedMachineTools && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Tools: </span>
-                                            <span className="font-bold">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
-                                            <button onClick={() => setSelectedMachineTools('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedSource && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Source From: </span>
-                                            <span className="font-bold">{selectedSource}</span>
-                                            <button onClick={() => setSelectedSource('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedBranch && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Branch: </span>
-                                            <span className="font-bold">{getBranchName(selectedBranch) || selectedBranch}</span>
-                                            <button onClick={() => setSelectedBranch('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedEnteredBy && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">Entered By: </span>
-                                            <span className="font-bold">{selectedEnteredBy}</span>
-                                            <button onClick={() => setSelectedEnteredBy('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedEno && (
-                                        <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                                            <span className="font-normal">E.No: </span>
-                                            <span className="font-bold">{selectedEno}</span>
-                                            <button onClick={() => setSelectedEno('')} className="text-[#BF9853] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                </div>
-                            )}
+                    ) : sortedExpenses.length === 0 ? (
+                        <div className="w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] flex items-center justify-center min-h-[120px] text-[16px] font-medium text-[#666666]">
+                            No datas are matched
                         </div>
-                        <div className='flex items-center gap-2'>
-                            <button onClick={clearFilters} className='w-10 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'>
-                                <img className='w-4 h-4' src={Reload} alt="Reload" />
-                            </button>
-                            <div className=' text-left md:text-right md:items-center items-start cursor-default flex max-w-screen-2xl table-auto overflow-auto w-full'>
-                                <div className='flex items-center'>
-                                    <span className='text-[#E4572E] mr-3 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                                    <span className='text-[#007233] mr-1 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
+                    ) : null}
+                    <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div
-                            ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-x-auto select-none thin-scrollbar"
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}>
-                            <table className="table-fixed  min-w-[1885px] w-full border-collapse">
-                                <thead className="sticky top-0 z-10 bg-white ">
-                                    <tr className="bg-[#FAF6ED]">
-                                        <th className="px-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('timestamp')}>
-                                            Time stamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pt-2 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
-                                            Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
-                                            Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
-                                            Vendor {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
-                                            Contractor {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
-                                            Staff {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
-                                            Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('amount')}>
-                                            Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
-                                            Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[160px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
-                                            Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[130px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
-                                            A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
-                                            Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
-                                            Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
-                                            Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('enteredBy')}>
-                                            Entered By {sortField === 'enteredBy' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
-                                            E.No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
-                                            Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-0.5 w-[120px] font-bold text-left">Activity</th>
-                                        <th className="px-0.5 w-[50px] font-bold text-left">File</th>
-                                    </tr>
-                                    {showFilters && (
-                                        <tr ref={filterRowRef} className="bg-[#FAF6ED]">
-                                            <th className="py-3">
-                                                <div className="relative [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowDateRangePicker(true)}
-                                                        className="w-full min-w-[140px] h-[45px] px-2 py-0 text-sm font-normal bg-white text-left flex items-center gap-1"
-                                                    >
-                                                        <span className={`text-[14px] truncate flex-1 min-w-0 text-left ${timestampStartDate && timestampEndDate ? 'text-black font-normal' : 'text-[#d3d5db] font-normal'}`}>
-                                                            {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Time stamp'}
-                                                        </span>
-                                                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                    </button>
-                                                    <DateRangePicker
-                                                        isOpen={showDateRangePicker}
-                                                        onClose={() => setShowDateRangePicker(false)}
-                                                        startDate={timestampStartDate}
-                                                        endDate={timestampEndDate}
-                                                        variant="dropdown"
-                                                        onApply={(from, to) => {
-                                                            setTimestampStartDate(from);
-                                                            setTimestampEndDate(to);
+                            className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
+                                ? 'flex-col sm:flex-row sm:justify-between'
+                                : 'flex-row justify-between items-center'
+                                } mb-[12px] gap-[6px]`}>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
+                                <button
+                                    className=''
+                                    onClick={() => {
+                                        const willOpen = !showFilters;
+                                        setShowFilters(willOpen);
+                                        if (!willOpen) return;
+                                        const scroller = scrollRef.current;
+                                        if (!scroller) return;
+                                        if (scroller.scrollTop <= 0) return;
+                                        if (filterNudgeUsedRef.current) return;
+                                        filterNudgeUsedRef.current = true;
+                                        requestAnimationFrame(() => {
+                                            requestAnimationFrame(() => {
+                                                const h = filterRowRef.current?.offsetHeight || 0;
+                                                if (h > 0) {
+                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                }
+                                            });
+                                        });
+                                    }}
+                                >
+                                    <img
+                                        src={Filter}
+                                        alt="Toggle Filter"
+                                        className=" border rounded-md"
+                                    />
+                                </button>
+                                {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
+                                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                                        {timestampStartDate && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit">
+                                                <span className="font-medium">Timestamp: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
+                                                <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        )}
+                                        {timestampEndDate && !timestampStartDate && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                <span className="font-medium">Timestamp until: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(timestampEndDate)}</span>
+                                                <button onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        )}
+                                        {selectedDate && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                <span className="font-medium">Date: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedDate)}</span>
+                                                <button onClick={() => setSelectedDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        )}
+                                        {selectedSiteName && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Project Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedSiteName === BLANK_VALUE ? BLANK_LABEL : selectedSiteName}</span>
+                                                <button onClick={() => setSelectedSiteName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedVendor && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Vendor Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedVendor === BLANK_VALUE ? BLANK_LABEL : selectedVendor}</span>
+                                                <button onClick={() => setSelectedVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedContractor && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Contractor Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedContractor === BLANK_VALUE ? BLANK_LABEL : selectedContractor}</span>
+                                                <button onClick={() => setSelectedContractor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedStaff && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Staff Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedStaff === BLANK_VALUE ? BLANK_LABEL : selectedStaff}</span>
+                                                <button onClick={() => setSelectedStaff('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedQuantity.trim() && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Quantity: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedQuantity}</span>
+                                                <button onClick={() => setSelectedQuantity('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedDescription.trim() && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Description: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedDescription}</span>
+                                                <button onClick={() => setSelectedDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedCategory && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Category: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedCategory === BLANK_VALUE ? BLANK_LABEL : selectedCategory}</span>
+                                                <button onClick={() => setSelectedCategory('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedAccountType && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">A/C Type: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedAccountType}</span>
+                                                <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedMachineTools && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Tools: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedMachineTools === BLANK_VALUE ? BLANK_LABEL : getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
+                                                <button onClick={() => setSelectedMachineTools('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedSource && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Source From: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedSource === BLANK_VALUE ? BLANK_LABEL : selectedSource}</span>
+                                                <button onClick={() => setSelectedSource('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedBranch && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Branch: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedBranch === BLANK_VALUE ? BLANK_LABEL : (getBranchName(selectedBranch) || selectedBranch)}</span>
+                                                <button onClick={() => setSelectedBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedEnteredBy && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Entered By: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedEnteredBy === BLANK_VALUE ? BLANK_LABEL : selectedEnteredBy}</span>
+                                                <button onClick={() => setSelectedEnteredBy('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedEno && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Entry No: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{String(selectedEno) === BLANK_VALUE ? BLANK_LABEL : selectedEno}</span>
+                                                <button onClick={() => setSelectedEno('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedBillArrival && (
+                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium">Bill Arrival: </span>
+                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedBillArrival)}</span>
+                                                <button onClick={() => setSelectedBillArrival('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className='flex items-end gap-[6px]'>
+                                <button onClick={clearFilters} className='flex h-[30px] w-[30px] shrink-0 items-center justify-center'>
+                                    <img className='w-full h-full' src={Reload} alt="Reload" />
+                                </button>
+                                <div className="w-[286px] min-w-[286px]  translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                                    <input
+                                        type="text"
+                                        value={overallSearch}
+                                        onChange={(e) => setOverallSearch(e.target.value)}
+                                        placeholder="Search Transactions..."
+                                        className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                                    />
+                                    <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+                                </div>
+
+                                <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
+                                    <div className='flex items-end text-center '>
+                                        <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                                        <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                            <div
+                                ref={scrollRef}
+                                className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
+                                onWheel={() => { filterNudgeUsedRef.current = false; }}
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}>
+                                <table className="table-fixed w-full min-w-[1920px] border-collapse">
+                                    <thead className="sticky top-0 z-10 bg-white ">
+                                        <tr className="bg-[#FAF6ED] h-[40px] text-[16px] font-bold text-center">
+                                            <th className="pl-[12px] w-[168px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('timestamp')}>
+                                                Timestamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="w-[120px] pr-[1px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
+                                                Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[298px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
+                                                Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
+                                                Vendor Name {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
+                                                Contractor Name {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
+                                                Staff Name {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[78px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
+                                                Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('amount')}>
+                                                Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[9px] pr-[1px] w-[198px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
+                                                Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
+                                                Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
+                                                Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
+                                                A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('paymentMode')}>
+                                                Mode {sortField === 'paymentMode' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
+                                                Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
+                                                Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('enteredBy')}>
+                                                Entered By {sortField === 'enteredBy' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
+                                                Entry No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
+                                                Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="pl-[9px] pr-[1px] w-[70px] font-bold text-center">Activity</th>
+                                            <th className="pl-[6px] pr-[12px] w-[70px] font-bold text-center">File</th>
+                                        </tr>
+                                        {showFilters && (
+                                            <tr ref={filterRowRef} className="bg-[#eeeeee] h-[44px]">
+                                                <th className="">
+                                                    <div className="relative pl-[10px] [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowDateRangePicker(true)}
+                                                            className="w-[158px] box-border h-[36px] pl-[12px] pr-[3px] py-0 text-sm font-normal bg-white text-left flex items-center justify-between"
+                                                        >
+                                                            <span className={`text-[14px] font-medium truncate flex-1 text-left ${timestampStartDate && timestampEndDate ? 'text-black font-normal' : 'text-[#A6A5A6] font-normal'}`}>
+                                                                {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Timestamp'}
+                                                            </span>
+                                                            <img src={CalendarIcon} alt="Calendar" className="w-[16px] h-[16px] text-gray-400 flex-shrink-0 mr-[6px] ml-[3px]" />
+                                                        </button>
+                                                        <DateRangePicker
+                                                            isOpen={showDateRangePicker}
+                                                            onClose={() => setShowDateRangePicker(false)}
+                                                            startDate={timestampStartDate}
+                                                            endDate={timestampEndDate}
+                                                            variant="dropdown"
+                                                            onApply={(from, to) => {
+                                                                setTimestampStartDate(from);
+                                                                setTimestampEndDate(to);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </th>
+                                                <th className=" pr-[1px]">
+                                                    <div className="w-[120px]">
+                                                        <CustomDateField
+                                                            value={selectedDate}
+                                                            onChange={setSelectedDate}
+                                                            placeholder="Date"
+                                                            alwaysOpenBelow
+                                                            className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedDate ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
+                                                        />
+                                                    </div>
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[298px]"
+                                                        options={siteOptions}
+                                                        value={selectedSiteName ? (selectedSiteName === BLANK_VALUE ? blankOption : { value: selectedSiteName, label: selectedSiteName }) : null}
+                                                        onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Project Name"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[218px]"
+                                                        options={vendorOptions}
+                                                        value={selectedVendor ? (selectedVendor === BLANK_VALUE ? blankOption : { value: selectedVendor, label: selectedVendor }) : null}
+                                                        onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Vendor Name"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[218px]"
+                                                        options={contractorOptions}
+                                                        value={selectedContractor ? (selectedContractor === BLANK_VALUE ? blankOption : { value: selectedContractor, label: selectedContractor }) : null}
+                                                        onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Contractor Name"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[218px]"
+                                                        options={staffOptions}
+                                                        value={selectedStaff ? (selectedStaff === BLANK_VALUE ? blankOption : { value: selectedStaff, label: selectedStaff }) : null}
+                                                        onChange={(selectedOption) => setSelectedStaff(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Staff Name"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <input
+                                                        type="text"
+                                                        value={selectedQuantity}
+                                                        onChange={(e) => setSelectedQuantity(e.target.value)}
+                                                        placeholder="Quantity"
+                                                        className="w-[78px] h-[36px] box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white px-2 text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]"
+                                                    />
+                                                </th>
+                                                <th className="text-[14px] w-[120px] text-right font-bold ">
+                                                    ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </th>
+                                                <th className="pl-[9px] pr-[1px]">
+                                                    <input
+                                                        type="text"
+                                                        value={selectedDescription}
+                                                        onChange={(e) => setSelectedDescription(e.target.value)}
+                                                        placeholder="Description"
+                                                        className="w-[190px] h-[36px] box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white px-3 text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]"
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[158px]"
+                                                        options={categoryOptions}
+                                                        value={selectedCategory ? (selectedCategory === BLANK_VALUE ? blankOption : { value: selectedCategory, label: selectedCategory }) : null}
+                                                        onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Category"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[158px]"
+                                                        options={machineToolsOptions}
+                                                        value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
+                                                        onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Machine Tools"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[158px]"
+                                                        options={accountTypeOptions}
+                                                        value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
+                                                        onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="A/C Type"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]"></th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[158px]"
+                                                        options={sourceOptions}
+                                                        value={selectedSource ? (selectedSource === BLANK_VALUE ? blankOption : { value: selectedSource, label: selectedSource }) : null}
+                                                        onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Source From"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[158px]"
+                                                        options={branchFilterOptions}
+                                                        value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
+                                                        onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Branch"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px]">
+                                                    <Select
+                                                        className="w-[158px]"
+                                                        options={enteredByOptions}
+                                                        value={selectedEnteredBy ? (selectedEnteredBy === BLANK_VALUE ? blankOption : { value: selectedEnteredBy, label: selectedEnteredBy }) : null}
+                                                        onChange={(selectedOption) => setSelectedEnteredBy(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Entered By"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={customStyles}
+                                                    />
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px] text-right">
+                                                    <Select
+                                                        className="w-[120px]"
+                                                        options={enoOptions.map((eno) => (String(eno) === BLANK_VALUE ? blankOption : { value: String(eno), label: String(eno) }))}
+                                                        value={selectedEno ? (String(selectedEno) === BLANK_VALUE ? blankOption : { value: String(selectedEno), label: String(selectedEno) }) : null}
+                                                        onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
+                                                        placeholder="Entry No"
+                                                        menuPlacement="bottom"
+                                                        noOptionsMessage={() => null}
+                                                        styles={{
+                                                            ...customStyles,
+                                                            control: (provided, state) => ({
+                                                                ...(typeof customStyles.control === 'function' ? customStyles.control(provided, state) : provided),
+                                                                textAlign: 'right',
+                                                            }),
+                                                            valueContainer: (provided) => ({
+                                                                ...(typeof customStyles.valueContainer === 'function' ? customStyles.valueContainer(provided) : provided),
+                                                                justifyContent: 'flex-end',
+                                                                paddingLeft: '2px',
+                                                                paddingRight: '12px',
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
+                                                                textAlign: 'right',
+                                                            }),
+                                                            input: (provided) => ({
+                                                                ...(typeof customStyles.input === 'function' ? customStyles.input(provided) : provided),
+                                                                textAlign: 'right',
+                                                            }),
+                                                            placeholder: (provided) => ({
+                                                                ...provided,
+                                                                textAlign: 'right',
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...(typeof customStyles.option === 'function' ? customStyles.option(provided, state) : provided),
+                                                                textAlign: 'right',
+                                                            }),
                                                         }}
                                                     />
-                                                </div>
-                                            </th>
-                                            <th className="py-3">
-                                                <div className="min-w-[100px]">
-                                                    <CustomDateField
-                                                        value={selectedDate}
-                                                        onChange={setSelectedDate}
-                                                        placeholder="dd/mm/yyyy"
-                                                        alwaysOpenBelow
-                                                        className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedDate ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
-                                                    />
-                                                </div>
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={siteOptions}
-                                                    value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
-                                                    onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Project Name"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={vendorOptions}
-                                                    value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
-                                                    onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Vendor"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={contractorOptions}
-                                                    value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
-                                                    onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Contractor"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th></th>
-                                            <th></th>
-                                            <th className="text-base text-right font-bold py-3">
-                                                ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </th>
-                                            <th></th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={categoryOptions}
-                                                    value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
-                                                    onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Category"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={accountTypeOptions}
-                                                    value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
-                                                    onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="A/C Type"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={machineToolsOptions}
-                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
-                                                    onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="MachineTools"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={sourceOptions}
-                                                    value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
-                                                    onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="SourceFrom"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={branchFilterOptions}
-                                                    value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
-                                                    onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Branch"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={enteredByOptions}
-                                                    value={selectedEnteredBy ? { value: selectedEnteredBy, label: selectedEnteredBy } : null}
-                                                    onChange={(selectedOption) => setSelectedEnteredBy(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Entered By"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3">
-                                                <Select
-                                                    className="w-full"
-                                                    options={enoOptions.map((eno) => ({ value: String(eno), label: String(eno) }))}
-                                                    value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
-                                                    onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="E.No"
-                                                    menuPlacement="bottom"
-                                                    styles={customStyles}
-                                                />
-                                            </th>
-                                            <th className="py-3" aria-label="Bill Arrival filter" />
-                                            <th></th>
-                                            <th></th>
-                                        </tr>
-                                    )}
-                                </thead>
-                                <tbody>
-                                    {currentItems.map((expense, index) => (
-                                        <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                            <td className="px-3 text-sm text-left ">{formatDate(expense.timestamp)}</td>
-                                            <td className=" text-sm text-left w-32 ">{formatDateOnly(expense.date)}</td>
-                                            <td className=" text-sm text-left w-60 ">{getDisplaySiteName(expense)}</td>
-                                            <td className=" text-sm text-left ">{getDisplayVendorName(expense)}</td>
-                                            <td className=" text-sm text-left ">{getDisplayContractorName(expense)}</td>
-                                            <td className=" text-sm text-left ">{getDisplayStaffName(expense)}</td>
-                                            <td className=" text-sm text-left ">{expense.quantity}</td>
-                                            <td className="text-sm text-right">
-                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{expense.comments || ''}</td>
-                                            <td className=" text-sm text-left ">{expense.category}</td>
-                                            <td className=" text-sm text-left ">{expense.accountType}</td>
-                                            <td className=" text-sm text-left ">{getMachineToolsItemIdDisplay(expense.machineTools)}</td>
-                                            <td className=" text-sm text-left ">{expense.source}</td>
-                                            <td className=" text-sm text-left ">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
-                                            <td className=" text-sm text-left ">{expense.enteredBy || 'Sivaprakasm'}</td>
-                                            <td className=" text-sm text-right pl-3 ">{expense.eno}</td>
-                                            <td className="text-sm text-left px-1 whitespace-nowrap">{formatBillArrivalDisplay(expense)}</td>
-                                            <td className=" flex w-[100px] justify-between py-2">
-                                                <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200 ml-2 mr-3">
-                                                    <img
-                                                        src={edit}
-                                                        alt="Edit"
-                                                        className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                                                    />
-                                                </button>
-                                                <button className=" -ml-5 -mr-2">
-                                                    <img
-                                                        src={remove}
-                                                        alt='delete'
-                                                        onClick={() => handleDelete(expense.id, username)}
-                                                        className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
-                                                </button>
-                                                <button onClick={() => fetchAuditDetails(expense.id)} className="rounded-full transition duration-200 -mr-1" >
-                                                    <img
-                                                        src={history}
-                                                        alt="history"
-                                                        className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                                                    />
-                                                </button>
-                                            </td>
-                                            <td className="px-1 text-sm">
-                                                {expense.billCopy ? (
-                                                    <a
-                                                        href={expense.billCopy}
-                                                        className="text-red-500 underline "
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                </th>
+                                                <th className="pl-[1px] pr-[1px] text-right">
+                                                    <div
+                                                        className="w-[98px]"
+                                                        ref={billArrivalFilterRef}
+                                                        onMouseDown={(e) => {
+                                                            if (!e.target.closest('[aria-label="Open calendar"]')) return;
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            const rect = billArrivalFilterRef.current?.getBoundingClientRect();
+                                                            if (!rect) return;
+                                                            setBillArrivalCalendarPos({ top: rect.bottom, left: rect.right });
+                                                            setShowBillArrivalCalendar(true);
+                                                        }}
                                                     >
-                                                        View
-                                                    </a>
-                                                ) : (
-                                                    <span></span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm text-gray-700">Items per page:</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => {
-                                        setItemsPerPage(Number(e.target.value));
-                                        setCurrentPage(1);
-                                    }}
-                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                    <option value={100}>100</option>
-                                    <option value={200}>200</option>
-                                    <option value={300}>300</option>
-                                    <option value={400}>400</option>
-                                    <option value={500}>500</option>
-                                    <option value={600}>600</option>
-                                    <option value={700}>700</option>
-                                    <option value={800}>800</option>
-                                    <option value={900}>900</option>
-                                    <option value={1000}>1000</option>
-                                </select>
+                                                        <CustomDateField
+                                                            value={selectedBillArrival}
+                                                            onChange={setSelectedBillArrival}
+                                                            placeholder="Bill Arrival"
+                                                            alwaysOpenBelow
+                                                            anchor="right"
+                                                            className={` [&>div:first-child]:!w-[120px] [&>div:first-child]:!h-[36px] [&>div.absolute]:!hidden [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedBillArrival ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
+                                                        />
+                                                    </div>
+                                                </th>
+                                                <th></th>
+                                                <th></th>
+                                            </tr>
+                                        )}
+                                    </thead>
+                                    <tbody>
+                                        {currentItems.map((expense, index) => (
+                                            <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED] text-[14px] font-semibold h-[40px]">
+                                                <td className="pl-[12px] w-[168px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-timestamp`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-timestamp`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={formatDate(expense.timestamp)}
+                                                    >
+                                                        {formatDate(expense.timestamp)}
+                                                    </span>
+                                                </td>
+                                                <td className="w-[120px] pr-[1px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-date`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-date`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={formatDateOnly(expense.date)}
+                                                    >
+                                                        {formatDateOnly(expense.date)}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[298px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-site`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-site`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={getDisplaySiteName(expense)}
+                                                    >
+                                                        {getDisplaySiteName(expense)}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[218px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-vendor`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-vendor`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={getDisplayVendorName(expense)}
+                                                    >
+                                                        {getDisplayVendorName(expense)}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[218px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-contractor`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-contractor`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={getDisplayContractorName(expense)}
+                                                    >
+                                                        {getDisplayContractorName(expense)}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[218px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-staff`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-staff`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={getDisplayStaffName(expense)}
+                                                    >
+                                                        {getDisplayStaffName(expense)}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[78px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-quantity`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-quantity`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={String(expense.quantity ?? '')}
+                                                    >
+                                                        {expense.quantity}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[98px] text-right">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-amount`)}
+                                                        className={`block w-full cursor-pointer text-right ${expandedCells[`${expense.id ?? index}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={`₹${Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                    >
+                                                        ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                </td>
+                                                <td className="text-left pl-[9px] pr-[1px] w-[198px] px-1">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-comments`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-comments`]
+                                                            ? 'whitespace-normal break-words'
+                                                            : 'truncate whitespace-nowrap overflow-hidden'
+                                                            }`}
+                                                        title={expense.comments || ''}
+                                                    >
+                                                        {expense.comments || ''}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-category`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-category`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={expense.category || ''}
+                                                    >
+                                                        {expense.category}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-machineTools`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-machineTools`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={getMachineToolsItemIdDisplay(expense.machineTools) || ''}
+                                                    >
+                                                        {getMachineToolsItemIdDisplay(expense.machineTools)}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-accountType`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-accountType`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={expense.accountType || ''}
+                                                    >
+                                                        {expense.accountType}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[120px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-paymentMode`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-paymentMode`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={expense.paymentMode || ''}
+                                                    >
+                                                        {expense.paymentMode || ''}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-source`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-source`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={expense.source || ''}
+                                                    >
+                                                        {expense.source}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-branch`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-branch`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}
+                                                    >
+                                                        {getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-enteredBy`)}
+                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-enteredBy`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={expense.enteredBy || 'Sivaprakasm'}
+                                                    >
+                                                        {expense.enteredBy || 'Sivaprakasm'}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[120px] text-right ">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-eno`)}
+                                                        className={`block w-full cursor-pointer text-right ${expandedCells[`${expense.id ?? index}-eno`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={String(expense.eno ?? '')}
+                                                    >
+                                                        {expense.eno}
+                                                    </span>
+                                                </td>
+                                                <td className="pl-[1px] pr-[1px] w-[120px] text-right whitespace-nowrap">
+                                                    <span
+                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-billArrival`)}
+                                                        className={`block w-full cursor-pointer text-right ${expandedCells[`${expense.id ?? index}-billArrival`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                                                        title={formatBillArrivalDisplay(expense) || ''}
+                                                    >
+                                                        {formatBillArrivalDisplay(expense)}
+                                                    </span>
+                                                </td>
+                                                <td className=" flex pl-[9px] pr-[1px] w-[70px] justify-between py-2 gap-[8px]">
+                                                    <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200">
+                                                        <img
+                                                            src={edit}
+                                                            alt="Edit"
+                                                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                                                        />
+                                                    </button>
+                                                    <button className="">
+                                                        <img
+                                                            src={remove}
+                                                            alt='delete'
+                                                            onClick={() => handleDelete(expense.id, username)}
+                                                            className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
+                                                    </button>
+                                                    <button onClick={() => fetchAuditDetails(expense.id)} className="rounded-full transition duration-200" >
+                                                        <img
+                                                            src={history}
+                                                            alt="history"
+                                                            className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
+                                                        />
+                                                    </button>
+                                                </td>
+                                                <td className="pl-[6px] pr-[12px] w-[70px] text-center">
+                                                    {expense.billCopy ? (
+                                                        <a
+                                                            href={expense.billCopy}
+                                                            className="text-red-500 underline "
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            View
+                                                        </a>
+                                                    ) : (
+                                                        <span></span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm text-gray-700">
-                                    Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
-                                </span>
+                            <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-700">Items per page:</span>
+                                    <select
+                                        value={itemsPerPage}
+                                        onChange={(e) => {
+                                            setItemsPerPage(Number(e.target.value));
+                                            setCurrentPage(1);
+                                        }}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                        <option value={200}>200</option>
+                                        <option value={300}>300</option>
+                                        <option value={400}>400</option>
+                                        <option value={500}>500</option>
+                                        <option value={600}>600</option>
+                                        <option value={700}>700</option>
+                                        <option value={800}>800</option>
+                                        <option value={900}>900</option>
+                                        <option value={1000}>1000</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-700">
+                                        Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
+                                    </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
+                                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        Previous
+                                    </button>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        return (
+                                            <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
+                                                className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                    }`}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}
+                                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center space-x-1">
-                                <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    Previous
-                                </button>
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let pageNum;
-                                    if (totalPages <= 5) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage <= 3) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage >= totalPages - 2) {
-                                        pageNum = totalPages - 4 + i;
-                                    } else {
-                                        pageNum = currentPage - 2 + i;
-                                    }
-                                    return (
-                                        <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
-                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
-                                                ? 'bg-[#BF9853] text-white border-[#BF9853]'
-                                                : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
-                                                }`}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-                                <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        </div>
-                        <Modal isOpen={modalIsOpen} onRequestClose={handleCancel}
-                            contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
-                            overlayClassName="fixed inset-0 z-[9999]">
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-                                <h2 className="text-xl font-normal mb-6 border-b-2">Edit Expense</h2>
-                                <form className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Date</label>
-                                        <div className="mt-1">
-                                            <CustomDateField
-                                                value={formData.date}
-                                                onChange={(v) => {
-                                                    // Keep existing behavior: prevent clearing the main date field
-                                                    if (!v) return;
-                                                    setFormData((prev) => ({ ...prev, date: v }));
-                                                }}
-                                                placeholder="Select date"
-                                                alwaysOpenBelow
-                                                className="[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-normal"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Account Type *</label>
-                                        <Select
-                                            name="accountType"
-                                            value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    accountType: selectedOption?.value || '',
-                                                })
-                                            }
-                                            options={editAccountTypeOptions}
-                                            placeholder="Select"
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            menuPlacement="bottom"
-                                            menuPosition="absolute"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Site Name *</label>
-                                        <Select
-                                            name="siteName"
-                                            value={siteOption.find(option => option.value === formData.siteName)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    siteName: selectedOption?.value || '',
-                                                    projectId: selectedOption?.id || ''
-                                                })
-                                            }
-                                            options={siteOption}
-                                            placeholder="Select Site"
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            menuPlacement="bottom"
-                                            menuPosition="absolute"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Vendor Name *</label>
-                                        <Select
-                                            name="vendor"
-                                            options={vendorOption}
-                                            value={vendorOption.find(opt => opt.value === formData.vendor)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    vendor: selectedOption?.value || '',
-                                                    vendorId: selectedOption?.id || '',
-                                                    contractor: selectedOption ? '' : formData.contractor,
-                                                    contractorId: selectedOption ? '' : formData.contractorId
-                                                })
-                                            }
-                                            isDisabled={!!formData.contractor}
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            placeholder="Select Vendor"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Contractor Name *</label>
-                                        <Select
-                                            name="contractor"
-                                            options={contractorOption}
-                                            value={contractorOption.find(opt => opt.value === formData.contractor)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    contractor: selectedOption?.value || '',
-                                                    contractorId: selectedOption?.id || '',
-                                                    vendor: selectedOption ? '' : formData.vendor,
-                                                    vendorId: selectedOption ? '' : formData.vendorId
-                                                })
-                                            }
-                                            isDisabled={!!formData.vendor}
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            placeholder="Select Contractor"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Quantity *</label>
-                                        <input type="text" name="quantity" value={formData.quantity} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Category *</label>
-                                        <Select name="category" value={categoryOption.find(option => option.value === formData.category)}
-                                            onChange={(selectedOption) => setFormData({ ...formData, category: selectedOption?.value || '' })}
-                                            options={categoryOption}
-                                            placeholder="Select Category"
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            menuPlacement="bottom"
-                                            menuPosition="absolute"
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <label className="block text-gray-500 font-normal text-left">Amount *</label>
-                                        <span className="absolute top-9 left-3 mt-[2px] text-gray-600 font-normal">₹</span>
-                                        <input type="text" name="amount" value={formData.amount} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                            onWheel={(e) => e.target.blur()}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Comments *</label>
-                                        <input type="text" name="comments" value={formData.comments} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className=' flex'>
-                                            <label className="block text-gray-500 font-normal text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
-                                            {selectedFile && <span className="text-orange-600 ml-4">{selectedFile.name}</span>}
-                                        </div>
-                                        <input type="text" name="billCopy" value={formData.billCopy} onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                        />
-                                        <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
-                                    </div>
-                                    {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
+                            <Modal isOpen={modalIsOpen} onRequestClose={handleCancel}
+                                contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
+                                overlayClassName="fixed inset-0 z-[9999]">
+                                <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
+                                    <h2 className="text-xl font-normal mb-6 border-b-2">Edit Expense</h2>
+                                    <form className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-gray-500 font-normal text-left">Bill Arrival Date</label>
-                                            <input
-                                                type="date"
-                                                name="billArrivalDate"
-                                                value={formData.billArrivalDate || ''}
-                                                onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                            />
+                                            <label className="block text-gray-500 font-normal text-left">Date</label>
+                                            <div className="mt-1">
+                                                <CustomDateField
+                                                    value={formData.date}
+                                                    onChange={(v) => {
+                                                        // Keep existing behavior: prevent clearing the main date field
+                                                        if (!v) return;
+                                                        setFormData((prev) => ({ ...prev, date: v }));
+                                                    }}
+                                                    placeholder="Select date"
+                                                    alwaysOpenBelow
+                                                    className="[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-normal"
+                                                />
+                                            </div>
                                         </div>
-                                    )}
-                                    {/* Conditional fields based on Account Type */}
-                                    {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills' || formData.accountType === 'Weekly Payment') && (
                                         <div>
-                                            <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
+                                            <label className="block text-gray-500 font-normal text-left">Account Type *</label>
                                             <Select
-                                                name="paymentMode"
-                                                options={finalPaymentModeOptions.map((mode) => ({
-                                                    value: mode.modeOfPayment,
-                                                    label: mode.modeOfPayment,
-                                                }))}
-                                                value={
-                                                    finalPaymentModeOptions
-                                                        .map((mode) => ({
-                                                            value: mode.modeOfPayment,
-                                                            label: mode.modeOfPayment,
-                                                        }))
-                                                        .find((o) => o.value === formData.paymentMode) || null
-                                                }
+                                                name="accountType"
+                                                value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
                                                 onChange={(selectedOption) =>
                                                     setFormData({
                                                         ...formData,
-                                                        paymentMode: selectedOption?.value || '',
+                                                        accountType: selectedOption?.value || '',
                                                     })
                                                 }
-                                                placeholder="Select Payment Mode"
+                                                options={editAccountTypeOptions}
+                                                placeholder="Select"
                                                 isClearable
-                                                maxMenuHeight={200}
-                                                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                                                 styles={{
                                                     control: (base, state) => ({
                                                         ...base,
@@ -2632,9 +2764,68 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         color: '#111827',
                                                         fontWeight: 'normal',
                                                     }),
-                                                    menuPortal: (base) => ({
+                                                    menu: (base) => ({
                                                         ...base,
-                                                        zIndex: 10001,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                menuPlacement="bottom"
+                                                menuPosition="absolute"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Site Name *</label>
+                                            <Select
+                                                name="siteName"
+                                                value={siteOption.find(option => option.value === formData.siteName)}
+                                                onChange={(selectedOption) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        siteName: selectedOption?.value || '',
+                                                        projectId: selectedOption?.id || ''
+                                                    })
+                                                }
+                                                options={siteOption}
+                                                placeholder="Select Site"
+                                                isClearable
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.25rem',
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 'normal',
                                                     }),
                                                     menu: (base) => ({
                                                         ...base,
@@ -2648,254 +2839,590 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     }),
                                                 }}
                                                 menuPlacement="bottom"
-                                                menuPosition="fixed"
+                                                menuPosition="absolute"
                                             />
                                         </div>
-                                    )}
-                                    {formData.accountType === 'Utility Bills' && (
-                                        <>
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">Utility Type *</label>
-                                                <select
-                                                    name="utilityType"
-                                                    value={formData.utilityType}
-                                                    onChange={handleChange}
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal">
-                                                    <option value="" disabled>--- Select ---</option>
-                                                    <option value="Electricity">Electricity</option>
-                                                    <option value="Property">Property</option>
-                                                    <option value="Water">Water</option>
-                                                    <option value="Telecom">Telecom</option>
-                                                    <option value="Subscription">Subscription</option>
-                                                </select>
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Vendor Name *</label>
+                                            <Select
+                                                name="vendor"
+                                                options={vendorOption}
+                                                value={vendorOption.find(opt => opt.value === formData.vendor)}
+                                                onChange={(selectedOption) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        vendor: selectedOption?.value || '',
+                                                        vendorId: selectedOption?.id || '',
+                                                        contractor: selectedOption ? '' : formData.contractor,
+                                                        contractorId: selectedOption ? '' : formData.contractorId
+                                                    })
+                                                }
+                                                isDisabled={!!formData.contractor}
+                                                isClearable
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.25rem',
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 'normal',
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                placeholder="Select Vendor"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Contractor Name *</label>
+                                            <Select
+                                                name="contractor"
+                                                options={contractorOption}
+                                                value={contractorOption.find(opt => opt.value === formData.contractor)}
+                                                onChange={(selectedOption) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        contractor: selectedOption?.value || '',
+                                                        contractorId: selectedOption?.id || '',
+                                                        vendor: selectedOption ? '' : formData.vendor,
+                                                        vendorId: selectedOption ? '' : formData.vendorId
+                                                    })
+                                                }
+                                                isDisabled={!!formData.vendor}
+                                                isClearable
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.25rem',
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 'normal',
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                placeholder="Select Contractor"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Quantity *</label>
+                                            <input type="text" name="quantity" value={formData.quantity} onChange={handleChange}
+                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Category *</label>
+                                            <Select name="category" value={categoryOption.find(option => option.value === formData.category)}
+                                                onChange={(selectedOption) => setFormData({ ...formData, category: selectedOption?.value || '' })}
+                                                options={categoryOption}
+                                                placeholder="Select Category"
+                                                isClearable
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.25rem',
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 'normal',
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 'normal',
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                menuPlacement="bottom"
+                                                menuPosition="absolute"
+                                            />
+                                        </div>
+                                        <div className="relative">
+                                            <label className="block text-gray-500 font-normal text-left">Amount *</label>
+                                            <span className="absolute top-9 left-3 mt-[2px] text-gray-600 font-normal">₹</span>
+                                            <input type="text" name="amount" value={formData.amount} onChange={handleChange}
+                                                className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                onWheel={(e) => e.target.blur()}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-500 font-normal text-left">Comments *</label>
+                                            <input type="text" name="comments" value={formData.comments} onChange={handleChange}
+                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className=' flex'>
+                                                <label className="block text-gray-500 font-normal text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
+                                                {selectedFile && <span className="text-orange-600 ml-4">{selectedFile.name}</span>}
                                             </div>
+                                            <input type="text" name="billCopy" value={formData.billCopy} onChange={handleChange}
+                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                            />
+                                            <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
+                                        </div>
+                                        {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
                                             <div>
-                                                <label className="block text-gray-500 font-normal text-left">
-                                                    {formData.utilityType === 'Electricity' ? 'EB Number' :
-                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
-                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
-                                                </label>
+                                                <label className="block text-gray-500 font-normal text-left">Bill Arrival Date</label>
+                                                <input
+                                                    type="date"
+                                                    name="billArrivalDate"
+                                                    value={formData.billArrivalDate || ''}
+                                                    onChange={handleChange}
+                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                />
+                                            </div>
+                                        )}
+                                        {/* Conditional fields based on Account Type */}
+                                        {(formData.accountType === 'Claim Payment' || formData.accountType === 'Utility Bills' || formData.accountType === 'Sundry Payment') && (
+                                            <div>
+                                                <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
                                                 <Select
-                                                    options={ebNumberOptions}
-                                                    value={selectedEbNumber}
-                                                    onChange={(opt) => {
-                                                        setSelectedEbNumber(opt);
-                                                        setFormData((prev) => ({ ...prev, utilityTypeNumber: opt?.label || "" }));
-                                                    }}
+                                                    name="paymentMode"
+                                                    options={finalPaymentModeOptions.map((mode) => ({
+                                                        value: mode.modeOfPayment,
+                                                        label: mode.modeOfPayment,
+                                                    }))}
+                                                    value={
+                                                        finalPaymentModeOptions
+                                                            .map((mode) => ({
+                                                                value: mode.modeOfPayment,
+                                                                label: mode.modeOfPayment,
+                                                            }))
+                                                            .find((o) => o.value === formData.paymentMode) || null
+                                                    }
+                                                    onChange={(selectedOption) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            paymentMode: selectedOption?.value || '',
+                                                        })
+                                                    }
+                                                    placeholder="Select Payment Mode"
                                                     isClearable
-                                                    placeholder={`Select ${formData.utilityType === 'Electricity' ? 'EB Number' :
-                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
-                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                    maxMenuHeight={200}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                                                     styles={{
-                                                        ...customStyles,
-                                                        singleValue: (provided) => ({
-                                                            ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
+                                                        control: (base, state) => ({
+                                                            ...base,
+                                                            fontWeight: 'normal',
+                                                            borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                            borderWidth: '2px',
+                                                            borderRadius: '0.5rem',
+                                                            padding: '0.25rem',
+                                                            textAlign: 'left',
+                                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                            '&:hover': {
+                                                                borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                            },
+                                                        }),
+                                                        placeholder: (base) => ({
+                                                            ...base,
+                                                            fontWeight: 'normal',
+                                                            color: '#6B7280',
+                                                            textAlign: 'left',
+                                                        }),
+                                                        option: (provided, state) => ({
+                                                            ...provided,
+                                                            textAlign: 'left',
+                                                            fontWeight: 'normal',
+                                                            fontSize: '15px',
+                                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                            color: 'black',
+                                                        }),
+                                                        singleValue: (base) => ({
+                                                            ...base,
+                                                            color: '#111827',
                                                             fontWeight: 'normal',
                                                         }),
+                                                        menuPortal: (base) => ({
+                                                            ...base,
+                                                            zIndex: 10001,
+                                                        }),
+                                                        menu: (base) => ({
+                                                            ...base,
+                                                            zIndex: 999,
+                                                        }),
                                                         menuList: (base) => ({
-                                                            ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
+                                                            ...base,
                                                             scrollbarWidth: 'none',
                                                             msOverflowStyle: 'none',
                                                             '&::-webkit-scrollbar': { display: 'none' },
                                                         }),
                                                     }}
                                                     menuPlacement="bottom"
-                                                    menuPosition="absolute"
+                                                    menuPosition="fixed"
                                                 />
                                             </div>
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">Months</label>
-                                                <input
-                                                    type="month"
-                                                    name="utilityForTheMonth"
-                                                    value={formData.utilityForTheMonth}
-                                                    onChange={handleChange}
-                                                    placeholder="Enter months..."
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                />
-                                            </div>
-                                            {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
-                                                <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                                        )}
+                                        {formData.accountType === 'Utility Bills' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-gray-500 font-normal text-left">Utility Type *</label>
+                                                    <select
+                                                        name="utilityType"
+                                                        value={formData.utilityType}
+                                                        onChange={handleChange}
+                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal">
+                                                        <option value="" disabled>--- Select ---</option>
+                                                        <option value="Electricity">Electricity</option>
+                                                        <option value="Property">Property</option>
+                                                        <option value="Water">Water</option>
+                                                        <option value="Telecom">Telecom</option>
+                                                        <option value="Subscription">Subscription</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-gray-500 font-normal text-left">
+                                                        {formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                            formData.utilityType === 'Property' ? 'Property Tax Number' :
+                                                                formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                                    </label>
+                                                    <Select
+                                                        options={ebNumberOptions}
+                                                        value={selectedEbNumber}
+                                                        onChange={(opt) => {
+                                                            setSelectedEbNumber(opt);
+                                                            setFormData((prev) => ({ ...prev, utilityTypeNumber: opt?.label || "" }));
+                                                        }}
+                                                        isClearable
+                                                        placeholder={`Select ${formData.utilityType === 'Electricity' ? 'EB Number' :
+                                                            formData.utilityType === 'Property' ? 'Property Tax Number' :
+                                                                formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                        styles={{
+                                                            ...customStyles,
+                                                            singleValue: (provided) => ({
+                                                                ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
+                                                                fontWeight: 'normal',
+                                                            }),
+                                                            menuList: (base) => ({
+                                                                ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
+                                                                scrollbarWidth: 'none',
+                                                                msOverflowStyle: 'none',
+                                                                '&::-webkit-scrollbar': { display: 'none' },
+                                                            }),
+                                                        }}
+                                                        menuPlacement="bottom"
+                                                        menuPosition="absolute"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-gray-500 font-normal text-left">Months</label>
+                                                    <input
+                                                        type="month"
+                                                        name="utilityForTheMonth"
+                                                        value={formData.utilityForTheMonth}
+                                                        onChange={handleChange}
+                                                        placeholder="Enter months..."
+                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                    />
+                                                </div>
+                                                {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
+                                                    <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
 
-                                                    {/* Validity */}
-                                                    <div>
-                                                        <label className="block text-gray-500 font-normal text-left">Validity</label>
-                                                        <input
-                                                            type="text"
-                                                            name="utilityValidityDays"
-                                                            value={formData.utilityValidityDays}
-                                                            onChange={handleChange}
-                                                            placeholder="Enter validity..."
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                        />
-                                                    </div>
-
-                                                    {/* Validity Type */}
-                                                    <div>
-                                                        <label className="block text-gray-500 font-normal text-left">Validity Type</label>
-                                                        <select
-                                                            name="utilityValidityType"
-                                                            value={formData.utilityValidityType}
-                                                            onChange={handleChange}
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                        >
-                                                            <option value="">--- Select ---</option>
-                                                            <option value="Days">Days</option>
-                                                            <option value="Month">Month</option>
-                                                            <option value="Year">Year</option>
-                                                        </select>
-                                                    </div>
-
-                                                    {/* Service Start Date */}
-                                                    {formData.utilityType === 'Telecom' && (
+                                                        {/* Validity */}
                                                         <div>
-                                                            <label className="block text-gray-500 font-normal text-left">Service Start Date</label>
-                                                            <div className="mt-1">
-                                                                <CustomDateField
-                                                                    value={formData.serviceStartingDate}
-                                                                    onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
-                                                                    placeholder="Service start date"
-                                                                    className="[&>button]:!font-normal"
-                                                                />
-                                                            </div>
+                                                            <label className="block text-gray-500 font-normal text-left">Validity</label>
+                                                            <input
+                                                                type="text"
+                                                                name="utilityValidityDays"
+                                                                value={formData.utilityValidityDays}
+                                                                onChange={handleChange}
+                                                                placeholder="Enter validity..."
+                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                            />
                                                         </div>
-                                                    )}
 
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                    <div className="col-span-2 flex justify-end space-x-4 mt-4 border-t-2 ">
-                                        <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
-                                            Cancel
-                                        </button>
-                                        <button type="submit" disabled={isSubmitting} onClick={handleSave}
-                                            className={`px-4 py-2 bg-[#BF9853] text-white rounded mt-3 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        >
-                                            {isSubmitting ? 'Submitting...' : 'Submit'}
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </Modal>
-                        {showPaymentModal && (
-                            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
-                                <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
-                                    <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
-                                    <div className="flex-1 overflow-hidden">
-                                        <div className="space-y-4 mb-4">
-                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                        <CustomDateField
-                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                            onChange={() => { }}
-                                                            disabled
-                                                            placeholder="Date"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                                        <input
-                                                            type="text"
-                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
-                                                            readOnly
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
-                                                        <input
-                                                            type="text"
-                                                            value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
-                                                            readOnly
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {(formData.paymentMode === 'GPay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
-                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                                    <div className="space-y-4">
-                                                        {formData.paymentMode === 'Cheque' && (
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={paymentModalData.chequeNo}
-                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                                        placeholder="Enter cheque number"
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                        {/* Validity Type */}
+                                                        <div>
+                                                            <label className="block text-gray-500 font-normal text-left">Validity Type</label>
+                                                            <select
+                                                                name="utilityValidityType"
+                                                                value={formData.utilityValidityType}
+                                                                onChange={handleChange}
+                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                            >
+                                                                <option value="">--- Select ---</option>
+                                                                <option value="Days">Days</option>
+                                                                <option value="Month">Month</option>
+                                                                <option value="Year">Year</option>
+                                                            </select>
+                                                        </div>
+
+                                                        {/* Service Start Date */}
+                                                        {formData.utilityType === 'Telecom' && (
+                                                            <div>
+                                                                <label className="block text-gray-500 font-normal text-left">Service Start Date</label>
+                                                                <div className="mt-1">
                                                                     <CustomDateField
-                                                                        value={paymentModalData.chequeDate}
-                                                                        onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
-                                                                        placeholder="Cheque date"
+                                                                        value={formData.serviceStartingDate}
+                                                                        onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
+                                                                        placeholder="Service start date"
+                                                                        className="[&>button]:!font-normal"
                                                                     />
                                                                 </div>
                                                             </div>
                                                         )}
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={paymentModalData.transactionNumber}
-                                                                    onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                                    placeholder="Enter transaction number (optional)"
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
-                                                                <select
-                                                                    value={paymentModalData.accountNumber}
-                                                                    onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                                >
-                                                                    <option value="">Select Account</option>
-                                                                    {accountDetails.map((account) => (
-                                                                        <option key={account.id} value={account.account_number}>
-                                                                            {account.account_number}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
+
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                        <div className="col-span-2 flex justify-end space-x-4 mt-4 border-t-2 ">
+                                            <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" disabled={isSubmitting} onClick={handleSave}
+                                                className={`px-4 py-2 bg-[#BF9853] text-white rounded mt-3 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {isSubmitting ? 'Submitting...' : 'Submit'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </Modal>
+                            {showPaymentModal && createPortal(
+                                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[10000]">
+                                    <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
+                                        <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
+                                        <div className="flex-1 overflow-hidden">
+                                            <div className="space-y-4 mb-4">
+                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                    <div className="grid grid-cols-3 gap-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                            <CustomDateField
+                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
+                                                                onChange={() => { }}
+                                                                disabled
+                                                                placeholder="Date"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                            <input
+                                                                type="text"
+                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                                            <input
+                                                                type="text"
+                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
+                                                                readOnly
+                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>
-                                            )}
+                                                {(formData.paymentMode === 'GPay'|| formData.paymentMode === 'Gpay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
+                                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
+                                                        <div className="space-y-4">
+                                                            {formData.paymentMode === 'Cheque' && (
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={paymentModalData.chequeNo}
+                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                                            placeholder="Enter cheque number"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
+                                                                        <CustomDateField
+                                                                            value={paymentModalData.chequeDate}
+                                                                            onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
+                                                                            placeholder="Cheque date"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={paymentModalData.transactionNumber}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                                        placeholder="Enter transaction number (optional)"
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
+                                                                    <select
+                                                                        value={paymentModalData.accountNumber}
+                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                                    >
+                                                                        <option value="">Select Account</option>
+                                                                        {accountDetails.map((account) => (
+                                                                            <option key={account.id} value={account.account_number}>
+                                                                                {account.account_number}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
-                                        <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
-                                            Cancel
+                                        <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
+                                            <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
+                                                Cancel
+                                            </button>
+                                            <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
+                                                {isSubmitting ? 'Saving...' : 'Submit'}
+                                            </button>
+                                        </div>
+                                        <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
+                                            ×
                                         </button>
-                                        <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
-                                            {isSubmitting ? 'Saving...' : 'Submit'}
-                                        </button>
                                     </div>
-                                    <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
-                                        ×
-                                    </button>
                                 </div>
-                            </div>
-                        )}
-                        <AuditModal
-                            show={showModal}
-                            onClose={() => setShowModal(false)}
-                            audits={audits}
-                            resolveMachineToolsDisplay={getMachineToolsItemIdDisplay}
-                        />
+                            , document.body)}
+                            <AuditModal
+                                show={showModal}
+                                onClose={() => setShowModal(false)}
+                                audits={audits}
+                                resolveMachineToolsDisplay={getMachineToolsItemIdDisplay}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
-        </body>
+            {showBillArrivalCalendar && createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 z-[9998]"
+                        aria-hidden
+                        onMouseDown={() => setShowBillArrivalCalendar(false)}
+                    />
+                    <div
+                        className="fixed z-[9999] w-0 h-0 [&>div]:!top-full [&>div]:!bottom-auto [&>div]:!mt-2 [&>div]:!mb-0 [&>div]:!right-0 [&>div]:!left-auto"
+                        style={{
+                            top: billArrivalCalendarPos.top,
+                            left: billArrivalCalendarPos.left,
+                        }}
+                    >
+                        <SingleDatePicker
+                            isOpen
+                            onClose={() => setShowBillArrivalCalendar(false)}
+                            value={selectedBillArrival || ''}
+                            onChange={(v) => {
+                                setSelectedBillArrival(v);
+                                setShowBillArrivalCalendar(false);
+                            }}
+                            variant="dropdown"
+                            anchor="right"
+                        />
+                    </div>
+                </>,
+                document.body
+            )}
+        </>
     );
 };
 export default DatabaseExpenses;

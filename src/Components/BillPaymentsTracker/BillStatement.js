@@ -2,6 +2,14 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import {
+  createVendorNameResolver,
+  filterStatementRows,
+  getPaymentYmd,
+  getStatementVendorName,
+  normalizeStatementList,
+  parseStatementDate,
+} from './billStatementFilters';
 
 const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
   const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
@@ -55,21 +63,28 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
       console.error("Error fetching vendor names:", error);
     }
   };
+  const vendorFilterName =
+    typeof selectedVendor === 'string'
+      ? selectedVendor
+      : (selectedVendor?.label ?? selectedVendor?.value ?? '');
+
+  const vendorNameById = useMemo(() => {
+    const map = new Map();
+    vendorOptions.forEach((opt) => {
+      if (opt?.id != null) {
+        map.set(String(opt.id), String(opt.label || opt.value || '').trim());
+      }
+    });
+    return map;
+  }, [vendorOptions]);
+
+  const resolveRowVendorName = useMemo(
+    () => createVendorNameResolver(vendorNameById),
+    [vendorNameById]
+  );
+
   const fetchStatementData = async (signal) => {
-    const q = String(selectedVendor?.label || '').trim();
-    const from = String(fromDate || '').trim();
-    const to = String(toDate || '').trim();
-    const paymentDate = String(fromPaymentDate || '').trim();
-    const paymentMode = String(selectedPaymentMode?.value || '').trim();
-
-    const params = new URLSearchParams();
-    if (q) params.set('query', q);
-    if (from) params.set('fromDate', from);
-    if (to) params.set('toDate', to);
-    if (paymentDate) params.set('paymentDate', paymentDate);
-    if (paymentMode) params.set('paymentMode', paymentMode);
-
-    const url = `${API_BASE}/vendor-payments/statement${params.toString() ? `?${params.toString()}` : ''}`;
+    const url = `${API_BASE}/vendor-payments/statement`;
     const res = await fetch(url, {
       method: 'GET',
       credentials: 'include',
@@ -81,8 +96,7 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
       throw new Error(msg || `Request failed (${res.status})`);
     }
     const data = await res.json().catch(() => []);
-    const list = Array.isArray(data) ? data : [];
-    setApiData(list);
+    setApiData(normalizeStatementList(data));
   };
   // Clear filters
   const clearFilters = () => {
@@ -151,28 +165,16 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
   };
 
   const getSortDate = (row) => {
-    // "Latest first" should follow actual payment timestamp if present, else payment date, else arrival.
-    const raw =
-      row?.payment_timestamp ??
-      row?.paymentTimestamp ??
-      row?.payment_ts ??
-      row?.paymentTs ??
-      row?.p_timestamp ??
-      row?.pTimestamp ??
-      row?.p_date ??
-      row?.pDate ??
-      row?.payment_date ??
-      row?.arrival_date ??
-      row?.bill_arrival_date ??
-      null;
-    const d = raw ? new Date(raw) : new Date(0);
-    return isNaN(d.getTime()) ? new Date(0) : d;
+    const d =
+      parseStatementDate(row?.payment_timestamp ?? row?.paymentTimestamp) ??
+      parseStatementDate(row?.payment_date ?? row?.p_date ?? row?.pDate) ??
+      parseStatementDate(row?.arrival_date ?? row?.bill_arrival_date);
+    return d || new Date(0);
   };
 
   const getArrivalDate = (row) => {
-    const raw = row?.arrival_date ?? row?.bill_arrival_date ?? null;
-    const d = raw ? new Date(raw) : new Date(0);
-    return isNaN(d.getTime()) ? new Date(0) : d;
+    const d = parseStatementDate(row?.arrival_date ?? row?.bill_arrival_date);
+    return d || new Date(0);
   };
   // Apply sorting to filtered data
   const applySorting = (data) => {
@@ -230,11 +232,36 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
     })
   }
 
-  // Always render a consistently sorted list (prevents "random mixing").
   const displayData = useMemo(() => {
-    return applySorting(Array.isArray(apiData) ? apiData : []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiData, sortConfig]);
+    const filtered = filterStatementRows(
+      apiData,
+      {
+        vendorName: vendorFilterName,
+        fromDate,
+        toDate,
+        paymentDate: fromPaymentDate,
+        paymentMode: selectedPaymentMode?.value ?? '',
+      },
+      resolveRowVendorName
+    );
+    return applySorting(filtered);
+  }, [
+    apiData,
+    vendorFilterName,
+    fromDate,
+    toDate,
+    fromPaymentDate,
+    selectedPaymentMode,
+    sortConfig,
+    resolveRowVendorName,
+  ]);
+
+  const hasActiveFilters =
+    Boolean(vendorFilterName) ||
+    Boolean(fromDate) ||
+    Boolean(toDate) ||
+    Boolean(fromPaymentDate) ||
+    Boolean(selectedPaymentMode?.value);
   // Format amount in Indian numbering system with 2 decimal places
   const formatIndianCurrency = (amount) => {
     if (!amount || amount === '-') return '-';
@@ -325,7 +352,7 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
       tableRows.push([
         String(index + 1),
         arrival ? new Date(arrival).toLocaleDateString('en-GB') : '-',
-        String(item?.vendor_name ?? item?.vendorName ?? '-'),
+        resolveRowVendorName(item) || '-',
         String(getNoOfBills(item)),
         overallAmount != null && String(overallAmount).trim() !== '' ? formatIndianCurrency(overallAmount) : '-',
         String(item?.v_date ?? item?.vDate ?? '-'),
@@ -378,11 +405,18 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
     const fileName = `Bill_Statement_${dateStr}.pdf`;
     doc.save(fileName);
   };
-  // Custom select styles
+  const selectMenuPortalTarget = typeof document !== 'undefined' ? document.body : null;
+  const selectMenuProps = {
+    menuPortalTarget: selectMenuPortalTarget,
+    menuPosition: 'fixed',
+    menuPlacement: 'auto',
+  };
+  // Custom select styles — menuPortal z-index must sit above table (sticky thead uses z-90)
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
       borderWidth: '2px',
+      minHeight: '45px',
       height: '45px',
       borderRadius: '8px',
       textAlign: 'left',
@@ -390,7 +424,17 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
       boxShadow: state.isFocused ? '0 0 0 1px rgba(101, 102, 53, 0.1)' : 'none',
       '&:hover': {
         borderColor: 'rgba(191, 152, 83, 0.2)',
-      }
+      },
+    }),
+    menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+    menu: (base) => ({
+      ...base,
+      zIndex: 99999,
+      textAlign: 'left',
+    }),
+    menuList: (base) => ({
+      ...base,
+      maxHeight: '280px',
     }),
   };
   useEffect(() => {
@@ -419,7 +463,7 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
       mounted = false;
       controller.abort();
     };
-  }, [selectedVendor, fromDate, toDate, fromPaymentDate, selectedPaymentMode]);
+  }, []);
 
   const billPaymentsTabActivePrevRef = useRef(undefined);
   useEffect(() => {
@@ -454,18 +498,20 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
   return (
     <div className="">
       <div className=' ml-10 mr-10'>
-        <div className="mb-6 bg-white p-6 rounded-lg h-[128px]">
+        <div className="mb-6 bg-white p-6 rounded-lg min-h-[128px] overflow-visible relative z-[100]">
           <div className="lg:flex lg:gap-4 gap-2 ml-5 text-left ">
-            <div>
+            <div className="relative z-[100]">
               <label className="block font-semibold mb-1">Vendor Name</label>
               <Select
+                {...selectMenuProps}
                 options={vendorOptions}
                 value={selectedVendor}
-                onChange={setSelectedVendor}
+                onChange={(option) => setSelectedVendor(option || null)}
+                getOptionLabel={(opt) => opt.label}
+                getOptionValue={(opt) => String(opt.id ?? opt.value)}
                 placeholder="Select Vendor Name"
                 styles={customStyles}
                 isClearable
-                menuPortalTarget={document.body}
                 className="w-[323px]"
               />
             </div>
@@ -499,23 +545,44 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
                 placeholder="Select Payment Date"
               />
             </div>
-            <div className="text-left">
+            <div className="text-left relative z-[100]">
               <label className="block font-semibold mb-1">Payment Mode</label>
               <Select
+                {...selectMenuProps}
                 options={paymentModeOptions}
                 value={selectedPaymentMode}
-                onChange={setSelectedPaymentMode}
+                onChange={(option) => setSelectedPaymentMode(option || null)}
                 placeholder="Select Payment Mode "
                 styles={customStyles}
                 isClearable
-                menuPortalTarget={document.body}
                 className="w-[230px] "
               />
             </div>
+            {hasActiveFilters && (
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="h-[45px] px-4 text-sm font-semibold text-[#BF9853] border-2 border-[#BF9853] border-opacity-30 rounded-lg hover:bg-[#FAF6ED]"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
           </div>
         </div>
-        <div className="bg-white p-4">
-          <div className="flex justify-end items-center p-4 ml-5">
+        <div className="bg-white p-4 relative z-0">
+          <div className="flex justify-between items-center p-4 ml-5">
+            <p className="text-sm text-gray-600">
+              Showing <span className="font-semibold text-[#202020]">{displayData.length}</span> of{' '}
+              <span className="font-semibold text-[#202020]">{apiData.length}</span> entries
+              {vendorFilterName ? (
+                <span>
+                  {' '}
+                  for vendor <span className="font-semibold text-[#202020]">{vendorFilterName}</span>
+                </span>
+              ) : null}
+            </p>
             <button onClick={exportToPDF} className="flex items-center gap-2 px-4 py-2 font-semibold text-sm">
               Export PDF
             </button>
@@ -634,27 +701,33 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
                     </td>
                   </tr>
                 )}
-                {displayData.length === 0 && !loading && !error && (
+                {!loading && !error && displayData.length === 0 && (
                   <tr>
                     <td colSpan="12" className="px-4 py-8 text-center text-sm text-gray-500">
                       No data found
                     </td>
                   </tr>
                 )}
-                {displayData.map((item, index) => {
+                {!loading &&
+                  !error &&
+                  displayData.map((item, index) => {
                   const arrival = item?.arrival_date || item?.bill_arrival_date || null;
                   const overallAmount = item?.overall_amount ?? item?.total_amount ?? null;
                   const paidAmount = item?.paid_amount ?? item?.payment_amount ?? null;
                   const billUrl = item?.bill_url ?? item?.billUrl ?? null;
                   const overallPdfUrl = item?.overall_pdf_url ?? item?.overallPdfUrl ?? item?.over_all_payment_pdf_url ?? null;
+                  const rowVendor = resolveRowVendorName(item);
                   return (
-                    <tr key={`statement-${item.tracker_id || item.id || index}`} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}  text-left`}>
+                    <tr
+                      key={`statement-row-${index}-${item.tracker_id ?? ''}-${item.id ?? ''}-${getPaymentYmd(item) ?? ''}-${rowVendor}`}
+                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}  text-left`}
+                    >
                       <td className="px-4 py-3 text-sm border-b border-gray-200">{index + 1}</td>
                       <td className="px-4 py-3 text-sm border-b border-gray-200">
                         {arrival ? new Date(arrival).toLocaleDateString('en-GB') : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm border-b border-gray-200">
-                        {item.vendor_name || item.vendorName || '-'}
+                        {rowVendor || '-'}
                       </td>
                       <td className="px-4 py-3 text-sm border-b border-gray-200">
                         {getNoOfBills(item)}

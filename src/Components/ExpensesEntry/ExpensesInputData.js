@@ -1114,7 +1114,7 @@ const DTableView = ({ username, userRoles = [] }) => {
     <div className='flex flex-col h-[calc(100vh-104px)] px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-[#FAF6ED]'>
       <div className=" flex flex-col flex-1 min-h-0 px-[18px] pt-[18px] pb-[18px] overflow-hidden bg-white">
         <div
-          className=" lg:flex space-x-[18px] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto no-scrollbar scrollbar-none select-none"
+          className="flex-1 min-h-0 lg:flex space-x-[18px] lg:w-full md:w-[32rem] w-[20rem] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none select-none"
           style={{ cursor: isDragging ? 'grabbing' : 'default' }}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseLeave}
@@ -1160,7 +1160,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[340px] w-full">
                   <tbody>
                     {filteredSiteNames.map((item, index) => (
@@ -1230,7 +1230,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[320px] w-full">
                   <tbody>
                     {filteredVendorNames.map((item, index) => (
@@ -1300,7 +1300,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[320px] w-full">
                   <tbody>
                     {filteredContractorNames.map((item, index) => (
@@ -1368,7 +1368,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[280px] w-full">
                   <tbody>
                     {filteredCategories.map((item, index) => (
@@ -1436,7 +1436,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[280px] w-full">
                   <tbody>
                     {filteredMachineTools.map((item, index) => (
@@ -1504,7 +1504,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[280px] w-full">
                   <tbody>
                     {filteredAccountType.map((item, index) => (
@@ -1572,7 +1572,7 @@ const DTableView = ({ username, userRoles = [] }) => {
                   </thead>
                 </table>
               </div>
-              <div className="overflow-y-auto max-h-[660px] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="overflow-y-auto max-h-[calc(100vh-300px)] no-scrollbar scrollbar-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <table className="table-fixed lg:w-[280px] w-full">
                   <tbody>
                     {filteredWeeklyType.map((item, index) => (

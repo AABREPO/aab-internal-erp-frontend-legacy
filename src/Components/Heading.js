@@ -60,7 +60,7 @@ const Heading = ({ username, userRoles = [] }) => {
                         </h2>
                         <h2 className={`link whitespace-nowrap ${activeTab === 'addInput' ? 'active' : ''}`}
                             onClick={() => setActiveTab('addInput')}>
-                            Add Input
+                            Input Data
                         </h2>                        
                     </>
                 )}

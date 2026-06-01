@@ -18,6 +18,12 @@ import Pdf from '../Images/pdf.png'
 import CustomDateField from './CustomDateField';
 import { Calendar } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
+import { Table, TableProvider, buildTableViewExpenseTableContext, BLANK_VALUE, blankOption } from './Table';
+import {
+    TABLE_FILTER_MAX_VISIBLE_OPTIONS,
+    TABLE_FILTER_MENU_MAX_HEIGHT_PX,
+    TABLE_FILTER_OPTION_HEIGHT_PX,
+} from './databaseExpensesSharedColumns';
 Modal.setAppElement('#root');
 const EDIT_POPUP_UTILITY_TYPE_OPTIONS = [
     { value: 'Electricity', label: 'Electricity' },
@@ -32,6 +38,144 @@ const EDIT_POPUP_VALIDITY_TYPE_OPTIONS = [
     { value: 'Year', label: 'Year' },
 ];
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
+const NON_CASH_PAYMENT_MODES = ['GPay', 'Gpay', 'PhonePe', 'Net Banking', 'Cheque'];
+
+const fetchWeeklyPaymentBillsByExpensesEntryId = async (expensesEntryId) => {
+    const listResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/all`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    if (!listResponse.ok) {
+        throw new Error('Failed to fetch weekly payment bills');
+    }
+    const billPayments = await listResponse.json();
+    return (Array.isArray(billPayments) ? billPayments : []).filter(
+        (bill) =>
+            bill.expenses_entry_id != null &&
+            String(bill.expenses_entry_id) === String(expensesEntryId)
+    );
+};
+
+/** API expects yyyy-MM-dd; expense form may send dd/MM/yyyy or ISO strings. */
+const normalizeWeeklyBillApiDate = (value) => {
+    if (value == null || String(value).trim() === '') return null;
+    const s = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    // dd/MM/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+        const [dd, mm, yyyy] = s.split('/');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+};
+
+const normalizeWeeklyBillNullableId = (value) => {
+    if (value === '' || value === undefined || value === null) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
+const pickWeeklyBillModalOrExisting = (modalPaymentData, bill, modalKey, billKey, billKeyAlt) => {
+    if (modalPaymentData && modalPaymentData[modalKey] != null && String(modalPaymentData[modalKey]).trim() !== '') {
+        return modalPaymentData[modalKey];
+    }
+    if (bill && bill[billKey] != null && String(bill[billKey]).trim() !== '') return bill[billKey];
+    if (bill && billKeyAlt && bill[billKeyAlt] != null && String(bill[billKeyAlt]).trim() !== '') return bill[billKeyAlt];
+    return null;
+};
+
+const getWeeklyBillTypeFromAccountType = (accountType) => {
+    if (accountType === 'Claim Payment') return 'Claim Payment';
+    if (accountType === 'Sundry Payment') return 'Sundry Payment';
+    return 'Utility Payment';
+};
+
+const buildWeeklyPaymentBillUpdatePayload = (updatedFormData, expensesEntryId, bill, { modalPaymentData = null, editedBy = '' } = {}) => {
+    const chequeDateRaw = pickWeeklyBillModalOrExisting(
+        modalPaymentData,
+        bill,
+        'chequeDate',
+        'cheque_date',
+        'chequeDate'
+    );
+    const chequeDate =
+        chequeDateRaw != null
+            ? normalizeWeeklyBillApiDate(chequeDateRaw) || String(chequeDateRaw).trim()
+            : null;
+
+    const resolvedDate =
+        normalizeWeeklyBillApiDate(updatedFormData.date) ??
+        normalizeWeeklyBillApiDate(bill?.date) ??
+        (typeof bill?.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(bill.date) ? bill.date.slice(0, 10) : null);
+
+    return {
+        id: bill.id,
+        date: resolvedDate,
+        created_at: bill.created_at ?? bill.createdAt ?? new Date().toISOString(),
+        contractor_id: normalizeWeeklyBillNullableId(updatedFormData.contractorId ?? updatedFormData.contractor_id ?? bill.contractor_id),
+        vendor_id: normalizeWeeklyBillNullableId(updatedFormData.vendorId ?? updatedFormData.vendor_id ?? bill.vendor_id),
+        employee_id: normalizeWeeklyBillNullableId(bill.employee_id ?? bill.employeeId),
+        labour_id: normalizeWeeklyBillNullableId(bill.labour_id ?? bill.labourId),
+        project_id: normalizeWeeklyBillNullableId(updatedFormData.projectId ?? updatedFormData.project_id ?? bill.project_id),
+        type: getWeeklyBillTypeFromAccountType(updatedFormData.accountType),
+        amount: parseFloat(updatedFormData.amount) || 0,
+        status: bill?.status !== false,
+        weekly_number: bill.weekly_number ?? bill.weeklyNumber ?? null,
+        weekly_payment_expense_id: normalizeWeeklyBillNullableId(bill.weekly_payment_expense_id ?? bill.weeklyPaymentExpenseId),
+        bill_payment_mode: updatedFormData.paymentMode || bill.bill_payment_mode || null,
+        advance_portal_id: normalizeWeeklyBillNullableId(bill.advance_portal_id ?? bill.advancePortalId),
+        staff_advance_portal_id: normalizeWeeklyBillNullableId(bill.staff_advance_portal_id ?? bill.staffAdvancePortalId),
+        tenant_id: normalizeWeeklyBillNullableId(bill.tenant_id ?? bill.tenantId),
+        tenant_complex_name: bill.tenant_complex_name ?? bill.tenantComplexName ?? null,
+        rent_management_id: normalizeWeeklyBillNullableId(bill.rent_management_id ?? bill.rentManagementId),
+        loan_portal_id: normalizeWeeklyBillNullableId(bill.loan_portal_id ?? bill.loanPortalId),
+        expenses_entry_id: normalizeWeeklyBillNullableId(expensesEntryId),
+        claim_payment_id: normalizeWeeklyBillNullableId(bill.claim_payment_id ?? bill.claimPaymentId),
+        purpose_id: normalizeWeeklyBillNullableId(bill.purpose_id ?? bill.purposeId),
+        cheque_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            bill,
+            'chequeNo',
+            'cheque_number',
+            'chequeNumber'
+        ),
+        cheque_date: chequeDate,
+        transaction_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            bill,
+            'transactionNumber',
+            'transaction_number',
+            'transactionNumber'
+        ),
+        account_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            bill,
+            'accountNumber',
+            'account_number',
+            'accountNumber'
+        ),
+        vendor_payment_tracker_id: bill.vendor_payment_tracker_id ?? bill.vendorPaymentTrackerId ?? null,
+        branch_id: normalizeWeeklyBillNullableId(bill.branch_id ?? bill.branchId),
+        edited_by: (editedBy || bill.edited_by || bill.editedBy) ?? null,
+        entered_by: (bill.entered_by ?? bill.enteredBy ?? editedBy) || null,
+    };
+};
+
+const updateWeeklyPaymentBillById = async (billId, payload) => {
+    const response = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/update/${billId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Weekly payment bill update failed: ${errText}`);
+    }
+    return response.json();
+};
 
 /** Scoped styles to match DatabaseExpenses table UI. */
 const TVE_LEDGER_TABLE_UI_CSS = `
@@ -55,6 +199,7 @@ const TVE_LEDGER_TABLE_UI_CSS = `
   background:#FAF6ED;
   z-index:11;
 }
+.tve-exp-ledger-ui .tve-exp-table thead tr:first-child th.cursor-pointer:hover{background:#e5e7eb;}
 .tve-exp-ledger-ui .tve-exp-table th.text-right,
 .tve-exp-ledger-ui .tve-exp-table td.text-right{text-align:right;}
 .tve-exp-ledger-ui .tve-exp-table th.tve-amount-col,
@@ -92,7 +237,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     }, []);
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [totalAmount, setTotalAmount] = useState(0);
     const [expenses, setExpenses] = useState([]);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [exportFilteredExpenses, setExportFilteredExpenses] = useState([]);
@@ -107,6 +251,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [machineToolsCatalog, setMachineToolsCatalog] = useState([]);
     const [branchOptions, setBranchOptions] = useState([]);
     const [sourceOptions, setSourceOptions] = useState([]);
+    const [paymentModeFilterOptions, setPaymentModeFilterOptions] = useState([]);
     const [branchFilterOptions, setBranchFilterOptions] = useState([]);
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
@@ -143,6 +288,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [selectedSource, setSelectedSource] = useState(() => {
         return localStorage.getItem('expenseFilter_source') || '';
     });
+    const [selectedPaymentMode, setSelectedPaymentMode] = useState(() => {
+        return localStorage.getItem('expenseFilter_paymentMode') || '';
+    });
     const [selectedBranch, setSelectedBranch] = useState(() => {
         return localStorage.getItem('expenseFilter_branch') || '';
     });
@@ -154,7 +302,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [categoryOption, setCategoryOption] = useState([]);
     const [machineToolsOption, setMachineToolsOption] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
-    const [expandedCells, setExpandedCells] = useState({});
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -162,7 +309,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [sortDirection, setSortDirection] = useState('asc');
     const scrollRef = useRef(null);
     const filterRowRef = useRef(null);
+    const billArrivalFilterRef = useRef(null);
     const filterNudgeUsedRef = useRef(false);
+    const filterScrollResetSkipRef = useRef(true);
     const headerRowRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
@@ -311,6 +460,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     useEffect(() => {
         localStorage.setItem('expenseFilter_source', selectedSource);
     }, [selectedSource]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_paymentMode', selectedPaymentMode);
+    }, [selectedPaymentMode]);
     useEffect(() => {
         localStorage.setItem('expenseFilter_branch', selectedBranch);
     }, [selectedBranch]);
@@ -880,6 +1032,8 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         doc.save(`Filtered_Expenses_${dateStr}.pdf`);
     };
     useEffect(() => {
+        const isBlankish = (value) =>
+            value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
         const filtered = expenses.filter(expense => {
             if (startDate && endDate) {
                 const s = new Date(startDate);
@@ -911,6 +1065,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                     expense.comments,
                     expense.category,
                     expense.accountType,
+                    expense.paymentMode,
                     getMachineToolsItemIdDisplay(expense.machineTools),
                     expense.source,
                     getBranchName(expense.branch_id ?? expense.branchId),
@@ -922,19 +1077,56 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                 if (!searchable.includes(q)) return false;
             }
             return (
-                (selectedSiteName ? expense.siteName === selectedSiteName : true) &&
-                (selectedVendor ? expense.vendor === selectedVendor : true) &&
-                (selectedContractor ? expense.contractor === selectedContractor : true) &&
-                (selectedCategory ? expense.category === selectedCategory : true) &&
-                (selectedMachineTools ? String(expense.machineTools ?? '') === String(selectedMachineTools) : true) &&
-                (selectedSource ? expense.source === selectedSource : true) &&
-                (selectedBranch ? String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch) : true) &&
+                (selectedSiteName
+                    ? (selectedSiteName === BLANK_VALUE
+                        ? isBlankish(expense.siteName)
+                        : expense.siteName === selectedSiteName)
+                    : true) &&
+                (selectedVendor
+                    ? (selectedVendor === BLANK_VALUE
+                        ? isBlankish(expense.vendor)
+                        : expense.vendor === selectedVendor)
+                    : true) &&
+                (selectedContractor
+                    ? (selectedContractor === BLANK_VALUE
+                        ? isBlankish(expense.contractor)
+                        : expense.contractor === selectedContractor)
+                    : true) &&
+                (selectedCategory
+                    ? (selectedCategory === BLANK_VALUE
+                        ? isBlankish(expense.category)
+                        : expense.category === selectedCategory)
+                    : true) &&
+                (selectedMachineTools
+                    ? (selectedMachineTools === BLANK_VALUE
+                        ? isBlankish(expense.machineTools)
+                        : String(expense.machineTools ?? '') === String(selectedMachineTools))
+                    : true) &&
+                (selectedSource
+                    ? (selectedSource === BLANK_VALUE
+                        ? isBlankish(expense.source)
+                        : expense.source === selectedSource)
+                    : true) &&
+                (selectedPaymentMode
+                    ? (selectedPaymentMode === BLANK_VALUE
+                        ? isBlankish(expense.paymentMode)
+                        : expense.paymentMode === selectedPaymentMode)
+                    : true) &&
+                (selectedBranch
+                    ? (selectedBranch === BLANK_VALUE
+                        ? isBlankish(expense.branch_id ?? expense.branchId)
+                        : String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch))
+                    : true) &&
                 (selectedAccountType ?
-                    (selectedAccountType === 'Unknown' ?
-                        (!expense.accountType || expense.accountType === '') :
-                        expense.accountType === selectedAccountType
-                    ) : true) &&
-                (selectedEno ? String(expense.eno) === String(selectedEno) : true)
+                    (selectedAccountType === BLANK_VALUE
+                        ? isBlankish(expense.accountType)
+                        : expense.accountType === selectedAccountType)
+                    : true) &&
+                (selectedEno
+                    ? (selectedEno === BLANK_VALUE
+                        ? isBlankish(expense.eno)
+                        : String(expense.eno) === String(selectedEno))
+                    : true)
             );
         });
         setFilteredExpenses(filtered);
@@ -946,6 +1138,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             selectedCategory,
             selectedMachineTools,
             selectedSource,
+            selectedPaymentMode,
             selectedBranch,
             selectedAccountType,
             startDate,
@@ -953,36 +1146,39 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             selectedEno
         ].some(Boolean) || overallSearch.trim();
         setExportFilteredExpenses(anyFilterApplied ? filtered : []);
-        const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        setTotalAmount(total);
         const getOptions = (data, key) => {
-            const unique = [...new Set(data.map(item => item[key]).filter(Boolean))];
-            return unique.map(val => ({ value: val, label: val }));
+            const unique = [...new Set(data.map(item => item[key]).filter(val => !isBlankish(val)))];
+            const options = unique.map(val => ({ value: val, label: val }));
+            options.unshift(blankOption);
+            return options;
         };
         setSiteOptions(getOptions(filtered, "siteName"));
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
         setSourceOptions(getOptions(filtered, "source"));
-        const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(Boolean))];
-        setBranchFilterOptions(
-            uniqueBranchIds.map(id => ({
-                value: String(id),
-                label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
-            }))
-        );
-        const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter((v) => v != null && v !== ''))];
-        setMachineToolsOptions(
-            uniqueToolIds.map((id) => ({
-                value: String(id),
-                label:
-                    machineToolsIdToLabel[id] ??
-                    machineToolsIdToLabel[String(id)] ??
-                    String(id),
-            }))
-        );
+        setPaymentModeFilterOptions(getOptions(filtered, "paymentMode"));
+        const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(val => !isBlankish(val)))];
+        const branchFilterOptionsBuilt = uniqueBranchIds.map(id => ({
+            value: String(id),
+            label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
+        }));
+        branchFilterOptionsBuilt.unshift(blankOption);
+        setBranchFilterOptions(branchFilterOptionsBuilt);
+        const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter(val => !isBlankish(val)))];
+        const machineToolsOptionsBuilt = uniqueToolIds.map((id) => ({
+            value: String(id),
+            label:
+                machineToolsIdToLabel[id] ??
+                machineToolsIdToLabel[String(id)] ??
+                String(id),
+        }));
+        machineToolsOptionsBuilt.unshift(blankOption);
+        setMachineToolsOptions(machineToolsOptionsBuilt);
         setAccountTypeOptions(getOptions(filtered, "accountType"));
-        setEnoOptions([...new Set(filtered.map(item => item.eno).filter(Boolean))]);
+        const uniqueEno = [...new Set(filtered.map(item => item.eno).filter(val => !isBlankish(val)))];
+        uniqueEno.unshift(BLANK_VALUE);
+        setEnoOptions(uniqueEno);
     }, [
         selectedSiteName,
         selectedVendor,
@@ -990,6 +1186,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         selectedCategory,
         selectedMachineTools,
         selectedSource,
+        selectedPaymentMode,
         selectedBranch,
         selectedAccountType,
         startDate,
@@ -999,6 +1196,23 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         expenses,
         machineToolsIdToLabel,
         branchOptions
+    ]);
+    useEffect(() => {
+        if (filterScrollResetSkipRef.current) {
+            filterScrollResetSkipRef.current = false;
+            return;
+        }
+        if (!showFilters) return;
+        const scroller = scrollRef.current;
+        if (!scroller) return;
+        filterNudgeUsedRef.current = false;
+        requestAnimationFrame(() => {
+            scroller.scrollTop = 0;
+        });
+    }, [
+        selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools,
+        selectedSource, selectedPaymentMode, selectedBranch, selectedAccountType, startDate, endDate,
+        selectedEno,
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
@@ -1117,7 +1331,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             billCopy: updatedBillCopy,
             editedBy: username,
         };
-        const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
+        const isPaymentType = (updatedFormData.accountType === 'Claim Payment' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Sundry Payment');
         const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
         const previousPaymentMode = expenses.find(e => e.id === editId)?.paymentMode || '';
         const isChangingFromCashToOnline = previousPaymentMode === 'Cash' && isNonCashPaymentMode;
@@ -1162,7 +1376,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             billArrivalDate: billArrivalForApi
         };
         const updateUrl = `https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`;
-        const isPaymentTypeForWeekly = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
+        const isPaymentTypeForWeekly = (updatedFormData.accountType === 'Claim Payment' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Sundry Payment');
         if (
             isPaymentTypeForWeekly &&
             isPaymentModeRequiringBankRegisterLog(updatedFormData.paymentMode) &&
@@ -1184,40 +1398,57 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             body: JSON.stringify(updatePayload)
         });
         if (!response.ok) throw new Error('Failed to update expense');
-        const isPaymentType = (updatedFormData.accountType === 'Claim' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Weekly Payment');
-        const isNonCashPaymentMode = ['GPay', 'PhonePe', 'Net Banking', 'Cheque'].includes(updatedFormData.paymentMode);
-        if (isPaymentType && isNonCashPaymentMode && editId && !sentToWeeklyPaymentBillsRef.current.has(editId)) {
+        const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
+        let existingWeeklyBills = [];
+        if (editId) {
+            existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
+        }
+        if (isPaymentTypeForWeekly && isNonCashPaymentMode && editId) {
             try {
-                const weeklyPaymentBillPayload = {
-                    date: updatedFormData.date,
-                    created_at: new Date().toISOString(),
-                    contractor_id: updatedFormData.contractorId || null,
-                    vendor_id: updatedFormData.vendorId || null,
-                    employee_id: null,
-                    project_id: updatedFormData.projectId || null,
-                    type: updatedFormData.accountType === 'Claim' ? 'Claim Payment' : updatedFormData.accountType === 'Weekly Payment' ? 'Weekly Payment' : 'Utility Payment',
-                    bill_payment_mode: updatedFormData.paymentMode,
-                    amount: parseFloat(updatedFormData.amount) || 0,
-                    status: true,
-                    weekly_number: '',
-                    expenses_entry_id: editId,
-                    advance_portal_id: null,
-                    staff_advance_portal_id: null,
-                    claim_payment_id: null,
-                    cheque_number: (modalPaymentData && modalPaymentData.chequeNo) || null,
-                    cheque_date: (modalPaymentData && modalPaymentData.chequeDate) || null,
-                    transaction_number: (modalPaymentData && modalPaymentData.transactionNumber) || null,
-                    account_number: (modalPaymentData && modalPaymentData.accountNumber) || null
-                };
-                const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(weeklyPaymentBillPayload)
-                });
-                if (weeklyResponse.ok) sentToWeeklyPaymentBillsRef.current.add(editId);
+                if (existingWeeklyBills.length > 0) {
+                    for (const bill of existingWeeklyBills) {
+                        if (bill?.id == null) continue;
+                        const weeklyPaymentBillPayload = buildWeeklyPaymentBillUpdatePayload(
+                            updatedFormData,
+                            editId,
+                            bill,
+                            { modalPaymentData, editedBy: username }
+                        );
+                        await updateWeeklyPaymentBillById(bill.id, weeklyPaymentBillPayload);
+                    }
+                } else {
+                    const weeklyPaymentBillPayload = {
+                        date: updatedFormData.date,
+                        created_at: new Date().toISOString(),
+                        contractor_id: updatedFormData.contractorId || null,
+                        vendor_id: updatedFormData.vendorId || null,
+                        employee_id: null,
+                        project_id: updatedFormData.projectId || null,
+                        type: getWeeklyBillTypeFromAccountType(updatedFormData.accountType),
+                        bill_payment_mode: updatedFormData.paymentMode,
+                        amount: parseFloat(updatedFormData.amount) || 0,
+                        status: true,
+                        weekly_number: '',
+                        expenses_entry_id: editId,
+                        advance_portal_id: null,
+                        staff_advance_portal_id: null,
+                        claim_payment_id: null,
+                        cheque_number: (modalPaymentData && modalPaymentData.chequeNo) || null,
+                        cheque_date: (modalPaymentData && modalPaymentData.chequeDate) || null,
+                        transaction_number: (modalPaymentData && modalPaymentData.transactionNumber) || null,
+                        account_number: (modalPaymentData && modalPaymentData.accountNumber) || null
+                    };
+                    const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(weeklyPaymentBillPayload)
+                    });
+                    if (weeklyResponse.ok) sentToWeeklyPaymentBillsRef.current.add(editId);
+                }
             } catch (weeklyErr) {
-                console.error('Weekly payment bills save error:', weeklyErr);
+                console.error('Weekly payment bills sync error:', weeklyErr);
+                throw weeklyErr;
             }
         }
     };
@@ -1280,7 +1511,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         menu: (provided) => ({
             ...provided,
             zIndex: 999,
-            maxHeight: '300px',
+            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
         }),
         menuPortal: (provided) => ({
             ...provided,
@@ -1288,7 +1519,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         }),
         menuList: (provided) => ({
             ...provided,
-            maxHeight: '250px',
+            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
+            paddingTop: 0,
+            paddingBottom: 0,
             overflowY: 'auto',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
@@ -1325,6 +1558,12 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         }),
         option: (provided, state) => ({
             ...provided,
+            minHeight: TABLE_FILTER_OPTION_HEIGHT_PX,
+            height: TABLE_FILTER_OPTION_HEIGHT_PX,
+            paddingTop: 0,
+            paddingBottom: 0,
+            display: 'flex',
+            alignItems: 'center',
             textAlign: 'left',
             fontWeight: 'normal',
             fontSize: '15px',
@@ -1348,19 +1587,20 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             display: 'none',
         }),
     }), []);
-    const TABLE_FILTER_OPTION_HEIGHT = 36;
-    const TABLE_FILTER_MAX_VISIBLE_OPTIONS = 8;
+    const TABLE_FILTER_OPTION_HEIGHT = TABLE_FILTER_OPTION_HEIGHT_PX;
+    const TABLE_FILTER_MAX_VISIBLE_OPTIONS_COUNT = TABLE_FILTER_MAX_VISIBLE_OPTIONS;
     const getTableFilterMenuMaxHeight = () => {
-        const maxLargeHeight = TABLE_FILTER_OPTION_HEIGHT * TABLE_FILTER_MAX_VISIBLE_OPTIONS;
+        const maxLargeHeight = TABLE_FILTER_MENU_MAX_HEIGHT_PX;
         if (typeof window === 'undefined') return maxLargeHeight;
+        if (window.innerWidth >= 1024) return maxLargeHeight;
         const viewportSpace = Math.max(window.innerHeight - 320, TABLE_FILTER_OPTION_HEIGHT * 3);
         const scrollSpace = scrollRef.current
             ? Math.max(scrollRef.current.clientHeight - 120, TABLE_FILTER_OPTION_HEIGHT * 3)
             : viewportSpace;
-        const raw = Math.min(viewportSpace, scrollSpace);
+        const raw = Math.min(maxLargeHeight, viewportSpace, scrollSpace);
         const visibleCount = Math.max(
             3,
-            Math.min(TABLE_FILTER_MAX_VISIBLE_OPTIONS, Math.floor(raw / TABLE_FILTER_OPTION_HEIGHT))
+            Math.min(TABLE_FILTER_MAX_VISIBLE_OPTIONS_COUNT, Math.floor(raw / TABLE_FILTER_OPTION_HEIGHT))
         );
         return visibleCount * TABLE_FILTER_OPTION_HEIGHT;
     };
@@ -1548,6 +1788,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const endIndex = startIndex + itemsPerPage;
     const currentItems = sortedExpenses.slice(startIndex, endIndex);
     const currentExportItems = exportFilteredExpenses;
+    const totalAmount = currentItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const accountTypeSummary = React.useMemo(() => {
         const summary = {};
         filteredExpenses.forEach(expense => {
@@ -1697,12 +1938,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         setModalIsOpen(false);
         setSelectedFile(null);
     };
-    const toggleExpandedCell = (cellKey) => {
-        setExpandedCells((prev) => ({
-            ...prev,
-            [cellKey]: !prev[cellKey],
-        }));
-    };
     const clearFilters = () => {
         setSelectedSiteName('');
         setSelectedVendor('');
@@ -1711,6 +1946,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         setSelectedMachineTools('');
         setSelectedAccountType('');
         setSelectedSource('');
+        setSelectedPaymentMode('');
         setSelectedBranch('');
         setStartDate('');
         setEndDate('');
@@ -1727,6 +1963,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         localStorage.removeItem('expenseFilter_machineTools');
         localStorage.removeItem('expenseFilter_accountType');
         localStorage.removeItem('expenseFilter_source');
+        localStorage.removeItem('expenseFilter_paymentMode');
         localStorage.removeItem('expenseFilter_branch');
         localStorage.removeItem('expenseFilter_date');
         localStorage.removeItem('expenseFilter_startDate');
@@ -1780,31 +2017,132 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         link.click();
         document.body.removeChild(link);
     };
+    const tableViewExpenseContext = useMemo(() => ({
+        ...buildTableViewExpenseTableContext({
+        currentItems,
+        showFilters,
+        filterRowRef,
+        totalAmount,
+        sortField,
+        sortDirection,
+        handleSort,
+        startDate,
+        setStartDate,
+        endDate,
+        setEndDate,
+        showDateRangePicker,
+        setShowDateRangePicker,
+        siteOptions,
+        selectedSiteName,
+        setSelectedSiteName,
+        vendorOptions,
+        selectedVendor,
+        setSelectedVendor,
+        contractorOptions,
+        selectedContractor,
+        setSelectedContractor,
+        categoryOptions,
+        selectedCategory,
+        setSelectedCategory,
+        accountTypeOptions,
+        selectedAccountType,
+        setSelectedAccountType,
+        machineToolsOptions,
+        selectedMachineTools,
+        setSelectedMachineTools,
+        sourceOptions,
+        selectedSource,
+        setSelectedSource,
+        branchFilterOptions,
+        selectedBranch,
+        setSelectedBranch,
+        enoOptions,
+        selectedEno,
+        setSelectedEno,
+        customStyles: ledgerFilterSelectStyles,
+        formatDate,
+        formatDateOnly,
+        getDisplaySiteName,
+        getDisplayVendorName,
+        getDisplayContractorName,
+        getDisplayStaffName,
+        getMachineToolsItemIdDisplay,
+        getBranchName,
+        formatBillArrivalDisplay,
+        handleEditClick,
+        username,
+        billArrivalFilterRef,
+        }),
+        paymentModeFilterOptions,
+        selectedPaymentMode,
+        setSelectedPaymentMode,
+    }), [
+        currentItems,
+        showFilters,
+        totalAmount,
+        sortField,
+        sortDirection,
+        startDate,
+        endDate,
+        showDateRangePicker,
+        siteOptions,
+        selectedSiteName,
+        vendorOptions,
+        selectedVendor,
+        contractorOptions,
+        selectedContractor,
+        categoryOptions,
+        selectedCategory,
+        accountTypeOptions,
+        selectedAccountType,
+        machineToolsOptions,
+        selectedMachineTools,
+        sourceOptions,
+        selectedSource,
+        paymentModeFilterOptions,
+        selectedPaymentMode,
+        branchFilterOptions,
+        selectedBranch,
+        enoOptions,
+        selectedEno,
+        ledgerFilterSelectStyles,
+    ]);
     return (
         <body className='bg-[#FAF6ED]'>
             <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
                 <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
                 <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                    <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || startDate || endDate || selectedEno
+                    <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || startDate || endDate || selectedEno
                         ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
+                        <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
                             <button
                                 className=''
                                 onClick={() => {
                                     const willOpen = !showFilters;
-                                    setShowFilters(willOpen);
-                                    if (!willOpen) return;
                                     const scroller = scrollRef.current;
-                                    if (!scroller) return;
-                                    if (scroller.scrollTop <= 0) return;
-                                    if (filterNudgeUsedRef.current) return;
-                                    filterNudgeUsedRef.current = true;
+                                    if (willOpen) {
+                                        setShowFilters(true);
+                                        if (!scroller) return;
+                                        if (scroller.scrollTop <= 0) return;
+                                        if (filterNudgeUsedRef.current) return;
+                                        filterNudgeUsedRef.current = true;
+                                        requestAnimationFrame(() => {
+                                            requestAnimationFrame(() => {
+                                                const h = filterRowRef.current?.offsetHeight || 0;
+                                                if (h > 0) {
+                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                }
+                                            });
+                                        });
+                                        return;
+                                    }
+                                    const h = filterRowRef.current?.offsetHeight || 0;
+                                    setShowFilters(false);
+                                    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                    filterNudgeUsedRef.current = false;
                                     requestAnimationFrame(() => {
                                         requestAnimationFrame(() => {
-                                            const h = filterRowRef.current?.offsetHeight || 0;
-                                            if (h > 0) {
-                                                scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
-                                            }
+                                            scroller.scrollTop = scroller.scrollTop + h;
                                         });
                                     });
                                 }}
@@ -1815,87 +2153,94 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                     className=" border rounded-md"
                                 />
                             </button>
-                            {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || startDate || endDate || selectedEno) && (
-                                <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                            {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || startDate || endDate || selectedEno) && (
+                                <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                                     {startDate && endDate ? (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit">
-                                            <span className="font-semibold">Date: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(startDate)} – {formatChipDateDMY(endDate)}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(startDate)} – {formatChipDateDMY(endDate)}</span>
                                             <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                         </span>
                                     ) : startDate ? (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit">
-                                            <span className="font-semibold">Date: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(startDate)} onwards</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(startDate)} onwards</span>
                                             <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                         </span>
                                     ) : endDate ? (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit">
-                                            <span className="font-semibold">Date until: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(endDate)}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Date until: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(endDate)}</span>
                                             <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                         </span>
                                     ) : null}
                                     {selectedSiteName && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Project Name: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedSiteName}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Project Name: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedSiteName}</span>
                                             <button onClick={() => setSelectedSiteName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedVendor && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Vendor Name: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedVendor}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Vendor Name: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedVendor}</span>
                                             <button onClick={() => setSelectedVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedContractor && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Contractor Name: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedContractor}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Contractor Name: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedContractor}</span>
                                             <button onClick={() => setSelectedContractor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedCategory && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Category: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedCategory}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Category: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedCategory}</span>
                                             <button onClick={() => setSelectedCategory('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedAccountType && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">A/C Type: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedAccountType}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">A/C Type: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedAccountType}</span>
                                             <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
+                                    {selectedPaymentMode && (
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Mode: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedPaymentMode}</span>
+                                            <button onClick={() => setSelectedPaymentMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                        </span>
+                                    )}
                                     {selectedMachineTools && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Tools: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Tools: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
                                             <button onClick={() => setSelectedMachineTools('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedSource && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Source From: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedSource}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Source From: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedSource}</span>
                                             <button onClick={() => setSelectedSource('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedBranch && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Branch: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{getBranchName(selectedBranch) || selectedBranch}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Branch: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getBranchName(selectedBranch) || selectedBranch}</span>
                                             <button onClick={() => setSelectedBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
                                     {selectedEno && (
-                                        <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
-                                            <span className="font-semibold">Entry No: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000]">{selectedEno}</span>
+                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                            <span className="font-semibold shrink-0 whitespace-nowrap">Entry No: </span>
+                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedEno}</span>
                                             <button onClick={() => setSelectedEno('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                         </span>
                                     )}
@@ -1937,407 +2282,15 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                     onMouseUp={handleMouseUp}
                                     onMouseLeave={handleMouseUp}
                                 >
-                                    <table className={`tve-exp-table table-fixed w-full min-w-[2638px] border-collapse${showFilters ? ' tve-filters-open' : ''}`}>
-                                        <colgroup>
-                                            <col style={{ width: '120px' }} />
-                                            <col style={{ width: '298px' }} />
-                                            <col style={{ width: '218px' }} />
-                                            <col style={{ width: '218px' }} />
-                                            <col style={{ width: '218px' }} />
-                                            <col style={{ width: '78px' }} />
-                                            <col style={{ width: '120px' }} />
-                                            <col style={{ width: '158px' }} />
-                                            <col style={{ width: '158px' }} />
-                                            <col style={{ width: '198px' }} />
-                                            <col style={{ width: '158px' }} />
-                                            <col style={{ width: '158px' }} />
-                                            <col style={{ width: '158px' }} />
-                                            <col style={{ width: '120px' }} />
-                                            <col style={{ width: '120px' }} />
-                                            <col style={{ width: '70px' }} />
-                                            <col style={{ width: '70px' }} />
-                                        </colgroup>
-                                <thead className="sticky top-0 z-10 bg-white">
-                                    <tr ref={headerRowRef} className="bg-[#FAF6ED] h-[40px] text-[16px] font-bold text-center text-black">
-                                        <th className="pl-[12px] w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
-                                            Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[298px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
-                                            Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
-                                            Vendor Name {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
-                                            Contractor Name {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
-                                            Staff Name {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[78px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
-                                            Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none tve-amount-col" onClick={() => handleSort('amount')}>
-                                            Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
-                                            Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
-                                            A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[9px] pr-[1px] w-[198px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
-                                            Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
-                                            Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
-                                            Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
-                                            Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
-                                            Entry No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
-                                            Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="pl-[9px] pr-[1px] w-[70px] font-bold text-center">Edit</th>
-                                        <th className="pl-[6px] pr-[12px] w-[70px] font-bold text-center">File</th>
-                                    </tr>
-                                    {showFilters && (
-                                        <tr ref={filterRowRef} className="filter-row bg-[#eeeeee] h-[44px]">
-                                            <th className=" pr-[1px]">
-                                                <div className="w-[120px] relative [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowDateRangePicker(true)}
-                                                        className="w-[120px] box-border h-[36px] pl-[12px] pr-[3px] py-0 text-sm font-normal bg-white text-left flex items-center justify-between"
-                                                    >
-                                                        <span className={`text-[14px] font-medium truncate flex-1 text-left ${startDate && endDate ? 'text-black font-normal' : 'text-[#A6A5A6] font-normal'}`}>
-                                                            {startDate
-                                                                ? endDate
-                                                                    ? `${startDate.split('-').reverse().join('-')} – ${endDate.split('-').reverse().join('-')}`
-                                                                    : `From ${startDate.split('-').reverse().join('-')}`
-                                                                : 'Date'}
-                                                        </span>
-                                                        <Calendar className="w-[16px] h-[16px] text-gray-400 flex-shrink-0 mr-[6px] ml-[3px]" />
-                                                    </button>
-                                                    <DateRangePicker
-                                                        isOpen={showDateRangePicker}
-                                                        onClose={() => setShowDateRangePicker(false)}
-                                                        startDate={startDate}
-                                                        endDate={endDate}
-                                                        variant="dropdown"
-                                                        onApply={(from, to) => {
-                                                            setStartDate(from);
-                                                            setEndDate(to);
-                                                        }}
-                                                    />
-                                                </div>
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[298px]"
-                                                    options={siteOptions}
-                                                    value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
-                                                    onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Project Name"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[218px]"
-                                                    options={vendorOptions}
-                                                    value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
-                                                    onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Vendor Name"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[218px]"
-                                                    options={contractorOptions}
-                                                    value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
-                                                    onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Contractor Name"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]"></th>
-                                            <th className="pl-[1px] pr-[1px]"></th>
-                                            <th className="text-[14px] w-[120px] text-right font-bold">
-                                                ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={categoryOptions}
-                                                    value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
-                                                    onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Category"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={accountTypeOptions}
-                                                    value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
-                                                    onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="A/C Type"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[9px] pr-[1px]"></th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={machineToolsOptions}
-                                                    value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
-                                                    onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Machine Tools"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={sourceOptions}
-                                                    value={selectedSource ? { value: selectedSource, label: selectedSource } : null}
-                                                    onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Source From"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={branchFilterOptions}
-                                                    value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
-                                                    onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Branch"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={ledgerFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] text-right">
-                                                <Select
-                                                    className="w-[120px]"
-                                                    options={enoOptions.map((eno) => ({ value: String(eno), label: String(eno) }))}
-                                                    value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
-                                                    onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Entry No"
-                                                    menuPlacement="bottom"
-                                                    noOptionsMessage={() => null}
-                                                    styles={enoFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] text-right"></th>
-                                            <th></th>
-                                            <th></th>
-                                        </tr>
-                                    )}
-                                </thead>
-                                <tbody>
-                                    {currentItems.map((expense, index) => {
-                                        const rowId = expense.id ?? index;
-                                        const cellClass = (key) => `block w-full cursor-pointer ${expandedCells[`${rowId}-${key}`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`;
-                                        return (
-                                        <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED] text-[14px] font-semibold h-[40px]">
-                                            <td className="num-cell text-left pl-3 w-[200px]">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-date`)}
-                                                    className={cellClass('date')}
-                                                    title={formatDateOnly(expense.date)}
-                                                >
-                                                    {formatDateOnly(expense.date)}
-                                                </span>
-                                            </td>
-                                            <td className="ink text-left w-60">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-site`)}
-                                                    className={cellClass('site')}
-                                                    title={getDisplaySiteName(expense)}
-                                                >
-                                                    {getDisplaySiteName(expense)}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-vendor`)}
-                                                    className={cellClass('vendor')}
-                                                    title={getDisplayVendorName(expense)}
-                                                >
-                                                    {getDisplayVendorName(expense)}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-contractor`)}
-                                                    className={cellClass('contractor')}
-                                                    title={getDisplayContractorName(expense)}
-                                                >
-                                                    {getDisplayContractorName(expense)}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-staff`)}
-                                                    className={cellClass('staff')}
-                                                    title={getDisplayStaffName(expense)}
-                                                >
-                                                    {getDisplayStaffName(expense)}
-                                                </span>
-                                            </td>
-                                            <td className="num-cell text-right">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-quantity`)}
-                                                    className={cellClass('quantity')}
-                                                    title={String(expense.quantity ?? '')}
-                                                >
-                                                    {expense.quantity}
-                                                </span>
-                                            </td>
-                                            <td className="tve-amount-col num-cell ink text-right font-normal w-[90px]">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-amount`)}
-                                                    className={`${cellClass('amount')} text-right`}
-                                                    title={`₹${Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                                >
-                                                    ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-category`)}
-                                                    className={cellClass('category')}
-                                                    title={expense.category || ''}
-                                                >
-                                                    {expense.category}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-accountType`)}
-                                                    className={cellClass('accountType')}
-                                                    title={expense.accountType || ''}
-                                                >
-                                                    {expense.accountType}
-                                                </span>
-                                            </td>
-                                            <td className="text-left pl-[9px] pr-[1px] px-1">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-comments`)}
-                                                    className={cellClass('comments')}
-                                                    title={expense.comments || ''}
-                                                >
-                                                    {expense.comments || ''}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-machineTools`)}
-                                                    className={cellClass('machineTools')}
-                                                    title={getMachineToolsItemIdDisplay(expense.machineTools) || ''}
-                                                >
-                                                    {getMachineToolsItemIdDisplay(expense.machineTools)}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-source`)}
-                                                    className={cellClass('source')}
-                                                    title={expense.source || ''}
-                                                >
-                                                    {expense.source}
-                                                </span>
-                                            </td>
-                                            <td className="text-left">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-branch`)}
-                                                    className={cellClass('branch')}
-                                                    title={getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}
-                                                >
-                                                    {getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}
-                                                </span>
-                                            </td>
-                                            <td className="num-cell text-right pl-3">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-eno`)}
-                                                    className={`${cellClass('eno')} text-right`}
-                                                    title={String(expense.eno ?? '')}
-                                                >
-                                                    {expense.eno}
-                                                </span>
-                                            </td>
-                                            <td className="num-cell text-left px-1">
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-billArrival`)}
-                                                    className={`${cellClass('billArrival')} text-right`}
-                                                    title={formatBillArrivalDisplay(expense)}
-                                                >
-                                                    {formatBillArrivalDisplay(expense)}
-                                                </span>
-                                            </td>
-                                            <td className="py-1.5 w-[50px]">
-                                                <div className="act-cell">
-                                                <button
-                                                    onClick={() => handleEditClick(expense)}
-                                                    className="rounded-full transition duration-200 inline-flex items-center justify-center"
-                                                    title="Edit"
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        viewBox="0 0 14.75 17.56"
-                                                        className="w-5 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                        fill="none"
-                                                        stroke="#007233"
-                                                        strokeWidth="1.5"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        aria-label="Edit"
-                                                    >
-                                                        <line x1="9.709" y1="2.451" x2="12.451" y2="5.042" />
-                                                        <path d="M4.556,12.462 L0.773,13.693 L1.773,9.893 L11.159,0.072 a0.273,0.273 0 0 1 0.383,0 l2.371,2.223 a0.266,0.266 0 0 1 0.016,0.379 z" />
-                                                        <line x1="0.0" y1="16.0" x2="11.395" y2="16.0" />
-                                                    </svg>
-                                                </button>
-                                                </div>
-                                            </td>
-                                            <td className="px-1">
-                                                {expense.billCopy ? (
-                                                    <a href={expense.billCopy} className="text-red-500 underline" target="_blank" rel="noopener noreferrer">
-                                                        View
-                                                    </a>
-                                                ) : (
-                                                    <span></span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                    <TableProvider value={tableViewExpenseContext}>
+                                        <Table
+                                            showTimestampColumn={false}
+                                            showActivityColumn
+                                            activityColumnLabel="Edit"
+                                            editOnlyActivityColumn
+                                            tableClassName={`tve-exp-table min-w-[2638px]${showFilters ? ' tve-filters-open' : ''}`}
+                                        />
+                                    </TableProvider>
                                 </div>
                             </div>
                         </div>
@@ -2809,7 +2762,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                             />
                                         </div>
                                     )}
-                                    {(formData.accountType === 'Claim' || formData.accountType === 'Utility Bills' || formData.accountType === 'Weekly Payment') && (
+                                    {(formData.accountType === 'Claim Payment' || formData.accountType === 'Utility Bills' || formData.accountType === 'Sundry Payment') && (
                                         <div>
                                             <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
                                             <Select

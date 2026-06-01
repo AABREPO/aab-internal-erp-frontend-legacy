@@ -290,7 +290,7 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
       `}</style>
       {isVisible && (
         <div
-          className="erp-orbit-drawer-bg fixed left-0 right-0 bottom-0 top-[55px] z-[259] lg:hidden"
+          className="erp-orbit-drawer-bg fixed left-0 right-0 bottom-0 top-[64px] z-[259] lg:hidden"
           onClick={() => onCloseSidebar && onCloseSidebar()}
           role="presentation"
           aria-hidden="true"
@@ -298,9 +298,9 @@ function Sidebar({ isVisible, sidebarRef, userRoles = [], onCloseSidebar }) {
       )}
       <aside
         ref={sidebarRef}
-        className={`erp-orbit-drawer fixed left-0 bottom-0 top-[65px] z-[260] flex ${isSidebarExpanded ? "w-[280px] sidebar-expanded" : "w-[62px] sidebar-collapsed"} flex-col overflow-hidden bg-[#FFFFFF] translate-x-0`}
+        className={`erp-orbit-drawer fixed left-0 bottom-0 top-0 z-[260] flex ${isSidebarExpanded ? "w-[280px] sidebar-expanded" : "w-[62px] sidebar-collapsed"} flex-col overflow-hidden bg-[#FFFFFF] translate-x-0`}
       >
-        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar scrollbar-none pt-[6px]">
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar scrollbar-none pt-[70px]">
         <Link
           to="/"
           title="Home"

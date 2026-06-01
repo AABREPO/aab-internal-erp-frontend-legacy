@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
-import Filter from '../Images/filter (3).png'
-import Reload from '../Images/rotate-right.png'
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+import Filter from '../Images/TableFilter.svg'
+import Search from '../Images/Searchnew.svg'
+import Reload from '../Images/Clear.svg'
 import Pdf from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 import { sum } from 'mathjs';
@@ -12,6 +14,30 @@ import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 import Attach from '../Images/Attachfile.svg';
 import cross from '../Images/cross.png';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  getEdbcColumnConfig,
+  useEdbcExpandedCells,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcTimestampFilter,
+  EdbcDateFilter,
+  EdbcProjectNameFilter,
+  EdbcSelectFilter,
+  EdbcTextInputFilter,
+  EdbcTotalAmountFilter,
+  EdbcEmptyFilterCell,
+  EdbcTimestampBodyCell,
+  EdbcDateBodyCell,
+  EdbcExpandableBodyCell,
+  EdbcFileBodyCell,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
+import { syncWeeklyPaymentBillsForAdvancePortal, deleteRelatedWeeklyPaymentBillsForAdvancePortal, needsAdvancePortalPaymentModalForWeeklyBill, getAdvancePortalDisplayAmount } from '../../utils/advancePortalWeeklyPaymentBill';
+import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 
 const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
   const BLANK_VALUE = 'BLANK';
@@ -54,6 +80,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [selectDatabaseProjectName, setSelectDatabaseProjectName] = useState('');
   const [selectDatabaseTransfer, setSelectDatabaseTransfer] = useState('');
   const [selectDatabaseType, setSelectDatabaseType] = useState('');
+  const [selectDatabaseDescription, setSelectDatabaseDescription] = useState('');
   const [selectDatabaseMode, setSelectDatabaseMode] = useState('');
   const [selectDatabaseEntryNo, setSelectDatabaseEntryNo] = useState('');
   const [selectDatabaseSourceFrom, setSelectDatabaseSourceFrom] = useState('');
@@ -65,6 +92,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [file, setFile] = useState(null);
   const [advancePortalAudits, setAdvancePortalAudits] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [overallSearch, setOverallSearch] = useState('');
+  const [showTimestampDatePicker, setShowTimestampDatePicker] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestingEntry, setRequestingEntry] = useState(null);
@@ -79,6 +108,16 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
+  const pendingAdvanceUpdateRef = useRef(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
+  const [accountDetails, setAccountDetails] = useState([]);
   const adminUsernames = ['Mahalingam M', 'Admin'];
   const normalizedUsername = (username || '').trim().toLowerCase();
   const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
@@ -112,6 +151,21 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       }
     };
     fetchBranches();
+  }, []);
+
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          setAccountDetails(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching account details:', error);
+      }
+    };
+    fetchAccountDetails();
   }, []);
 
   useEffect(() => {
@@ -153,6 +207,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           if (filters.selectDatabaseProjectName) setSelectDatabaseProjectName(filters.selectDatabaseProjectName);
           if (filters.selectDatabaseTransfer) setSelectDatabaseTransfer(filters.selectDatabaseTransfer);
           if (filters.selectDatabaseType) setSelectDatabaseType(filters.selectDatabaseType);
+          if (filters.selectDatabaseDescription) setSelectDatabaseDescription(filters.selectDatabaseDescription);
           if (filters.selectDatabaseMode) setSelectDatabaseMode(filters.selectDatabaseMode);
           if (filters.selectDatabaseEntryNo) setSelectDatabaseEntryNo(filters.selectDatabaseEntryNo);
           if (filters.selectDatabaseSourceFrom) setSelectDatabaseSourceFrom(filters.selectDatabaseSourceFrom);
@@ -160,6 +215,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           if (filters.selectDatabaseEnteredBy) setSelectDatabaseEnteredBy(filters.selectDatabaseEnteredBy);
           if (filters.startDate) setStartDate(filters.startDate);
           if (filters.endDate) setEndDate(filters.endDate);
+          if (filters.overallSearch) setOverallSearch(filters.overallSearch);
           if (filters.showFilters !== undefined) setShowFilters(filters.showFilters);
         } catch (error) {
           console.error('Error loading filters from sessionStorage:', error);
@@ -194,6 +250,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       selectDatabaseProjectName,
       selectDatabaseTransfer,
       selectDatabaseType,
+      selectDatabaseDescription,
       selectDatabaseMode,
       selectDatabaseEntryNo,
       selectDatabaseSourceFrom,
@@ -201,12 +258,15 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       selectDatabaseEnteredBy,
       startDate,
       endDate,
+      overallSearch,
       showFilters
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, showFilters]);
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch, showFilters]);
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
+  const filterNudgeUsedRef = useRef(false);
+  const filterScrollResetSkipRef = useRef(true);
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
   const scroll = useRef({ left: 0, top: 0 });
@@ -242,6 +302,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     };
     scrollRef.current.scrollLeft = scroll.current.left - dx;
     scrollRef.current.scrollTop = scroll.current.top - dy;
+    filterNudgeUsedRef.current = false;
     lastMove.current = {
       time: now,
       x: e.clientX,
@@ -799,6 +860,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         if (entry.type?.toLowerCase() !== selectDatabaseType.toLowerCase()) return false;
       }
     }
+    if (selectDatabaseDescription.trim()) {
+      if (!String(entry.description ?? '').toLowerCase().includes(selectDatabaseDescription.toLowerCase().trim())) return false;
+    }
     if (selectDatabaseMode) {
       if (selectDatabaseMode === BLANK_VALUE) {
         if (!isBlankish(entry.payment_mode)) return false;
@@ -836,6 +900,29 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       } else {
         if (String(enteredVal).toLowerCase() !== String(selectDatabaseEnteredBy).toLowerCase()) return false;
       }
+    }
+    if (overallSearch.trim()) {
+      const q = overallSearch.toLowerCase().trim();
+      const searchable = [
+        formatDate(entry.timestamp),
+        formatDateOnly(entry.date),
+        entry.vendor_id ? getVendorName(entry.vendor_id) : getContractorName(entry.contractor_id),
+        getSiteName(entry.project_id),
+        getSiteName(entry.transfer_site_id),
+        entry.amount,
+        entry.bill_amount,
+        entry.refund_amount,
+        entry.type,
+        entry.description,
+        entry.payment_mode,
+        entry.source_from ?? entry.sourceFrom ?? entry.source,
+        getBranchName(entry.branch_id ?? entry.branchId),
+        entry.enteredBy ?? entry.entered_by ?? entry.request_send_by ?? entry.requested_by ?? entry.createdBy ?? entry.created_by,
+        entry.entry_no,
+      ]
+        .map((v) => String(v ?? '').toLowerCase())
+        .join(' ');
+      if (!searchable.includes(q)) return false;
     }
     return true;
   });
@@ -996,9 +1083,25 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             aValue = getSiteName(a.transfer_site_id);
             bValue = getSiteName(b.transfer_site_id);
             break;
+          case 'amount':
+            aValue = Number(a.amount) || 0;
+            bValue = Number(b.amount) || 0;
+            break;
+          case 'bill_amount':
+            aValue = Number(a.bill_amount) || 0;
+            bValue = Number(b.bill_amount) || 0;
+            break;
+          case 'refund_amount':
+            aValue = Number(a.refund_amount) || 0;
+            bValue = Number(b.refund_amount) || 0;
+            break;
           case 'type':
             aValue = a.type || '';
             bValue = b.type || '';
+            break;
+          case 'description':
+            aValue = String(a.description ?? '').toLowerCase();
+            bValue = String(b.description ?? '').toLowerCase();
             break;
           case 'mode':
             aValue = a.payment_mode || '';
@@ -1029,7 +1132,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
           return compareByAdvanceIdDesc(a, b);
         }
-        if (sortConfig.key === 'entry_no') {
+        if (sortConfig.key === 'entry_no' || sortConfig.key === 'amount' || sortConfig.key === 'bill_amount' || sortConfig.key === 'refund_amount') {
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
           return compareByAdvanceIdDesc(a, b);
@@ -1047,9 +1150,72 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
+  const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
+  const edbc19TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC19)?.tdClass || '';
+  const mapAdvanceSortKeyToEdbc = (key) => {
+    if (key === 'project' || key === 'transfer') return 'siteName';
+    if (key === 'entry_no') return 'eno';
+    if (key === 'mode') return 'paymentMode';
+    if (key === 'type') return 'accountType';
+    if (key === 'description') return 'comments';
+    return key;
+  };
+  const handleEdbcSort = (edbcField) => {
+    const fieldToKey = {
+      siteName: 'project',
+      eno: 'entry_no',
+      paymentMode: 'mode',
+      accountType: 'type',
+      comments: 'description',
+    };
+    handleSort(fieldToKey[edbcField] || edbcField);
+  };
+  const resolveEdbcSortField = (advanceSortKey) =>
+    sortConfig.key === advanceSortKey ? mapAdvanceSortKeyToEdbc(advanceSortKey) : '';
+  const formatAdvanceAmount = (value) =>
+    value != null && value !== ''
+      ? `₹${Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '';
+  const advCol1Label = 'Time Stamp';
+  const advCol2Label = 'Date';
+  const advCol3Label = 'Contractor/Vendor';
+  const advCol4Label = 'Project Name';
+  const advCol5Label = 'Transfer Project';
+  const advCol6Label = 'Advance';
+  const advCol7Label = 'Bill Payment';
+  const advCol8Label = 'Refund';
+  const advCol9Label = 'Type';
+  const advCol10Label = 'Description';
+  const advCol11Label = 'Mode';
+  const advCol12Label = 'Source From';
+  const advCol13Label = 'Branch';
+  const advCol14Label = 'Entered By';
+  const advCol15Label = 'Entry No';
+  const advCol16Label = 'File';
+  const advCol17Label = 'Activity';
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate]);
+  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch]);
+  useEffect(() => {
+    if (filterScrollResetSkipRef.current) {
+      filterScrollResetSkipRef.current = false;
+      return;
+    }
+    if (!showFilters) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    filterNudgeUsedRef.current = false;
+    requestAnimationFrame(() => {
+      scroller.scrollTop = 0;
+    });
+  }, [
+    selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName,
+    selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode,
+    selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy,
+    startDate, endDate,
+  ]);
   const clearFilters = useCallback(() => {
     setSelectTimeStampDate('');
     setSelectDatabaseDate('');
@@ -1057,6 +1223,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     setSelectDatabaseProjectName('');
     setSelectDatabaseTransfer('');
     setSelectDatabaseType('');
+    setSelectDatabaseDescription('');
     setSelectDatabaseMode('');
     setSelectDatabaseEntryNo('');
     setSelectDatabaseSourceFrom('');
@@ -1064,6 +1231,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     setSelectDatabaseEnteredBy('');
     setStartDate('');
     setEndDate('');
+    setOverallSearch('');
     sessionStorage.removeItem('advanceDatabaseFilters');
   }, []);
   const handleChange = async (selected) => {
@@ -1256,6 +1424,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           ...editFormData,
           ...overrides,
           file_url: fileUrl,
+          branch_id: editFormData.branch_id ?? currentEntry?.branch_id ?? currentEntry?.branchId ?? activeBranchId,
         };
         if (selectedOption) {
           if (selectedOption.type === 'Vendor') {
@@ -1298,7 +1467,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         payload.entry_no = sanitizeNumberField(payload.entry_no);
         return payload;
       };
-      const updateRecord = async (id, payload) => {
+      const updateRecord = async (id, payload, modalPaymentData = null) => {
         const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${id}?editedBy=${username}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1310,10 +1479,16 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           throw new Error(errorText || 'Failed to update record');
         }
         const contentType = res.headers.get('content-type') || '';
+        let updatedRecord = null;
         if (contentType.includes('application/json')) {
-          return res.json();
+          updatedRecord = await res.json();
         }
-        return null;
+        await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
+          editedBy: username,
+          branchId: activeBranchId,
+          modalPaymentData,
+        });
+        return updatedRecord;
       };
       const setAllowToEdit = async (id, allow) => {
         try {
@@ -1326,6 +1501,22 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           }
         } catch (error) {
           console.error('Error updating allowToEdit:', error);
+        }
+      };
+      const finishEditSuccess = async (payload) => {
+        await setAllowToEdit(editingId, false);
+        setAdvanceData(prev =>
+          prev.map(item =>
+            item.advancePortalId === editingId ? { ...item, ...payload } : item
+          )
+        );
+        await fetchAdvanceData();
+        setShowEditPaymentModal(false);
+        pendingAdvanceUpdateRef.current = null;
+        setIsEditModalOpen(false);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
         }
       };
       if (editFormData.type === 'Transfer') {
@@ -1389,13 +1580,20 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         }
       } else {
         const payload = buildPayload();
-        const updatedRecord = await updateRecord(editingId, payload);
-        await setAllowToEdit(editingId, false);
-        setAdvanceData(prev =>
-          prev.map(item =>
-            item.advancePortalId === editingId ? { ...item, ...payload } : item
-          )
-        );
+        if (await needsAdvancePortalPaymentModalForWeeklyBill(editingId, payload)) {
+          pendingAdvanceUpdateRef.current = { payload };
+          setEditPaymentModalData({
+            chequeNo: '',
+            chequeDate: '',
+            transactionNumber: '',
+            accountNumber: '',
+          });
+          setShowEditPaymentModal(true);
+          return;
+        }
+        await updateRecord(editingId, payload);
+        await finishEditSuccess(payload);
+        return;
       }
       await fetchAdvanceData();
       setIsEditModalOpen(false);
@@ -1405,6 +1603,67 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       }
     } catch (err) {
       console.error('Update error:', err);
+      alert('Failed to submit edit request. Please try again.');
+    }
+  };
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    if (editFormData.payment_mode === 'Cheque' && (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingAdvanceUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+    setIsEditPaymentSubmitting(true);
+    try {
+      const payload = pending.payload;
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${username}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || 'Failed to update record');
+      }
+      await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
+        editedBy: username,
+        branchId: activeBranchId,
+        modalPaymentData: editPaymentModalData,
+      });
+      try {
+        const allowRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${editingId}?allow=${false}`, {
+          method: 'PUT',
+          credentials: 'include',
+        });
+        if (!allowRes.ok) {
+          console.error('Failed to update allowToEdit');
+        }
+      } catch (allowError) {
+        console.error('Error updating allowToEdit:', allowError);
+      }
+      setAdvanceData(prev =>
+        prev.map(item =>
+          item.advancePortalId === editingId ? { ...item, ...payload } : item
+        )
+      );
+      await fetchAdvanceData();
+      setShowEditPaymentModal(false);
+      pendingAdvanceUpdateRef.current = null;
+      setIsEditModalOpen(false);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      console.error('Update error:', err);
+      alert('Failed to submit edit request. Please try again.');
+    } finally {
+      setIsEditPaymentSubmitting(false);
     }
   };
   const handleDelete = async (idToDelete) => {
@@ -1432,6 +1691,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         payment_mode: '',
         refund_amount: ''
       };
+      const advancePortalIdsToClear = [];
       if (record.type === 'Transfer') {
         const transferRecords = advanceData.filter(r => r.entry_no === entryNo);
         if (transferRecords.length !== 2) {
@@ -1447,6 +1707,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             if (!res.ok) {
               throw new Error(`Failed to clear transfer record with ID: ${rec.advancePortalId}`);
             }
+            advancePortalIdsToClear.push(rec.advancePortalId);
           })
         );
       } else {
@@ -1458,10 +1719,36 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         if (!res.ok) {
           throw new Error('Failed to clear record');
         }
+        advancePortalIdsToClear.push(idToDelete);
       }
+
+      let billDeleteMessage = '';
+      try {
+        let deletedCount = 0;
+        let failedCount = 0;
+        for (const advancePortalId of advancePortalIdsToClear) {
+          const result = await deleteRelatedWeeklyPaymentBillsForAdvancePortal(advancePortalId);
+          deletedCount += result.deletedCount;
+          failedCount += result.failedCount;
+        }
+        if (deletedCount > 0 && failedCount === 0) {
+          billDeleteMessage = ' Related bill payment record(s) were also deleted.';
+        } else if (deletedCount > 0 && failedCount > 0) {
+          billDeleteMessage = ' Some related bill payment record(s) could not be deleted.';
+        } else if (failedCount > 0) {
+          billDeleteMessage = ' Failed to delete related bill payment record(s).';
+        }
+      } catch (billDeleteError) {
+        console.error('Failed to delete related bill payments:', billDeleteError);
+        billDeleteMessage = ' Failed to delete related bill payment record(s).';
+      }
+
+      alert(`Record deleted successfully.${billDeleteMessage}`);
+
       await fetchAdvanceData();
     } catch (error) {
       console.error('Delete error:', error);
+      alert('Failed to delete record. Please try again.');
     }
   };
   const totals = currentData.reduce(
@@ -1484,57 +1771,62 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     );
   }
   return (
-    <div className='bg-[#FAF6ED]'>
-      <div className='max-w-[1850px] bg-white rounded-md ml-10 xl:h-[128px] h-auto mr-10 px-4 text-left flex items-center gap-6'>
+    <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+      <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
         <div className='w-full xl:w-auto xl:justify-between'>
-          <div className='flex flex-wrap gap-[10px] p-4'>
+          <div className='flex flex-wrap gap-[12px]'>
             <div className=''>
-              <label className='block mb-2 font-semibold'>Advance Amount</label>
+              <label className='block mb-[8px] font-semibold'>Advance Amount</label>
               <input
-                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
             <div className=''>
-              <label className='block mb-2 font-semibold'>Bill Amount</label>
+              <label className='block mb-[8px] font-semibold'>Bill Amount</label>
               <input
-                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
             <div className=''>
-              <label className='block mb-2 font-semibold'>Transfer Amount </label>
+              <label className='block mb-[8px] font-semibold'>Transfer Amount </label>
               <input
                 value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
-                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
+                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
             </div>
             <div className=''>
-              <label className='block mb-2 font-semibold'>Refund Amount</label>
+              <label className='block mb-[8px] font-semibold'>Refund Amount</label>
               <input
-                className='w-full h-[45px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
                 value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
             </div>
             <div className=''>
-              <label className='block mb-2 font-semibold'>Start Date</label>
-              <input
-                type="date"
+              <label className='block mb-[8px] font-semibold'>Start Date</label>
+              <CustomDateField
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className='w-full max-w-[150px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                onChange={setStartDate}
+                placeholder="Select date"
+                alwaysOpenBelow
+                controlHeightPx={40}
+                className="w-full max-w-[150px]"
               />
             </div>
             <div className=''>
-              <label className='block mb-2 font-semibold'>End Date</label>
-              <input
-                type="date"
+              <label className='block mb-[8px] font-semibold'>End Date</label>
+              <CustomDateField
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className='w-full max-w-[150px] h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-2'
+                onChange={setEndDate}
+                placeholder="Select date"
+                alwaysOpenBelow
+                controlHeightPx={40}
+                className="w-full max-w-[150px]"
               />
             </div>
           </div>
@@ -1543,445 +1835,561 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           <button onClick={() => setIsOpen(true)} className='w-28 h-[35px] border-2 bg-[#BF9853] border-opacity-25 rounded-lg xl:mt-4 text-white'>Migrate</button>
         </div>
       </div>
-      <div className="w-full px-4 sm:px-6 lg:px-10">
-        <div className="w-full max-w-[1860px] mx-auto p-4 mt-4 bg-white shadow-lg overflow-x-auto">
+      <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
-          className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
+          className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
-            } mb-3 gap-2`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
+            } mb-[12px] gap-[6px]`}>
+          <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
             <button
-              className='pl-2'
+              className=''
               onClick={() => {
                 const willOpen = !showFilters;
-                setShowFilters(willOpen);
-                if (!willOpen) return;
                 const scroller = scrollRef.current;
-                if (!scroller) return;
-                if (scroller.scrollTop <= 0) return;
+                if (willOpen) {
+                  setShowFilters(true);
+                  if (!scroller) return;
+                  if (scroller.scrollTop <= 0) return;
+                  if (filterNudgeUsedRef.current) return;
+                  filterNudgeUsedRef.current = true;
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      const h = filterRowRef.current?.offsetHeight || 0;
+                      if (h > 0) {
+                        scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                      }
+                    });
+                  });
+                  return;
+                }
+                const h = filterRowRef.current?.offsetHeight || 0;
+                setShowFilters(false);
+                if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                filterNudgeUsedRef.current = false;
                 requestAnimationFrame(() => {
-                  const h = filterRowRef.current?.offsetHeight || 0;
-                  if (h > 0) scroller.scrollTop = scroller.scrollTop + h;
+                  requestAnimationFrame(() => {
+                    scroller.scrollTop = scroller.scrollTop + h;
+                  });
                 });
               }}
             >
               <img
                 src={Filter}
                 alt="Toggle Filter"
-                className="w-7 h-7 border border-[#BF9853] rounded-md"
+                className=" border rounded-md h-[34px]"
               />
             </button>
-            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
+              <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                 {startDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">Start Date: </span>
-                    <span className="font-bold">{startDate}</span>
-                    <button onClick={() => setStartDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Start Date: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{startDate}</span>
+                    <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {endDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">End Date: </span>
-                    <span className="font-bold">{endDate}</span>
-                    <button onClick={() => setEndDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">End Date: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{endDate}</span>
+                    <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectTimeStampDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">Timestamp: </span>
-                    <span className="font-bold">{selectTimeStampDate}</span>
-                    <button onClick={() => setSelectTimeStampDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Timestamp: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectTimeStampDate}</span>
+                    <button onClick={() => setSelectTimeStampDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectDatabaseDate && (
-                  <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium w-fit">
-                    <span className="font-normal">Date: </span>
-                    <span className="font-bold">{selectDatabaseDate}</span>
-                    <button onClick={() => setSelectDatabaseDate('')} className="text-[#BF9853] ml-1 text-2xl">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseDate}</span>
+                    <button onClick={() => setSelectDatabaseDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectDatabaseContractororVendorName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Contractor/Vendor Name: </span>
-                    <span className="font-bold">{selectDatabaseContractororVendorName}</span>
-                    <button onClick={() => setSelectDatabaseContractororVendorName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Contractor/Vendor Name: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseContractororVendorName === BLANK_VALUE ? BLANK_LABEL : selectDatabaseContractororVendorName}</span>
+                    <button onClick={() => setSelectDatabaseContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseProjectName && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Project Name:</span>
-                    <span className="font-bold">{selectDatabaseProjectName}</span>
-                    <button onClick={() => setSelectDatabaseProjectName('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Project Name: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseProjectName === BLANK_VALUE ? BLANK_LABEL : selectDatabaseProjectName}</span>
+                    <button onClick={() => setSelectDatabaseProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseTransfer && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Transfer site: </span>
-                    <span className="font-bold">{selectDatabaseTransfer}</span>
-                    <button onClick={() => setSelectDatabaseTransfer('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{advCol5Label}: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseTransfer === BLANK_VALUE ? BLANK_LABEL : selectDatabaseTransfer}</span>
+                    <button onClick={() => setSelectDatabaseTransfer('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseType && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Type: </span>
-                    <span className="font-bold">{selectDatabaseType}</span>
-                    <button onClick={() => setSelectDatabaseType('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseType === BLANK_VALUE ? BLANK_LABEL : selectDatabaseType}</span>
+                    <button onClick={() => setSelectDatabaseType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectDatabaseDescription.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Description: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseDescription}</span>
+                    <button onClick={() => setSelectDatabaseDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseMode && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Mode: </span>
-                    <span className="font-bold">{selectDatabaseMode}</span>
-                    <button onClick={() => setSelectDatabaseMode('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseMode === BLANK_VALUE ? BLANK_LABEL : selectDatabaseMode}</span>
+                    <button onClick={() => setSelectDatabaseMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseEntryNo && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Entry No: </span>
-                    <span className="font-bold">{selectDatabaseEntryNo}</span>
-                    <button onClick={() => setSelectDatabaseEntryNo('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entry No: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{String(selectDatabaseEntryNo) === BLANK_VALUE ? BLANK_LABEL : selectDatabaseEntryNo}</span>
+                    <button onClick={() => setSelectDatabaseEntryNo('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseSourceFrom && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Source From: </span>
-                    <span className="font-bold">{selectDatabaseSourceFrom}</span>
-                    <button onClick={() => setSelectDatabaseSourceFrom('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Source From: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseSourceFrom === BLANK_VALUE ? BLANK_LABEL : selectDatabaseSourceFrom}</span>
+                    <button onClick={() => setSelectDatabaseSourceFrom('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseBranch && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Branch: </span>
-                    <span className="font-bold">{getBranchName(selectDatabaseBranch) || selectDatabaseBranch}</span>
-                    <button onClick={() => setSelectDatabaseBranch('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Branch: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseBranch === BLANK_VALUE ? BLANK_LABEL : (getBranchName(selectDatabaseBranch) || selectDatabaseBranch)}</span>
+                    <button onClick={() => setSelectDatabaseBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
                 {selectDatabaseEnteredBy && (
-                  <span className="inline-flex items-center gap-1 text-[#BF9853] border border-[#BF9853] rounded px-2 py-1 text-sm font-medium w-fit">
-                    <span className="font-normal">Entered By: </span>
-                    <span className="font-bold">{selectDatabaseEnteredBy}</span>
-                    <button onClick={() => setSelectDatabaseEnteredBy('')} className="text-[#BF9853] text-2xl ml-1">×</button>
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entered By: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseEnteredBy === BLANK_VALUE ? BLANK_LABEL : selectDatabaseEnteredBy}</span>
+                    <button onClick={() => setSelectDatabaseEnteredBy('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                   </span>
                 )}
               </div>
             )}
           </div>
-          <div className='flex items-center gap-2'>
-            <button onClick={clearFilters} className='w-10 h-9 border border-[#BF9853] rounded-md font-semibold text-sm text-[#BF9853] flex items-center justify-center gap-2'>
-              <img className='w-4 h-4' src={Reload} alt="Reload" />
+          <div className='flex items-end gap-[6px]'>
+            <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
+              <img className='w-full h-full' src={Reload} alt="Reload" />
             </button>
-            <div className=' text-left md:text-right md:items-center items-start cursor-default flex max-w-screen-2xl table-auto overflow-auto w-full'>
-              <div className='flex items-center'>
-                <span className='text-[#E4572E] mr-3 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                <span className='text-[#007233] mr-1 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+            <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+              <input
+                type="text"
+                value={overallSearch}
+                onChange={(e) => setOverallSearch(e.target.value)}
+                placeholder="Search Transactions..."
+                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+              />
+              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+            </div>
+            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
+              <div className='flex items-end text-center '>
+                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
               </div>
             </div>
           </div>
         </div>
-        <div>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
             ref={scrollRef}
-            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[600px] overflow-x-auto select-none thin-scrollbar"
+            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none no-scrollbar scrollbar-none"
+            onWheel={() => { filterNudgeUsedRef.current = false; }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <table className="table-fixed min-w-[1180px] w-full border-collapse">
+            <table className={`table-fixed min-w-[1180px] w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_#EDBC-12]:!pl-0 [&_#EDBC-9]:!pl-0 [&_thead_tr>th#EDBC-19]:!pr-[1px]`}>
               <thead className="sticky top-0 z-10 bg-white ">
-                <tr className="bg-[#FAF6ED]">
-                  <th className="px-3 w-44 font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('timestamp')}
-                  >
-                    Time Stamp {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="pt-2 w-36 font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('date')}
-                  >
-                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[220px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('vendor')}
-                  >
-                    Contractor/Vendor {sortConfig.key === 'vendor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[300px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('project')}
-                  >
-                    Project Name {sortConfig.key === 'project' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[280px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
+                <EdbcTableHeaderRow>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC1}
+                    label={advCol1Label}
+                    sortField={resolveEdbcSortField('timestamp')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC2}
+                    label={advCol2Label}
+                    sortField={resolveEdbcSortField('date')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC4}
+                    label={advCol3Label}
+                    sortField={resolveEdbcSortField('vendor')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC3}
+                    label={advCol4Label}
+                    sortField={resolveEdbcSortField('project')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <th
+                    className={edbc3Config?.headerClass}
                     onClick={() => handleSort('transfer')}
                   >
-                    Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    {advCol5Label} {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                   </th>
-                  <th className="w-[140px] pl-4 pr-2 font-bold text-right select-none whitespace-nowrap">Advance</th>
-                  <th className="w-[140px] pl-2 pr-1.5 font-bold text-right select-none whitespace-nowrap ">Bill Payment</th>
-                  <th className="w-[140px] pl-2 pr-3 font-bold text-right select-none whitespace-nowrap ">Refund</th>
-                  <th className="px-0.5 pl-3 w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('type')}
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC8}
+                    label={advCol6Label}
+                    sortField={resolveEdbcSortField('amount')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <th
+                    className={edbc8Config?.headerClass}
+                    onClick={() => handleSort('bill_amount')}
                   >
-                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    {advCol7Label} {sortConfig.key === 'bill_amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                   </th>
-                  <th className="px-0.5 w-[120px] font-bold text-left select-none whitespace-nowrap">Description</th>
-                  <th className="px-0.5 w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('mode')}
+                  <th
+                    className={edbc8Config?.headerClass}
+                    onClick={() => handleSort('refund_amount')}
                   >
-                    Mode {sortConfig.key === 'mode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    {advCol8Label} {sortConfig.key === 'refund_amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                   </th>
-                  <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('source')}
-                  >
-                    Source From {sortConfig.key === 'source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('branch')}
-                  >
-                    Branch {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[150px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('enteredBy')}
-                  >
-                    Entered By {sortConfig.key === 'enteredBy' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[140px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap"
-                    onClick={() => handleSort('entry_no')}
-                  >
-                    E.No {sortConfig.key === 'entry_no' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-0.5 w-[80px] font-bold text-left select-none whitespace-nowrap">File</th>
-                  <th className="px-0.5 w-[120px] font-bold text-left select-none whitespace-nowrap">Activity</th>
-                </tr>
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC12}
+                    label={advCol9Label}
+                    sortField={resolveEdbcSortField('type')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC9}
+                    label={advCol10Label}
+                    sortField={resolveEdbcSortField('description')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC13}
+                    label={advCol11Label}
+                    sortField={resolveEdbcSortField('mode')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC14}
+                    label={advCol12Label}
+                    sortField={resolveEdbcSortField('source')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC15}
+                    label={advCol13Label}
+                    sortField={resolveEdbcSortField('branch')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC16}
+                    label={advCol14Label}
+                    sortField={resolveEdbcSortField('enteredBy')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader
+                    columnId={EDBC_IDS.EDBC17}
+                    label={advCol15Label}
+                    sortField={resolveEdbcSortField('entry_no')}
+                    sortDirection={sortConfig.direction}
+                    onSort={handleEdbcSort}
+                  />
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={advCol16Label} />
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label={advCol17Label} />
+                </EdbcTableHeaderRow>
                 {showFilters && (
-                  <tr ref={filterRowRef} className="bg-[#FAF6ED]">
-                    <th className="py-3 w-44 min-w-0">
-                      <input
-                        type="date"
-                        value={selectTimeStampDate}
-                        onChange={(e) => setSelectTimeStampDate(e.target.value)}
-                        className="w-full min-w-0 max-w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-1.5 text-xs"
-                      />
-                    </th>
-                    <th className="py-3 w-36 min-w-0">
-                      <input
-                        type="date"
-                        value={selectDatabaseDate}
-                        onChange={(e) => setSelectDatabaseDate(e.target.value)}
-                        className="w-full min-w-0 max-w-full h-[45px] rounded-lg border-2 border-[#BF9853] border-opacity-25 focus:outline-none p-1.5 text-xs"
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.vendorContractorOptions}
-                        value={selectDatabaseContractororVendorName ? { value: selectDatabaseContractororVendorName, label: selectDatabaseContractororVendorName } : null}
-                        onChange={(opt) => setSelectDatabaseContractororVendorName(opt ? opt.value : '')}
-                        placeholder="Contractor/Vendor"
-                        isSearchable
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.projectOptions}
-                        value={selectDatabaseProjectName ? { value: selectDatabaseProjectName, label: selectDatabaseProjectName } : null}
-                        onChange={(opt) => setSelectDatabaseProjectName(opt ? opt.value : '')}
-                        placeholder="Project Name"
-                        isSearchable
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.transferSiteOptions}
-                        value={selectDatabaseTransfer ? { value: selectDatabaseTransfer, label: selectDatabaseTransfer } : null}
-                        onChange={(opt) => setSelectDatabaseTransfer(opt ? opt.value : '')}
-                        placeholder="Transfer Site"
-                        isSearchable
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="text-base text-right font-bold py-3 pl-4 pr-2">
-                      ₹{Number(totals.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </th>
-                    <th className="text-base text-right font-bold py-3 pl-2 pr-1.5 ">
-                      ₹{Number(totals.bill_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </th>
-                    <th className="text-base text-right font-bold py-3 pl-2 pr-3 ">
-                      ₹{Number(totals.refund_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </th>
-                    <th className="py-3 pl-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.typeOptions.map((t) =>
-                          t === BLANK_VALUE ? blankOption : { value: t, label: t }
-                        )}
-                        value={selectDatabaseType ? { value: selectDatabaseType, label: selectDatabaseType } : null}
-                        onChange={(opt) => setSelectDatabaseType(opt ? opt.value : '')}
-                        placeholder="Type"
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3" />
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.modeOptions.map((m) =>
-                          m === BLANK_VALUE ? blankOption : { value: m, label: m }
-                        )}
-                        value={selectDatabaseMode ? { value: selectDatabaseMode, label: selectDatabaseMode } : null}
-                        onChange={(opt) => setSelectDatabaseMode(opt ? opt.value : '')}
-                        placeholder="Mode"
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.sourceFromOptions.map((v) =>
-                          v === BLANK_VALUE ? blankOption : { value: v, label: v }
-                        )}
-                        value={selectDatabaseSourceFrom ? { value: selectDatabaseSourceFrom, label: selectDatabaseSourceFrom } : null}
-                        onChange={(opt) => setSelectDatabaseSourceFrom(opt ? opt.value : '')}
-                        placeholder="Source From"
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.branchOptions}
-                        value={selectDatabaseBranch ? filterOptionsFromData.branchOptions.find((opt) => String(opt.value) === String(selectDatabaseBranch)) || { value: selectDatabaseBranch, label: getBranchName(selectDatabaseBranch) || selectDatabaseBranch } : null}
-                        onChange={(opt) => setSelectDatabaseBranch(opt ? String(opt.value) : '')}
-                        placeholder="Branch"
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.enteredByOptions.map((v) =>
-                          v === BLANK_VALUE ? blankOption : { value: v, label: v }
-                        )}
-                        value={selectDatabaseEnteredBy ? { value: selectDatabaseEnteredBy, label: selectDatabaseEnteredBy } : null}
-                        onChange={(opt) => setSelectDatabaseEnteredBy(opt ? opt.value : '')}
-                        placeholder="Entered By"
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3">
-                      <Select
-                        className="w-full"
-                        options={filterOptionsFromData.entryNoOptions.map((eno) =>
-                          String(eno) === BLANK_VALUE ? blankOption : { value: String(eno), label: String(eno) }
-                        )}
-                        value={selectDatabaseEntryNo ? { value: String(selectDatabaseEntryNo), label: String(selectDatabaseEntryNo) } : null}
-                        onChange={(opt) => setSelectDatabaseEntryNo(opt ? opt.value : '')}
-                        placeholder="E.No"
-                        isClearable
-                        menuPlacement="bottom"
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        styles={customStyles}
-                      />
-                    </th>
-                    <th className="py-3" />
-                    <th className="py-3" />
-                  </tr>
+                  <EdbcTableFilterRow ref={filterRowRef}>
+                    <EdbcTimestampFilter
+                      placeholder={advCol1Label}
+                      timestampStartDate={selectTimeStampDate}
+                      timestampEndDate={selectTimeStampDate}
+                      isOpen={showTimestampDatePicker}
+                      onOpen={() => setShowTimestampDatePicker(true)}
+                      onClose={() => setShowTimestampDatePicker(false)}
+                      onApply={(from) => {
+                        setSelectTimeStampDate(from || '');
+                        setShowTimestampDatePicker(false);
+                      }}
+                    />
+                    <EdbcDateFilter
+                      placeholder={advCol2Label}
+                      value={selectDatabaseDate}
+                      onChange={setSelectDatabaseDate}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC4}
+                      placeholder={advCol3Label}
+                      options={filterOptionsFromData.vendorContractorOptions}
+                      value={selectDatabaseContractororVendorName}
+                      onChange={setSelectDatabaseContractororVendorName}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcProjectNameFilter
+                      placeholder={advCol4Label}
+                      options={filterOptionsFromData.projectOptions}
+                      value={selectDatabaseProjectName}
+                      onChange={setSelectDatabaseProjectName}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcProjectNameFilter
+                      placeholder={advCol5Label}
+                      options={filterOptionsFromData.transferSiteOptions}
+                      value={selectDatabaseTransfer}
+                      onChange={setSelectDatabaseTransfer}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.amount} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.bill_amount} />
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.refund_amount} />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC12}
+                      placeholder={advCol9Label}
+                      options={filterOptionsFromData.typeOptions.map((t) =>
+                        t === BLANK_VALUE ? blankOption : { value: t, label: t }
+                      )}
+                      value={selectDatabaseType}
+                      onChange={setSelectDatabaseType}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcTextInputFilter
+                      columnId={EDBC_IDS.EDBC9}
+                      placeholder={advCol10Label}
+                      value={selectDatabaseDescription}
+                      onChange={(e) => setSelectDatabaseDescription(e.target.value)}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC13}
+                      placeholder={advCol11Label}
+                      options={filterOptionsFromData.modeOptions.map((m) =>
+                        m === BLANK_VALUE ? blankOption : { value: m, label: m }
+                      )}
+                      value={selectDatabaseMode}
+                      onChange={setSelectDatabaseMode}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC14}
+                      placeholder={advCol12Label}
+                      options={filterOptionsFromData.sourceFromOptions.map((v) =>
+                        v === BLANK_VALUE ? blankOption : { value: v, label: v }
+                      )}
+                      value={selectDatabaseSourceFrom}
+                      onChange={setSelectDatabaseSourceFrom}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC15}
+                      placeholder={advCol13Label}
+                      options={filterOptionsFromData.branchOptions}
+                      selectValue={selectDatabaseBranch ? filterOptionsFromData.branchOptions.find((opt) => String(opt.value) === String(selectDatabaseBranch)) || { value: selectDatabaseBranch, label: getBranchName(selectDatabaseBranch) || selectDatabaseBranch } : null}
+                      onChange={(value) => setSelectDatabaseBranch(value ? String(value) : '')}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC16}
+                      placeholder={advCol14Label}
+                      options={filterOptionsFromData.enteredByOptions.map((v) =>
+                        v === BLANK_VALUE ? blankOption : { value: v, label: v }
+                      )}
+                      value={selectDatabaseEnteredBy}
+                      onChange={setSelectDatabaseEnteredBy}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    />
+                    <EdbcSelectFilter
+                      columnId={EDBC_IDS.EDBC17}
+                      placeholder={advCol15Label}
+                      options={filterOptionsFromData.entryNoOptions.map((eno) =>
+                        String(eno) === BLANK_VALUE ? blankOption : { value: String(eno), label: String(eno) }
+                      )}
+                      value={selectDatabaseEntryNo}
+                      onChange={setSelectDatabaseEntryNo}
+                      blankOption={blankOption}
+                      blankValue={BLANK_VALUE}
+                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                      textAlign="right"
+                    />
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                  </EdbcTableFilterRow>
                 )}
               </thead>
               <tbody>
                 {currentData.length > 0 ? (
-                  currentData.map((entry) => (
-                    <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                      <td className="px-3 text-sm text-left whitespace-nowrap">{formatDate(entry.timestamp)}</td>
-                      <td className="px-3 text-sm text-left whitespace-nowrap">{formatDateOnly(entry.date)}</td>
-                      <td className="text-sm text-left">
-                        {entry.vendor_id
-                          ? getVendorName(entry.vendor_id)
-                          : getContractorName(entry.contractor_id)}
+                  currentData.map((entry, index) => (
+                    <EdbcTableBodyRow key={entry.id}>
+                      <EdbcTimestampBodyCell
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        formatValue={formatDate}
+                      />
+                      <EdbcDateBodyCell
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        formatValue={formatDateOnly}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC4}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) =>
+                          row.vendor_id
+                            ? getVendorName(row.vendor_id)
+                            : getContractorName(row.contractor_id)
+                        }
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC3}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => getSiteName(row.project_id)}
+                      />
+                      <td className={edbc3Config?.tdClass}>
+                        <span
+                          onClick={() => toggleExpandedCell(`${entry.id ?? index}-transfer`)}
+                          className={`block w-full cursor-pointer ${expandedCells[`${entry.id ?? index}-transfer`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                          title={getSiteName(entry.transfer_site_id)}
+                        >
+                          {getSiteName(entry.transfer_site_id)}
+                        </span>
                       </td>
-                      <td className="text-sm text-left px-0.5 min-w-0 max-w-[300px] break-words whitespace-normal">
-                        {getSiteName(entry.project_id)}
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC8}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={(row) => formatAdvanceAmount(row.amount)}
+                      />
+                      <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
+                        <span
+                          onClick={() => toggleExpandedCell(`${entry.id ?? index}-bill_amount`)}
+                          className={`block w-full cursor-pointer text-right ${expandedCells[`${entry.id ?? index}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                          title={formatAdvanceAmount(entry.bill_amount)}
+                        >
+                          {formatAdvanceAmount(entry.bill_amount)}
+                        </span>
                       </td>
-                      <td className="text-sm text-left px-0.5 min-w-0 max-w-[280px] break-words whitespace-normal">
-                        {getSiteName(entry.transfer_site_id)}
+                      <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
+                        <span
+                          onClick={() => toggleExpandedCell(`${entry.id ?? index}-refund_amount`)}
+                          className={`block w-full cursor-pointer text-right ${expandedCells[`${entry.id ?? index}-refund_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                          title={formatAdvanceAmount(entry.refund_amount)}
+                        >
+                          {formatAdvanceAmount(entry.refund_amount)}
+                        </span>
                       </td>
-                      <td className="text-sm text-right pl-4 pr-2 tabular-nums">
-                        {entry.amount != null && entry.amount !== ''
-                          ? `₹${Number(entry.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : ''}
-                      </td>
-                      <td className="text-sm text-right pl-2 pr-1.5 tabular-nums">
-                        {entry.bill_amount != null && entry.bill_amount !== ''
-                          ? `₹${Number(entry.bill_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : ''}
-                      </td>
-                      <td className="text-sm text-right pl-2 pr-3 tabular-nums">
-                        {entry.refund_amount != null && entry.refund_amount !== ''
-                          ? `₹${Number(entry.refund_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : ''}
-                      </td>
-                      <td className="text-sm text-left pl-3">{entry.type}</td>
-                      <td className="text-sm text-left w-[120px] max-w-[120px] break-words overflow-hidden whitespace-normal px-1">{entry.description}</td>
-                      <td className="text-sm text-left min-w-0 max-w-[140px] break-words whitespace-normal px-0.5">{entry.payment_mode}</td>
-                      <td className="text-sm text-left">{entry.source_from ?? entry.sourceFrom ?? entry.source ?? ''}</td>
-                      <td className="text-sm text-left">{getBranchName(entry.branch_id ?? entry.branchId ?? '') || (entry.branch ?? entry.branch_name ?? entry.branchName ?? '')}</td>
-                      <td className="text-sm text-left">{entry.enteredBy ?? entry.entered_by ?? entry.request_send_by ?? entry.requested_by ?? entry.createdBy ?? entry.created_by ?? ''}</td>
-                      <td className="text-sm text-left pl-3">{entry.entry_no}</td>
-                      <td className="px-1 text-sm">
-                        {entry.file_url ? (
-                          <a
-                            href={entry.file_url}
-                            className="text-red-500 underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            View
-                          </a>
-                        ) : (
-                          <span></span>
-                        )}
-                      </td>
-                      <td className="flex w-[100px] justify-between py-1.5">
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC12}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.type}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC9}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.description || ''}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC13}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.payment_mode}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC14}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.source_from ?? row.sourceFrom ?? row.source ?? ''}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC15}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => getBranchName(row.branch_id ?? row.branchId ?? '') || (row.branch ?? row.branch_name ?? row.branchName ?? '')}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC16}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        getDisplayValue={(row) => row.enteredBy ?? row.entered_by ?? row.request_send_by ?? row.requested_by ?? row.createdBy ?? row.created_by ?? ''}
+                      />
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC17}
+                        expense={entry}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={(row) => row.entry_no}
+                      />
+                      <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...entry, billCopy: entry.file_url }} />
+                      <td className={edbc19TdClass}>
                         <button
-                          className={`rounded-full transition duration-200 ml-2 mr-3 ${entry.not_allow_to_edit && !isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`rounded-full transition duration-200 ${entry.not_allow_to_edit && !isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={entry.not_allow_to_edit && !isAdmin}
                         >
                           <img
@@ -1991,7 +2399,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                             className={`w-4 h-6 transition duration-200 ${entry.not_allow_to_edit && !isAdmin ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
                           />
                         </button>
-                        <button className={`-ml-5 -mr-2 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        <button className={`${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={entry.not_allow_to_edit}
                         >
                           <img
@@ -2002,7 +2410,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                         </button>
                         <button
                           onClick={entry.not_allow_to_edit ? undefined : () => fetchAuditDetails(entry.advancePortalId)}
-                          className={`rounded-full transition duration-200 -mr-1 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`rounded-full transition duration-200 ${entry.not_allow_to_edit ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={entry.not_allow_to_edit}
                         >
                           <img
@@ -2012,11 +2420,11 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                           />
                         </button>
                       </td>
-                    </tr>
+                    </EdbcTableBodyRow>
                   ))
                 ) : (
                   <tr>
-                    <td className="p-2 text-center text-sm text-gray-400" colSpan={18}>
+                    <td className="p-2 text-center text-sm text-gray-400" colSpan={17}>
                       No data available
                     </td>
                   </tr>
@@ -2026,7 +2434,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           </div>
         </div>
         {sortedData.length > 0 && (
-          <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+          <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-700">Items per page:</span>
               <select
@@ -2101,10 +2509,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             </div>
           </div>
         )}
-        </div>
       </div>
         {isOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-[9999]">
             <div className="bg-white rounded-md shadow-lg p-6 w-[400px]">
               <h2 className="text-lg font-semibold mb-4 text-center">
                 Upload Bulk Data
@@ -2134,7 +2541,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           </div>
         )}
         {isEditModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]">
             <div className="bg-white rounded-md w-[65rem] px-6">
               <div className="flex justify-end">
                 <button className="text-red-500 mt-3" onClick={() => {
@@ -2348,8 +2755,24 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             </div>
           </div>
         )}
+        <AdvancePortalEditPaymentModal
+          isOpen={showEditPaymentModal}
+          onClose={() => {
+            setShowEditPaymentModal(false);
+            pendingAdvanceUpdateRef.current = null;
+          }}
+          onSubmit={handleEditPaymentModalSubmit}
+          isSubmitting={isEditPaymentSubmitting}
+          paymentMode={editFormData.payment_mode}
+          date={editFormData.date}
+          amount={getAdvancePortalDisplayAmount(editFormData)}
+          paymentModalData={editPaymentModalData}
+          setPaymentModalData={setEditPaymentModalData}
+          accountDetails={accountDetails}
+          selectStyles={customStyles}
+        />
         {isRequestModalOpen && requestingEntry && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]">
             <div className="bg-white p-6 rounded-lg w-[400px] text-center">
               <h2 className="text-lg font-bold mb-2 text-[#BF9853]">Request Edit Permission</h2>
               <p className="text-gray-700 mb-6">
@@ -2377,6 +2800,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         )}
         <AuditModal show={showAdvancePortalModal} onClose={() => setShowAdvancePortalModal(false)} audits={advancePortalAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
           siteOptions={siteOptions} />
+      </div>
     </div>
 
   )
@@ -2449,7 +2873,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     return value ?? "-";
   };
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
       <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
         <div className="flex justify-between items-center mt-4 ml-7 mr-7">
           <h2 className="text-xl font-bold">History</h2>

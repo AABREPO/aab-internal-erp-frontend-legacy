@@ -4,6 +4,33 @@ import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import Select from "react-select";
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+import Filter from '../Images/TableFilter.svg';
+import Search from '../Images/Searchnew.svg';
+import Reload from '../Images/Clear.svg';
+import Pdf from '../Images/pdf.png';
+import XL from '../Images/sheets.png';
+import {
+  EDBC_IDS,
+  DATABASE_TABLE_FILTER_SELECT_STYLES,
+  getEdbcColumnConfig,
+  useEdbcExpandedCells,
+  formatExpenseDateOnly,
+  EdbcTableHeaderRow,
+  EdbcTableFilterRow,
+  EdbcTableBodyRow,
+  EdbcColumnHeader,
+  EdbcDateFilter,
+  EdbcProjectNameFilter,
+  EdbcSelectFilter,
+  EdbcTextInputFilter,
+  EdbcTotalAmountFilter,
+  EdbcEmptyFilterCell,
+  EdbcDateBodyCell,
+  EdbcExpandableBodyCell,
+  EdbcFileBodyCell,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 
 Date.prototype.getWeekNumber = function () {
   const firstDay = new Date(this.getFullYear(), 0, 1);
@@ -23,6 +50,9 @@ const getCurrentWeekYear = () => {
 };
 
 const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
+  const BLANK_VALUE = 'BLANK';
+  const BLANK_LABEL = '(Blank)';
+  const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
   const resolveActiveBranchId = useCallback(() => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -67,6 +97,15 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [endDate, setEndDate] = useState("");
   const [paymentModeFilter, setPaymentModeFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [overallSearch, setOverallSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectReportDate, setSelectReportDate] = useState("");
+  const [selectReportContractorVendor, setSelectReportContractorVendor] = useState("");
+  const [selectReportProjectName, setSelectReportProjectName] = useState("");
+  const [selectReportTransfer, setSelectReportTransfer] = useState("");
+  const [selectReportType, setSelectReportType] = useState("");
+  const [selectReportMode, setSelectReportMode] = useState("");
+  const [selectReportDescription, setSelectReportDescription] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -95,8 +134,8 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       borderWidth: '2px',
       lineHeight: '20px',
       fontSize: '14px',
-      minHeight: '45px',
-      height: '45px',
+      minHeight: '40px',
+      height: '40px',
       borderRadius: '8px',
       borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.5)' : 'rgba(191, 152, 83, 0.25)',
       boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
@@ -107,6 +146,21 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     clearIndicator: (provided) => ({
       ...provided,
       cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: '2px',
+    }),
+    dropdownIndicator: (provided, state) => ({
+      ...provided,
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
     }),
     menu: (provided) => ({
       ...provided,
@@ -121,12 +175,16 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       ...provided,
       maxHeight: '250px',
       overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': { display: 'none' },
     }),
     singleValue: (provided) => ({
       ...provided,
       fontWeight: '500',
       color: 'black',
       textAlign: 'left',
+      marginRight: 0,
     }),
     option: (provided, state) => ({
       ...provided,
@@ -150,6 +208,10 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       fontWeight: '500',
       color: '#999',
       textAlign: 'left',
+    }),
+    indicatorSeparator: (provided) => ({
+      ...provided,
+      display: 'none',
     }),
   };
 
@@ -530,8 +592,91 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
       filtered = filtered.filter((item) => (item.type || "").toString().toLowerCase() === typeFilter.toLowerCase());
     }
 
+    if (selectReportDate) {
+      const [reportYear, reportMonth, reportDay] = selectReportDate.split("-");
+      const formattedSelectDate = `${parseInt(reportDay, 10)}-${parseInt(reportMonth, 10)}-${reportYear}`;
+      filtered = filtered.filter((item) => {
+        const entryDateObj = new Date(item.date);
+        const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+        return formattedEntryDate === formattedSelectDate;
+      });
+    }
+    if (selectReportContractorVendor) {
+      filtered = filtered.filter((item) => {
+        const name = contractorOptions.find((c) => c.id === item.contractor_id)?.label
+          || vendorOptions.find((v) => v.id === item.vendor_id)?.label
+          || "";
+        if (selectReportContractorVendor === BLANK_VALUE) {
+          return !name || !String(name).trim();
+        }
+        return name.toLowerCase() === selectReportContractorVendor.toLowerCase();
+      });
+    }
+    if (selectReportProjectName) {
+      filtered = filtered.filter((item) => {
+        const projectName = siteOptions.find((s) => String(s.id) === String(item.project_id))?.label || "";
+        if (selectReportProjectName === BLANK_VALUE) {
+          return !projectName || !String(projectName).trim();
+        }
+        return projectName.toLowerCase() === selectReportProjectName.toLowerCase();
+      });
+    }
+    if (selectReportTransfer) {
+      filtered = filtered.filter((item) => {
+        const transferName = siteOptions.find((s) => String(s.id) === String(item.transfer_site_id))?.label || "";
+        if (selectReportTransfer === BLANK_VALUE) {
+          return !transferName || !String(transferName).trim();
+        }
+        return transferName.toLowerCase() === selectReportTransfer.toLowerCase();
+      });
+    }
+    if (selectReportType) {
+      filtered = filtered.filter((item) => {
+        if (selectReportType === BLANK_VALUE) {
+          return !item.type || !String(item.type).trim();
+        }
+        return (item.type || "").toString().toLowerCase() === selectReportType.toLowerCase();
+      });
+    }
+    if (selectReportMode) {
+      filtered = filtered.filter((item) => {
+        if (selectReportMode === BLANK_VALUE) {
+          return !item.payment_mode || !String(item.payment_mode).trim();
+        }
+        return (item.payment_mode || "").toString().toLowerCase() === selectReportMode.toLowerCase();
+      });
+    }
+    if (selectReportDescription.trim()) {
+      filtered = filtered.filter((item) =>
+        String(item.description ?? "").toLowerCase().includes(selectReportDescription.toLowerCase().trim())
+      );
+    }
+
+    if (overallSearch.trim()) {
+      const q = overallSearch.toLowerCase().trim();
+      filtered = filtered.filter((item) => {
+        const searchable = [
+          new Date(item.date).toLocaleDateString("en-GB"),
+          contractorOptions.find((c) => c.id === item.contractor_id)?.label,
+          vendorOptions.find((v) => v.id === item.vendor_id)?.label,
+          siteOptions.find((s) => String(s.id) === String(item.project_id))?.label,
+          item.amount,
+          item.bill_amount,
+          item.refund_amount,
+          siteOptions.find((s) => s.id === item.transfer_site_id)?.label,
+          item.type,
+          item.payment_mode,
+          item.description,
+          item.file_url,
+        ]
+          .map((v) => String(v ?? "").toLowerCase())
+          .join(" ");
+        return searchable.includes(q);
+      });
+    }
+
     setFilteredData(filtered);
-  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter]);
+  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportContractorVendor, selectReportProjectName, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, overallSearch, contractorOptions, vendorOptions, siteOptions]);
 
   // fromDate/toDate/totalAdvance computations
   const fromDate = filteredData.length
@@ -573,6 +718,134 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     return isNaN(t) ? -Infinity : new Date(new Date(t).toDateString()).getTime();
   };
   const getLabelById = (options, id) => options.find((o) => String(o.id) === String(id))?.label || "";
+  const reportFilterOptions = useMemo(() => {
+    const getVendorName = (id) =>
+      vendorOptions.find((v) => v.id === id)?.value || vendorOptions.find((v) => v.id === id)?.label || "";
+    const getContractorName = (id) =>
+      contractorOptions.find((c) => c.id === id)?.value || contractorOptions.find((c) => c.id === id)?.label || "";
+    const getSiteName = (id) =>
+      siteOptions.find((s) => String(s.id) === String(id))?.value
+      || siteOptions.find((s) => String(s.id) === String(id))?.label
+      || "";
+
+    let tableData = advanceData;
+    if (startDate && endDate) {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      tableData = advanceData.filter((item) => {
+        const d = new Date(item.date);
+        return d >= s && d <= e;
+      });
+    } else if (week) {
+      const selectedWeekNum = parseInt(week.replace("Week ", ""), 10);
+      tableData = advanceData.filter((item) => {
+        const itemWeekYear = getWeekYear(item.date);
+        const itemWeekNumber = getISOWeekNumber(item.date);
+        return itemWeekYear === parseInt(year, 10) && itemWeekNumber === selectedWeekNum;
+      });
+    } else {
+      tableData = [];
+    }
+    if (paymentModeFilter) {
+      tableData = tableData.filter((item) =>
+        (item.payment_mode || "").toString().toLowerCase() === paymentModeFilter.toLowerCase()
+      );
+    }
+    if (typeFilter) {
+      tableData = tableData.filter((item) =>
+        (item.type || "").toString().toLowerCase() === typeFilter.toLowerCase()
+      );
+    }
+
+    const uniqueVendors = new Set();
+    const uniqueContractors = new Set();
+    const uniqueProjectIds = new Set();
+    const uniqueTransferSiteIds = new Set();
+    const uniqueTypes = new Set();
+    const uniqueModes = new Set();
+    let hasBlankVendorContractor = false;
+    let hasBlankProject = false;
+    let hasBlankTransfer = false;
+    let hasBlankType = false;
+    let hasBlankMode = false;
+
+    tableData.forEach((entry) => {
+      if (entry.vendor_id) {
+        const vendorName = getVendorName(entry.vendor_id);
+        if (vendorName) uniqueVendors.add(vendorName);
+      }
+      if (entry.contractor_id) {
+        const contractorName = getContractorName(entry.contractor_id);
+        if (contractorName) uniqueContractors.add(contractorName);
+      }
+      if (!entry.vendor_id && !entry.contractor_id) hasBlankVendorContractor = true;
+
+      if (entry.project_id) {
+        const projectName = getSiteName(entry.project_id);
+        if (projectName) uniqueProjectIds.add(projectName);
+      } else {
+        hasBlankProject = true;
+      }
+
+      if (entry.transfer_site_id) {
+        const transferName = getSiteName(entry.transfer_site_id);
+        if (transferName) uniqueTransferSiteIds.add(transferName);
+      } else {
+        hasBlankTransfer = true;
+      }
+
+      if (entry.type) uniqueTypes.add(entry.type);
+      else hasBlankType = true;
+
+      if (entry.payment_mode) uniqueModes.add(entry.payment_mode);
+      else hasBlankMode = true;
+    });
+
+    const vendorContractorOptions = [
+      ...Array.from(uniqueVendors).map((name) => {
+        const vendor = vendorOptions.find((v) => v.value === name || v.label === name);
+        return vendor || { value: name, label: name, type: "Vendor" };
+      }),
+      ...Array.from(uniqueContractors).map((name) => {
+        const contractor = contractorOptions.find((c) => c.value === name || c.label === name);
+        return contractor || { value: name, label: name, type: "Contractor" };
+      }),
+    ].sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlankVendorContractor) vendorContractorOptions.unshift(blankOption);
+
+    const projectOptions = Array.from(uniqueProjectIds)
+      .map((name) => {
+        const site = siteOptions.find((s) => s.value === name || s.label === name);
+        return site || { value: name, label: name, id: null };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlankProject) projectOptions.unshift(blankOption);
+
+    const transferOptions = Array.from(uniqueTransferSiteIds)
+      .map((name) => {
+        const site = siteOptions.find((s) => s.value === name || s.label === name);
+        return site || { value: name, label: name, id: null };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (hasBlankTransfer) transferOptions.unshift({ value: BLANK_VALUE, label: 'Blank' });
+
+    const typeOptions = (hasBlankType ? [BLANK_VALUE] : []).concat(Array.from(uniqueTypes).sort());
+    const modeOptions = (hasBlankMode ? [BLANK_VALUE] : []).concat(Array.from(uniqueModes).sort());
+
+    return {
+      vendorContractorOptions,
+      projectOptions,
+      transferOptions,
+      typeOptions,
+      modeOptions,
+    };
+  }, [advanceData, startDate, endDate, week, year, paymentModeFilter, typeFilter, vendorOptions, contractorOptions, siteOptions]);
+  const reportTotals = useMemo(() => ({
+    amount: filteredData.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0),
+    bill_amount: filteredData.reduce((sum, row) => sum + (parseFloat(row.bill_amount) || 0), 0),
+    refund_amount: filteredData.reduce((sum, row) => sum + (parseFloat(row.refund_amount) || 0), 0),
+  }), [filteredData]);
   const requestSort = (key) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
@@ -621,6 +894,12 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
           va = normStr(a.description);
           vb = normStr(b.description);
           break;
+        case "amount":
+          return (parseFloat(a.amount) || 0) - (parseFloat(b.amount) || 0);
+        case "bill_amount":
+          return (parseFloat(a.bill_amount) || 0) - (parseFloat(b.bill_amount) || 0);
+        case "refund_amount":
+          return (parseFloat(a.refund_amount) || 0) - (parseFloat(b.refund_amount) || 0);
         default:
           va = "";
           vb = "";
@@ -637,26 +916,46 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = sortedData.slice(startIndex, endIndex);
+  const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
+  const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
+  const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
+  const edbc21Config = getEdbcColumnConfig(EDBC_IDS.EDBC21);
+  const mapReportSortKeyToEdbc = (key) => {
+    if (key === "cv") return "vendor";
+    if (key === "project" || key === "transfer") return "siteName";
+    if (key === "payment_mode") return "paymentMode";
+    if (key === "type") return "accountType";
+    if (key === "description") return "comments";
+    return key;
+  };
+  const handleEdbcSort = (edbcField) => {
+    const fieldToKey = {
+      vendor: "cv",
+      siteName: "project",
+      paymentMode: "payment_mode",
+      accountType: "type",
+      comments: "description",
+    };
+    requestSort(fieldToKey[edbcField] || edbcField);
+  };
+  const resolveEdbcSortField = (reportSortKey) =>
+    sortConfig.key === reportSortKey ? mapReportSortKeyToEdbc(reportSortKey) : "";
+  const getReportContractorVendorName = (item) =>
+    contractorOptions.find((c) => c.id === item.contractor_id)?.label
+    || vendorOptions.find((v) => v.id === item.vendor_id)?.label
+    || "";
+  const getReportProjectName = (item) =>
+    siteOptions.find((s) => String(s.id) === String(item.project_id))?.label || "";
+  const getReportTransferName = (item) =>
+    siteOptions.find((s) => s.id === item.transfer_site_id)?.label || "";
+  const formatReportAmount = (value) => {
+    if (value == null || value === "" || value === "-") return "";
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toLocaleString("en-IN") : "";
+  };
   useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter]);
-  const SortIcon = ({ columnKey }) => {
-    if (sortConfig.key !== columnKey) return null;
-    return <span className="ml-1">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
-  };
-  const goToPage = (page) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
+  }, [startDate, endDate, week, year, paymentModeFilter, typeFilter, selectReportDate, selectReportContractorVendor, selectReportProjectName, selectReportTransfer, selectReportType, selectReportMode, selectReportDescription, overallSearch]);
   const openPdfExportModal = () => {
     if (!filteredData.length) {
       alert("No data to export");
@@ -664,6 +963,24 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     }
     setPdfExportModalOpen(true);
   };
+
+  const clearFilters = useCallback(() => {
+    const currentWeek = getCurrentWeekNumber();
+    setWeek(`Week ${String(currentWeek).padStart(2, "0")}`);
+    setYear(getCurrentWeekYear().toString());
+    setStartDate("");
+    setEndDate("");
+    setPaymentModeFilter("");
+    setTypeFilter("");
+    setOverallSearch("");
+    setSelectReportDate("");
+    setSelectReportContractorVendor("");
+    setSelectReportProjectName("");
+    setSelectReportTransfer("");
+    setSelectReportType("");
+    setSelectReportMode("");
+    setSelectReportDescription("");
+  }, []);
 
   const getSiteEngineerForPdfRow = useCallback(
     (row) => {
@@ -1252,9 +1569,10 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
     );
   }
   return (
-    <div className='bg-[#FAF6ED]'>
-      <div className="flex flex-wrap flex-col xl:space-y-0 space-y-4 xl:flex-row items-start justify-between bg-white p-4 ml-10 mr-10 px-8 lg:h-[128px] rounded-md shadow-sm max-w-[1850px] mb-4">
-        <div className="flex flex-wrap gap-4 text-left">
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+      <div className="flex flex-wrap flex-col xl:space-y-0 space-y-4 xl:flex-row items-start justify-between bg-white px-[18px] pt-[18px] pb-[18px] rounded-md w-full mx-auto mb-[18px] shrink-0">
+        <div className="flex flex-wrap gap-[12px] text-left">
           <div>
             <label className="block font-semibold mb-1">Week No</label>
             <Select
@@ -1273,7 +1591,7 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               isSearchable
               isClearable
               styles={customStyles}
-              className="w-full h-[45px]"
+              className="w-full h-[40px]"
               classNamePrefix="select"
             />
           </div>
@@ -1290,32 +1608,40 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
               isSearchable
               isClearable
               styles={customStyles}
-              className="w-full h-[45px]"
+              className="w-full h-[40px]"
               classNamePrefix="select"
             />
           </div>
           <div>
             <label className="block font-semibold mb-1">Start Date</label>
-            <input
-              type="date"
+            <CustomDateField
               value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setWeek("");
+              onChange={(v) => {
+                setStartDate(v);
+                if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                  setWeek("");
+                }
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
+              placeholder="Select date"
+              alwaysOpenBelow
+              controlHeightPx={40}
+              className="w-full"
             />
           </div>
           <div>
             <label className="block font-semibold mb-1">End Date</label>
-            <input
-              type="date"
+            <CustomDateField
               value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setWeek("");
+              onChange={(v) => {
+                setEndDate(v);
+                if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                  setWeek("");
+                }
               }}
-              className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-full h-[45px] focus:outline-none"
+              placeholder="Select date"
+              alwaysOpenBelow
+              controlHeightPx={40}
+              className="w-full"
             />
           </div>
           <div>
@@ -1353,101 +1679,275 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
           </div>
         </div>
         <div>
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1">
-            <div>
-              <span className="font-semibold">From Date</span> :{" "}
-              <span className="text-red-500">
+          <div className="text-sm border-2 border-[#E4572E] border-opacity-15 px-[4px] ml-auto">
+            <div className="grid grid-cols-[max-content_auto_max-content] gap-x-1 gap-y-1">
+              <span className="font-semibold text-right">From Date</span>
+              <span>:</span>
+              <span className="text-red-500 text-right">
                 {startDate
                   ? new Date(startDate).toLocaleDateString("en-GB")
                   : fromDate || "-"}
               </span>
-            </div>
-            <div>
-              <span className="font-semibold">To Date</span> :{" "}
-              <span className="text-red-500">
+              <span className="font-semibold text-right">To Date</span>
+              <span>:</span>
+              <span className="text-red-500 text-right">
                 {endDate
                   ? new Date(endDate).toLocaleDateString("en-GB")
                   : toDate || "-"}
               </span>
-            </div>
-          </div>
-          <div className="text-sm text-right space-y-1 border-2 border-[#E4572E] border-opacity-15 p-1 mt-2">
-            <div>
-              <span className="font-semibold">Total Advance</span> : <span className="text-red-500 font-semibold">{totalAdvance}</span>
+              <span className="font-semibold text-right">Total Advance</span>
+              <span>:</span>
+              <span className="text-red-500 font-semibold text-right">{totalAdvance}</span>
             </div>
           </div>
         </div>
       </div>
-      <div className='max-w-[1850px] rounded-md h-[650px] ml-10 mr-10 px-8 bg-white p-4'>
-        <div className='space-x-6 flex justify-end'>
-          <button onClick={openPdfExportModal} className='text-sm text-[#E4572E] hover:underline font-bold'>Export PDF</button>
-          <button onClick={handleExportExcel} className='text-sm text-[#007233] hover:underline font-bold'>Export XL</button>
-          <button className='text-sm text-[#BF9853] hover:underline font-bold'>Print</button>
+      <div className="w-full max-w-[1850px] mx-auto pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div
+          className={`text-left flex ${selectReportDate || selectReportContractorVendor || selectReportProjectName || selectReportTransfer || selectReportType || selectReportMode || selectReportDescription.trim()
+            ? 'flex-col sm:flex-row sm:justify-between'
+            : 'flex-row justify-between items-center'
+            } mb-[12px] gap-[6px] shrink-0`}
+        >
+          <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+            <button className='' type="button" onClick={() => setShowFilters((prev) => !prev)}>
+              <img
+                src={Filter}
+                alt="Toggle Filter"
+                className=" border rounded-md h-[34px]"
+              />
+            </button>
+            {(selectReportDate || selectReportContractorVendor || selectReportProjectName || selectReportTransfer || selectReportType || selectReportMode || selectReportDescription.trim()) && (
+              <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+                {selectReportDate && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportDate}</span>
+                    <button onClick={() => setSelectReportDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                )}
+                {selectReportContractorVendor && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Contractor/Vendor Name: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportContractorVendor === BLANK_VALUE ? BLANK_LABEL : selectReportContractorVendor}</span>
+                    <button onClick={() => setSelectReportContractorVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportProjectName && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Project Name: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportProjectName === BLANK_VALUE ? BLANK_LABEL : selectReportProjectName}</span>
+                    <button onClick={() => setSelectReportProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportTransfer && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Transfer: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportTransfer === BLANK_VALUE ? 'Blank' : selectReportTransfer}</span>
+                    <button onClick={() => setSelectReportTransfer('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportType && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Type: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportType === BLANK_VALUE ? BLANK_LABEL : selectReportType}</span>
+                    <button onClick={() => setSelectReportType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportMode && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportMode === BLANK_VALUE ? BLANK_LABEL : selectReportMode}</span>
+                    <button onClick={() => setSelectReportMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+                {selectReportDescription.trim() && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Description: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectReportDescription}</span>
+                    <button onClick={() => setSelectReportDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className='flex items-end gap-[6px]'>
+            <button onClick={clearFilters} className='flex h-[34px] w-[32px] shrink-0 items-center justify-center'>
+              <img className='w-full h-full' src={Reload} alt="Reload" />
+            </button>
+            <div className="w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+              <input
+                type="text"
+                value={overallSearch}
+                onChange={(e) => setOverallSearch(e.target.value)}
+                placeholder="Search Transactions..."
+                className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+              />
+              <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+            </div>
+            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end'>
+              <div className='flex items-end text-center '>
+                <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={openPdfExportModal}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={handleExportExcel}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+              </div>
+            </div>
+          </div>
         </div>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
           ref={scrollRef}
-          className=" rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] h-[500px] overflow-auto select-none "
+          className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <table ref={tableRef} className="table-fixed min-w-[1835px] w-full border-collapse">
-            <thead className='bg-[#FAF6ED]'>
-              <tr>
+          <table ref={tableRef} className={`table-fixed min-w-[1630px] w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_th]:!p-0 [&_thead_th]:align-middle [&_thead_th#EDBC-8]:!pr-[9px] [&_thead_tr:first-child>th:nth-child(6)]:!pr-[9px] [&_thead_tr:first-child>th:nth-child(7)]:!pr-[9px] ${showFilters ? '[&_thead_tr:first-child_th]:!border-b-0' : ''}`}>
+            <thead className="sticky top-0 z-20 bg-[#FAF6ED]">
+              <EdbcTableHeaderRow>
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC2}
+                  label="Date"
+                  sortField={resolveEdbcSortField("date")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC4}
+                  label="Contractor/Vendor"
+                  sortField={resolveEdbcSortField("cv")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC3}
+                  label="Project Name"
+                  sortField={resolveEdbcSortField("project")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC8}
+                  label="Advance"
+                  sortField={resolveEdbcSortField("amount")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
                 <th
-                  className="py-2 pl-3 w-20 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("sno")}
+                  className={edbc8Config?.headerClass}
+                  onClick={() => requestSort("bill_amount")}
                 >
-                  S.No <SortIcon columnKey="sno" />
+                  Bill Payment {sortConfig.key === "bill_amount" && (sortConfig.direction === "asc" ? " ↑" : " ↓")}
                 </th>
                 <th
-                  className="pt-2 pl-3 w-32 font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("date")}
+                  className={edbc8Config?.headerClass}
+                  onClick={() => requestSort("refund_amount")}
                 >
-                  Date <SortIcon columnKey="date" />
+                  Refund {sortConfig.key === "refund_amount" && (sortConfig.direction === "asc" ? " ↑" : " ↓")}
                 </th>
                 <th
-                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("cv")}
-                >
-                  Contractor/Vendor <SortIcon columnKey="cv" />
-                </th>
-                <th
-                  className="px-2 w-[240px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("project")}
-                >
-                  Project Name <SortIcon columnKey="project" />
-                </th>
-                <th className="px-2 w-[100px] font-bold text-right">Advance</th>
-                <th className="px-2 w-[100px] font-bold text-right">Bill Amount</th>
-                <th className="px-2 w-[120px] font-bold text-right">Refund Amount</th>
-                <th
-                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
+                  className={edbc3Config?.headerClass}
                   onClick={() => requestSort("transfer")}
                 >
-                  Transfer <SortIcon columnKey="transfer" />
+                  Transfer {sortConfig.key === "transfer" && (sortConfig.direction === "asc" ? " ↑" : " ↓")}
                 </th>
-                <th
-                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("type")}
-                >
-                  Type <SortIcon columnKey="type" />
-                </th>
-                <th
-                  className="px-2 w-[100px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("payment_mode")}
-                >
-                  Mode <SortIcon columnKey="payment_mode" />
-                </th>
-                <th
-                  className="px-2 w-[200px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => requestSort("description")}
-                >
-                  Description <SortIcon columnKey="description" />
-                </th>
-                <th className="px-2 w-[100px] font-bold text-left whitespace-nowrap">File</th>
-              </tr>
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC12}
+                  label="Type"
+                  sortField={resolveEdbcSortField("type")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC13}
+                  label="Mode"
+                  sortField={resolveEdbcSortField("payment_mode")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
+                <EdbcColumnHeader
+                  columnId={EDBC_IDS.EDBC9}
+                  label="Description"
+                  sortField={resolveEdbcSortField("description")}
+                  sortDirection={sortConfig.direction}
+                  onSort={handleEdbcSort}
+                />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
+              </EdbcTableHeaderRow>
+              {showFilters && (
+                <EdbcTableFilterRow>
+                  <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
+                  <EdbcDateFilter
+                    placeholder="Date"
+                    value={selectReportDate}
+                    onChange={setSelectReportDate}
+                  />
+                  <EdbcSelectFilter
+                    columnId={EDBC_IDS.EDBC4}
+                    placeholder="Contractor/Vendor"
+                    options={reportFilterOptions.vendorContractorOptions}
+                    value={selectReportContractorVendor}
+                    onChange={setSelectReportContractorVendor}
+                    blankOption={blankOption}
+                    blankValue={BLANK_VALUE}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
+                  <EdbcProjectNameFilter
+                    placeholder="Project Name"
+                    options={reportFilterOptions.projectOptions}
+                    value={selectReportProjectName}
+                    onChange={setSelectReportProjectName}
+                    blankOption={blankOption}
+                    blankValue={BLANK_VALUE}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
+                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.amount} />
+                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.bill_amount} />
+                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={reportTotals.refund_amount} />
+                  <EdbcProjectNameFilter
+                    placeholder="Transfer"
+                    options={reportFilterOptions.transferOptions}
+                    value={selectReportTransfer}
+                    onChange={setSelectReportTransfer}
+                    blankOption={{ value: BLANK_VALUE, label: 'Blank' }}
+                    blankValue={BLANK_VALUE}
+                    isClearable
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
+                  <EdbcSelectFilter
+                    columnId={EDBC_IDS.EDBC12}
+                    placeholder="Type"
+                    options={reportFilterOptions.typeOptions.map((t) =>
+                      t === BLANK_VALUE ? blankOption : { value: t, label: t }
+                    )}
+                    value={selectReportType}
+                    onChange={setSelectReportType}
+                    blankOption={blankOption}
+                    blankValue={BLANK_VALUE}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
+                  <EdbcSelectFilter
+                    columnId={EDBC_IDS.EDBC13}
+                    placeholder="Mode"
+                    options={reportFilterOptions.modeOptions.map((m) =>
+                      m === BLANK_VALUE ? blankOption : { value: m, label: m }
+                    )}
+                    value={selectReportMode}
+                    onChange={setSelectReportMode}
+                    blankOption={blankOption}
+                    blankValue={BLANK_VALUE}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
+                  <EdbcTextInputFilter
+                    columnId={EDBC_IDS.EDBC9}
+                    placeholder="Description"
+                    value={selectReportDescription}
+                    onChange={(e) => setSelectReportDescription(e.target.value)}
+                  />
+                  <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                </EdbcTableFilterRow>
+              )}
             </thead>
             <tbody>
               {currentData.length === 0 ? (
@@ -1456,134 +1956,173 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
                 </tr>
               ) : (
                 currentData.map((row, index) => (
-                  <tr key={row.id || index} className="odd:bg-white even:bg-[#FAF6ED]">
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{startIndex + index + 1}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{new Date(row.date).toLocaleDateString("en-GB")}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{contractorOptions.find(c => c.id === row.contractor_id)?.label || vendorOptions.find(v => v.id === row.vendor_id)?.label || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{siteOptions.find(s => String(s.id) === String(row.project_id))?.label || "-"}</td>
-                    <td className="text-sm text-right p-3 w-32 font-semibold">{row.amount?.toLocaleString("en-IN") || "0"}</td>
-                    <td className="text-sm text-right p-3 w-32 font-semibold">{row.bill_amount?.toLocaleString("en-IN") || "0"}</td>
-                    <td className="text-sm text-right pr-1 p-3 w-32 font-semibold">{row.refund_amount?.toLocaleString("en-IN") || "0"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{siteOptions.find(s => s.id === row.transfer_site_id)?.label || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.type || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.payment_mode || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">{row.description || "-"}</td>
-                    <td className="text-sm text-left p-3 w-32 font-semibold">
-                      {row.file_url ? (
-                        <a
-                          href={row.file_url}
-                          className="text-red-500 underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          View
-                        </a>
-                      ) : (
-                        <span></span>
-                      )}
+                  <EdbcTableBodyRow key={row.id || index}>
+                    <td id={EDBC_IDS.EDBC21} className={edbc21Config?.tdClass}>
+                      {startIndex + index + 1}
                     </td>
-                  </tr>
+                    <EdbcDateBodyCell
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      formatValue={formatExpenseDateOnly}
+                    />
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC4}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      getDisplayValue={getReportContractorVendorName}
+                    />
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC3}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      getDisplayValue={getReportProjectName}
+                    />
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC8}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      textAlignClass="text-right"
+                      getDisplayValue={(entry) => formatReportAmount(entry.amount)}
+                    />
+                    <td className={`${edbc8Config?.tdClass || ""} text-right`.trim()}>
+                      <span
+                        onClick={() => toggleExpandedCell(`${row.id ?? index}-bill_amount`)}
+                        className={`block w-full cursor-pointer text-right ${expandedCells[`${row.id ?? index}-bill_amount`] ? "whitespace-normal break-words" : "truncate whitespace-nowrap overflow-hidden"}`}
+                        title={formatReportAmount(row.bill_amount)}
+                      >
+                        {formatReportAmount(row.bill_amount)}
+                      </span>
+                    </td>
+                    <td className={`${edbc8Config?.tdClass || ""} text-right`.trim()}>
+                      <span
+                        onClick={() => toggleExpandedCell(`${row.id ?? index}-refund_amount`)}
+                        className={`block w-full cursor-pointer text-right ${expandedCells[`${row.id ?? index}-refund_amount`] ? "whitespace-normal break-words" : "truncate whitespace-nowrap overflow-hidden"}`}
+                        title={formatReportAmount(row.refund_amount)}
+                      >
+                        {formatReportAmount(row.refund_amount)}
+                      </span>
+                    </td>
+                    <td className={edbc3Config?.tdClass}>
+                      <span
+                        onClick={() => toggleExpandedCell(`${row.id ?? index}-transfer`)}
+                        className={`block w-full cursor-pointer ${expandedCells[`${row.id ?? index}-transfer`] ? "whitespace-normal break-words" : "truncate whitespace-nowrap overflow-hidden"}`}
+                        title={getReportTransferName(row)}
+                      >
+                        {getReportTransferName(row) || ""}
+                      </span>
+                    </td>
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC12}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      getDisplayValue={(entry) => (entry.type && entry.type !== "-") ? entry.type : ""}
+                    />
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC13}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      getDisplayValue={(entry) => (entry.payment_mode && entry.payment_mode !== "-") ? entry.payment_mode : ""}
+                    />
+                    <EdbcExpandableBodyCell
+                      columnId={EDBC_IDS.EDBC9}
+                      expense={row}
+                      rowIndex={index}
+                      expandedCells={expandedCells}
+                      onToggleExpanded={toggleExpandedCell}
+                      getDisplayValue={(entry) => (entry.description && entry.description !== "-") ? entry.description : ""}
+                    />
+                    <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...row, billCopy: row.file_url }} />
+                  </EdbcTableBodyRow>
                 ))
               )}
             </tbody>
           </table>
         </div>
-        {sortedData.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-5 py-4 bg-white border-t border-gray-200">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">Show:</label>
-              <Select
-                value={{ value: itemsPerPage, label: itemsPerPage.toString() }}
-                onChange={(selectedOption) => {
-                  const newItemsPerPage = selectedOption ? selectedOption.value : 50;
-                  setItemsPerPage(newItemsPerPage);
-                  setCurrentPage(1);
-                }}
-                options={[
-                  { value: 50, label: "50" },
-                  { value: 100, label: "100" },
-                  { value: 200, label: "200" },
-                  { value: 300, label: "300" },
-                  { value: 400, label: "400" },
-                  { value: 500, label: "500" },
-                  { value: 600, label: "600" },
-                  { value: 700, label: "700" },
-                  { value: 800, label: "800" },
-                  { value: 900, label: "900" },
-                  { value: 1000, label: "1000" },
-                ]}
-                isSearchable
-                styles={{
-                  ...customStyles,
-                  control: (provided, state) => ({
-                    ...provided,
-                    borderWidth: '1px',
-                    minHeight: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    borderColor: state.isFocused ? '#BF9853' : '#d1d5db',
-                    boxShadow: state.isFocused ? '0 0 0 2px rgba(191, 152, 83, 0.2)' : 'none',
-                    fontSize: '14px',
-                  }),
-                }}
-                className="w-24"
-                classNamePrefix="select"
-              />
-              <span className="text-sm text-gray-700">entries</span>
-            </div>
-            <div className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
-              >
-                Previous
-              </button>
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => goToPage(pageNum)}
-                      className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === pageNum
-                        ? 'bg-[#BF9853] text-white'
-                        : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                        }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-[#BF9853] border border-[#BF9853] hover:bg-[#BF9853] hover:text-white transition-colors'
-                  }`}
-              >
-                Next
-              </button>
-            </div>
+        </div>
+        <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 border-t border-gray-200">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-700">Items per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value={300}>300</option>
+              <option value={400}>400</option>
+              <option value={500}>500</option>
+              <option value={600}>600</option>
+              <option value={700}>700</option>
+              <option value={800}>800</option>
+              <option value={900}>900</option>
+              <option value={1000}>1000</option>
+            </select>
           </div>
-        )}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-700">
+              Showing {sortedData.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1 || totalPages === 0}
+              className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+            >
+              Previous
+            </button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                    }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
       </div>
       {pdfExportModalOpen && (
         <div

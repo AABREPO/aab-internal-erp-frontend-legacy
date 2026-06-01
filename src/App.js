@@ -78,7 +78,12 @@ function AppContent({ user, handleLogout }) {
 
   const wrapOrbitChrome = (node) =>
     shouldHideDesktopBars ? node : (
-      <OrbitAppChrome username={user.username} onLogout={handleLogout}>
+      <OrbitAppChrome
+        username={user.username}
+        onLogout={handleLogout}
+        branchId={user?.branchId ?? user?.branch_id ?? user?.brachId ?? ''}
+        brachId={user?.brachId ?? ''}
+      >
         {node}
       </OrbitAppChrome>
     );

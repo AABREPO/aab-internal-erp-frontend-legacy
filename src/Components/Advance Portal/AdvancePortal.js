@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import Attach from '../Images/Attachfile.svg';
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import edit from '../Images/Edit.svg';
-import file from '../Images/file.png';
+import SideTable from './SideTable';
 import { use } from 'react';
 import {
   postBankRegisterLogSave,
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import { syncWeeklyPaymentBillsForAdvancePortal, needsAdvancePortalPaymentModalForWeeklyBill, getAdvancePortalDisplayAmount } from '../../utils/advancePortalWeeklyPaymentBill';
+import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 const advancePortalReadonlyFieldClass =
   'min-h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg bg-[#FAF6ED] px-3 flex items-center text-sm font-medium text-[#202020]';
 const AdvancePortalReadonlyField = ({ value, className = '' }) => (
@@ -84,16 +83,9 @@ const AdvancePortal = ({
     window.addEventListener("branchSelectionChanged", syncBranch);
     return () => window.removeEventListener("branchSelectionChanged", syncBranch);
   }, []);
-  // Use paymentModeOptions from props, fallback to default if not provided
-  const defaultPaymentModeOptions = [
-    { value: 'Cash', label: 'Cash' },
-    { value: 'GPay', label: 'GPay' },
-    { value: 'PhonePe', label: 'PhonePe' },
-    { value: 'Net Banking', label: 'Net Banking' },
-    { value: 'Cheque', label: 'Cheque' }
-  ];
+ 
   const [backendPaymentModeOptions, setBackendPaymentModeOptions] = useState([]);
-  const finalPaymentModeOptions = backendPaymentModeOptions.length > 0 ? backendPaymentModeOptions : paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+  const finalPaymentModeOptions = backendPaymentModeOptions.length > 0 ? backendPaymentModeOptions : paymentModeOptions.length > 0 ? paymentModeOptions : '';
   useEffect(() => {
     const fetchPaymentModes = async () => {
       try {
@@ -149,6 +141,15 @@ const AdvancePortal = ({
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const pendingEditUpdateRef = useRef(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
   const [paymentModalData, setPaymentModalData] = useState({
     date: new Date().toISOString().split('T')[0],
     amount: "",
@@ -1252,189 +1253,6 @@ const AdvancePortal = ({
       }, 0);
     setTodayAmount(todayTotal);
   }, [advanceData]);
-  // ✅ Export PDF function
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    const entityType = selectedOption?.type === "Contractor" ? "Contractor" : "Vendor";
-    const entityName = selectedOption?.label || "";
-    const projectName = selectedSite?.label || "";
-    doc.setFontSize(12);
-    doc.text(`${entityType} - ${entityName}`, 14, 20);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const projectText = `Project Name: ${projectName}`;
-    const textWidth = doc.getTextWidth(projectText);
-    doc.text(projectText, pageWidth - textWidth - 14, 20);
-    // ✅ Filter data first
-    const filteredData = advanceData
-      .filter(entry => {
-        const isMatchingVendor =
-          selectedOption?.type === 'Vendor'
-            ? entry.vendor_id === selectedOption.id
-            : selectedOption?.type === 'Contractor'
-              ? entry.contractor_id === selectedOption.id
-              : false;
-        const isForCurrentProject = entry.project_id === selectedSite.id;
-        return isMatchingVendor && isForCurrentProject;
-      })
-      // ✅ Sort by type (custom order) then mode
-      .sort((a, b) => {
-        const typeOrder = ["Advance", "Bill Settlement", "Refund", "Transfer"];
-        const typeIndexA = typeOrder.indexOf((a.type || "").trim());
-        const typeIndexB = typeOrder.indexOf((b.type || "").trim());
-        if (typeIndexA !== typeIndexB) return typeIndexA - typeIndexB;
-        const modeA = (a.payment_mode || "").trim().toLowerCase();
-        const modeB = (b.payment_mode || "").trim().toLowerCase();
-        if (!modeA && modeB) return 1;
-        if (modeA && !modeB) return -1;
-        return modeA.localeCompare(modeB);
-      });
-    // ✅ Table columns (removed Contractor/Vendor and Project Name)
-    const tableColumn = [
-      "S.No",
-      "Date",
-      "Advance",
-      "Bill Amount",
-      "Discount",
-      "Refund Amount",
-      "Transfer",
-      "Type",
-      "Mode",
-      "Description"
-    ];
-    // ✅ Table rows
-    const tableRows = filteredData.map((entry, index) => {
-      const {
-        date,
-        amount,
-        bill_amount,
-        discount_amount,
-        type,
-        transfer_site_id,
-        payment_mode,
-        refund_amount,
-        description
-      } = entry;
-      const advanceAmount =
-        type === 'Refund' ? '' : parseFloat(amount || 0).toLocaleString('en-IN');
-      const billAmount =
-        type === 'Bill Settlement'
-          ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
-          : '';
-      const discountDisplay =
-        type === 'Bill Settlement' && (parseFloat(discount_amount) || 0) > 0
-          ? parseFloat(discount_amount).toLocaleString('en-IN')
-          : '';
-      const refundAmount =
-        type === 'Refund'
-          ? parseFloat(refund_amount || 0).toLocaleString('en-IN')
-          : '';
-      let transferText = '';
-      if (type === 'Transfer') {
-        const siteLabel = siteOptions.find(site => site.id === parseInt(transfer_site_id))?.label;
-        transferText =
-          parseFloat(amount) < 0
-            ? `Transfer to ${siteLabel || 'Unknown Site'}`
-            : `Transfer from ${siteLabel || 'Unknown Site'}`;
-      }
-      return [
-        index + 1,
-        new Date(date).toLocaleDateString('en-GB'),
-        advanceAmount,
-        billAmount,
-        discountDisplay,
-        refundAmount,
-        transferText,
-        type,
-        payment_mode || '',
-        description || ''
-      ];
-    });
-    // ✅ Generate PDF table
-    doc.autoTable({
-      startY: 28,
-      head: [tableColumn],
-      body: tableRows,
-      theme: "grid",
-      styles: { halign: "left" },
-      headStyles: {
-        fillColor: [255, 255, 255],
-        textColor: 0,
-        lineWidth: 0.1
-      },
-      columnStyles: {
-        2: { halign: 'right' }, // Advance
-        3: { halign: 'right' }, // Bill Amount
-        4: { halign: 'right' }, // Discount
-        5: { halign: 'right' }  // Refund Amount
-      }
-    });
-    doc.save("Advance_Report.pdf");
-  };
-  // ✅ Export CSV function
-  const exportCSV = () => {
-    const entityType = selectedOption?.type === "Contractor" ? "Contractor" : "Vendor";
-    const entityName = selectedOption?.label || "";
-    const projectName = selectedSite?.label || "";
-    const filteredData = advanceData.filter(entry => {
-      const isMatchingVendor =
-        selectedOption?.type === 'Vendor'
-          ? entry.vendor_id === selectedOption.id
-          : selectedOption?.type === 'Contractor'
-            ? entry.contractor_id === selectedOption.id
-            : false;
-      const isForCurrentProject = entry.project_id === selectedSite.id;
-      return isMatchingVendor && isForCurrentProject;
-    });
-    const rows = filteredData.map((entry, index) => {
-      const { date, amount, bill_amount, discount_amount, type, transfer_site_id, payment_mode, refund_amount } = entry;
-      const advanceAmount = (() => {
-        if (type === 'Refund') {
-          return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
-        }
-        return parseFloat(amount || 0).toLocaleString('en-IN');
-      })();
-      const billAmount =
-        type === 'Bill Settlement'
-          ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
-          : '';
-      const discountCsv =
-        type === 'Bill Settlement' && (parseFloat(discount_amount) || 0) > 0
-          ? parseFloat(discount_amount).toLocaleString('en-IN')
-          : '';
-      let transferOrRefund = '';
-      if (type === 'Refund') {
-        transferOrRefund = 'Refund';
-      } else if (type === 'Transfer') {
-        const siteLabel = siteOptions.find(site => site.id === parseInt(transfer_site_id))?.label;
-        transferOrRefund =
-          parseFloat(amount) < 0
-            ? `Transfer to ${siteLabel || 'Unknown Site'}`
-            : `Transfer from ${siteLabel || 'Unknown Site'}`;
-      }
-      return {
-        "S.No": index + 1,
-        "Date": new Date(date).toLocaleDateString('en-GB'),
-        "Advance": advanceAmount,
-        "Bill": billAmount,
-        "Discount": discountCsv,
-        "Transfer/Refund": transferOrRefund,
-        "Mode": payment_mode || ''
-      };
-    });
-    let csv = `${entityType}: ${entityName},Project Name: ${projectName}\n\n`;
-    csv += Object.keys(rows[0] || {}).join(",") + "\n";
-    rows.forEach(row => {
-      csv += Object.values(row).map(value => `"${value}"`).join(",") + "\n";
-    });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "Advance_Report.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
   useEffect(() => {
     const { totalAmount, totalRefund, totalBill } = advanceData.reduce(
       (acc, entry) => {
@@ -1857,21 +1675,45 @@ const AdvancePortal = ({
               body: JSON.stringify(updatedOther)
             })
           ]);
+          await Promise.all([
+            syncWeeklyPaymentBillsForAdvancePortal(editedRecord.advancePortalId, updatedEdited, {
+              editedBy: enteredBy,
+              branchId: activeBranchId,
+            }),
+            syncWeeklyPaymentBillsForAdvancePortal(otherRecord.advancePortalId, updatedOther, {
+              editedBy: enteredBy,
+              branchId: activeBranchId,
+            }),
+          ]);
         } else {
           console.warn('Could not find both Transfer records for entry_no:', editFormData.entry_no);
         }
       } else {
-        // Normal single update
         const payload = {
           ...editFormData,
           branch_id: editFormData.branch_id ?? activeBranchId
         };
+        if (await needsAdvancePortalPaymentModalForWeeklyBill(editingId, payload)) {
+          pendingEditUpdateRef.current = { payload };
+          setEditPaymentModalData({
+            chequeNo: '',
+            chequeDate: '',
+            transactionNumber: '',
+            accountNumber: '',
+          });
+          setShowEditPaymentModal(true);
+          return;
+        }
         const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error('Failed to update');
+        await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
+          editedBy: enteredBy,
+          branchId: activeBranchId,
+        });
       }
       setIsEditModalOpen(false);
       await fetchAdvanceData();
@@ -1882,40 +1724,78 @@ const AdvancePortal = ({
       console.error(err);
     }
   };
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    if (editFormData.payment_mode === 'Cheque' && (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingEditUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+    setIsEditPaymentSubmitting(true);
+    try {
+      const payload = pending.payload;
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${editingId}?editedBy=${encodeURIComponent(enteredBy)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
+        editedBy: enteredBy,
+        branchId: activeBranchId,
+        modalPaymentData: editPaymentModalData,
+      });
+      setShowEditPaymentModal(false);
+      pendingEditUpdateRef.current = null;
+      setIsEditModalOpen(false);
+      await fetchAdvanceData();
+      if (selectedOption) handleChange(selectedOption);
+      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
+      await notifyParentSuccess();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update record. Please try again.');
+    } finally {
+      setIsEditPaymentSubmitting(false);
+    }
+  };
   return (
-    <div className='bg-[#FAF6ED] pb-10'>
-      <div className='overflow-hidden bg-[#FAF6ED] w-full'>
-        <div className='px-4 sm:px-6 lg:px-10 overflow-hidden'>
-          <div className='flex flex-col xl:flex-row gap-4 xl:gap-10 text-left '>
-            <div className='bg-white w-full p-4 px-10 rounded-md text-left xl:flex  items-center pb-6 gap-[16px]'>
-              <div className='space-y-2 flex-1'>
-                <h2 className='font-semibold text-sm sm:text-base'>From Date</h2>
+    <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+          <div className='w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] text-left flex items-center gap-6'>
+            <div className='flex flex-wrap gap-[10px] w-full'>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>From Date</label>
                 <input
                   type='date'
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none text-sm'
+                  className='w-full max-w-[150px] h-[40px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-2 py-1 focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1'>
-                <h2 className='font-semibold text-sm sm:text-base'>To Date</h2>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>To Date</label>
                 <input
                   type='date'
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className='border-2 border-[#BF9853] border-opacity-30 rounded-lg px-2 py-1 w-full h-[45px] focus:outline-none text-sm'
+                  className='w-full max-w-[150px] h-[40px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-2 py-1 focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1'>
-                <h2 className='font-semibold text-sm sm:text-base'>Amount Given</h2>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Amount Given</label>
                 <input
                   readOnly
                   value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
+                  className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm'
                 />
               </div>
-              <div className='space-y-2 flex-1'>
-                <h2 className='font-semibold text-sm sm:text-base'>Payment Mode</h2>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Payment Mode</label>
                 <Select
                   options={finalPaymentModeOptions}
                   value={filteredPaymentMode ? { value: filteredPaymentMode, label: filteredPaymentMode } : null}
@@ -1925,36 +1805,39 @@ const AdvancePortal = ({
                   isClearable
                   menuPortalTarget={document.body}
                   styles={customStyles}
-                  className='w-full rounded-lg focus:outline-none'
+                  className='w-full min-w-[150px] rounded-lg focus:outline-none'
                 />
               </div>
-            </div>
-            <div className='flex flex-col sm:flex-row bg-white w-full h-auto xl:h-[128px] rounded-md p-4 gap-[16px] px-10 '>
-              <div className='space-y-2'>
-                <h2 className='font-semibold text-sm sm:text-base'>Today Amount</h2>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Today Amount</label>
                 <input
                   readOnly
                   type='text'
                   value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] rounded-lg p-2 w-[144px] h-[45px] focus:outline-none text-sm'
+                  className='w-[144px] h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm'
                 />
               </div>
-              <div className='space-y-2'>
-                <h2 className='font-semibold text-sm sm:text-base'>Total Outstanding</h2>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Total Outstanding</label>
                 <input
                   readOnly
                   type='text'
                   value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='bg-[#F2F2F2] p-2 rounded-lg w-[144px] h-[45px] focus:outline-none text-sm'
+                  className='w-[144px] h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm'
+                />
+              </div>
+              <div className="flex items-end">
+                <input
+                  readOnly
+                  value={projectAdvance}
+                  className="border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs"
                 />
               </div>
             </div>
           </div>
-        </div>
-        <div className='px-4 sm:px-6 lg:px-10 mt-4'>
-          <div className='bg-white w-full max-w-[1850px] xl:h-[610px] p-4 lg:p-6 rounded-md shadow-sm'>
-            <div className='xl:flex px-4 gap-10'>
-              <div className='xl:flex xl:w-[1100px]'>
+        <div className='w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col'>
+            <div className='xl:flex flex-1 min-h-0 xl:min-w-0 px- gap-[18px]'>
+              <div className='shrink-0 xl:w-fit'>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-left'>
                   <div className='space-y-1 flex items-center max-w-[300px]'>
                     <label className='font-semibold text-[#E4572E] text-sm sm:text-base xl:w-40 w-20'>Select Type</label>
@@ -2167,187 +2050,17 @@ const AdvancePortal = ({
                   </div>
                 </div>
               </div>
-              <div className='w-full'>
-                <div className='flex flex-col sm:flex-row items-start sm:items-center justify-end mb-4 gap-4'>
-                  <div className='flex items-center gap-2'>
-                    <input
-                      readOnly
-                      value={projectAdvance}
-                      className='border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs'
-                    />
-                  </div>
-                  <div className='flex flex-wrap gap-2 sm:gap-4'>
-                    <span onClick={exportPDF} className='text-[#E4572E] font-semibold hover:underline cursor-pointer text-sm'>Export PDF</span>
-                    <span onClick={exportCSV} className='text-[#007233] font-semibold hover:underline cursor-pointer text-sm'>Export XL</span>
-                    <span className='text-[#BF9853] font-semibold hover:underline cursor-pointer text-sm'>Print</span>
-                  </div>
-                </div>
-                <div className='border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-full'>
-                  <div className='overflow-x-auto max-h-[400px] overflow-y-auto thin-scrollbar w-full'>
-                    <table className="w-full">
-                      <thead className="bg-[#FAF6ED] text-left sticky top-0 z-10">
-                        <tr>
-                          <th className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm whitespace-nowrap">Date</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Advance</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Bill</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Discount</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Transfer/Refund</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Mode</th>
-                          <th className="px-2 py-2 text-xs sm:text-sm whitespace-nowrap">Activity</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {!selectedOption || !selectedSite ? (
-                          <tr>
-                            <td colSpan="7" className="text-center py-4 text-sm text-gray-500">
-                              Please select a contractor/vendor and project to view advance records.
-                            </td>
-                          </tr>
-                        ) : advanceData
-                          .filter(entry => {
-                            const isMatchingVendor =
-                              selectedOption?.type === 'Vendor'
-                                ? entry.vendor_id === selectedOption.id
-                                : selectedOption?.type === 'Contractor'
-                                  ? entry.contractor_id === selectedOption.id
-                                  : false;
-                            const isForCurrentProject = entry.project_id === selectedSite.id;
-                            return isMatchingVendor && isForCurrentProject;
-                          })
-                          .sort((a, b) => {
-                            const entryNoA = a.entry_no || 0;
-                            const entryNoB = b.entry_no || 0;
-                            return entryNoB - entryNoA;
-                          }).length === 0 ? (
-                          <tr>
-                            <td colSpan="7" className="text-center py-4 text-sm text-gray-500">
-                              No records found for the selected contractor/vendor and project.
-                            </td>
-                          </tr>
-                        ) : (
-                          advanceData
-                            .filter(entry => {
-                              const isMatchingVendor =
-                                selectedOption?.type === 'Vendor'
-                                  ? entry.vendor_id === selectedOption.id
-                                  : selectedOption?.type === 'Contractor'
-                                    ? entry.contractor_id === selectedOption.id
-                                    : false;
-                              const isForCurrentProject = entry.project_id === selectedSite.id;
-                              return isMatchingVendor && isForCurrentProject;
-                            })
-                            .sort((a, b) => {
-                              const entryNoA = a.entry_no || 0;
-                              const entryNoB = b.entry_no || 0;
-                              return entryNoB - entryNoA;
-                            })
-                            .map((entry, index) => {
-                            const {
-                              date,
-                              amount,
-                              bill_amount,
-                              discount_amount,
-                              type,
-                              transfer_site_id,
-                              payment_mode,
-                              refund_amount
-                            } = entry;
-                            const discountAmt = parseFloat(discount_amount) || 0;
-                            const advanceAmount = (() => {
-                              if (type === 'Refund') {
-                                return `-${parseFloat(refund_amount || 0).toLocaleString('en-IN')}`;
-                              }
-                              return parseFloat(amount || 0).toLocaleString('en-IN');
-                            })();
-                            const billAmount =
-                              type === 'Bill Settlement'
-                                ? parseFloat(bill_amount || 0).toLocaleString('en-IN')
-                                : '';
-                            const discountDisplay =
-                              type === 'Bill Settlement' && discountAmt > 0
-                                ? discountAmt.toLocaleString('en-IN')
-                                : '';
-                            let transferOrRefund = '';
-                            if (type === 'Refund') {
-                              transferOrRefund = 'Refund';
-                            } else if (type === 'Transfer') {
-                              const relatedSiteId = transfer_site_id;
-                              const siteLabel = siteOptions.find(site => site.id === parseInt(relatedSiteId))?.label;
-                              transferOrRefund =
-                                parseFloat(amount) < 0
-                                  ? `Transfer to ${siteLabel || 'Unknown Site'}`
-                                  : `Transfer from ${siteLabel || 'Unknown Site'}`;
-                            }
-                            return (
-                              <tr key={entry.advancePortalId ?? index} className="border-t hover:bg-gray-50">
-                                <td className="px-2 sm:px-4 lg:px-6 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
-                                  {new Date(date).toLocaleDateString('en-GB')}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
-                                  {advanceAmount}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
-                                  {billAmount}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-center font-semibold whitespace-nowrap">
-                                  {discountDisplay}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold break-words min-w-[120px] sm:min-w-[200px]">
-                                  {transferOrRefund}
-                                </td>
-                                <td className="px-2 py-2 text-xs sm:text-sm text-left font-semibold whitespace-nowrap">
-                                  {payment_mode || ''}
-                                </td>
-                                <td className="px-2 py-2 whitespace-nowrap">
-                                  <div className="flex items-center gap-1 sm:gap-2">
-                                    <button className="rounded-full transition duration-200">
-                                      <img
-                                        src={edit}
-                                        onClick={() => handleEditClick(entry)}
-                                        alt="Edit"
-                                        className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                      />
-                                    </button>
-                                    {entry.file_url ? (
-                                      <a
-                                        href={entry.file_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="cursor-pointer"
-                                        title="View File"
-                                      >
-                                        <img
-                                          src={file}
-                                          className="w-5 h-4 transform hover:scale-110 transition duration-200"
-                                          alt="View File"
-                                          style={{ filter: 'invert(0%) brightness(0%)' }}
-                                        />
-                                      </a>
-                                    ) : (
-                                      <div className="opacity-30">
-                                        <img
-                                          src={file}
-                                          className="w-5 h-4"
-                                          alt="No File"
-                                          title="No file attached"
-                                          style={{ filter: 'invert(0%) brightness(0%)' }}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1 overflow-x-auto">
+                <SideTable
+                  advanceData={advanceData}
+                  selectedOption={selectedOption}
+                  siteOptions={siteOptions}
+                  selectedSite={selectedSite}
+                  onEditClick={handleEditClick}
+                />
               </div>
             </div>
           </div>
-        </div>
         {isEditModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
             <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -2551,6 +2264,22 @@ const AdvancePortal = ({
             </div>
           </div>
         )}
+        <AdvancePortalEditPaymentModal
+          isOpen={showEditPaymentModal}
+          onClose={() => {
+            setShowEditPaymentModal(false);
+            pendingEditUpdateRef.current = null;
+          }}
+          onSubmit={handleEditPaymentModalSubmit}
+          isSubmitting={isEditPaymentSubmitting}
+          paymentMode={editFormData.payment_mode}
+          date={editFormData.date}
+          amount={getAdvancePortalDisplayAmount(editFormData)}
+          paymentModalData={editPaymentModalData}
+          setPaymentModalData={setEditPaymentModalData}
+          accountDetails={accountDetails}
+          selectStyles={customStyles}
+        />
         {showPaymentModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white text-left rounded-xl p-8 w-[800px] max-h-[100vh] overflow-y-auto flex flex-col">

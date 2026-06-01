@@ -77,12 +77,20 @@ export default function CustomDateField({
   disabled = false,
   anchor = "left",
   alwaysOpenBelow = false,
+  controlHeightPx,
   /** When empty, replaces default trigger typography (placeholder look only; calendar unchanged). */
   placeholderButtonClassName = "",
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(() => formatIsoToDisplay(value));
   const inputRef = useRef(null);
+  const controlBoxStyle = controlHeightPx
+    ? {
+        height: `${controlHeightPx}px`,
+        minHeight: `${controlHeightPx}px`,
+        boxSizing: 'border-box',
+      }
+    : undefined;
 
   useEffect(() => {
     if (inputRef.current === document.activeElement) return;
@@ -143,9 +151,10 @@ export default function CustomDateField({
   return (
     <div className={`relative ${className}`}>
       <div
-        className={`relative flex items-center w-[120px] h-[36px] rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-[#FFFFFF] shadow-sm overflow-hidden ${
+        className={`relative flex items-center ${controlHeightPx ? 'w-full' : 'w-[120px] h-[36px]'} rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-[#FFFFFF] shadow-sm overflow-hidden ${
           disabled ? "opacity-70 cursor-not-allowed bg-gray-100" : "hover:border-[rgba(191,152,83,0.4)]"
         }`}
+        style={controlBoxStyle}
       >
         <input
           ref={inputRef}

@@ -1634,46 +1634,46 @@ const AdvanceSummary = ({ refreshSignal }) => {
   }
 
   return (
-    <div className='bg-[#FAF6ED]'>
-      <div className="flex flex-wrap gap-6">
-        <div className="bg-white rounded xl:w-[1850px] xl:h-[793px] p-4 ml-10 mr-10 px-4 lg:px-14">
-          <div className="xl:flex space-y-4 xl:space-y-0 gap-8">
-            <div className="w-full">
-              <div className="flex items-center mb-4 lg:justify-between">
-                <div className='lg:flex lg:gap-3 gap-1'>
-                  <div className="text-left">
-                    <label className="block font-semibold mb-2">Contractor/Vendor</label>
-                    <Select
-                      options={combinedOptions}
-                      value={selectedContractorOrVendorOption}
-                      onChange={(selectedOption) => {
-                        setSelectedContractorOrVendorOption(selectedOption);
-                      }}
-                      placeholder="Select..."
-                      className="w-[253px] h-[45px] rounded-lg focus:outline-none"
-                      isClearable
-                      menuPortalTarget={document.body}
-                      styles={customStyles}
-                    />
-                  </div>
-                  <div className="text-left">
-                    <label className="block font-semibold mb-2">Project Name</label>
-                    <Select
-                      options={projectData.map(proj => ({
-                        value: proj.projectName,
-                        label: proj.projectName
-                      }))}
-                      value={selectedProject}
-                      onChange={(selectedOption) => setSelectedProject(selectedOption)}
-                      className="w-[273px] h-[45px] rounded-lg focus:outline-none"
-                      isClearable
-                      isSearchable
-                      menuPortalTarget={document.body}
-                      styles={customStyles}
-                    />
-                  </div>
+    <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
+      <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full">
+          <div className="flex flex-col xl:flex-row items-stretch justify-between bg-white rounded-md px-[18px] py-[18px] mb-[18px] shrink-0 gap-[18px]">
+            <div className="flex flex-wrap flex-col xl:flex-row justify-between flex-1 items-center gap-[12px]">
+              <div className="flex flex-wrap gap-[12px] text-left">
+                <div className="text-left">
+                  <label className="block font-semibold mb-1">Contractor/Vendor</label>
+                  <Select
+                    options={combinedOptions}
+                    value={selectedContractorOrVendorOption}
+                    onChange={(selectedOption) => {
+                      setSelectedContractorOrVendorOption(selectedOption);
+                    }}
+                    placeholder="Select..."
+                    className="w-[253px] h-[45px] rounded-lg focus:outline-none"
+                    isClearable
+                    menuPortalTarget={document.body}
+                    styles={customStyles}
+                  />
                 </div>
-                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-25 p-2">
+                <div className="text-left">
+                  <label className="block font-semibold mb-1">Project Name</label>
+                  <Select
+                    options={projectData.map(proj => ({
+                      value: proj.projectName,
+                      label: proj.projectName
+                    }))}
+                    value={selectedProject}
+                    onChange={(selectedOption) => setSelectedProject(selectedOption)}
+                    className="w-[273px] h-[45px] rounded-lg focus:outline-none"
+                    isClearable
+                    isSearchable
+                    menuPortalTarget={document.body}
+                    styles={customStyles}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-15 p-1 ml-auto">
                   <span>
                     Pending Advance:{" "}
                     <b className="text-red-500">
@@ -1686,12 +1686,42 @@ const AdvanceSummary = ({ refreshSignal }) => {
                   </span>
                 </div>
               </div>
-              <div className="flex gap-3 text-sm justify-end">
+            </div>
+            <div className="flex flex-wrap flex-col xl:flex-row justify-between flex-1 items-center gap-[12px]">
+              <div className="text-left">
+                <label className="block font-semibold mb-1">Project Name</label>
+                <Select
+                  options={sortedSiteOptions || []}
+                  placeholder="Select a project..."
+                  isSearchable={true}
+                  value={selectedAdvanceSite}
+                  onChange={setSelectedAdvanceSite}
+                  styles={customStyles}
+                  isClearable
+                  menuPortalTarget={document.body}
+                  className="w-[270px] h-[45px] focus:outline-none"
+                />
+              </div>
+              <div>
+                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-15 p-1 ml-auto">
+                  <span>
+                    Pending Advance: <b className="text-red-500">{sitePendingAdvance.toLocaleString("en-IN")}</b>
+                  </span>
+                  <span>Bill Amount: {siteBillAmount.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="w-full flex-1 min-h-0 bg-white rounded-[6px] pt-[18px] px-[18px] pb-[18px] flex flex-col overflow-hidden">
+          <div className="flex flex-col xl:flex-row gap-[18px] w-full flex-1 min-h-0 overflow-hidden">
+            <div className="w-full xl:flex-1 flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex shrink-0 gap-3 text-sm justify-end mb-[12px]">
                 <button onClick={exportPDF} className="flex items-center font-bold hover:underline gap-1 text-[#E4572E]">Export PDF</button>
                 <button onClick={exportCSV} className="flex items-center font-bold hover:underline gap-1 text-[#007233]">Export XL</button>
                 <button className="flex items-center font-bold hover:underline gap-1 text-[#BF9853]">Print</button>
               </div>
-              <div className="border-l-8 border-l-[#BF9853] rounded-lg h-[580px] overflow-auto">
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto">
                 <table className="w-full border-collapse ">
                   <thead>
                     <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
@@ -1762,36 +1792,16 @@ const AdvanceSummary = ({ refreshSignal }) => {
                   </tbody>
                 </table>
               </div>
-            </div>
-            <div className=" w-full">
-              <div className="flex items-center mb-4 lg:justify-between">
-                <div className="text-left">
-                  <label className="block font-semibold mb-2">Project Name</label>
-                  <Select
-                    options={sortedSiteOptions || []}
-                    placeholder="Select a project..."
-                    isSearchable={true}
-                    value={selectedAdvanceSite}
-                    onChange={setSelectedAdvanceSite}
-                    styles={customStyles}
-                    isClearable
-                    menuPortalTarget={document.body}
-                    className="w-[270px] h-[45px] focus:outline-none"
-                  />
-                </div>
-                <div className="flex flex-col text-right border-2 border-[#E4572E] border-opacity-25 p-2">
-                  <span>
-                    Pending Advance: <b className="text-red-500">{sitePendingAdvance.toLocaleString("en-IN")}</b>
-                  </span>
-                  <span>Bill Amount: {siteBillAmount.toLocaleString("en-IN")}</span>
-                </div>
               </div>
-              <div className="flex gap-3 text-sm justify-end">
+            </div>
+            <div className="w-full xl:flex-1 flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex shrink-0 gap-3 text-sm justify-end mb-[12px]">
                 <button onClick={exportsiteNamePDF} className="flex items-center gap-1 font-bold hover:underline text-[#E4572E]">Export PDF</button>
                 <button onClick={exportSiteNameCSV} className="flex items-center gap-1 font-bold hover:underline text-[#007233]"> Export XL</button>
                 <button className="flex items-center gap-1 font-bold hover:underline text-[#BF9853]"> Print</button>
               </div>
-              <div className="border-l-8 border-l-[#BF9853] rounded-lg h-[580px] overflow-auto">
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-[#f8f1e5] text-left sticky top-0 z-10">
@@ -1864,9 +1874,10 @@ const AdvanceSummary = ({ refreshSignal }) => {
                   </tbody>
                 </table>
               </div>
+              </div>
             </div>
           </div>
-        </div>
+          </div>
       </div>
       {projectTooltipData && (
         <div className="fixed z-50 bg-white text-black p-3 rounded shadow-lg text-sm max-w-xs"
@@ -1943,7 +1954,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
         </div>
       )}
       {showProjectPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
           onClick={() => setShowProjectPopup(false)}
         >
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto"
@@ -2055,7 +2066,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
         </div>
       )}
       {showSitePopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
           onClick={() => setShowSitePopup(false)}
         >
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto"
@@ -2172,7 +2183,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
         </div>
       )}
       {showBillStatusPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
           onClick={() => setShowBillStatusPopup(false)}
         >
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full max-h-[80vh] overflow-y-auto"
@@ -2437,6 +2448,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
         </div>
       ) : null}
 
+      </div>
     </div>
   );
 }

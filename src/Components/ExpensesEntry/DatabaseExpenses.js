@@ -23,6 +23,11 @@ import {
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
+import { Table, TableProvider } from './Table';
+import {
+    TABLE_FILTER_MENU_MAX_HEIGHT_PX,
+    TABLE_FILTER_OPTION_HEIGHT_PX,
+} from './databaseExpensesSharedColumns';
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const NON_CASH_PAYMENT_MODES = ['GPay', 'Gpay', 'PhonePe', 'Net Banking', 'Cheque'];
@@ -51,6 +56,241 @@ const fetchWeeklyPaymentBillsByExpensesEntryId = async (expensesEntryId) => {
     );
 };
 
+const isWeeklyBillAccountType = (accountType) =>
+    accountType === 'Claim Payment' ||
+    accountType === 'Utility Bills' ||
+    accountType === 'Sundry Payment';
+
+const getWeeklyBillTypeFromAccountType = (accountType) => {
+    if (accountType === 'Claim Payment') return 'Claim Payment';
+    if (accountType === 'Sundry Payment') return 'Sundry Payment';
+    return 'Utility Payment';
+};
+
+/** API expects yyyy-MM-dd; expense form may send dd/MM/yyyy or ISO strings. */
+const normalizeWeeklyBillApiDate = (value) => {
+    if (value == null || String(value).trim() === '') return null;
+    const s = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const dmy = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dmy) {
+        const [, day, month, year] = dmy;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+};
+
+const normalizeWeeklyBillNullableId = (value) => {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+};
+
+const normalizeWeeklyBillWeeklyNumber = (value) => {
+    if (value == null || value === '') return null;
+    const n = parseInt(String(value).trim(), 10);
+    return Number.isFinite(n) ? n : null;
+};
+
+const pickWeeklyBillModalOrExisting = (modalPaymentData, existingBill, modalKey, snakeKey, camelKey) => {
+    const modalVal = modalPaymentData?.[modalKey];
+    if (modalVal != null && String(modalVal).trim() !== '') {
+        return modalVal;
+    }
+    if (existingBill) {
+        const fromBill = existingBill[snakeKey] ?? existingBill[camelKey];
+        if (fromBill != null && String(fromBill).trim() !== '') {
+            return fromBill;
+        }
+    }
+    return null;
+};
+
+/** PUT /update/{id} — must match WeeklyPaymentBillDataList entity types; branch_id cannot change. */
+const buildWeeklyPaymentBillUpdatePayload = (
+    updatedFormData,
+    expensesEntryId,
+    existingBill,
+    { modalPaymentData = null, editedBy = '' } = {}
+) => {
+    const bill = existingBill || {};
+    const employeeId =
+        updatedFormData.employeeId ??
+        updatedFormData.employee_id ??
+        null;
+    const labourId =
+        updatedFormData.labourId ??
+        updatedFormData.labour_id ??
+        null;
+
+    const chequeDateRaw = pickWeeklyBillModalOrExisting(
+        modalPaymentData,
+        bill,
+        'chequeDate',
+        'cheque_date',
+        'chequeDate'
+    );
+    const chequeDate =
+        chequeDateRaw != null
+            ? normalizeWeeklyBillApiDate(chequeDateRaw) || String(chequeDateRaw).trim()
+            : null;
+
+    const resolvedDate =
+        normalizeWeeklyBillApiDate(updatedFormData.date) ??
+        normalizeWeeklyBillApiDate(bill.date) ??
+        (typeof bill.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(bill.date) ? bill.date.slice(0, 10) : null);
+
+    return {
+        id: bill.id,
+        date: resolvedDate,
+        created_at: bill.created_at ?? bill.createdAt ?? new Date().toISOString(),
+        contractor_id: normalizeWeeklyBillNullableId(
+            updatedFormData.contractorId ?? updatedFormData.contractor_id ?? bill.contractor_id
+        ),
+        vendor_id: normalizeWeeklyBillNullableId(
+            updatedFormData.vendorId ?? updatedFormData.vendor_id ?? bill.vendor_id
+        ),
+        employee_id: normalizeWeeklyBillNullableId(employeeId ?? bill.employee_id),
+        labour_id: normalizeWeeklyBillNullableId(labourId ?? bill.labour_id),
+        project_id: normalizeWeeklyBillNullableId(
+            updatedFormData.projectId ?? updatedFormData.project_id ?? bill.project_id
+        ),
+        type: getWeeklyBillTypeFromAccountType(updatedFormData.accountType),
+        amount: parseFloat(updatedFormData.amount) || 0,
+        status: bill.status !== false,
+        weekly_number: normalizeWeeklyBillWeeklyNumber(bill.weekly_number ?? bill.weeklyNumber),
+        weekly_payment_expense_id: normalizeWeeklyBillNullableId(
+            bill.weekly_payment_expense_id ?? bill.weeklyPaymentExpenseId
+        ),
+        bill_payment_mode: updatedFormData.paymentMode || bill.bill_payment_mode || null,
+        advance_portal_id: normalizeWeeklyBillNullableId(bill.advance_portal_id ?? bill.advancePortalId),
+        staff_advance_portal_id: normalizeWeeklyBillNullableId(
+            bill.staff_advance_portal_id ?? bill.staffAdvancePortalId
+        ),
+        tenant_id: normalizeWeeklyBillNullableId(bill.tenant_id ?? bill.tenantId),
+        tenant_complex_name: bill.tenant_complex_name ?? bill.tenantComplexName ?? null,
+        rent_management_id: normalizeWeeklyBillNullableId(bill.rent_management_id ?? bill.rentManagementId),
+        loan_portal_id: normalizeWeeklyBillNullableId(bill.loan_portal_id ?? bill.loanPortalId),
+        expenses_entry_id: normalizeWeeklyBillNullableId(expensesEntryId),
+        claim_payment_id: normalizeWeeklyBillNullableId(bill.claim_payment_id ?? bill.claimPaymentId),
+        purpose_id: normalizeWeeklyBillNullableId(bill.purpose_id ?? bill.purposeId),
+        cheque_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            bill,
+            'chequeNo',
+            'cheque_number',
+            'chequeNumber'
+        ),
+        cheque_date: chequeDate,
+        transaction_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            bill,
+            'transactionNumber',
+            'transaction_number',
+            'transactionNumber'
+        ),
+        account_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            bill,
+            'accountNumber',
+            'account_number',
+            'accountNumber'
+        ),
+        vendor_payment_tracker_id:
+            bill.vendor_payment_tracker_id ?? bill.vendorPaymentTrackerId ?? null,
+        branch_id: normalizeWeeklyBillNullableId(bill.branch_id ?? bill.branchId),
+        edited_by: (editedBy || bill.edited_by || bill.editedBy) ?? null,
+        entered_by: (bill.entered_by ?? bill.enteredBy ?? editedBy) || null,
+    };
+};
+
+const buildWeeklyPaymentBillSavePayload = (
+    updatedFormData,
+    expensesEntryId,
+    { modalPaymentData = null, branchId = null, enteredBy = '' } = {}
+) => {
+    const employeeId =
+        updatedFormData.employeeId ??
+        updatedFormData.employee_id ??
+        updatedFormData.labourId ??
+        updatedFormData.labour_id ??
+        null;
+
+    const chequeDateRaw = pickWeeklyBillModalOrExisting(
+        modalPaymentData,
+        null,
+        'chequeDate',
+        'cheque_date',
+        'chequeDate'
+    );
+    const chequeDate =
+        chequeDateRaw != null
+            ? normalizeWeeklyBillApiDate(chequeDateRaw) || String(chequeDateRaw).trim()
+            : null;
+
+    return {
+        date: normalizeWeeklyBillApiDate(updatedFormData.date),
+        created_at: new Date().toISOString(),
+        contractor_id: normalizeWeeklyBillNullableId(
+            updatedFormData.contractorId ?? updatedFormData.contractor_id
+        ),
+        vendor_id: normalizeWeeklyBillNullableId(updatedFormData.vendorId ?? updatedFormData.vendor_id),
+        employee_id: normalizeWeeklyBillNullableId(employeeId),
+        labour_id: null,
+        project_id: normalizeWeeklyBillNullableId(updatedFormData.projectId ?? updatedFormData.project_id),
+        type: getWeeklyBillTypeFromAccountType(updatedFormData.accountType),
+        bill_payment_mode: updatedFormData.paymentMode || null,
+        amount: parseFloat(updatedFormData.amount) || 0,
+        status: true,
+        weekly_number: null,
+        weekly_payment_expense_id: null,
+        expenses_entry_id: normalizeWeeklyBillNullableId(expensesEntryId),
+        advance_portal_id: null,
+        staff_advance_portal_id: null,
+        claim_payment_id: null,
+        cheque_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            null,
+            'chequeNo',
+            'cheque_number',
+            'chequeNumber'
+        ),
+        cheque_date: chequeDate,
+        transaction_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            null,
+            'transactionNumber',
+            'transaction_number',
+            'transactionNumber'
+        ),
+        account_number: pickWeeklyBillModalOrExisting(
+            modalPaymentData,
+            null,
+            'accountNumber',
+            'account_number',
+            'accountNumber'
+        ),
+        branch_id: normalizeWeeklyBillNullableId(branchId),
+        entered_by: enteredBy || null,
+    };
+};
+
+const updateWeeklyPaymentBillById = async (billId, payload) => {
+    const response = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/update/${billId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Weekly payment bill update failed: ${errText}`);
+    }
+    return response.json();
+};
+
 const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
     const resolveActiveBranchId = useCallback(() => {
@@ -67,7 +307,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [expenses, setExpenses] = useState([]);
-    const [totalAmount, setTotalAmount] = useState(0);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [editId, setEditId] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -89,6 +328,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [branchOptions, setBranchOptions] = useState([]);
     const [sourceOptions, setSourceOptions] = useState([]);
+    const [paymentModeFilterOptions, setPaymentModeFilterOptions] = useState([]);
     const [branchFilterOptions, setBranchFilterOptions] = useState([]);
     const [enteredByOptions, setEnteredByOptions] = useState([]);
     // Initialize filter states from localStorage or defaults
@@ -134,6 +374,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     });
     const [selectedSource, setSelectedSource] = useState(() => {
         return localStorage.getItem('expenseFilter_source') || '';
+    });
+    const [selectedPaymentMode, setSelectedPaymentMode] = useState(() => {
+        return localStorage.getItem('expenseFilter_paymentMode') || '';
     });
     const [selectedBranch, setSelectedBranch] = useState(() => {
         return localStorage.getItem('expenseFilter_branch') || '';
@@ -204,6 +447,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const scrollRef = useRef(null);
     const filterRowRef = useRef(null);
     const filterNudgeUsedRef = useRef(false);
+    const filterScrollResetSkipRef = useRef(true);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -334,6 +578,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.setItem('expenseFilter_source', selectedSource);
     }, [selectedSource]);
     useEffect(() => {
+        localStorage.setItem('expenseFilter_paymentMode', selectedPaymentMode);
+    }, [selectedPaymentMode]);
+    useEffect(() => {
         localStorage.setItem('expenseFilter_branch', selectedBranch);
     }, [selectedBranch]);
     useEffect(() => {
@@ -390,7 +637,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [projectData, setProjectData] = useState(null);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [selectedEbNumber, setSelectedEbNumber] = useState(null);
-    const [expandedCells, setExpandedCells] = useState({});
     const customStyles = useMemo(() => ({
         control: (provided, state) => ({
             ...provided,
@@ -414,7 +660,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         menu: (provided) => ({
             ...provided,
             zIndex: 999,
-            maxHeight: '300px',
+            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
         }),
         menuPortal: (provided) => ({
             ...provided,
@@ -422,7 +668,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }),
         menuList: (provided) => ({
             ...provided,
-            maxHeight: '250px',
+            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
+            paddingTop: 0,
+            paddingBottom: 0,
             overflowY: 'auto',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
@@ -452,6 +700,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }),
         option: (provided, state) => ({
             ...provided,
+            minHeight: TABLE_FILTER_OPTION_HEIGHT_PX,
+            height: TABLE_FILTER_OPTION_HEIGHT_PX,
+            paddingTop: 0,
+            paddingBottom: 0,
+            display: 'flex',
+            alignItems: 'center',
             textAlign: 'left',
             fontWeight: 'normal',
             fontSize: '15px',
@@ -1019,6 +1273,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     expense.comments,
                     expense.category,
                     expense.accountType,
+                    expense.paymentMode,
                     getMachineToolsItemIdDisplay(expense.machineTools),
                     expense.source,
                     getBranchName(expense.branch_id ?? expense.branchId),
@@ -1060,6 +1315,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                         ? isBlankish(expense.source)
                         : expense.source === selectedSource)
                     : true) &&
+                (selectedPaymentMode
+                    ? (selectedPaymentMode === BLANK_VALUE
+                        ? isBlankish(expense.paymentMode)
+                        : expense.paymentMode === selectedPaymentMode)
+                    : true) &&
                 (selectedBranch
                     ? (selectedBranch === BLANK_VALUE
                         ? isBlankish(expense.branch_id ?? expense.branchId)
@@ -1071,10 +1331,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                         : (expense.enteredBy || 'Sivaprakasm') === selectedEnteredBy)
                     : true) &&
                 (selectedAccountType ?
-                    (selectedAccountType === 'Unknown' ?
-                        (!expense.accountType || expense.accountType === '') :
-                        expense.accountType === selectedAccountType
-                    ) : true) &&
+                    (selectedAccountType === BLANK_VALUE
+                        ? isBlankish(expense.accountType)
+                        : expense.accountType === selectedAccountType)
+                    : true) &&
                 (selectedDate ? expense.date === selectedDate : true) &&
                 (selectedEno
                     ? (selectedEno === BLANK_VALUE
@@ -1099,9 +1359,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         });
         setFilteredExpenses(filtered);
         setCurrentPage(1); // Reset to first page when filters change
-        // Set total amount
-        const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        setTotalAmount(total);
         // Dynamically update dropdown options from filtered data
         const getOptions = (data, key, includeBlank = true) => {
             const unique = [];
@@ -1120,7 +1377,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 }
             });
             const options = unique.map(val => ({ value: val, label: val }));
-            if (includeBlank && hasBlank) options.unshift(blankOption);
+            if (includeBlank) options.unshift(blankOption);
             return options;
         };
         setSiteOptions(getOptions(filtered, "siteName"));
@@ -1128,6 +1385,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
         setSourceOptions(getOptions(filtered, "source"));
+        setPaymentModeFilterOptions(getOptions(filtered, "paymentMode"));
         const uniqueStaff = [];
         const seenStaff = new Set();
         let hasBlankStaff = false;
@@ -1143,7 +1401,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             }
         });
         const staffOptionsBuilt = uniqueStaff.map((staff) => ({ value: staff, label: staff }));
-        if (hasBlankStaff) staffOptionsBuilt.unshift(blankOption);
+        staffOptionsBuilt.unshift(blankOption);
         setStaffOptions(staffOptionsBuilt);
         const uniqueBranchIds = [];
         const seenBranchIds = new Set();
@@ -1164,7 +1422,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             value: String(id),
             label: branchOptions.find(branch => String(branch.id) === String(id))?.branch || String(id)
         }));
-        if (hasBlankBranch) branchFilterOptionsBuilt.unshift(blankOption);
+        branchFilterOptionsBuilt.unshift(blankOption);
         setBranchFilterOptions(branchFilterOptionsBuilt);
 
         const uniqueEnteredBy = [];
@@ -1183,7 +1441,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             }
         });
         const enteredByOptionsBuilt = uniqueEnteredBy.map(val => ({ value: val, label: val }));
-        if (hasBlankEnteredBy) enteredByOptionsBuilt.unshift(blankOption);
+        enteredByOptionsBuilt.unshift(blankOption);
         setEnteredByOptions(enteredByOptionsBuilt);
 
         const uniqueToolIds = [];
@@ -1208,10 +1466,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 machineToolsIdToLabel[String(id)] ??
                 String(id),
         }));
-        if (hasBlankTools) machineToolsOptionsBuilt.unshift(blankOption);
+        machineToolsOptionsBuilt.unshift(blankOption);
         setMachineToolsOptions(machineToolsOptionsBuilt);
 
-        setAccountTypeOptions(getOptions(filtered, "accountType", false));
+        setAccountTypeOptions(getOptions(filtered, "accountType", true));
 
         const uniqueEno = [];
         const seenEno = new Set();
@@ -1228,10 +1486,28 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 uniqueEno.push(eno);
             }
         });
-        if (hasBlankEno) uniqueEno.unshift(BLANK_VALUE);
+        uniqueEno.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEno);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedBranch, selectedEnteredBy, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
+    useEffect(() => {
+        if (filterScrollResetSkipRef.current) {
+            filterScrollResetSkipRef.current = false;
+            return;
+        }
+        if (!showFilters) return;
+        const scroller = scrollRef.current;
+        if (!scroller) return;
+        filterNudgeUsedRef.current = false;
+        requestAnimationFrame(() => {
+            scroller.scrollTop = 0;
+        });
+    }, [
+        selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools,
+        selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType,
+        selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno,
+        selectedStaff, selectedBillArrival, selectedQuantity, selectedDescription,
+    ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
         // Prevent clearing the date field
@@ -1331,11 +1607,14 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             billCopy: updatedBillCopy,
             editedBy: username,
         };
-        const isPaymentType = (updatedFormData.accountType === 'Claim Payment' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Sundry Payment');
+        const isPaymentTypeForWeekly = isWeeklyBillAccountType(updatedFormData.accountType);
         const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
-        if (isPaymentType && isNonCashPaymentMode && editId) {
+        if (isPaymentTypeForWeekly && isNonCashPaymentMode && editId) {
             const existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
-            if (existingWeeklyBills.length === 0) {
+            const previousExpense = expenses.find((e) => String(e.id) === String(editId));
+            const previousPaymentMode = previousExpense?.paymentMode || '';
+            const hadNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(previousPaymentMode);
+            if (existingWeeklyBills.length === 0 && !hadNonCashPaymentMode) {
                 pendingUpdateFormDataRef.current = updatedFormData;
                 setPaymentModalData({ chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
                 setShowPaymentModal(true);
@@ -1372,15 +1651,16 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             billArrivalDate: billArrivalForApi
         };
         const updateUrl = `https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`;
-        const isPaymentTypeForWeekly = (updatedFormData.accountType === 'Claim Payment' || updatedFormData.accountType === 'Utility Bills' || updatedFormData.accountType === 'Sundry Payment');
+        const isPaymentTypeForWeekly = isWeeklyBillAccountType(updatedFormData.accountType);
         const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
         let existingWeeklyBills = [];
-        if (editId && isPaymentTypeForWeekly && isNonCashPaymentMode) {
+        if (editId) {
             existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
         }
-        const shouldSendWeeklyBill = isPaymentTypeForWeekly && isNonCashPaymentMode && editId && existingWeeklyBills.length === 0;
+        const shouldCreateWeeklyBill =
+            isPaymentTypeForWeekly && isNonCashPaymentMode && editId && existingWeeklyBills.length === 0;
         if (
-            shouldSendWeeklyBill &&
+            shouldCreateWeeklyBill &&
             isPaymentModeRequiringBankRegisterLog(updatedFormData.paymentMode)
         ) {
             await postBankRegisterLogSave(
@@ -1398,42 +1678,52 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             body: JSON.stringify(updatePayload)
         });
         if (!response.ok) throw new Error('Failed to update expense');
-        if (shouldSendWeeklyBill) {
+
+        if (isPaymentTypeForWeekly && isNonCashPaymentMode && editId) {
             try {
-                const weeklyPaymentBillPayload = {
-                    date: updatedFormData.date,
-                    created_at: new Date().toISOString(),
-                    contractor_id: updatedFormData.contractorId || null,
-                    vendor_id: updatedFormData.vendorId || null,
-                    employee_id: null,
-                    project_id: updatedFormData.projectId || null,
-                    type: updatedFormData.accountType === 'Claim Payment' ? 'Claim Payment' : updatedFormData.accountType === 'Sundry Payment' ? 'Sundry Payment' : 'Utility Payment',
-                    bill_payment_mode: updatedFormData.paymentMode,
-                    amount: parseFloat(updatedFormData.amount) || 0,
-                    status: true,
-                    weekly_number: '',
-                    expenses_entry_id: editId,
-                    advance_portal_id: null,
-                    staff_advance_portal_id: null,
-                    claim_payment_id: null,
-                    cheque_number: (modalPaymentData && modalPaymentData.chequeNo) || null,
-                    cheque_date: (modalPaymentData && modalPaymentData.chequeDate) || null,
-                    transaction_number: (modalPaymentData && modalPaymentData.transactionNumber) || null,
-                    account_number: (modalPaymentData && modalPaymentData.accountNumber) || null,
-                    branch_id: activeBranchId,
-                    enteredBy: username,
-                };
-                const weeklyResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(weeklyPaymentBillPayload)
-                });
-                if (!weeklyResponse.ok) {
-                    console.error('Weekly payment bills save failed:', await weeklyResponse.text());
+                if (existingWeeklyBills.length > 0) {
+                    for (const bill of existingWeeklyBills) {
+                        if (bill?.id == null) continue;
+                        const weeklyPaymentBillPayload = buildWeeklyPaymentBillUpdatePayload(
+                            updatedFormData,
+                            editId,
+                            bill,
+                            { modalPaymentData, editedBy: username }
+                        );
+                        await updateWeeklyPaymentBillById(bill.id, weeklyPaymentBillPayload);
+                    }
+                } else if (shouldCreateWeeklyBill) {
+                    const weeklyPaymentBillPayload = buildWeeklyPaymentBillSavePayload(
+                        updatedFormData,
+                        editId,
+                        {
+                            modalPaymentData,
+                            branchId: activeBranchId,
+                            enteredBy: username,
+                        }
+                    );
+                    const weeklyResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/save`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(weeklyPaymentBillPayload),
+                    });
+                    if (!weeklyResponse.ok) {
+                        console.error('Weekly payment bills save failed:', await weeklyResponse.text());
+                    }
                 }
             } catch (weeklyErr) {
-                console.error('Weekly payment bills save error:', weeklyErr);
+                console.error('Weekly payment bills sync error:', weeklyErr);
+                throw weeklyErr;
+            }
+        } else if (editId && existingWeeklyBills.length > 0) {
+            try {
+                const { failedCount } = await deleteRelatedWeeklyPaymentBills(editId);
+                if (failedCount > 0) {
+                    console.error('Some related weekly payment bills could not be deleted after expense update');
+                }
+            } catch (weeklyErr) {
+                console.error('Weekly payment bills delete error:', weeklyErr);
             }
         }
     };
@@ -1472,6 +1762,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }
         setCurrentPage(1); // Reset to first page when sorting
     };
+    const dstCol1Label = 'Timestamp';
+    const dstCol2Label = 'Date';
+    const dstCol3Label = 'Project Name';
     // Sort data
     const sortedExpenses = [...filteredExpenses].sort((a, b) => {
         if (!sortField) return 0;
@@ -1528,6 +1821,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const currentItems = sortedExpenses.slice(startIndex, endIndex);
+    const totalAmount = currentItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     // Calculate account type summary
     const accountTypeSummary = React.useMemo(() => {
         const summary = {};
@@ -1762,6 +2056,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setSelectedMachineTools('');
         setSelectedAccountType('');
         setSelectedSource('');
+        setSelectedPaymentMode('');
         setSelectedBranch('');
         setSelectedEnteredBy('');
         setSelectedDate('');
@@ -1787,6 +2082,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.removeItem('expenseFilter_machineTools');
         localStorage.removeItem('expenseFilter_accountType');
         localStorage.removeItem('expenseFilter_source');
+        localStorage.removeItem('expenseFilter_paymentMode');
         localStorage.removeItem('expenseFilter_branch');
         localStorage.removeItem('expenseFilter_enteredBy');
         localStorage.removeItem('expenseFilter_date');
@@ -1795,12 +2091,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.removeItem('expenseFilter_timestampStartDate');
         localStorage.removeItem('expenseFilter_timestampEndDate');
         localStorage.removeItem('expenseFilter_eno');
-    };
-    const toggleExpandedCell = (cellKey) => {
-        setExpandedCells((prev) => ({
-            ...prev,
-            [cellKey]: !prev[cellKey],
-        }));
     };
     const exportToCSV = () => {
         const headers = [
@@ -1923,28 +2213,39 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     ) : null}
                     <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div
-                            className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
+                            className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
                                 ? 'flex-col sm:flex-row sm:justify-between'
                                 : 'flex-row justify-between items-center'
                                 } mb-[12px] gap-[6px]`}>
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
+                            <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
                                 <button
                                     className=''
                                     onClick={() => {
                                         const willOpen = !showFilters;
-                                        setShowFilters(willOpen);
-                                        if (!willOpen) return;
                                         const scroller = scrollRef.current;
-                                        if (!scroller) return;
-                                        if (scroller.scrollTop <= 0) return;
-                                        if (filterNudgeUsedRef.current) return;
-                                        filterNudgeUsedRef.current = true;
+                                        if (willOpen) {
+                                            setShowFilters(true);
+                                            if (!scroller) return;
+                                            if (scroller.scrollTop <= 0) return;
+                                            if (filterNudgeUsedRef.current) return;
+                                            filterNudgeUsedRef.current = true;
+                                            requestAnimationFrame(() => {
+                                                requestAnimationFrame(() => {
+                                                    const h = filterRowRef.current?.offsetHeight || 0;
+                                                    if (h > 0) {
+                                                        scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                    }
+                                                });
+                                            });
+                                            return;
+                                        }
+                                        const h = filterRowRef.current?.offsetHeight || 0;
+                                        setShowFilters(false);
+                                        if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                        filterNudgeUsedRef.current = false;
                                         requestAnimationFrame(() => {
                                             requestAnimationFrame(() => {
-                                                const h = filterRowRef.current?.offsetHeight || 0;
-                                                if (h > 0) {
-                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
-                                                }
+                                                scroller.scrollTop = scroller.scrollTop + h;
                                             });
                                         });
                                     }}
@@ -1955,124 +2256,131 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                         className=" border rounded-md"
                                     />
                                 </button>
-                                {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
-                                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
+                                {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
+                                    <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                                         {timestampStartDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit">
-                                                <span className="font-medium">Timestamp: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{dstCol1Label}: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
                                                 <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {timestampEndDate && !timestampStartDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium">Timestamp until: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(timestampEndDate)}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Timestamp until: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(timestampEndDate)}</span>
                                                 <button onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium">Date: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedDate)}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(selectedDate)}</span>
                                                 <button onClick={() => setSelectedDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedSiteName && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Project Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedSiteName === BLANK_VALUE ? BLANK_LABEL : selectedSiteName}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Project Name: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedSiteName === BLANK_VALUE ? BLANK_LABEL : selectedSiteName}</span>
                                                 <button onClick={() => setSelectedSiteName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedVendor && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Vendor Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedVendor === BLANK_VALUE ? BLANK_LABEL : selectedVendor}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Vendor Name: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedVendor === BLANK_VALUE ? BLANK_LABEL : selectedVendor}</span>
                                                 <button onClick={() => setSelectedVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedContractor && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Contractor Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedContractor === BLANK_VALUE ? BLANK_LABEL : selectedContractor}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Contractor Name: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedContractor === BLANK_VALUE ? BLANK_LABEL : selectedContractor}</span>
                                                 <button onClick={() => setSelectedContractor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedStaff && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Staff Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedStaff === BLANK_VALUE ? BLANK_LABEL : selectedStaff}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Staff Name: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedStaff === BLANK_VALUE ? BLANK_LABEL : selectedStaff}</span>
                                                 <button onClick={() => setSelectedStaff('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedQuantity.trim() && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Quantity: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedQuantity}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Quantity: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedQuantity}</span>
                                                 <button onClick={() => setSelectedQuantity('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedDescription.trim() && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Description: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedDescription}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Description: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedDescription}</span>
                                                 <button onClick={() => setSelectedDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedCategory && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Category: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedCategory === BLANK_VALUE ? BLANK_LABEL : selectedCategory}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Category: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedCategory === BLANK_VALUE ? BLANK_LABEL : selectedCategory}</span>
                                                 <button onClick={() => setSelectedCategory('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedAccountType && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">A/C Type: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedAccountType}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">A/C Type: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedAccountType}</span>
                                                 <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
+                                        {selectedPaymentMode && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedPaymentMode === BLANK_VALUE ? BLANK_LABEL : selectedPaymentMode}</span>
+                                                <button onClick={() => setSelectedPaymentMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
                                         {selectedMachineTools && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Tools: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedMachineTools === BLANK_VALUE ? BLANK_LABEL : getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Tools: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedMachineTools === BLANK_VALUE ? BLANK_LABEL : getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
                                                 <button onClick={() => setSelectedMachineTools('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedSource && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Source From: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedSource === BLANK_VALUE ? BLANK_LABEL : selectedSource}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Source From: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedSource === BLANK_VALUE ? BLANK_LABEL : selectedSource}</span>
                                                 <button onClick={() => setSelectedSource('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedBranch && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Branch: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedBranch === BLANK_VALUE ? BLANK_LABEL : (getBranchName(selectedBranch) || selectedBranch)}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Branch: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedBranch === BLANK_VALUE ? BLANK_LABEL : (getBranchName(selectedBranch) || selectedBranch)}</span>
                                                 <button onClick={() => setSelectedBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedEnteredBy && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Entered By: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedEnteredBy === BLANK_VALUE ? BLANK_LABEL : selectedEnteredBy}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entered By: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedEnteredBy === BLANK_VALUE ? BLANK_LABEL : selectedEnteredBy}</span>
                                                 <button onClick={() => setSelectedEnteredBy('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedEno && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Entry No: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{String(selectedEno) === BLANK_VALUE ? BLANK_LABEL : selectedEno}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Entry No: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{String(selectedEno) === BLANK_VALUE ? BLANK_LABEL : selectedEno}</span>
                                                 <button onClick={() => setSelectedEno('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedBillArrival && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Bill Arrival: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedBillArrival)}</span>
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Bill Arrival: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(selectedBillArrival)}</span>
                                                 <button onClick={() => setSelectedBillArrival('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
@@ -2111,524 +2419,24 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 onMouseMove={handleMouseMove}
                                 onMouseUp={handleMouseUp}
                                 onMouseLeave={handleMouseUp}>
-                                <table className="table-fixed w-full min-w-[1920px] border-collapse">
-                                    <thead className="sticky top-0 z-10 bg-white ">
-                                        <tr className="bg-[#FAF6ED] h-[40px] text-[16px] font-bold text-center">
-                                            <th className="pl-[12px] w-[168px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('timestamp')}>
-                                                Timestamp {sortField === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="w-[120px] pr-[1px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('date')}>
-                                                Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[298px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('siteName')}>
-                                                Project Name {sortField === 'siteName' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('vendor')}>
-                                                Vendor Name {sortField === 'vendor' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('contractor')}>
-                                                Contractor Name {sortField === 'contractor' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('staff')}>
-                                                Staff Name {sortField === 'staff' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[78px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('quantity')}>
-                                                Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('amount')}>
-                                                Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[9px] pr-[1px] w-[198px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('comments')}>
-                                                Description {sortField === 'comments' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('category')}>
-                                                Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('machineTools')}>
-                                                Machine Tools {sortField === 'machineTools' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('accountType')}>
-                                                A/C Type {sortField === 'accountType' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('paymentMode')}>
-                                                Mode {sortField === 'paymentMode' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('source')}>
-                                                Source From {sortField === 'source' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('branch')}>
-                                                Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('enteredBy')}>
-                                                Entered By {sortField === 'enteredBy' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('eno')}>
-                                                Entry No {sortField === 'eno' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right cursor-pointer hover:bg-gray-200 select-none" onClick={() => handleSort('billArrivalDate')}>
-                                                Bill Arrival {sortField === 'billArrivalDate' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="pl-[9px] pr-[1px] w-[70px] font-bold text-center">Activity</th>
-                                            <th className="pl-[6px] pr-[12px] w-[70px] font-bold text-center">File</th>
-                                        </tr>
-                                        {showFilters && (
-                                            <tr ref={filterRowRef} className="bg-[#eeeeee] h-[44px]">
-                                                <th className="">
-                                                    <div className="relative pl-[10px] [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowDateRangePicker(true)}
-                                                            className="w-[158px] box-border h-[36px] pl-[12px] pr-[3px] py-0 text-sm font-normal bg-white text-left flex items-center justify-between"
-                                                        >
-                                                            <span className={`text-[14px] font-medium truncate flex-1 text-left ${timestampStartDate && timestampEndDate ? 'text-black font-normal' : 'text-[#A6A5A6] font-normal'}`}>
-                                                                {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Timestamp'}
-                                                            </span>
-                                                            <img src={CalendarIcon} alt="Calendar" className="w-[16px] h-[16px] text-gray-400 flex-shrink-0 mr-[6px] ml-[3px]" />
-                                                        </button>
-                                                        <DateRangePicker
-                                                            isOpen={showDateRangePicker}
-                                                            onClose={() => setShowDateRangePicker(false)}
-                                                            startDate={timestampStartDate}
-                                                            endDate={timestampEndDate}
-                                                            variant="dropdown"
-                                                            onApply={(from, to) => {
-                                                                setTimestampStartDate(from);
-                                                                setTimestampEndDate(to);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </th>
-                                                <th className=" pr-[1px]">
-                                                    <div className="w-[120px]">
-                                                        <CustomDateField
-                                                            value={selectedDate}
-                                                            onChange={setSelectedDate}
-                                                            placeholder="Date"
-                                                            alwaysOpenBelow
-                                                            className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedDate ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
-                                                        />
-                                                    </div>
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[298px]"
-                                                        options={siteOptions}
-                                                        value={selectedSiteName ? (selectedSiteName === BLANK_VALUE ? blankOption : { value: selectedSiteName, label: selectedSiteName }) : null}
-                                                        onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Project Name"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[218px]"
-                                                        options={vendorOptions}
-                                                        value={selectedVendor ? (selectedVendor === BLANK_VALUE ? blankOption : { value: selectedVendor, label: selectedVendor }) : null}
-                                                        onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Vendor Name"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[218px]"
-                                                        options={contractorOptions}
-                                                        value={selectedContractor ? (selectedContractor === BLANK_VALUE ? blankOption : { value: selectedContractor, label: selectedContractor }) : null}
-                                                        onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Contractor Name"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[218px]"
-                                                        options={staffOptions}
-                                                        value={selectedStaff ? (selectedStaff === BLANK_VALUE ? blankOption : { value: selectedStaff, label: selectedStaff }) : null}
-                                                        onChange={(selectedOption) => setSelectedStaff(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Staff Name"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <input
-                                                        type="text"
-                                                        value={selectedQuantity}
-                                                        onChange={(e) => setSelectedQuantity(e.target.value)}
-                                                        placeholder="Quantity"
-                                                        className="w-[78px] h-[36px] box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white px-2 text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]"
-                                                    />
-                                                </th>
-                                                <th className="text-[14px] w-[120px] text-right font-bold ">
-                                                    ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </th>
-                                                <th className="pl-[9px] pr-[1px]">
-                                                    <input
-                                                        type="text"
-                                                        value={selectedDescription}
-                                                        onChange={(e) => setSelectedDescription(e.target.value)}
-                                                        placeholder="Description"
-                                                        className="w-[190px] h-[36px] box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white px-3 text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]"
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[158px]"
-                                                        options={categoryOptions}
-                                                        value={selectedCategory ? (selectedCategory === BLANK_VALUE ? blankOption : { value: selectedCategory, label: selectedCategory }) : null}
-                                                        onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Category"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[158px]"
-                                                        options={machineToolsOptions}
-                                                        value={selectedMachineTools ? machineToolsOptions.find(opt => opt.value === String(selectedMachineTools)) : null}
-                                                        onChange={(selectedOption) => setSelectedMachineTools(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Machine Tools"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[158px]"
-                                                        options={accountTypeOptions}
-                                                        value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
-                                                        onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="A/C Type"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]"></th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[158px]"
-                                                        options={sourceOptions}
-                                                        value={selectedSource ? (selectedSource === BLANK_VALUE ? blankOption : { value: selectedSource, label: selectedSource }) : null}
-                                                        onChange={(selectedOption) => setSelectedSource(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Source From"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[158px]"
-                                                        options={branchFilterOptions}
-                                                        value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
-                                                        onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Branch"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px]">
-                                                    <Select
-                                                        className="w-[158px]"
-                                                        options={enteredByOptions}
-                                                        value={selectedEnteredBy ? (selectedEnteredBy === BLANK_VALUE ? blankOption : { value: selectedEnteredBy, label: selectedEnteredBy }) : null}
-                                                        onChange={(selectedOption) => setSelectedEnteredBy(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Entered By"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={customStyles}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px] text-right">
-                                                    <Select
-                                                        className="w-[120px]"
-                                                        options={enoOptions.map((eno) => (String(eno) === BLANK_VALUE ? blankOption : { value: String(eno), label: String(eno) }))}
-                                                        value={selectedEno ? (String(selectedEno) === BLANK_VALUE ? blankOption : { value: String(selectedEno), label: String(selectedEno) }) : null}
-                                                        onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
-                                                        placeholder="Entry No"
-                                                        menuPlacement="bottom"
-                                                        noOptionsMessage={() => null}
-                                                        styles={{
-                                                            ...customStyles,
-                                                            control: (provided, state) => ({
-                                                                ...(typeof customStyles.control === 'function' ? customStyles.control(provided, state) : provided),
-                                                                textAlign: 'right',
-                                                            }),
-                                                            valueContainer: (provided) => ({
-                                                                ...(typeof customStyles.valueContainer === 'function' ? customStyles.valueContainer(provided) : provided),
-                                                                justifyContent: 'flex-end',
-                                                                paddingLeft: '2px',
-                                                                paddingRight: '12px',
-                                                            }),
-                                                            singleValue: (provided) => ({
-                                                                ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
-                                                                textAlign: 'right',
-                                                            }),
-                                                            input: (provided) => ({
-                                                                ...(typeof customStyles.input === 'function' ? customStyles.input(provided) : provided),
-                                                                textAlign: 'right',
-                                                            }),
-                                                            placeholder: (provided) => ({
-                                                                ...provided,
-                                                                textAlign: 'right',
-                                                            }),
-                                                            option: (provided, state) => ({
-                                                                ...(typeof customStyles.option === 'function' ? customStyles.option(provided, state) : provided),
-                                                                textAlign: 'right',
-                                                            }),
-                                                        }}
-                                                    />
-                                                </th>
-                                                <th className="pl-[1px] pr-[1px] text-right">
-                                                    <div
-                                                        className="w-[98px]"
-                                                        ref={billArrivalFilterRef}
-                                                        onMouseDown={(e) => {
-                                                            if (!e.target.closest('[aria-label="Open calendar"]')) return;
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            const rect = billArrivalFilterRef.current?.getBoundingClientRect();
-                                                            if (!rect) return;
-                                                            setBillArrivalCalendarPos({ top: rect.bottom, left: rect.right });
-                                                            setShowBillArrivalCalendar(true);
-                                                        }}
-                                                    >
-                                                        <CustomDateField
-                                                            value={selectedBillArrival}
-                                                            onChange={setSelectedBillArrival}
-                                                            placeholder="Bill Arrival"
-                                                            alwaysOpenBelow
-                                                            anchor="right"
-                                                            className={` [&>div:first-child]:!w-[120px] [&>div:first-child]:!h-[36px] [&>div.absolute]:!hidden [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedBillArrival ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
-                                                        />
-                                                    </div>
-                                                </th>
-                                                <th></th>
-                                                <th></th>
-                                            </tr>
-                                        )}
-                                    </thead>
-                                    <tbody>
-                                        {currentItems.map((expense, index) => (
-                                            <tr key={expense.id} className="odd:bg-white even:bg-[#FAF6ED] text-[14px] font-semibold h-[40px]">
-                                                <td className="pl-[12px] w-[168px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-timestamp`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-timestamp`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={formatDate(expense.timestamp)}
-                                                    >
-                                                        {formatDate(expense.timestamp)}
-                                                    </span>
-                                                </td>
-                                                <td className="w-[120px] pr-[1px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-date`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-date`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={formatDateOnly(expense.date)}
-                                                    >
-                                                        {formatDateOnly(expense.date)}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[298px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-site`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-site`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={getDisplaySiteName(expense)}
-                                                    >
-                                                        {getDisplaySiteName(expense)}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[218px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-vendor`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-vendor`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={getDisplayVendorName(expense)}
-                                                    >
-                                                        {getDisplayVendorName(expense)}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[218px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-contractor`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-contractor`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={getDisplayContractorName(expense)}
-                                                    >
-                                                        {getDisplayContractorName(expense)}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[218px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-staff`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-staff`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={getDisplayStaffName(expense)}
-                                                    >
-                                                        {getDisplayStaffName(expense)}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[78px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-quantity`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-quantity`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={String(expense.quantity ?? '')}
-                                                    >
-                                                        {expense.quantity}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[98px] text-right">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-amount`)}
-                                                        className={`block w-full cursor-pointer text-right ${expandedCells[`${expense.id ?? index}-amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={`₹${Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                                    >
-                                                        ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </span>
-                                                </td>
-                                                <td className="text-left pl-[9px] pr-[1px] w-[198px] px-1">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-comments`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-comments`]
-                                                            ? 'whitespace-normal break-words'
-                                                            : 'truncate whitespace-nowrap overflow-hidden'
-                                                            }`}
-                                                        title={expense.comments || ''}
-                                                    >
-                                                        {expense.comments || ''}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-category`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-category`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={expense.category || ''}
-                                                    >
-                                                        {expense.category}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-machineTools`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-machineTools`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={getMachineToolsItemIdDisplay(expense.machineTools) || ''}
-                                                    >
-                                                        {getMachineToolsItemIdDisplay(expense.machineTools)}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-accountType`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-accountType`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={expense.accountType || ''}
-                                                    >
-                                                        {expense.accountType}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[120px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-paymentMode`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-paymentMode`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={expense.paymentMode || ''}
-                                                    >
-                                                        {expense.paymentMode || ''}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-source`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-source`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={expense.source || ''}
-                                                    >
-                                                        {expense.source}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-branch`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-branch`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}
-                                                    >
-                                                        {getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[158px] text-left ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-enteredBy`)}
-                                                        className={`block w-full cursor-pointer ${expandedCells[`${expense.id ?? index}-enteredBy`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={expense.enteredBy || 'Sivaprakasm'}
-                                                    >
-                                                        {expense.enteredBy || 'Sivaprakasm'}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[120px] text-right ">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-eno`)}
-                                                        className={`block w-full cursor-pointer text-right ${expandedCells[`${expense.id ?? index}-eno`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={String(expense.eno ?? '')}
-                                                    >
-                                                        {expense.eno}
-                                                    </span>
-                                                </td>
-                                                <td className="pl-[1px] pr-[1px] w-[120px] text-right whitespace-nowrap">
-                                                    <span
-                                                        onClick={() => toggleExpandedCell(`${expense.id ?? index}-billArrival`)}
-                                                        className={`block w-full cursor-pointer text-right ${expandedCells[`${expense.id ?? index}-billArrival`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                                                        title={formatBillArrivalDisplay(expense) || ''}
-                                                    >
-                                                        {formatBillArrivalDisplay(expense)}
-                                                    </span>
-                                                </td>
-                                                <td className=" flex pl-[9px] pr-[1px] w-[70px] justify-between py-2 gap-[8px]">
-                                                    <button onClick={() => handleEditClick(expense)} className="rounded-full transition duration-200">
-                                                        <img
-                                                            src={edit}
-                                                            alt="Edit"
-                                                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                                                        />
-                                                    </button>
-                                                    <button className="">
-                                                        <img
-                                                            src={remove}
-                                                            alt='delete'
-                                                            onClick={() => handleDelete(expense.id, username)}
-                                                            className='  w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200 ' />
-                                                    </button>
-                                                    <button onClick={() => fetchAuditDetails(expense.id)} className="rounded-full transition duration-200" >
-                                                        <img
-                                                            src={history}
-                                                            alt="history"
-                                                            className=" w-4 h-5 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                                                        />
-                                                    </button>
-                                                </td>
-                                                <td className="pl-[6px] pr-[12px] w-[70px] text-center">
-                                                    {expense.billCopy ? (
-                                                        <a
-                                                            href={expense.billCopy}
-                                                            className="text-red-500 underline "
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                        >
-                                                            View
-                                                        </a>
-                                                    ) : (
-                                                        <span></span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                <TableProvider value={{
+                                    currentItems, showFilters, filterRowRef, totalAmount, sortField, sortDirection, handleSort,
+                                    timestampStartDate, setTimestampStartDate, timestampEndDate, setTimestampEndDate,
+                                    showDateRangePicker, setShowDateRangePicker, selectedDate, setSelectedDate,
+                                    siteOptions, selectedSiteName, setSelectedSiteName, vendorOptions, selectedVendor, setSelectedVendor,
+                                    contractorOptions, selectedContractor, setSelectedContractor, staffOptions, selectedStaff, setSelectedStaff,
+                                    selectedQuantity, setSelectedQuantity, selectedDescription, setSelectedDescription,
+                                    categoryOptions, selectedCategory, setSelectedCategory, accountTypeOptions, selectedAccountType, setSelectedAccountType,
+                                    machineToolsOptions, selectedMachineTools, setSelectedMachineTools, paymentModeFilterOptions, selectedPaymentMode, setSelectedPaymentMode,
+                                    sourceOptions, selectedSource, setSelectedSource,
+                                    branchFilterOptions, selectedBranch, setSelectedBranch, enteredByOptions, selectedEnteredBy, setSelectedEnteredBy,
+                                    enoOptions, selectedEno, setSelectedEno, selectedBillArrival, setSelectedBillArrival,
+                                    billArrivalFilterRef, setBillArrivalCalendarPos, setShowBillArrivalCalendar, customStyles,
+                                    formatDate, formatDateOnly, getDisplaySiteName, getDisplayVendorName, getDisplayContractorName, getDisplayStaffName,
+                                    getMachineToolsItemIdDisplay, getBranchName, formatBillArrivalDisplay, handleEditClick, handleDelete, fetchAuditDetails, username,
+                                }}>
+                                    <Table showActivityColumn />
+                                </TableProvider>
                             </div>
                             <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
                                 <div className="flex items-center space-x-2">
@@ -3312,7 +3120,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {(formData.paymentMode === 'GPay'|| formData.paymentMode === 'Gpay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
+                                                {(formData.paymentMode === 'GPay' || formData.paymentMode === 'Gpay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
                                                     <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
                                                         <div className="space-y-4">
                                                             {formData.paymentMode === 'Cheque' && (
@@ -3382,7 +3190,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                         </button>
                                     </div>
                                 </div>
-                            , document.body)}
+                                , document.body)}
                             <AuditModal
                                 show={showModal}
                                 onClose={() => setShowModal(false)}

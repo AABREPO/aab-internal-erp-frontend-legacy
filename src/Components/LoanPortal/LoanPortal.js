@@ -1745,8 +1745,8 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     <body>
       <div>
         <div className='mr-10 ml-10'>
-          <div className=' xl:flex gap-10 max-w-[95vw] text-left'>
-            <div className='bg-white w-full p-4 px-4 py-2 rounded text-left xl:flex  items-center pb-6 gap-[16px]'>
+          <div className='max-w-[95vw] text-left'>
+            <div className='bg-white w-full p-4 px-4 py-2 rounded text-left xl:flex items-center pb-6 gap-[16px]'>
               <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>From Date</h2>
                 <input
@@ -1787,16 +1787,14 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                   className='w-full rounded-lg focus:outline-none'
                 />
               </div>
-            </div>
-            <div className='flex flex-col xl:flex-row xl:mt-0 mt-4 bg-white w-full xl:max-w-[1100px] h-auto xl:h-[128px] rounded-md p-4 gap-[16px] px-10 '>
-              <div className='space-y-2'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>Today Amount</h2>
                 <input readOnly type='text'
                   value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                   className='bg-[#F2F2F2] rounded-lg p-2 w-full h-[45px] focus:outline-none text-sm'
                 />
               </div>
-              <div className='space-y-2'>
+              <div className='space-y-2 flex-1'>
                 <h2 className='font-semibold text-sm sm:text-base'>Total Outstanding</h2>
                 <input readOnly type='text'
                   value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}

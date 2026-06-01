@@ -1,13 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import aaLogo from "../Images/AALogo.svg";
+import { canDownloadExpensesReport, downloadExpensesReport } from "../../utils/downloadExpensesReport";
 
-const BRANCHES = [
-  { id: "srivilliputtur", name: "Srivilliputtur" },
-  { id: "madurai", name: "Madurai" },
-];
-
-const IconDownload = () => (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
+const IconDownload = () => (  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
     <path d="M12 4v12M6 11l6 6 6-6M5 21h14" />
   </svg>
 );
@@ -118,17 +113,136 @@ export default function OrbitERPHeading({
   onNotifClick,
   displayName = "Admin",
   orgLine = "AA Builders",
+  branchId,
+  brachId,
   /** When true, only the brand row is shown; pair with OrbitBankRegisterStrip for tabs + tools on the row below. */
   hideEndToolbar = false,
   onSignOut,
 }) {
-  const [branchInternal, setBranchInternal] = useState(BRANCHES[0].id);
+  const [branchInternal, setBranchInternal] = useState("");
   const branch = branchProp !== undefined ? branchProp : branchInternal;
   const setBranch = setBranchProp || setBranchInternal;
 
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const normalizedUsername = String(displayName || "").trim().toLowerCase();
+  const canSelectBranch = normalizedUsername === "admin" || normalizedUsername === "mahalingam m";
+
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  };
+  const storedUser = getStoredUser();
+  const parsedBranchId = Number(
+    branchId ??
+      brachId ??
+      storedUser?.branchId ??
+      storedUser?.branch_id ??
+      storedUser?.brachId
+  );
+  const userBranchId = Number.isFinite(parsedBranchId) && parsedBranchId > 0 ? parsedBranchId : "";
+
+  const emitBranchChange = (nextBranchId) => {
+    const branchIdString = nextBranchId ? String(nextBranchId) : "";
+    if (branchIdString) {
+      localStorage.setItem("selectedBranchId", branchIdString);
+      const selectedBranch = branchOptions.find((item) => String(item.id) === branchIdString);
+      if (selectedBranch?.branch) {
+        localStorage.setItem("selectedBranchName", selectedBranch.branch);
+      }
+    }
+    window.dispatchEvent(
+      new CustomEvent("branchSelectionChanged", { detail: { branchId: branchIdString } })
+    );
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBranches = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/branch/getAll", {
+          credentials: "include",
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!isMounted) return;
+        setBranchOptions(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error fetching branch list:", error);
+      }
+    };
+    void fetchBranches();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const savedBranchId = localStorage.getItem("selectedBranchId");
+    const savedBranchIdAsNumber = Number(savedBranchId);
+    const hasValidSavedBranch = Number.isFinite(savedBranchIdAsNumber) && savedBranchIdAsNumber > 0;
+    if (canSelectBranch) {
+      const nextBranchId = hasValidSavedBranch ? String(savedBranchIdAsNumber) : "";
+      setSelectedBranchId(nextBranchId);
+      if (nextBranchId) {
+        localStorage.setItem("selectedBranchId", nextBranchId);
+        window.dispatchEvent(
+          new CustomEvent("branchSelectionChanged", { detail: { branchId: nextBranchId } })
+        );
+      }
+      return;
+    }
+    if (userBranchId !== "") {
+      const fixedBranchId = String(userBranchId);
+      setSelectedBranchId(fixedBranchId);
+      localStorage.setItem("selectedBranchId", fixedBranchId);
+      window.dispatchEvent(
+        new CustomEvent("branchSelectionChanged", { detail: { branchId: fixedBranchId } })
+      );
+    }
+  }, [canSelectBranch, userBranchId]);
+
+  useEffect(() => {
+    if (!Array.isArray(branchOptions) || branchOptions.length === 0) return;
+    if (canSelectBranch) {
+      if (selectedBranchId) return;
+      const fallbackBranchId = userBranchId || branchOptions[0]?.id;
+      if (fallbackBranchId) {
+        const branchIdString = String(fallbackBranchId);
+        setSelectedBranchId(branchIdString);
+        localStorage.setItem("selectedBranchId", branchIdString);
+        window.dispatchEvent(
+          new CustomEvent("branchSelectionChanged", { detail: { branchId: branchIdString } })
+        );
+      }
+      return;
+    }
+    if (userBranchId !== "") {
+      const fixedBranchId = String(userBranchId);
+      if (selectedBranchId !== fixedBranchId) {
+        setSelectedBranchId(fixedBranchId);
+        localStorage.setItem("selectedBranchId", fixedBranchId);
+        window.dispatchEvent(
+          new CustomEvent("branchSelectionChanged", { detail: { branchId: fixedBranchId } })
+        );
+      }
+    }
+  }, [branchOptions, canSelectBranch, selectedBranchId, userBranchId]);
+
+  const handleBranchChange = (event) => {
+    const nextBranchId = event.target.value;
+    setSelectedBranchId(nextBranchId);
+    setBranch(nextBranchId);
+    emitBranchChange(nextBranchId);
+  };
+
+  const [notifOpen, setNotifOpen] = useState(false);  const [isDownloading, setIsDownloading] = useState(false);
   const [notificationsInternal] = useState([]);
   const notifications = notificationsProp !== undefined ? notificationsProp : notificationsInternal;
+  const canDownloadExpenses = canDownloadExpensesReport(displayName);
 
   const popRef = useRef();
 
@@ -153,6 +267,19 @@ export default function OrbitERPHeading({
     if (onNotifClick) onNotifClick(n);
   };
 
+  const handleDownloadExpenses = async () => {
+    if (isDownloading || !canDownloadExpenses) return;
+    setIsDownloading(true);
+    try {
+      await downloadExpensesReport();
+    } catch (error) {
+      console.error("Error generating expenses report:", error);
+      alert("Unable to download expenses report. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="orbit-erp-heading-root">
       <style>{ORBIT_TOPBAR_CSS}</style>
@@ -167,16 +294,33 @@ export default function OrbitERPHeading({
         </div>
         {!hideEndToolbar && (
         <div className="flex items-center gap-2 ml-auto">
-          <select value={branch} onChange={(e) => setBranch(e.target.value)} className="branch-select">
-            {BRANCHES.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="icon-btn desktop-only" title="Export">
-            <IconDownload />
-          </button>
+          {canSelectBranch ? (
+            <select
+              value={selectedBranchId}
+              onChange={handleBranchChange}
+              className="branch-select"
+              title="Select Branch"
+            >
+              <option value="">Select Branch</option>
+              {branchOptions.map((item) => (
+                <option key={item.id} value={String(item.id)}>
+                  {item.branch}
+                </option>
+              ))}
+            </select>
+          ) : selectedBranchId ? (
+            <span className="branch-select">{branchOptions.find((b) => String(b.id) === String(selectedBranchId))?.branch || ""}</span>
+          ) : null}          {canDownloadExpenses && (
+            <button
+              type="button"
+              className="icon-btn desktop-only"
+              onClick={handleDownloadExpenses}
+              disabled={isDownloading}
+              title={isDownloading ? "Preparing download..." : "Download expenses and master data"}
+            >
+              <IconDownload />
+            </button>
+          )}
           <div style={{ position: "relative" }} ref={popRef}>
             <button type="button" className="icon-btn gold" onClick={() => setNotifOpen(!notifOpen)} title="Notifications">
               <IconBell />

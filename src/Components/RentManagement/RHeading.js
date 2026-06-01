@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import '../Heading.css';
 import Form from './Form';
 import Table from './Table';
 import Dashboard from './Dashboard';
@@ -10,53 +11,52 @@ import RentDatabase from './RentDatabase';
 import MonthlyReport from './MonthlyReport';
 import Ebno from './Ebno';
 
+const RENT_MODULE_TABS = [
+  'form',
+  'table',
+  'database',
+  'dashboard',
+  'inputdata',
+  'summary',
+  'rentalagreement',
+  'tenant',
+  'monthlyReport',
+  'ebno',
+];
+const RENT_DEFAULT_TAB = 'form';
+
+const getInitialRentTab = (username) => {
+  const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+  const allowedTabs = isAdmin
+    ? RENT_MODULE_TABS
+    : RENT_MODULE_TABS.filter((tab) => tab !== 'database');
+  const savedTab = sessionStorage.getItem('activeTab');
+  if (savedTab && allowedTabs.includes(savedTab)) {
+    return savedTab;
+  }
+  return RENT_DEFAULT_TAB;
+};
+
 const RHeading = ({ username, userRoles = [] }) => {
-  const [activeTab, setActiveTab] = useState(() => {
-    const savedTab = sessionStorage.getItem('activeTab');
-    if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
-      return 'form';
-    }
-    return savedTab || 'form';
-  });
+  const isAdminRent = username === 'Mahalingam M' || username === 'Admin';
+  const [activeTab, setActiveTab] = useState(() => getInitialRentTab(username));
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialRentTab(username)]));
 
   useEffect(() => {
-    if (activeTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+    if (activeTab === 'database' && !isAdminRent) {
       setActiveTab('form');
     } else {
       sessionStorage.setItem('activeTab', activeTab);
     }
-  }, [activeTab, username]);
+  }, [activeTab, isAdminRent]);
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'form':
-        return <Form username={username} userRoles={userRoles} />;
-      case 'table':
-        return <Table username={username} userRoles={userRoles} />;
-      case 'database':
-        return <RentDatabase username={username} userRoles={userRoles} />;
-      case 'dashboard':
-        return <Dashboard username={username} userRoles={userRoles} />;
-      case 'inputdata':
-        return <InputData username={username} userRoles={userRoles} />;
-      case 'summary':
-        return <Summary username={username} userRoles={userRoles} />;
-      case 'rentalagreement':
-        return <RentalAgreement username={username} userRoles={userRoles} />;
-      case 'tenant':
-        return <Tenant username={username} userRoles={userRoles} />;
-      case 'monthlyReport':
-        return <MonthlyReport />;
-      case 'ebno':
-        return <Ebno />;
-      default:
-        return <Form />;
-    }
-  };
+  useEffect(() => {
+    setVisitedTabs((prev) => new Set(prev).add(activeTab));
+  }, [activeTab]);
 
   return (
-    <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-      <div className="topbar-title w-[350px] sm:w-[680px] lg:w-[1470px] overflow-x-auto no-scrollbar py-3">
+    <div className="bg-[#FAF6ED]">
+      <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
         <h2
           className={`link whitespace-nowrap ${activeTab === 'form' ? 'active' : ''}`}
           onClick={() => setActiveTab('form')}
@@ -69,7 +69,7 @@ const RHeading = ({ username, userRoles = [] }) => {
         >
           Table View
         </h2>
-        {(username === 'Mahalingam M' || username === 'Admin') && (
+        {isAdminRent && (
           <h2
             className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
             onClick={() => setActiveTab('database')}
@@ -120,7 +120,58 @@ const RHeading = ({ username, userRoles = [] }) => {
           EB No
         </h2>
       </div>
-      <div className="content">{renderContent()}</div>
+      <div className="content">
+        {visitedTabs.has('form') && (
+          <div className={activeTab === 'form' ? '' : 'hidden'}>
+            <Form username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('table') && (
+          <div className={activeTab === 'table' ? '' : 'hidden'}>
+            <Table username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {isAdminRent && visitedTabs.has('database') && (
+          <div className={activeTab === 'database' ? '' : 'hidden'}>
+            <RentDatabase username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('dashboard') && (
+          <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
+            <Dashboard username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('inputdata') && (
+          <div className={activeTab === 'inputdata' ? '' : 'hidden'}>
+            <InputData username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('summary') && (
+          <div className={activeTab === 'summary' ? '' : 'hidden'}>
+            <Summary username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('rentalagreement') && (
+          <div className={activeTab === 'rentalagreement' ? '' : 'hidden'}>
+            <RentalAgreement username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('tenant') && (
+          <div className={activeTab === 'tenant' ? '' : 'hidden'}>
+            <Tenant username={username} userRoles={userRoles} />
+          </div>
+        )}
+        {visitedTabs.has('monthlyReport') && (
+          <div className={activeTab === 'monthlyReport' ? '' : 'hidden'}>
+            <MonthlyReport />
+          </div>
+        )}
+        {visitedTabs.has('ebno') && (
+          <div className={activeTab === 'ebno' ? '' : 'hidden'}>
+            <Ebno />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -481,17 +481,38 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                     axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
                     axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
                 ]);
-                setExpenses(expensesRes.data);
-                const filteredPayments = paymentsRes.data.filter(
+
+                const selectedYear = parseInt(year, 10);
+                const selectedWeekNum = Number(selectedWeek);
+
+                const filteredExpenses = expensesRes.data.filter((expense) => {
+                    if (!isRowForActiveBranch(expense)) return false;
+                    if (expense.status !== true) return false;
+                    const wn = Number(expense.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                    return getIsoYearFromRowDate(expense) === selectedYear;
+                });
+
+                const filteredPaymentsByYear = paymentsRes.data.filter((payment) => {
+                    if (!isRowForActiveBranch(payment)) return false;
+                    if (payment.status !== true) return false;
+                    const wn = Number(payment.weekly_number);
+                    if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                    return getIsoYearFromRowDate(payment) === selectedYear;
+                });
+
+                const filteredPayments = filteredPaymentsByYear.filter(
                     (payment) => payment.type !== "Handover"
                 );
+
+                setExpenses(filteredExpenses);
                 setPayments(filteredPayments);
             } catch (error) {
                 console.error("Error fetching weekly data:", error);
             }
         };
         fetchWeekData();
-    }, [selectedWeek, withBranchParams]);
+    }, [selectedWeek, year, activeBranchId, withBranchParams, isRowForActiveBranch]);
     useEffect(() => {
         fetchLaboursList();
         fetchSites();
@@ -771,8 +792,10 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const totalRefund = refundPayments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const overAllTotalPayments = (totalPayments + totalRefund);
-    const balance = overAllTotalPayments - expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const balance = (
+        payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
+        expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+    );
     const netAmount = totalAmount - totalRefund;
     const getNameById = (id, options) => {
         if (!id && id !== 0) return "-";
@@ -2411,9 +2434,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     };
     return (
         <body>
-            <h1 className="font-bold text-xl flex justify-end mr-5 -mt-7">
-                Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
-            </h1>
+            <div className="flex justify-end mr-6 -mt-7">
+                <h1 className="font-bold text-xl">
+                    Balance: <span style={{ color: "#E4572E" }} className="inline-block text-right min-w-[120px]">
+                        {balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </h1>
+            </div>
             <div className='mx-auto flex justify-between w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
                 <div className='flex gap-4'>
                     <div className='flex gap-4 mb-4'>

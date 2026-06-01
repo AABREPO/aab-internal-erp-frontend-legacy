@@ -142,6 +142,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
     const [loadingEntryDetails, setLoadingEntryDetails] = useState(false)
     const [existingPaymentDetails, setExistingPaymentDetails] = useState(null)
     const [loadingPaymentDetails, setLoadingPaymentDetails] = useState(false)
+    const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+    const [paymentProcessingMessage, setPaymentProcessingMessage] = useState('')
     const [paymentStatuses, setPaymentStatuses] = useState({})
     const [lastPaymentDates, setLastPaymentDates] = useState({})
     const [paidTodayBills, setPaidTodayBills] = useState({})
@@ -3315,6 +3317,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         setShowPaymentModal(true)
     }
     const handlePaymentCancel = () => {
+        if (isProcessingPayment) return;
         setShowPaymentModal(false)
         setSelectedPaymentBill(null)
         setPaymentEntries([
@@ -3753,6 +3756,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 return
             }
         }
+        setIsProcessingPayment(true)
+        setPaymentProcessingMessage('Saving payment details…')
         try {
             // Filter out empty payment entries (for carry forward only case)
             const validPaymentEntries = paymentEntries.filter(entry =>
@@ -3941,6 +3946,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                         tenant_id: null,
                         tenant_complex_name: null,
                         branch_id: activeBranchId,
+                        entered_by: username,
                     };
                     try {
                         const weeklyPaymentBillResponse = await fetch(
@@ -3983,7 +3989,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                         vendor_payment_tracker_id: selectedPaymentBill.id,
                         send_to_expenses_entry: false,
                         bill_copy_url: billUrl,
-                        branch_id: activeBranchId
+                        branch_id: activeBranchId,
+                        entered_by: username
                     };
                     try {
                         const weeklyExpenseResponse = await fetch(
@@ -4102,7 +4109,6 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 : null;
             const hasCashPayments = validPaymentEntries.some(entry => entry.mode === 'Cash');
             const hasFileUploads = validPaymentEntries.some(entry => entry.attachedFile);
-            setShowPaymentModal(false)
             setPaymentEntries([
                 {
                     id: 1,
@@ -4126,6 +4132,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             setUseCarryForward(false)
             setCarryForwardData([])
             setCarryForwardAmount(0)
+            setPaymentProcessingMessage('Refreshing records…')
             await fetchTrackerData()
             await fetchExpensesData()
             await fetchAllBillEntries()
@@ -4147,9 +4154,12 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 ...prev,
                 [selectedPaymentBill.id]: updatedStatusResult.paidToday
             }));
-            // If payment is fully paid, mark purchase orders as payment complete
-            if (updatedStatus === '✓ Paid') {
+            // If payment is fully settled (including overpay handled as carry-forward/excess),
+            // mark purchase orders as payment complete.
+            // Use `newRemainingAmount === 0` (local calc) instead of relying on exact status string.
+            if (newRemainingAmount === 0) {
                 try {
+                    setPaymentProcessingMessage('Updating purchase order payment status…')
                     // Fetch updated tracker data to get latest bill verifications
                     const trackerResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-payments/tracker/${selectedPaymentBill.id}`, {
                         method: 'GET',
@@ -4158,31 +4168,48 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                             'Content-Type': 'application/json',
                         }
                     });
-                    if (trackerResponse.ok) {
+                        if (trackerResponse.ok) {
                         const updatedTracker = await trackerResponse.json();
                         const vendorId = updatedTracker.vendor_id || updatedTracker.vendorId || selectedPaymentBill.vendor_id || selectedPaymentBill.vendorId;
-                        if (vendorId && updatedTracker.billVerifications && updatedTracker.billVerifications.length > 0) {
-                            // Get all verified PO numbers (ENOs) - exclude NO_PO entries
-                            // Each PO number will be sent individually to the API
-                            const verifiedPONumbers = updatedTracker.billVerifications
-                                .filter(verification => {
-                                    // Only include verified bills
-                                    const isVerified = verification.is_verified === true || verification.status === 'VERIFIED';
-                                    // Exclude NO_PO entries
-                                    const billNumber = verification.bill_number || verification.billNumber || '';
-                                    const isNotNoPO = billNumber !== 'NO_PO' && billNumber.trim() !== '';
-                                    // Must have a valid PO number
-                                    const hasValidPO = billNumber && billNumber.trim() !== '';
-                                    return isVerified && isNotNoPO && hasValidPO;
-                                })
-                                .map(verification => {
-                                    const poNumber = verification.bill_number || verification.billNumber || '';
-                                    return poNumber.trim();
-                                })
-                                .filter(poNumber => poNumber !== '');
-                            // Call complete payment API for each PO number individually
-                            // Each API call sends vendorId and one PO number (eno)
-                            const completePaymentPromises = verifiedPONumbers.map(async (poNumber) => {
+                            if (vendorId && updatedTracker.billVerifications && updatedTracker.billVerifications.length > 0) {
+                                const billVerifications = Array.isArray(updatedTracker.billVerifications)
+                                    ? updatedTracker.billVerifications
+                                    : [];
+
+                                const toUpper = (v) => String(v || '').toUpperCase();
+                                const getPONumber = (verification) => {
+                                    const raw = verification?.bill_number ?? verification?.billNumber ?? verification?.eno ?? '';
+                                    const s = String(raw || '').trim();
+                                    return s;
+                                };
+
+                                const validPONumbers = billVerifications
+                                    .map(getPONumber)
+                                    .filter((poNumber) => poNumber && poNumber !== 'NO_PO');
+
+                                const verifiedPONumbers = billVerifications
+                                    .filter((verification) => {
+                                        const isVerifiedByFlag = verification?.is_verified === true || verification?.is_verified === 'true';
+                                        const statusUpper = toUpper(verification?.status);
+                                        const isVerifiedByStatus = statusUpper.includes('VERIFIED');
+                                        const poNumber = getPONumber(verification);
+                                        const isNotNoPO = poNumber && poNumber !== 'NO_PO';
+                                        return (isVerifiedByFlag || isVerifiedByStatus) && isNotNoPO;
+                                    })
+                                    .map(getPONumber)
+                                    .filter((poNumber) => poNumber && poNumber !== 'NO_PO');
+
+                                // If verification status filtering fails (different backend formats),
+                                // still complete using all valid PO numbers we can extract.
+                                const poNumbersToComplete = verifiedPONumbers.length > 0 ? verifiedPONumbers : validPONumbers;
+
+                                if (poNumbersToComplete.length === 0) {
+                                    console.warn(`No valid PO numbers found to mark complete for vendorId=${vendorId}`);
+                                    return;
+                                }
+                                // Call complete payment API for each PO number individually
+                                // Each API call sends vendorId and one PO number (eno)
+                                const completePaymentPromises = poNumbersToComplete.map(async (poNumber) => {
                                 try {
                                     const completeResponse = await fetch(
                                         `https://backendaab.in/demoAabuildersDash/api/purchase_orders/payment/complete?vendorId=${vendorId}&eno=${encodeURIComponent(poNumber)}`,
@@ -4205,7 +4232,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                     return { success: false, poNumber, error: error.message };
                                 }
                             });
-                            const results = await Promise.all(completePaymentPromises);
+                                const results = await Promise.all(completePaymentPromises);
                             const successful = results.filter(r => r.success);
                             const failed = results.filter(r => !r.success);
                             if (failed.length > 0) {
@@ -4214,9 +4241,9 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                     console.warn(`  - PO Number ${f.poNumber}: ${f.error}`);
                                 });
                             }
-                            if (successful.length > 0) {
-                                console.log(`Successfully marked ${successful.length} purchase order(s) as payment complete for vendorId=${vendorId}`);
-                            }
+                                if (successful.length > 0) {
+                                    console.log(`Successfully marked ${successful.length} purchase order(s) as payment complete for vendorId=${vendorId}`);
+                                }
                         }
                     }
                 } catch (error) {
@@ -4233,9 +4260,14 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             }
             message += '!';
             alert(message);
+            setPaymentProcessingMessage('')
+            setIsProcessingPayment(false)
+            setShowPaymentModal(false)
         } catch (error) {
             console.error('Error saving payment details:', error)
             alert(`Error saving payment details: ${error.message}`)
+            setPaymentProcessingMessage('')
+            setIsProcessingPayment(false)
         }
     }
     const handleAddField = () => {
@@ -5766,18 +5798,37 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             ) : null}
             {showPaymentModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg w-[1100px] h-[780px] overflow-auto shadow-lg flex flex-col">
+                    <div className="relative bg-white rounded-lg w-[1100px] h-[780px] overflow-hidden shadow-lg flex flex-col">
+                        {isProcessingPayment && (
+                            <div
+                                className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90 backdrop-blur-[2px]"
+                                role="status"
+                                aria-live="polite"
+                                aria-busy="true"
+                            >
+                                <div className="w-12 h-12 border-4 border-[#BF9853] border-t-transparent rounded-full animate-spin mb-4" />
+                                <p className="text-lg font-semibold text-[#BF9853]">Work in progress</p>
+                                <p className="mt-2 text-sm text-gray-600 text-center max-w-md px-6">
+                                    {paymentProcessingMessage || 'Please wait while we complete your payment.'}
+                                </p>
+                                <p className="mt-3 text-xs text-gray-500 text-center max-w-md px-6">
+                                    Do not close this window or refresh the page.
+                                </p>
+                            </div>
+                        )}
                         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-semibold text-center flex-1">Entry Payment Details</h3>
-                                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
+                                <button
+                                    disabled={isProcessingPayment}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
                                     onClick={handlePaymentCancel}
                                 >
                                     ×
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-hidden">
+                        <div className={`flex-1 overflow-hidden ${isProcessingPayment ? 'pointer-events-none select-none opacity-60' : ''}`}>
                             <div className="flex gap-10 h-full">
                                 <div className="flex-1 flex flex-col">
                                     {loadingPaymentDetails && (
@@ -6052,13 +6103,22 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                         </div>
                                     )}
                                     <div className="flex justify-end gap-3 bg-white mb-2">
-                                        <button className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium" onClick={handlePaymentCancel}>
+                                        <button
+                                            disabled={isProcessingPayment}
+                                            className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium"
+                                            onClick={handlePaymentCancel}
+                                        >
                                             Cancel
                                         </button>
                                         <button className={`px-4 py-2 rounded-lg font-medium ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'text-white bg-[#BF9853]'}`}
-                                            onClick={handlePaymentSubmit} disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                            onClick={handlePaymentSubmit}
+                                            disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || isProcessingPayment}
                                         >
-                                            {paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'Fully Paid' : 'Submit'}
+                                            {isProcessingPayment
+                                                ? 'Processing…'
+                                                : paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
+                                                    ? 'Fully Paid'
+                                                    : 'Submit'}
                                         </button>
                                     </div>
                                 </div>

@@ -16,7 +16,7 @@ import {
     setYear,
 } from 'date-fns';
 
-const DateRangePicker = ({ isOpen, onClose, startDate, endDate, onApply, variant = "modal" }) => {
+const DateRangePicker = ({ isOpen, onClose, startDate, endDate, onApply, variant = "modal", controlHeightPx }) => {
     const [viewDate, setViewDate] = useState(() => startDate ? parseISO(startDate) : new Date());
     const [tempFrom, setTempFrom] = useState(startDate ? parseISO(startDate) : null);
     const [tempTo, setTempTo] = useState(endDate ? parseISO(endDate) : null);
@@ -124,7 +124,11 @@ const DateRangePicker = ({ isOpen, onClose, startDate, endDate, onApply, variant
     const Wrapper = ({ children }) => {
         if (variant === "dropdown") {
             return (
-                <div className="absolute left-0 top-full mt-2 z-[9999]" ref={containerRef}>
+                <div
+                    className={`absolute left-0 z-[9999] ${controlHeightPx ? '' : 'top-full mt-2'}`}
+                    style={controlHeightPx ? { top: `${controlHeightPx + 8}px` } : undefined}
+                    ref={containerRef}
+                >
                     {children}
                 </div>
             );

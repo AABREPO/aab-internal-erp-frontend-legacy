@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Select from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
 
 const BANK_REGISTER_6_FONT = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600;700&display=swap';
@@ -43,6 +44,17 @@ const parseDDMMYYYY = (s) => {
   const [d,m,y] = s.split("/");
   return new Date(+y, +m-1, +d);
 };
+const ledgerDateValue = (s) => {
+  const parsed = parseDDMMYYYY(s);
+  return parsed ? parsed.getTime() : 0;
+};
+const compareLedgerRowIdDesc = (a, b) => (Number(b.id) || 0) - (Number(a.id) || 0);
+const sortLedgerRowsDefault = (rows) =>
+  [...rows].sort((a, b) => {
+    const dateDiff = ledgerDateValue(b.date) - ledgerDateValue(a.date);
+    if (dateDiff !== 0) return dateDiff;
+    return compareLedgerRowIdDesc(a, b);
+  });
 const toISO = (date) => date.toISOString().slice(0,10);
 const fromISO = (iso) => {
   if(!iso) return "";
@@ -60,6 +72,179 @@ const fmtRangeShort = (fromIso, toIso) => {
   return `${f(fromIso)} → ${f(toIso)}`;
 };
 
+const getThisMonthDateRange = () => {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  return { from: toISO(monthStart), to: toISO(today) };
+};
+
+const LEGACY_BRANCH_SLUG_TO_ID = {
+  srivilliputtur: 1,
+  madurai: 2,
+};
+
+const BRANCH_ID_TO_SLUG = {
+  1: "srivilliputtur",
+  2: "madurai",
+};
+
+const BRANCH_DEFAULT_BANK_ACCOUNT = {
+  1: { bankName: "Karur Vysya Bank", accountNumber: "1804155000040012" },
+  2: { bankName: "Tamilnadu Mercantile Bank", accountNumber: "003100650307642" },
+};
+
+const getAccountValue = (account) => (
+  typeof account === "string" ? account : (account?.value || "")
+);
+
+const resolveDefaultBankSelection = (banks, branchId) => {
+  if (!Array.isArray(banks) || banks.length === 0) {
+    return { bank: "", account: "" };
+  }
+
+  const defaults = BRANCH_DEFAULT_BANK_ACCOUNT[Number(branchId)];
+  if (defaults) {
+    const bankEntry = banks.find((entry) => entry.name === defaults.bankName);
+    if (bankEntry) {
+      const matchedAccount = (bankEntry.accounts || []).find((entry) => {
+        const value = getAccountValue(entry);
+        return value === defaults.accountNumber
+          || String(value).startsWith(defaults.accountNumber);
+      });
+      if (matchedAccount) {
+        return {
+          bank: defaults.bankName,
+          account: getAccountValue(matchedAccount),
+        };
+      }
+      const firstAccount = bankEntry.accounts?.[0];
+      return {
+        bank: defaults.bankName,
+        account: getAccountValue(firstAccount),
+      };
+    }
+  }
+
+  const firstBank = banks[0];
+  return {
+    bank: firstBank?.name || "",
+    account: getAccountValue(firstBank?.accounts?.[0]),
+  };
+};
+
+const normalizeBranchId = (value) => {
+  if (value == null || value === "") return null;
+  const asString = String(value).trim().toLowerCase();
+  if (LEGACY_BRANCH_SLUG_TO_ID[asString] != null) {
+    return LEGACY_BRANCH_SLUG_TO_ID[asString];
+  }
+  const resolved = Number(value);
+  return Number.isFinite(resolved) && resolved > 0 ? resolved : null;
+};
+
+const resolveActiveBranchId = () => {
+  try {
+    const selectedBranchId = localStorage.getItem("selectedBranchId");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId;
+    const fromSelected = normalizeBranchId(selectedBranchId);
+    if (fromSelected != null) return fromSelected;
+    return normalizeBranchId(fallbackBranchId);
+  } catch {
+    return null;
+  }
+};
+
+const getEnteredByUsername = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    return String(user?.name || user?.username || user?.userName || "").trim();
+  } catch {
+    return "";
+  }
+};
+
+const getUserBranchId = () => normalizeBranchId(
+  (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return user?.branchId ?? user?.branch_id ?? user?.brachId;
+    } catch {
+      return null;
+    }
+  })()
+);
+
+const canUserSelectBranch = (username) => {
+  const normalized = String(username || "").trim().toLowerCase();
+  return normalized === "admin" || normalized === "mahalingam m";
+};
+
+const resolveBranchIdForSave = (activeBranchId) => {
+  const username = getEnteredByUsername();
+  if (canUserSelectBranch(username)) {
+    return activeBranchId ?? resolveActiveBranchId();
+  }
+  return getUserBranchId();
+};
+
+const buildBranchUrl = (baseUrl, branchId) => {
+  const url = new URL(baseUrl);
+  if (branchId !== null && branchId !== undefined && branchId !== "") {
+    url.searchParams.set("branchId", String(branchId));
+  }
+  return url.toString();
+};
+
+const isChequePaymentMode = (mode) => String(mode || "").trim().toLowerCase() === "cheque";
+
+const isBankRegisterManualExpenseRecord = (item) =>
+  String(item?.payment_status || item?.paymentStatus || "").trim().toLowerCase() === "expense";
+
+const isBankRegisterManualIncomeRecord = (item) =>
+  String(item?.payment_status || item?.paymentStatus || "").trim().toLowerCase() === "incoming";
+
+const pickExistingBillField = (existing, snakeKey, camelKey, fallback = null) =>
+  existing?.[snakeKey] ?? existing?.[camelKey] ?? fallback;
+
+const updateWeeklyPaymentBill = async (id, payload) => {
+  const response = await fetch(
+    `https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/update/${id}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(errText || "Failed to update record");
+  }
+  return response.json();
+};
+
+const deleteWeeklyPaymentBill = async (id) => {
+  const response = await fetch(
+    `https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/delete/${id}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    }
+  );
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(errText || "Failed to delete record");
+  }
+};
+
+const resolveIncomingProjectId = (branchId) => {
+  const id = Number(branchId);
+  if (id === 1) return 1049;
+  if (id === 2) return 1331;
+  return null;
+};
+
 const BRANCHES = [
   {id:"srivilliputtur", name:"Srivilliputtur"},
   {id:"madurai", name:"Madurai"},
@@ -72,6 +257,28 @@ const BANKS = [
   {name:"Kotak Mahindra", branch:"Madurai", accounts:["7411455125512 — Current"]},
 ];
 const MODES = ["G-Pay","PhonePe","Paytm","Net Banking","Cheque","Cash","RTGS","NEFT"];
+const DEFAULT_PAYMENT_MODE_OPTIONS = [
+  { modeOfPayment: "Cash" },
+  { modeOfPayment: "GPay" },
+  { modeOfPayment: "PhonePe" },
+  { modeOfPayment: "Net Banking" },
+  { modeOfPayment: "Cheque" },
+];
+
+const EXPENSE_PURPOSE_OPTIONS = [
+  "Cash Withdrawal",
+  "Refund",
+  "ATM Charges",
+  "Miscellaneous",
+].map((label) => ({ value: label, label }));
+
+const buildSelectablePaymentModeOptions = (paymentModeOptions = []) => {
+  const allModes = paymentModeOptions.length > 0 ? paymentModeOptions : DEFAULT_PAYMENT_MODE_OPTIONS;
+  return allModes
+    .map((mode) => mode?.modeOfPayment)
+    .filter(Boolean)
+    .filter((mode) => String(mode).trim().toLowerCase() !== "advance adjustment");
+};
 const PARTY_TYPES = ["Tenant","Contractor","Vendor","Employee","Other"];
 const PARTIES = [
   "Welding Perumal","Sivan Centring","Karuppiah Centering","Mani Centring","Lingam Centring",
@@ -219,6 +426,19 @@ const PartyChip = ({type}) => {
   const cls = type==="Tenant"?"chip-tenant":type==="Contractor"?"chip-contractor":type==="Vendor"?"chip-vendor":"chip-other";
   return <span className={`chip ${cls}`}>{type}</span>;
 };
+
+const mapIncomeLedgerRow = (r) => ({
+  ...r,
+  _source: "income",
+  _entry: "credit",
+  project: r.project && r.project !== "-" ? r.project : "—",
+  party: r.receivedFrom && String(r.receivedFrom).trim() ? r.receivedFrom : "—",
+  partyType: r.description && String(r.description).trim() ? r.description : "—",
+  type: r.description && String(r.description).trim() ? r.description : "Bank credit",
+  mode: r.mode && String(r.mode).trim() ? r.mode : "—",
+  chequeNo: "-",
+  chequeDate: "-",
+});
 
 // ---------- Date Range Picker (modal) ----------
 const DateRangeModal = ({open, value, onClose, onApply}) => {
@@ -521,18 +741,7 @@ const MergedBankLedger = ({
         _entry: creditSide ? "credit" : "debit",
       };
     });
-    const cr = incomeRows.map((r) => ({
-      ...r,
-      _source: "income",
-      _entry: "credit",
-      project: "—",
-      party: r.receivedFrom && String(r.receivedFrom).trim() ? r.receivedFrom : "—",
-      partyType: "—",
-      type: r.description && String(r.description).trim() ? r.description : "Bank credit",
-      mode: r.mode && String(r.mode).trim() ? r.mode : "—",
-      chequeNo: "-",
-      chequeDate: "-",
-    }));
+    const cr = incomeRows.map(mapIncomeLedgerRow);
     return [...deb, ...cr];
   }, [expenseRows, incomeRows]);
 
@@ -559,17 +768,14 @@ const MergedBankLedger = ({
         return String(blob).toLowerCase().includes(q);
       });
     }
-    const dateVal = (s) => {
-      if (!s || s === "-") return 0;
-      const [d, m, y] = String(s).split("/");
-      return new Date(+y, +m - 1, +d).getTime();
-    };
+    const dateVal = ledgerDateValue;
     const get = (r) => {
       if (sortBy === "date" || sortBy === "chequeDate") return dateVal(r[sortBy]);
       if (sortBy === "amount") return r.amount;
       if (sortBy === "matched") return r.matched ? 1 : 0;
       if (sortBy === "chequeNo") return (r.chequeNo === "-" ? "" : r.chequeNo);
       if (sortBy === "_entry") return r._entry === "debit" ? 0 : 1;
+      if (sortBy === "id") return Number(r.id) || 0;
       const v = r[sortBy];
       return typeof v === "string" ? v.toLowerCase() : v;
     };
@@ -579,7 +785,7 @@ const MergedBankLedger = ({
       const vb = get(b);
       if (va < vb) return sortDir === "asc" ? -1 : 1;
       if (va > vb) return sortDir === "asc" ? 1 : -1;
-      return 0;
+      return compareLedgerRowIdDesc(a, b);
     });
     return copy;
   }, [byKind, ledgerSearch, sortBy, sortDir]);
@@ -878,24 +1084,28 @@ const MergedBankLedger = ({
                   </td>
                   <td>
                     <div className="act-cell">
-                      {r._source === "expense" ? (
-                        <>
-                          <button onClick={() => onEditExp(r)} title="Edit">
-                            <I.Edit />
-                          </button>
-                          <button onClick={() => onDeleteExp(r)} title="Delete">
-                            <I.Trash />
-                          </button>
-                        </>
+                      {r.canEdit ? (
+                        r._source === "expense" ? (
+                          <>
+                            <button onClick={() => onEditExp(r)} title="Edit">
+                              <I.Edit />
+                            </button>
+                            <button onClick={() => onDeleteExp(r)} title="Delete">
+                              <I.Trash />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => onEditInc(r)} title="Edit">
+                              <I.Edit />
+                            </button>
+                            <button onClick={() => onDeleteInc(r)} title="Delete">
+                              <I.Trash />
+                            </button>
+                          </>
+                        )
                       ) : (
-                        <>
-                          <button onClick={() => onEditInc(r)} title="Edit">
-                            <I.Edit />
-                          </button>
-                          <button onClick={() => onDeleteInc(r)} title="Delete">
-                            <I.Trash />
-                          </button>
-                        </>
+                        <span className="muted">—</span>
                       )}
                     </div>
                   </td>
@@ -944,25 +1154,27 @@ const MergedBankLedger = ({
                   {r.matched && <span className="chip chip-matched">Reconciled</span>}
                 </div>
                 <div className="act-cell">
-                  {r._source === "expense" ? (
-                    <>
-                      <button onClick={() => onEditExp(r)}>
-                        <I.Edit />
-                      </button>
-                      <button onClick={() => onDeleteExp(r)}>
-                        <I.Trash />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => onEditInc(r)}>
-                        <I.Edit />
-                      </button>
-                      <button onClick={() => onDeleteInc(r)}>
-                        <I.Trash />
-                      </button>
-                    </>
-                  )}
+                  {r.canEdit ? (
+                    r._source === "expense" ? (
+                      <>
+                        <button onClick={() => onEditExp(r)}>
+                          <I.Edit />
+                        </button>
+                        <button onClick={() => onDeleteExp(r)}>
+                          <I.Trash />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => onEditInc(r)}>
+                          <I.Edit />
+                        </button>
+                        <button onClick={() => onDeleteInc(r)}>
+                          <I.Trash />
+                        </button>
+                      </>
+                    )
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1387,22 +1599,157 @@ const IncomeRegister = ({rows, total, onAdd, onEdit, onDelete, onToggleMatch, on
 };
 
 // ---------- Modals: Expense / Income (kept compact) ----------
-const ExpenseModal = ({open, initial, onClose, onSave, account}) => {
-  const empty = {date:new Date().toLocaleDateString("en-GB"), account, project:PROJECTS[0], party:"", partyType:"Tenant", type:"Rent Payment", amount:"", mode:"G-Pay", chequeNo:"-", chequeDate:"-", matched:false};
-  const [f,setF] = useState(initial||empty);
-  // For party + purpose, we track whether the user wants to type a custom (off-list) value
-  const [partyCustom,setPartyCustom] = useState(false);
-  const [purposeCustom,setPurposeCustom] = useState(false);
-  useEffect(()=>{
-    const init = initial||{...empty, account};
-    setF(init);
-    setPartyCustom(init.party && !PARTIES.includes(init.party));
-    setPurposeCustom(init.type && !PURPOSES.includes(init.type));
-  }, [initial,open,account]);
-  if(!open) return null;
-  const set = (k,v)=>setF(s=>({...s,[k]:v}));
+const EXPENSE_MODAL_SELECT_STYLES = {
+  control: (base) => ({
+    ...base,
+    minHeight: 38,
+    height: "auto",
+    borderRadius: 8,
+    borderColor: "var(--line)",
+    boxShadow: "none",
+    backgroundColor: "#fff",
+    textAlign: "left",
+    fontWeight: 400,
+  }),
+  valueContainer: (base) => ({ ...base, padding: "2px 0 2px 8px", flexWrap: "nowrap" }),
+  input: (base) => ({ ...base, margin: 0, padding: 0, fontWeight: 400, fontSize: 14 }),
+  indicatorsContainer: (base) => ({ ...base, height: 38, padding: 0 }),
+  dropdownIndicator: (base) => ({ ...base, padding: "0 8px" }),
+  indicatorSeparator: () => ({ display: "none" }),
+  clearIndicator: (base) => ({ ...base, padding: 0 }),
+  menu: (base) => ({ ...base, zIndex: 80 }),
+  menuPortal: (base) => ({ ...base, zIndex: 80 }),
+  option: (base) => ({ ...base, fontSize: 14, textAlign: "left" }),
+  placeholder: (base) => ({ ...base, fontSize: 14, fontWeight: 400, color: "var(--muted)" }),
+  singleValue: (base) => ({
+    ...base,
+    fontSize: 14,
+    fontWeight: 400,
+    color: "var(--ink)",
+    textAlign: "left",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  }),
+  menuList: (base) => ({
+    ...base,
+    textAlign: "left",
+    maxHeight: 220,
+  }),
+};
 
-  const save = () => { if(!f.party || !f.amount) return; onSave({...f, amount:Number(f.amount), id: f.id || Date.now()}); };
+const toModalSelectOptions = (items) =>
+  (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const label = typeof item === "string" ? item : item?.label;
+      if (!label || label === "-") return null;
+      return { value: label, label };
+    })
+    .filter(Boolean);
+
+const getModalSelected = (value) => (value ? { value, label: value } : null);
+
+const sameRecordId = (a, b) => {
+  const na = Number(a);
+  const nb = Number(b);
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
+  return String(a ?? "") === String(b ?? "");
+};
+
+const resolveProjectNameFromOptions = (projectId, siteOptions = []) => {
+  if (projectId == null || projectId === "") return "-";
+  const byId = siteOptions.find((option) => sameRecordId(option.id, projectId));
+  if (byId?.label && byId.label !== "-") return byId.label;
+  const bySiteNo = siteOptions.find(
+    (option) =>
+      sameRecordId(option.sNo, projectId) ||
+      sameRecordId(option.siteNo, projectId)
+  );
+  if (bySiteNo?.label && bySiteNo.label !== "-") return bySiteNo.label;
+  return "-";
+};
+
+const buildReceivedFromOptions = ({
+  projectOptions = [],
+  vendorOptions = [],
+  contractorOptions = [],
+  employeeOptions = [],
+} = {}) => {
+  const seen = new Set();
+  const options = [];
+  const addLabel = (label) => {
+    const trimmed = String(label || "").trim();
+    if (!trimmed || trimmed === "-" || seen.has(trimmed.toLowerCase())) return;
+    seen.add(trimmed.toLowerCase());
+    options.push({ value: trimmed, label: trimmed });
+  };
+
+  projectOptions.forEach((item) => addLabel(item?.label || item?.value));
+  vendorOptions.forEach((item) => addLabel(item?.label));
+  contractorOptions.forEach((item) => addLabel(item?.label));
+  employeeOptions.forEach((item) => addLabel(item?.label));
+
+  return options.sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base" }));
+};
+
+const ExpenseModal = ({
+  open,
+  initial,
+  onClose,
+  onSave,
+  account,
+  projectOptions = [],
+  vendorOptions = [],
+  paymentModeOptions = [],
+  isSaving = false,
+}) => {
+  const [f, setF] = useState(null);
+
+  const projectSelectOptions = useMemo(() => toModalSelectOptions(projectOptions), [projectOptions]);
+  const vendorSelectOptions = useMemo(() => toModalSelectOptions(vendorOptions), [vendorOptions]);
+  const selectablePaymentModeOptions = useMemo(
+    () => buildSelectablePaymentModeOptions(paymentModeOptions),
+    [paymentModeOptions]
+  );
+  const paymentModeSelectOptions = useMemo(
+    () => selectablePaymentModeOptions.map((mode) => ({ value: mode, label: mode })),
+    [selectablePaymentModeOptions]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const baseEmpty = {
+      date: new Date().toLocaleDateString("en-GB"),
+      account,
+      project: "",
+      party: "",
+      partyType: "",
+      type: "",
+      amount: "",
+      mode: "",
+      chequeNo: "-",
+      chequeDate: "-",
+      matched: false,
+    };
+    const init = initial ? { ...baseEmpty, ...initial, account } : baseEmpty;
+    const vendorNames = vendorSelectOptions.map((v) => v.value);
+    if (init.party && vendorNames.includes(init.party)) {
+      init.partyType = "Vendor";
+    }
+    if (!selectablePaymentModeOptions.includes(init.mode)) {
+      init.mode = "";
+    }
+    setF(init);
+  }, [initial, open, account, projectSelectOptions, vendorSelectOptions, selectablePaymentModeOptions]);
+
+  if (!open || !f) return null;
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+
+  const save = async () => {
+    if (!f.project || !f.party || !f.type || !f.amount || !f.mode || isSaving) return;
+    if (isChequePaymentMode(f.mode) && (!f.chequeNo || f.chequeNo === "-" || !chequeDateISO)) return;
+    await onSave({ ...f, type: String(f.type || "").trim(), amount: Number(f.amount), id: f.id || Date.now() });
+  };
 
   // Bind ISO date <-> DD/MM/YYYY
   const dateISO = ddmmToISO(f.date);
@@ -1430,48 +1777,79 @@ const ExpenseModal = ({open, initial, onClose, onSave, account}) => {
 
           <div className="col-span-2">
             <div className="label-text mb-1">Project</div>
-            <select className="input" value={f.project} onChange={e=>set("project",e.target.value)}>{PROJECTS.map(p=><option key={p}>{p}</option>)}</select>
+            <Select
+              value={getModalSelected(f.project)}
+              onChange={(opt) => set("project", opt?.value || "")}
+              options={projectSelectOptions}
+              isSearchable
+              placeholder="Select project..."
+              styles={EXPENSE_MODAL_SELECT_STYLES}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+              menuPlacement="auto"
+            />
           </div>
 
           <div className="col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between mb-1">
-              <div className="label-text">Party Name</div>
-              <button type="button" className="text-[11px] font-semibold text-gold-deep hover:underline" onClick={()=>{ setPartyCustom(c=>!c); set("party",""); }}>{partyCustom?"Pick from list":"+ Add new"}</button>
-            </div>
-            {partyCustom ? (
-              <input className="input" value={f.party} onChange={e=>set("party",e.target.value)} placeholder="Enter party name" autoFocus/>
-            ) : (
-              <select className="input" value={f.party} onChange={e=>set("party",e.target.value)}>
-                <option value="">Select party...</option>
-                {PARTIES.map(p=><option key={p}>{p}</option>)}
-              </select>
-            )}
+            <div className="label-text mb-1">Party Name</div>
+            <Select
+              value={getModalSelected(f.party)}
+              onChange={(opt) => {
+                const party = opt?.value || "";
+                setF((s) => ({
+                  ...s,
+                  party,
+                  partyType: party ? "Vendor" : "",
+                }));
+              }}
+              options={vendorSelectOptions}
+              isSearchable
+              placeholder="Select vendor..."
+              styles={EXPENSE_MODAL_SELECT_STYLES}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+              menuPlacement="auto"
+            />
           </div>
           <div className="col-span-2 sm:col-span-1">
             <div className="label-text mb-1">Party Type</div>
-            <select className="input" value={f.partyType} onChange={e=>set("partyType",e.target.value)}>{PARTY_TYPES.map(p=><option key={p}>{p}</option>)}</select>
+            <input
+              className="input bg-[var(--cream-2)]"
+              value={f.partyType}
+              readOnly
+              placeholder="Vendor"
+              tabIndex={-1}
+            />
           </div>
 
           <div className="col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between mb-1">
-              <div className="label-text">Purpose</div>
-              <button type="button" className="text-[11px] font-semibold text-gold-deep hover:underline" onClick={()=>{ setPurposeCustom(c=>!c); set("type",""); }}>{purposeCustom?"Pick from list":"+ Add new"}</button>
-            </div>
-            {purposeCustom ? (
-              <input className="input" value={f.type} onChange={e=>set("type",e.target.value)} placeholder="Enter purpose"/>
-            ) : (
-              <select className="input" value={f.type} onChange={e=>set("type",e.target.value)}>
-                <option value="">Select purpose...</option>
-                {PURPOSES.map(p=><option key={p}>{p}</option>)}
-              </select>
-            )}
+            <div className="label-text mb-1">Purpose</div>
+            <CreatableSelect
+              value={getModalSelected(f.type)}
+              onChange={(opt) => set("type", opt?.value || "")}
+              options={EXPENSE_PURPOSE_OPTIONS}
+              isClearable
+              isSearchable
+              placeholder="Select or enter purpose..."
+              formatCreateLabel={(inputValue) => `Use "${inputValue}"`}
+              styles={EXPENSE_MODAL_SELECT_STYLES}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+              menuPlacement="auto"
+            />
           </div>
           <div className="col-span-2 sm:col-span-1">
             <div className="label-text mb-1">Payment Mode</div>
-            <select className="input" value={f.mode} onChange={e=>set("mode",e.target.value)}>{MODES.map(m=><option key={m}>{m}</option>)}</select>
+            <Select
+              value={getModalSelected(f.mode)}
+              onChange={(opt) => set("mode", opt?.value || "")}
+              options={paymentModeSelectOptions}
+              isSearchable
+              placeholder="Select payment mode..."
+              styles={EXPENSE_MODAL_SELECT_STYLES}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+              menuPlacement="auto"
+            />
           </div>
 
-          {f.mode==="Cheque" && <>
+          {isChequePaymentMode(f.mode) && <>
             <div>
               <div className="label-text mb-1">Cheque No</div>
               <input className="input num-cell" value={f.chequeNo==="-"?"":f.chequeNo} onChange={e=>set("chequeNo",e.target.value||"-")} placeholder="e.g. 545467"/>
@@ -1483,35 +1861,64 @@ const ExpenseModal = ({open, initial, onClose, onSave, account}) => {
           </>}
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-add" onClick={save}>{initial?"Save Changes":"Add Expense"}</button>
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={isSaving}>Cancel</button>
+          <button type="button" className="btn-add" onClick={save} disabled={isSaving}>
+            {isSaving ? "Saving..." : initial ? "Save Changes" : "Add Expense"}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-const IncomeModal = ({open, initial, onClose, onSave, account, accountLabel}) => {
+const IncomeModal = ({
+  open,
+  initial,
+  onClose,
+  onSave,
+  account,
+  accountLabel,
+  paymentModeOptions = [],
+  receivedFromOptions = [],
+  isSaving = false,
+}) => {
+  const selectablePaymentModeOptions = useMemo(
+    () => buildSelectablePaymentModeOptions(paymentModeOptions),
+    [paymentModeOptions]
+  );
+  const paymentModeSelectOptions = useMemo(
+    () => selectablePaymentModeOptions.map((mode) => ({ value: mode, label: mode })),
+    [selectablePaymentModeOptions]
+  );
+
   const empty = {
     date: new Date().toLocaleDateString("en-GB"),
     account,
     amount: "",
     matched: false,
-    mode: "NEFT",
+    mode: "",
     receivedFrom: "",
     description: "",
   };
   const [f, setF] = useState(initial || empty);
   useEffect(() => {
     const base = { ...empty, account };
-    if (initial) setF({ ...base, ...initial, account: initial.account || account });
-    else setF(base);
-  }, [initial, open, account]);
+    const init = initial ? { ...base, ...initial, account: initial.account || account } : base;
+    if (!selectablePaymentModeOptions.includes(init.mode)) {
+      init.mode = "";
+    }
+    setF(init);
+  }, [initial, open, account, selectablePaymentModeOptions]);
   if (!open) return null;
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const save = () => {
-    if (!f.amount) return;
-    onSave({ ...f, amount: Number(f.amount), id: f.id || Date.now() });
+  const save = async () => {
+    if (!f.amount || !f.mode || !f.receivedFrom?.trim() || isSaving) return;
+    await onSave({
+      ...f,
+      receivedFrom: String(f.receivedFrom || "").trim(),
+      amount: Number(f.amount),
+      id: f.id || Date.now(),
+    });
   };
   const dateISO = ddmmToISO(f.date);
   const accountLine = accountLabel ?? f.account ?? account;
@@ -1538,17 +1945,31 @@ const IncomeModal = ({open, initial, onClose, onSave, account, accountLabel}) =>
           </div>
           <div>
             <div className="label-text mb-1">Payment Mode</div>
-            <select className="input" value={f.mode || ""} onChange={(e) => set("mode", e.target.value)}>
-              {MODES.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <Select
+              value={getModalSelected(f.mode)}
+              onChange={(opt) => set("mode", opt?.value || "")}
+              options={paymentModeSelectOptions}
+              isSearchable
+              placeholder="Select payment mode..."
+              styles={EXPENSE_MODAL_SELECT_STYLES}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+              menuPlacement="auto"
+            />
           </div>
           <div>
             <div className="label-text mb-1">Received From</div>
-            <input className="input" value={f.receivedFrom || ""} onChange={(e) => set("receivedFrom", e.target.value)} placeholder="e.g. Surya Residences booking" />
+            <CreatableSelect
+              value={getModalSelected(f.receivedFrom)}
+              onChange={(opt) => set("receivedFrom", opt?.value || "")}
+              options={receivedFromOptions}
+              isClearable
+              isSearchable
+              placeholder="Received From"
+              formatCreateLabel={(inputValue) => `Use "${inputValue}"`}
+              styles={EXPENSE_MODAL_SELECT_STYLES}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+              menuPlacement="auto"
+            />
           </div>
           <div className="col-span-2">
             <div className="label-text mb-1">Description (optional)</div>
@@ -1556,15 +1977,16 @@ const IncomeModal = ({open, initial, onClose, onSave, account, accountLabel}) =>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" className="btn-ghost" onClick={onClose}>
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={isSaving}>
             Cancel
           </button>
           <button
             type="button"
             onClick={save}
-            className="rounded-lg border border-[var(--green)] bg-white px-4 py-2 text-sm font-semibold text-[var(--green)] hover:bg-[var(--green-bg)]"
+            disabled={isSaving}
+            className="rounded-lg border border-[var(--green)] bg-white px-4 py-2 text-sm font-semibold text-[var(--green)] hover:bg-[var(--green-bg)] disabled:opacity-60"
           >
-            {initial ? "Save Changes" : "Add Income"}
+            {isSaving ? "Saving..." : initial ? "Save Changes" : "Add Income"}
           </button>
         </div>
       </div>
@@ -1580,12 +2002,43 @@ const BankRegister6Inner = () => {
   const [account,setAccount] = useState(banksForBranch[0]?.accounts[0] || "");
   const [billPayments, setBillPayments] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
+  const [paymentModeOptions, setPaymentModeOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
   const [tenantOptions, setTenantOptions] = useState([]);
   const [tenantShopData, setTenantShopData] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
+  const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const [isSavingIncome, setIsSavingIncome] = useState(false);
+
+  useEffect(() => {
+    const syncBranch = () => setActiveBranchId(resolveActiveBranchId());
+    syncBranch();
+    window.addEventListener("branchSelectionChanged", syncBranch);
+    return () => window.removeEventListener("branchSelectionChanged", syncBranch);
+  }, []);
+
+  useEffect(() => {
+    const slug = BRANCH_ID_TO_SLUG[Number(activeBranchId)] || "srivilliputtur";
+    setBranch(slug);
+  }, [activeBranchId]);
+
+  const fetchBillPayments = useCallback(async () => {
+    const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all", {
+      method: "GET",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch bill payments");
+    }
+    const data = await response.json();
+    const sortedData = (Array.isArray(data) ? data : []).sort((a, b) => (b.id || 0) - (a.id || 0));
+    setBillPayments(sortedData);
+    return sortedData;
+  }, []);
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
@@ -1622,35 +2075,15 @@ const BankRegister6Inner = () => {
 
   useEffect(() => {
     if (!banksForBranch.length) return;
-    const firstBank = banksForBranch[0];
-    const firstAcc = firstBank?.accounts?.[0];
-    const firstAccValue = typeof firstAcc === "string" ? firstAcc : (firstAcc?.value || "");
-    setBank(firstBank.name);
-    setAccount(firstAccValue || "");
-  }, [banksForBranch, branch]);
+    const { bank: defaultBank, account: defaultAccount } = resolveDefaultBankSelection(
+      banksForBranch,
+      activeBranchId
+    );
+    setBank(defaultBank);
+    setAccount(defaultAccount);
+  }, [banksForBranch, activeBranchId]);
 
   useEffect(() => {
-    const fetchBillPayments = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/all", {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        const claimPayments = (Array.isArray(data) ? data : []).filter(
-          item => item.type === "Claim Payment"
-        );
-        
-        console.log("[Claim Payments only]:", claimPayments);
-        const sortedData = (Array.isArray(data) ? data : []).sort((a, b) => (b.id || 0) - (a.id || 0));
-        setBillPayments(sortedData);
-      } catch (error) {
-        console.error("Error fetching bill payments:", error);
-      }
-    };
-
     const fetchVendorOptions = async () => {
       try {
         const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
@@ -1666,6 +2099,17 @@ const BankRegister6Inner = () => {
         })));
       } catch (error) {
         console.error("Error fetching vendor options:", error);
+      }
+    };
+
+    const fetchPaymentModes = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll");
+        if (!response.ok) return;
+        const data = await response.json();
+        setPaymentModeOptions(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error fetching payment modes:", error);
       }
     };
 
@@ -1715,21 +2159,23 @@ const BankRegister6Inner = () => {
         if (!response.ok) return;
         const data = await response.json();
         const formattedData = (Array.isArray(data) ? data : []).map((item) => ({
-          label: item?.siteName || item?.projectName || item?.project_name || item?.project || item?.name || "-",
-          id: item?.id,
+          value: item.siteName,
+          label: item.siteName,
+          id: item.id,
+          sNo: item.siteNo,
         }));
         const predefinedSiteOptions = [
-          { label: "Mason Advance", id: 1 },
-          { label: "Material Advance", id: 2 },
-          { label: "Weekly Advance", id: 3 },
-          { label: "Excess Advance", id: 4 },
-          { label: "Material Rent", id: 5 },
-          { label: "Subhash Kumar - Kunnur", id: 6 },
-          { label: "Summary Bill", id: 7 },
-          { label: "Daily Wage", id: 8 },
-          { label: "Rent Management Portal", id: 9 },
-          { label: "Multi-Project Batch", id: 10 },
-          { label: "Loan Portal", id: 11 },
+          { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
+          { value: "Material Advance", label: "Material Advance", id: 2, sNo: "2" },
+          { value: "Weekly Advance", label: "Weekly Advance", id: 3, sNo: "3" },
+          { value: "Excess Advance", label: "Excess Advance", id: 4, sNo: "4" },
+          { value: "Material Rent", label: "Material Rent", id: 5, sNo: "5" },
+          { value: "Subhash Kumar - Kunnur", label: "Subhash Kumar - Kunnur", id: 6, sNo: "6" },
+          { value: "Summary Bill", label: "Summary Bill", id: 7, sNo: "7" },
+          { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
+          { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
+          { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
         ];
         setSiteOptions([...predefinedSiteOptions, ...formattedData]);
       } catch (error) {
@@ -1780,38 +2226,32 @@ const BankRegister6Inner = () => {
     };
 
     void Promise.all([
-      fetchBillPayments(),
+      fetchBillPayments().catch((error) => console.error("Error fetching bill payments:", error)),
       fetchVendorOptions(),
+      fetchPaymentModes(),
       fetchContractorOptions(),
       fetchEmployeeOptions(),
       fetchProjectOptions(),
       fetchPurposeOptions(),
       fetchTenantOptions(),
     ]);
-  }, []);
+  }, [fetchBillPayments]);
 
   const [expenses,setExpenses] = useState([]);
-  const [income,setIncome] = useState(SEED_INCOME);
+  const [income,setIncome] = useState([]);
   const [expModal,setExpModal] = useState({open:false, initial:null});
   const [incModal,setIncModal] = useState({open:false, initial:null});
   const [filter,setFilter] = useState({date:"",project:"",party:"",purpose:"",cheque:"",partyType:"",mode:"",matched:"",amount:""});
   const [filterOpen,setFilterOpen] = useState(false);
   const [ledgerKind, setLedgerKind] = useState("all");
   const [dateRangeOpen,setDateRangeOpen] = useState(false);
-  const [dateRange,setDateRange] = useState({from:"2026-04-01", to:"2026-05-04"});
+  const [dateRange,setDateRange] = useState(() => getThisMonthDateRange());
   const [reconcileMode,setReconcileMode] = useState(false);
   const [toast,setToast] = useState("");
 
   useEffect(() => {
-    const sameId = (a, b) => {
-      const na = Number(a), nb = Number(b);
-      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
-      return String(a ?? "") === String(b ?? "");
-    };
-    const getProjectName = (projectId) => {
-      const project = siteOptions.find((o) => sameId(o.id, projectId));
-      return project ? project.label : "-";
-    };
+    const sameId = sameRecordId;
+    const getProjectName = (projectId) => resolveProjectNameFromOptions(projectId, siteOptions);
     const getVendorName = (vendorId) => {
       const vendor = vendorOptions.find((o) => sameId(o.id, vendorId));
       return vendor ? vendor.label : "-";
@@ -1847,10 +2287,10 @@ const BankRegister6Inner = () => {
       if (directPartyName || directPartyType) {
         return { name: directPartyName || "-", type: directPartyType || "-" };
       }
-      const contractorName = getContractorName(item.contractor_id);
-      const vendorName = getVendorName(item.vendor_id);
-      const employeeName = getEmployeeName(item.employee_id);
-      const tenantName = getTenantName(item.tenant_id);
+      const contractorName = getContractorName(item.contractor_id ?? item.contractorId);
+      const vendorName = getVendorName(item.vendor_id ?? item.vendorId);
+      const employeeName = getEmployeeName(item.employee_id ?? item.employeeId);
+      const tenantName = getTenantName(item.tenant_id ?? item.tenantId);
       if (contractorName !== "-") return { name: contractorName, type: "Contractor" };
       if (vendorName !== "-") return { name: vendorName, type: "Vendor" };
       if (employeeName !== "-") return { name: employeeName, type: "Employee" };
@@ -1859,28 +2299,34 @@ const BankRegister6Inner = () => {
     };
     const getProjectOrPurposeName = (item) => {
       const partyData = getPartyNameAndType(item);
-      if (partyData.type === "Tenant" && item.tenant_complex_name) return item.tenant_complex_name;
-      const directProject =
-        (typeof item?.project_name === "string" && item.project_name.trim()) ||
-        (typeof item?.projectName === "string" && item.projectName.trim()) ||
-        (typeof item?.project === "string" && item.project.trim()) ||
-        (typeof item?.projectNameText === "string" && item.projectNameText.trim()) ||
-        "";
-      if (directProject) return directProject;
-      if (item.project_id) {
-        const projectName = getProjectName(item.project_id);
+      if (partyData.type === "Tenant" && item.tenant_complex_name) {
+        return item.tenant_complex_name;
+      }
+      const projectId = item.project_id ?? item.projectId;
+      if (projectId != null && projectId !== "") {
+        const projectName = getProjectName(projectId);
         if (projectName !== "-") return projectName;
       }
-      if (item.purpose_id) {
-        const purposeName = getPurposeName(item.purpose_id);
+      const purposeId = item.purpose_id ?? item.purposeId;
+      if (purposeId != null && purposeId !== "") {
+        const purposeName = getPurposeName(purposeId);
         if (purposeName !== "-") return purposeName;
       }
       return "-";
     };
 
     if (!billPayments.length) return;
+
+    const isIncomingRecord = (item) => {
+      const paymentStatus = String(item.payment_status || item.paymentStatus || "").trim().toLowerCase();
+      const type = String(item.type || "").trim().toLowerCase();
+      return paymentStatus === "incoming" || type === "incoming";
+    };
+
     setExpenses(
-      billPayments.map((item, index) => {
+      billPayments
+        .filter((item) => !isIncomingRecord(item))
+        .map((item, index) => {
         const partyData = getPartyNameAndType(item);
         const dateStr = item.date ? new Date(item.date).toLocaleDateString("en-GB") : "-";
         return {
@@ -1889,7 +2335,14 @@ const BankRegister6Inner = () => {
           project: getProjectOrPurposeName(item),
           party: partyData.name,
           partyType: partyData.type,
-          type: item.type || "-",
+          type: (() => {
+            const paymentStatus = String(item.payment_status || item.paymentStatus || "").trim().toLowerCase();
+            if (paymentStatus === "expense") {
+              const description = item.description && String(item.description).trim();
+              return description || "-";
+            }
+            return item.type || "-";
+          })(),
           rent_management_id: item.rent_management_id,
           mode: item.bill_payment_mode || "-",
           chequeNo: item.cheque_number || "-",
@@ -1897,8 +2350,32 @@ const BankRegister6Inner = () => {
           amount: Number(item.amount || 0),
           matched: false,
           account: item.account_number || "",
+          canEdit: isBankRegisterManualExpenseRecord(item),
         };
       })
+    );
+
+    setIncome(
+      billPayments
+        .filter(isIncomingRecord)
+        .map((item, index) => {
+          const projectName = getProjectOrPurposeName(item);
+          const receivedFromRaw = (item.received_from || item.receivedFrom || "").trim();
+          return {
+          id: item.id ?? index + 1,
+          date: item.date ? new Date(item.date).toLocaleDateString("en-GB") : "-",
+          account: item.account_number || "",
+          amount: Number(item.amount || 0),
+          mode: item.bill_payment_mode || "-",
+          receivedFrom: receivedFromRaw || (projectName !== "-" ? projectName : ""),
+          description: item.description || "",
+          project: projectName,
+          party: receivedFromRaw || (projectName !== "-" ? projectName : "—"),
+          partyType: (item.description || "").trim() || "—",
+          matched: false,
+          canEdit: isBankRegisterManualIncomeRecord(item),
+        };
+        })
     );
   }, [
     billPayments,
@@ -1982,11 +2459,341 @@ const BankRegister6Inner = () => {
     return account;
   }, [banksForBranch, bank, account]);
 
+  const receivedFromOptions = useMemo(
+    () => buildReceivedFromOptions({
+      projectOptions: siteOptions,
+      vendorOptions,
+      contractorOptions,
+      employeeOptions,
+    }),
+    [siteOptions, vendorOptions, contractorOptions, employeeOptions]
+  );
+
   const showToast = (m) => { setToast(m); setTimeout(()=>setToast(""),2000); };
-  const saveExpense = (r) => { setExpenses(prev=> prev.some(x=>x.id===r.id) ? prev.map(x=>x.id===r.id?r:x) : [r,...prev]); setExpModal({open:false,initial:null}); showToast("Saved"); };
-  const saveIncome = (r) => { setIncome(prev=> prev.some(x=>x.id===r.id) ? prev.map(x=>x.id===r.id?r:x) : [r,...prev]); setIncModal({open:false,initial:null}); showToast("Saved"); };
-  const deleteExp = (r) => { if(!window.confirm(`Delete expense for ${r.party} (₹${fmtINR(r.amount)})?`)) return; setExpenses(prev=>prev.filter(x=>x.id!==r.id)); showToast("Deleted"); };
-  const deleteInc = (r) => { if(!window.confirm(`Delete income of ₹${fmtINR(r.amount)}?`)) return; setIncome(prev=>prev.filter(x=>x.id!==r.id)); showToast("Deleted"); };
+
+  const buildManualExpenseUpdatePayload = (existing, r, accountNumber, branchId, username) => {
+    const vendor = vendorOptions.find((v) => v.label === r.party);
+    const project = siteOptions.find((p) => p.label === r.project);
+    const isoDate = ddmmToISO(r.date);
+    const chequeMode = isChequePaymentMode(r.mode);
+    const chequeDateIso =
+      chequeMode && r.chequeDate && r.chequeDate !== "-" ? ddmmToISO(r.chequeDate) : null;
+
+    return {
+      date: isoDate,
+      created_at: pickExistingBillField(existing, "created_at", "createdAt", new Date().toISOString()),
+      contractor_id: pickExistingBillField(existing, "contractor_id", "contractorId"),
+      vendor_id: vendor?.id ?? pickExistingBillField(existing, "vendor_id", "vendorId"),
+      employee_id: pickExistingBillField(existing, "employee_id", "employeeId"),
+      labour_id: pickExistingBillField(existing, "labour_id", "labourId"),
+      project_id: project?.id ?? pickExistingBillField(existing, "project_id", "projectId"),
+      type: "Expense",
+      bill_payment_mode: r.mode,
+      amount: parseFloat(r.amount) || 0,
+      status: pickExistingBillField(existing, "status", "status", true),
+      weekly_number: pickExistingBillField(existing, "weekly_number", "weeklyNumber", ""),
+      expenses_entry_id: pickExistingBillField(existing, "expenses_entry_id", "expensesEntryId"),
+      advance_portal_id: pickExistingBillField(existing, "advance_portal_id", "advancePortalId"),
+      staff_advance_portal_id: pickExistingBillField(existing, "staff_advance_portal_id", "staffAdvancePortalId"),
+      claim_payment_id: pickExistingBillField(existing, "claim_payment_id", "claimPaymentId"),
+      cheque_number: chequeMode ? r.chequeNo || null : null,
+      cheque_date: chequeMode ? chequeDateIso : null,
+      transaction_number: pickExistingBillField(existing, "transaction_number", "transactionNumber"),
+      account_number: accountNumber || pickExistingBillField(existing, "account_number", "accountNumber"),
+      branch_id: pickExistingBillField(existing, "branch_id", "branchId", branchId),
+      entered_by: pickExistingBillField(existing, "entered_by", "enteredBy", username),
+      description: String(r.type || "").trim(),
+      payment_status: "expense",
+    };
+  };
+
+  const buildManualIncomeUpdatePayload = (existing, r, accountNumber, branchId, username) => {
+    const isoDate = ddmmToISO(r.date);
+
+    return {
+      date: isoDate,
+      created_at: pickExistingBillField(existing, "created_at", "createdAt", new Date().toISOString()),
+      contractor_id: pickExistingBillField(existing, "contractor_id", "contractorId"),
+      vendor_id: pickExistingBillField(existing, "vendor_id", "vendorId"),
+      employee_id: pickExistingBillField(existing, "employee_id", "employeeId"),
+      labour_id: pickExistingBillField(existing, "labour_id", "labourId"),
+      project_id: pickExistingBillField(existing, "project_id", "projectId", resolveIncomingProjectId(branchId)),
+      type: "incoming",
+      bill_payment_mode: r.mode,
+      amount: parseFloat(r.amount) || 0,
+      status: pickExistingBillField(existing, "status", "status", true),
+      weekly_number: pickExistingBillField(existing, "weekly_number", "weeklyNumber", ""),
+      expenses_entry_id: pickExistingBillField(existing, "expenses_entry_id", "expensesEntryId"),
+      advance_portal_id: pickExistingBillField(existing, "advance_portal_id", "advancePortalId"),
+      staff_advance_portal_id: pickExistingBillField(existing, "staff_advance_portal_id", "staffAdvancePortalId"),
+      claim_payment_id: pickExistingBillField(existing, "claim_payment_id", "claimPaymentId"),
+      cheque_number: pickExistingBillField(existing, "cheque_number", "chequeNumber"),
+      cheque_date: pickExistingBillField(existing, "cheque_date", "chequeDate"),
+      transaction_number: pickExistingBillField(existing, "transaction_number", "transactionNumber"),
+      account_number: accountNumber || pickExistingBillField(existing, "account_number", "accountNumber"),
+      branch_id: pickExistingBillField(existing, "branch_id", "branchId", branchId),
+      entered_by: pickExistingBillField(existing, "entered_by", "enteredBy", username),
+      received_from: String(r.receivedFrom || "").trim(),
+      description: String(r.description || "").trim(),
+      payment_status: "incoming",
+    };
+  };
+
+  const saveExpense = async (r) => {
+    if (expModal.initial) {
+      const existing = billPayments.find((item) => Number(item.id) === Number(expModal.initial.id));
+      if (!existing || !isBankRegisterManualExpenseRecord(existing)) {
+        showToast("Only manual bank register expenses can be edited");
+        return;
+      }
+
+      setIsSavingExpense(true);
+      try {
+        const branchId = resolveBranchIdForSave(activeBranchId);
+        const username = getEnteredByUsername();
+        const isoDate = ddmmToISO(r.date);
+        if (!isoDate) {
+          showToast("Please enter a valid date");
+          return;
+        }
+        if (!r.project) {
+          showToast("Please select a project");
+          return;
+        }
+        const chequeMode = isChequePaymentMode(r.mode);
+        const chequeDateIso =
+          chequeMode && r.chequeDate && r.chequeDate !== "-" ? ddmmToISO(r.chequeDate) : null;
+        if (chequeMode && (!r.chequeNo || r.chequeNo === "-" || !chequeDateIso)) {
+          showToast("Please enter cheque number and date");
+          return;
+        }
+
+        await updateWeeklyPaymentBill(
+          existing.id,
+          buildManualExpenseUpdatePayload(existing, r, account, branchId, username)
+        );
+        await fetchBillPayments();
+        setExpModal({ open: false, initial: null });
+        showToast("Expense updated successfully");
+      } catch (error) {
+        console.error("Error updating expense:", error);
+        showToast(error.message || "Failed to update expense");
+      } finally {
+        setIsSavingExpense(false);
+      }
+      return;
+    }
+
+    setIsSavingExpense(true);
+    try {
+      const branchId = resolveBranchIdForSave(activeBranchId);
+      const username = getEnteredByUsername();
+      const vendor = vendorOptions.find((v) => v.label === r.party);
+      const project = siteOptions.find((p) => p.label === r.project);
+      const isoDate = ddmmToISO(r.date);
+      if (!isoDate) {
+        showToast("Please enter a valid date");
+        return;
+      }
+      if (!r.project || !project?.id) {
+        showToast("Please select a project");
+        return;
+      }
+      const chequeMode = isChequePaymentMode(r.mode);
+      const chequeDateIso =
+        chequeMode && r.chequeDate && r.chequeDate !== "-" ? ddmmToISO(r.chequeDate) : null;
+      if (chequeMode && (!r.chequeNo || r.chequeNo === "-" || !chequeDateIso)) {
+        showToast("Please enter cheque number and date");
+        return;
+      }
+
+      const weeklyPaymentBillPayload = {
+        date: isoDate,
+        created_at: new Date().toISOString(),
+        contractor_id: null,
+        vendor_id: vendor?.id ?? null,
+        employee_id: null,
+        project_id: project?.id ?? null,
+        type: "Expense",
+        bill_payment_mode: r.mode,
+        amount: parseFloat(r.amount) || 0,
+        status: true,
+        weekly_number: "",
+        expenses_entry_id: null,
+        advance_portal_id: null,
+        staff_advance_portal_id: null,
+        claim_payment_id: null,
+        cheque_number: chequeMode ? r.chequeNo || null : null,
+        cheque_date: chequeMode ? chequeDateIso : null,
+        transaction_number: null,
+        account_number: account || null,
+        branch_id: branchId,
+        entered_by: username,
+        description: String(r.type || "").trim(),
+        payment_status: "expense",
+      };
+
+      const saveUrl = buildBranchUrl(
+        "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
+        branchId
+      );
+      const response = await fetch(saveUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(weeklyPaymentBillPayload),
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(responseText || "Failed to save expense");
+      }
+
+      await fetchBillPayments();
+      setExpModal({ open: false, initial: null });
+      showToast("Expense saved successfully");
+    } catch (error) {
+      console.error("Error saving expense:", error);
+      showToast(error.message || "Failed to save expense");
+    } finally {
+      setIsSavingExpense(false);
+    }
+  };
+  const saveIncome = async (r) => {
+    if (incModal.initial) {
+      const existing = billPayments.find((item) => Number(item.id) === Number(incModal.initial.id));
+      if (!existing || !isBankRegisterManualIncomeRecord(existing)) {
+        showToast("Only manual bank register income can be edited");
+        return;
+      }
+
+      setIsSavingIncome(true);
+      try {
+        const branchId = resolveBranchIdForSave(activeBranchId);
+        const username = getEnteredByUsername();
+        const isoDate = ddmmToISO(r.date);
+        if (!isoDate) {
+          showToast("Please enter a valid date");
+          return;
+        }
+        if (!String(r.receivedFrom || "").trim()) {
+          showToast("Please enter received from");
+          return;
+        }
+
+        await updateWeeklyPaymentBill(
+          existing.id,
+          buildManualIncomeUpdatePayload(existing, r, account, branchId, username)
+        );
+        await fetchBillPayments();
+        setIncModal({ open: false, initial: null });
+        showToast("Income updated successfully");
+      } catch (error) {
+        console.error("Error updating income:", error);
+        showToast(error.message || "Failed to update income");
+      } finally {
+        setIsSavingIncome(false);
+      }
+      return;
+    }
+
+    setIsSavingIncome(true);
+    try {
+      const branchId = resolveBranchIdForSave(activeBranchId);
+      const username = getEnteredByUsername();
+      const isoDate = ddmmToISO(r.date);
+      if (!isoDate) {
+        showToast("Please enter a valid date");
+        return;
+      }
+      if (!String(r.receivedFrom || "").trim()) {
+        showToast("Please enter received from");
+        return;
+      }
+
+      const weeklyPaymentBillPayload = {
+        date: isoDate,
+        created_at: new Date().toISOString(),
+        contractor_id: null,
+        vendor_id: null,
+        employee_id: null,
+        project_id: resolveIncomingProjectId(branchId),
+        type: "incoming",
+        bill_payment_mode: r.mode,
+        amount: parseFloat(r.amount) || 0,
+        status: true,
+        weekly_number: "",
+        expenses_entry_id: null,
+        advance_portal_id: null,
+        staff_advance_portal_id: null,
+        claim_payment_id: null,
+        cheque_number: null,
+        cheque_date: null,
+        transaction_number: null,
+        account_number: account || null,
+        branch_id: branchId,
+        entered_by: username,
+        received_from: String(r.receivedFrom || "").trim(),
+        description: String(r.description || "").trim(),
+        payment_status: "incoming",
+      };
+
+      const saveUrl = buildBranchUrl(
+        "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save",
+        branchId
+      );
+      const response = await fetch(saveUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(weeklyPaymentBillPayload),
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(responseText || "Failed to save income");
+      }
+
+      await fetchBillPayments();
+      setIncModal({ open: false, initial: null });
+      showToast("Income saved successfully");
+    } catch (error) {
+      console.error("Error saving income:", error);
+      showToast(error.message || "Failed to save income");
+    } finally {
+      setIsSavingIncome(false);
+    }
+  };
+  const deleteExp = async (r) => {
+    if (!r.canEdit) {
+      showToast("This entry cannot be deleted");
+      return;
+    }
+    if (!window.confirm(`Delete expense for ${r.party} (₹${fmtINR(r.amount)})?`)) return;
+
+    try {
+      await deleteWeeklyPaymentBill(r.id);
+      await fetchBillPayments();
+      showToast("Expense deleted successfully");
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      showToast(error.message || "Failed to delete expense");
+    }
+  };
+  const deleteInc = async (r) => {
+    if (!r.canEdit) {
+      showToast("This entry cannot be deleted");
+      return;
+    }
+    if (!window.confirm(`Delete income of ₹${fmtINR(r.amount)}?`)) return;
+
+    try {
+      await deleteWeeklyPaymentBill(r.id);
+      await fetchBillPayments();
+      showToast("Income deleted successfully");
+    } catch (error) {
+      console.error("Error deleting income:", error);
+      showToast(error.message || "Failed to delete income");
+    }
+  };
   const toggleMatchExp = (r) => setExpenses(prev=>prev.map(x=>x.id===r.id?{...x,matched:!x.matched}:x));
   const toggleMatchInc = (r) => setIncome(prev=>prev.map(x=>x.id===r.id?{...x,matched:!x.matched}:x));
   // Toggle-all: affects only rows currently visible (post account+date+filter)
@@ -2053,10 +2860,6 @@ const BankRegister6Inner = () => {
     const w = window.open("", "_blank");
     if(!w){ showToast("Popup blocked — allow popups"); return; }
     const fmt = (n)=>"₹"+Number(n).toLocaleString("en-IN",{minimumFractionDigits:2});
-    const dateVal = (s) => {
-      const d = parseDDMMYYYY(s);
-      return d ? d.getTime() : 0;
-    };
     const mergedBase = [
       ...filteredExpenses.map((r) => {
         const creditSide = r.type === "Rent Payment" && r.rent_management_id;
@@ -2066,23 +2869,12 @@ const BankRegister6Inner = () => {
           _entry: creditSide ? "credit" : "debit",
         };
       }),
-      ...accountIncome.map((r) => ({
-        ...r,
-        _source: "income",
-        _entry: "credit",
-        project: "—",
-        party: r.receivedFrom && String(r.receivedFrom).trim() ? r.receivedFrom : "—",
-        partyType: "—",
-        type: r.description && String(r.description).trim() ? r.description : "Bank credit",
-        mode: r.mode && String(r.mode).trim() ? r.mode : "—",
-        chequeNo: "-",
-        chequeDate: "-",
-      })),
+      ...accountIncome.map(mapIncomeLedgerRow),
     ];
     let merged = [...mergedBase];
     if (ledgerKind === "debit") merged = merged.filter((r) => r._entry === "debit");
     else if (ledgerKind === "credit") merged = merged.filter((r) => r._entry === "credit");
-    merged.sort((a, b) => dateVal(a.date) - dateVal(b.date));
+    merged = sortLedgerRowsDefault(merged);
 
     const { pdfDrTotal, pdfCrTotal } = merged.reduce(
       (acc, r) => {
@@ -2225,10 +3017,10 @@ const BankRegister6Inner = () => {
               totalExpense={totalExpense}
               totalIncome={totalIncome}
               onAddExp={()=>setExpModal({open:true,initial:null})}
-              onEditExp={(r)=>{ const {_entry,_source,...rest} = r; setExpModal({open:true,initial:rest}); }}
+              onEditExp={(r)=>{ if (!r.canEdit) return; const {_entry,_source,...rest} = r; setExpModal({open:true,initial:rest}); }}
               onDeleteExp={deleteExp}
               onAddInc={()=>setIncModal({open:true,initial:null})}
-              onEditInc={(r)=>{ const row = income.find((x)=>x.id===r.id); if(row) setIncModal({open:true,initial:row}); }}
+              onEditInc={(r)=>{ if (!r.canEdit) return; const row = income.find((x)=>x.id===r.id); if(row) setIncModal({open:true,initial:row}); }}
               onDeleteInc={deleteInc}
               onFilter={()=>setFilterOpen(o=>!o)}
               onToggleMatchExp={toggleMatchExp}
@@ -2249,8 +3041,28 @@ const BankRegister6Inner = () => {
         )}
       </div>
 
-      <ExpenseModal open={expModal.open} initial={expModal.initial} onClose={()=>setExpModal({open:false,initial:null})} onSave={saveExpense} account={account}/>
-      <IncomeModal open={incModal.open} initial={incModal.initial} onClose={()=>setIncModal({open:false,initial:null})} onSave={saveIncome} account={account} accountLabel={selectedAccountLabel}/>
+      <ExpenseModal
+        open={expModal.open}
+        initial={expModal.initial}
+        onClose={()=>setExpModal({open:false,initial:null})}
+        onSave={saveExpense}
+        account={account}
+        projectOptions={siteOptions}
+        vendorOptions={vendorOptions}
+        paymentModeOptions={paymentModeOptions}
+        isSaving={isSavingExpense}
+      />
+      <IncomeModal
+        open={incModal.open}
+        initial={incModal.initial}
+        onClose={()=>setIncModal({open:false,initial:null})}
+        onSave={saveIncome}
+        account={account}
+        accountLabel={selectedAccountLabel}
+        paymentModeOptions={paymentModeOptions}
+        receivedFromOptions={receivedFromOptions}
+        isSaving={isSavingIncome}
+      />
       <FilterModal open={false} value={filter} onClose={()=>setFilterOpen(false)} onApply={setFilter} onReset={clearAllFilters}/>
       <DateRangeModal open={dateRangeOpen} value={dateRange} onClose={()=>setDateRangeOpen(false)} onApply={setDateRange}/>
 

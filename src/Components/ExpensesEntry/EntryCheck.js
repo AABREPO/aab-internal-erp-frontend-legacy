@@ -1,11 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import Select from 'react-select';
 import DateRangePicker from './DateRangePicker';
 import CustomDateField from './CustomDateField';
+import { Table, TableProvider, buildEntryCheckTableContext, BLANK_VALUE, blankOption } from './Table';
+import {
+    TABLE_FILTER_MAX_VISIBLE_OPTIONS,
+    TABLE_FILTER_MENU_MAX_HEIGHT_PX,
+    TABLE_FILTER_OPTION_HEIGHT_PX,
+} from './databaseExpensesSharedColumns';
 import Reload from '../Images/Clear.svg'
 import Filter from '../Images/TableFilter.svg'
+import Search from '../Images/Searchnew.svg'
 import Pdf from '../Images/pdf.png'
 import CalendarIcon from "../Images/Calendoricon.png";
 import jsPDF from "jspdf";
@@ -37,14 +44,20 @@ const EntryChecking = () => {
     const [selectedQuantity, setSelectedQuantity] = useState('');
     const [selectedDescription, setSelectedDescription] = useState('');
     const [selectedBranch, setSelectedBranch] = useState('');
+    const [selectedPaymentMode, setSelectedPaymentMode] = useState('');
+    const [paymentModeFilterOptions, setPaymentModeFilterOptions] = useState([]);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [enoOptions, setEnoOptions] = useState([]);
     const [branchFilterOptions, setBranchFilterOptions] = useState([]);
+    const [overallSearch, setOverallSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
     const [showFilters, setShowFilters] = useState(false);
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [showTimestampDateRangePicker, setShowTimestampDateRangePicker] = useState(false);
     const scrollRef = useRef(null);
     const filterRowRef = useRef(null);
+    const billArrivalFilterRef = useRef(null);
     const filterNudgeUsedRef = useRef(false);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
@@ -131,17 +144,23 @@ const EntryChecking = () => {
                 });
                 setExpenses(sortedExpenses);
                 // Extract unique values for the dropdowns
-                const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-                const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
+                const isBlankish = (value) =>
+                    value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+                const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))].filter(type => !isBlankish(type));
+                const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))].filter(name => !isBlankish(name));
                 const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
-                const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
+                vendorOptions.unshift(blankOption);
+                const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))].filter(name => !isBlankish(name));
                 const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
-                const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName).filter(Boolean))];
+                contractorOption.unshift(blankOption);
+                const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))].filter(name => !isBlankish(name));
                 const projectNameOption = uniqueProjectNames.map(name => ({ value: name, label: name }));
-                const uniqueCategories = [...new Set(response.data.map(expense => expense.category).filter(Boolean))];
+                projectNameOption.unshift(blankOption);
+                const uniqueCategories = [...new Set(response.data.map(expense => expense.category))].filter(name => !isBlankish(name));
                 const categoryOption = uniqueCategories.map(name => ({ value: name, label: name }));
+                categoryOption.unshift(blankOption);
                 // Set the unique dropdown options in state
-                setAccountTypeOptions(uniqueAccountTypes);
+                setAccountTypeOptions([BLANK_VALUE, ...uniqueAccountTypes]);
                 setCategoryOptions(categoryOption);
                 setVendorOptions(vendorOptions);
                 setContractorOptions(contractorOption);
@@ -170,16 +189,42 @@ const EntryChecking = () => {
         fetchBranches();
     }, []);
     useEffect(() => {
+        const isBlankish = (value) =>
+            value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
         const uniqueBranchIds = [...new Set(expenses.map(expense => expense.branch_id ?? expense.branchId).filter(Boolean))];
-        setBranchFilterOptions(uniqueBranchIds.map(id => ({
+        const branchFilterOptionsBuilt = uniqueBranchIds.map(id => ({
             value: String(id),
             label: branchOptions.find(b => String(b.id) === String(id))?.branch || String(id),
-        })));
-        const uniqueEnos = [...new Set(expenses.map(expense => expense.eno).filter(Boolean))]
+        })).filter(opt => opt.label != null && String(opt.label).trim() !== '');
+        branchFilterOptionsBuilt.unshift(blankOption);
+        setBranchFilterOptions(branchFilterOptionsBuilt);
+        const uniqueEnos = [...new Set(expenses.map(expense => expense.eno))]
+            .filter(eno => eno != null && String(eno).trim() !== '')
             .sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
+        uniqueEnos.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEnos);
+        const uniquePaymentModes = [];
+        const seenPaymentModes = new Set();
+        let hasBlankPaymentMode = false;
+        expenses.forEach((expense) => {
+            const mode = expense.paymentMode;
+            if (isBlankish(mode)) {
+                hasBlankPaymentMode = true;
+                return;
+            }
+            const key = String(mode);
+            if (!seenPaymentModes.has(key)) {
+                seenPaymentModes.add(key);
+                uniquePaymentModes.push(String(mode));
+            }
+        });
+        const paymentModeOptionsBuilt = uniquePaymentModes.map((val) => ({ value: val, label: val }));
+        paymentModeOptionsBuilt.unshift(blankOption);
+        setPaymentModeFilterOptions(paymentModeOptionsBuilt);
     }, [expenses, branchOptions]);
     useEffect(() => {
+        const isBlankish = (value) =>
+            value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
         const filtered = expenses.filter(expense => {
             const expenseDate = new Date(expense.date).toISOString().slice(0, 10);
             if (timestampStartDate && timestampEndDate) {
@@ -200,32 +245,91 @@ const EntryChecking = () => {
                 const expenseTs = expense.timestamp ? new Date(expense.timestamp) : null;
                 if (!expenseTs || expenseTs > te) return false;
             }
+            if (overallSearch.trim()) {
+                const q = overallSearch.toLowerCase().trim();
+                const searchable = [
+                    formatDate(expense.timestamp),
+                    formatDateOnly(expense.date),
+                    expense.siteName,
+                    expense.vendor,
+                    expense.contractor,
+                    expense.quantity,
+                    expense.amount,
+                    expense.comments,
+                    expense.category,
+                    expense.accountType,
+                    expense.paymentMode,
+                    branchOptions.find(b => String(b.id) === String(expense.branch_id ?? expense.branchId ?? ''))?.branch || '',
+                    expense.eno
+                ]
+                    .map((v) => String(v ?? '').toLowerCase())
+                    .join(' ');
+                if (!searchable.includes(q)) return false;
+            }
             return (
-                (selectedSiteName ? expense.siteName === selectedSiteName : true) &&
-                (selectedVendor ? expense.vendor === selectedVendor : true) &&
-                (selectedContractor ? expense.contractor === selectedContractor : true) &&
-                (selectedCategory ? expense.category === selectedCategory : true) &&
-                (selectedMachineTools ? expense.machineTools === selectedMachineTools : true) &&
-                (selectedAccountType ? expense.accountType === selectedAccountType : true) &&
+                (selectedSiteName
+                    ? (selectedSiteName === BLANK_VALUE
+                        ? isBlankish(expense.siteName)
+                        : expense.siteName === selectedSiteName)
+                    : true) &&
+                (selectedVendor
+                    ? (selectedVendor === BLANK_VALUE
+                        ? isBlankish(expense.vendor)
+                        : expense.vendor === selectedVendor)
+                    : true) &&
+                (selectedContractor
+                    ? (selectedContractor === BLANK_VALUE
+                        ? isBlankish(expense.contractor)
+                        : expense.contractor === selectedContractor)
+                    : true) &&
+                (selectedCategory
+                    ? (selectedCategory === BLANK_VALUE
+                        ? isBlankish(expense.category)
+                        : expense.category === selectedCategory)
+                    : true) &&
+                (selectedMachineTools
+                    ? (selectedMachineTools === BLANK_VALUE
+                        ? isBlankish(expense.machineTools)
+                        : expense.machineTools === selectedMachineTools)
+                    : true) &&
+                (selectedAccountType
+                    ? (selectedAccountType === BLANK_VALUE
+                        ? isBlankish(expense.accountType)
+                        : expense.accountType === selectedAccountType)
+                    : true) &&
+                (selectedPaymentMode
+                    ? (selectedPaymentMode === BLANK_VALUE
+                        ? isBlankish(expense.paymentMode)
+                        : expense.paymentMode === selectedPaymentMode)
+                    : true) &&
                 (selectedDate ? expense.timestamp.split('T')[0] === selectedDate : true) &&
                 (selectedExpenseDate ? expenseDate === selectedExpenseDate : true) &&
                 (selectedStartDate ? expenseDate >= selectedStartDate : true) &&
                 (selectedEndDate ? expenseDate <= selectedEndDate : true) &&
-                (selectedBranch ? String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch) : true) &&
+                (selectedBranch
+                    ? (selectedBranch === BLANK_VALUE
+                        ? isBlankish(expense.branch_id ?? expense.branchId)
+                        : String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch))
+                    : true) &&
                 (selectedQuantity.trim()
                     ? String(expense.quantity ?? '').toLowerCase().includes(selectedQuantity.toLowerCase().trim())
                     : true) &&
                 (selectedDescription.trim()
                     ? String(expense.comments ?? '').toLowerCase().includes(selectedDescription.toLowerCase().trim())
                     : true) &&
-                (selectedEno ? String(expense.eno) === String(selectedEno) : true)
+                (selectedEno
+                    ? (selectedEno === BLANK_VALUE
+                        ? isBlankish(expense.eno)
+                        : String(expense.eno) === String(selectedEno))
+                    : true)
             );
         });
         setFilteredExpenses(filtered);
         setFilteredCount(filtered.length);
+        setCurrentPage(1);
         const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
         setTotalAmount(total);
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedEno, selectedAccountType, selectedDate, selectedExpenseDate, selectedStartDate, selectedEndDate, timestampStartDate, timestampEndDate, selectedBranch, selectedQuantity, selectedDescription, expenses]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedEno, selectedAccountType, selectedPaymentMode, selectedDate, selectedExpenseDate, selectedStartDate, selectedEndDate, timestampStartDate, timestampEndDate, selectedBranch, selectedQuantity, selectedDescription, overallSearch, expenses, branchOptions]);
     const formatDateOnly = (dateString) => {
         const date = new Date(dateString);
         const day = String(date.getDate()).padStart(2, '0');
@@ -260,7 +364,10 @@ const EntryChecking = () => {
         setSelectedQuantity('');
         setSelectedDescription('');
         setSelectedBranch('');
+        setSelectedPaymentMode('');
         setSelectedEno('');
+        setOverallSearch('');
+        setCurrentPage(1);
         setFilteredExpenses(expenses);
     };
     const generateFilteredPDF = () => {
@@ -330,29 +437,33 @@ const EntryChecking = () => {
         const dateStr = new Date().toISOString().slice(0, 10);
         doc.save(`Filtered_Expenses_Report_${dateStr}.pdf`);
     };
-    const customSelectStyles = {
-        control: (provided, state) => ({
-            ...provided,
-            backgroundColor: 'transparent',
-            border: '2px solid rgba(191, 152, 83, 0.2)',
-            borderRadius: '8px',
-            minHeight: '40px',
-            height: '40px',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-            '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
-        }),
-        placeholder: (provided) => ({ ...provided, color: '#999', textAlign: 'left' }),
-        menu: (provided) => ({ ...provided, zIndex: 9999 }),
-        option: (provided, state) => ({
-            ...provided,
-            textAlign: 'left',
-            fontWeight: 'normal',
-            fontSize: '15px',
-            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-            color: 'black',
-        }),
-        singleValue: (provided) => ({ ...provided, textAlign: 'left', color: 'black' }),
-        indicatorSeparator: () => ({ display: 'none' }),
+    const TABLE_FILTER_OPTION_HEIGHT = TABLE_FILTER_OPTION_HEIGHT_PX;
+    const TABLE_FILTER_MAX_VISIBLE_OPTIONS_COUNT = TABLE_FILTER_MAX_VISIBLE_OPTIONS;
+    const getTableFilterMenuMaxHeight = () => {
+        const maxLargeHeight = TABLE_FILTER_MENU_MAX_HEIGHT_PX;
+        if (typeof window === 'undefined') return maxLargeHeight;
+        if (window.innerWidth >= 1024) return maxLargeHeight;
+
+        const viewportSpace = Math.max(window.innerHeight - 320, TABLE_FILTER_OPTION_HEIGHT * 3);
+        const tableSpace = scrollRef.current?.clientHeight
+            ? Math.max(scrollRef.current.clientHeight - 120, TABLE_FILTER_OPTION_HEIGHT * 3)
+            : viewportSpace;
+        const raw = Math.min(maxLargeHeight, viewportSpace, tableSpace);
+        const visibleCount = Math.max(
+            3,
+            Math.min(TABLE_FILTER_MAX_VISIBLE_OPTIONS_COUNT, Math.floor(raw / TABLE_FILTER_OPTION_HEIGHT))
+        );
+        return visibleCount * TABLE_FILTER_OPTION_HEIGHT;
+    };
+    const [tableFilterMenuMaxHeight, setTableFilterMenuMaxHeight] = useState(getTableFilterMenuMaxHeight);
+    useEffect(() => {
+        const updateMenuHeight = () => setTableFilterMenuMaxHeight(getTableFilterMenuMaxHeight());
+        updateMenuHeight();
+        window.addEventListener('resize', updateMenuHeight);
+        return () => window.removeEventListener('resize', updateMenuHeight);
+    }, [showFilters]);
+    const tableFilterSelectClassNames = {
+        menuList: () => 'no-scrollbar scrollbar-none',
     };
     const tableFilterSelectStyles = {
         control: (provided, state) => ({
@@ -361,39 +472,271 @@ const EntryChecking = () => {
             lineHeight: '20px',
             fontSize: '14px',
             fontWeight: 'normal',
-            height: '36px',
-            minHeight: '36px',
+            height: '38px',
+            minHeight: '38px',
             borderRadius: '8px',
             textAlign: 'left',
             borderColor: 'rgba(191, 152, 83, 0.2)',
             boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
             '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
         }),
-        menu: (provided) => ({ ...provided, zIndex: 9999 }),
+        menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: tableFilterMenuMaxHeight }),
+        menuList: (provided) => ({
+            ...provided,
+            maxHeight: tableFilterMenuMaxHeight,
+            paddingTop: 0,
+            paddingBottom: 0,
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+        }),
         option: (provided, state) => ({
             ...provided,
+            minHeight: TABLE_FILTER_OPTION_HEIGHT,
+            height: TABLE_FILTER_OPTION_HEIGHT,
+            paddingTop: 0,
+            paddingBottom: 0,
+            display: 'flex',
+            alignItems: 'center',
             textAlign: 'left',
             fontWeight: 'normal',
             fontSize: '15px',
             backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
             color: 'black',
         }),
-        singleValue: (provided) => ({ ...provided, color: '#111827', fontWeight: 'normal' }),
-        placeholder: (provided) => ({ ...provided, color: '#999', textAlign: 'left' }),
+        singleValue: (provided) => ({
+            ...provided,
+            color: '#111827',
+            fontWeight: 'normal',
+            marginRight: 0,
+        }),
+        valueContainer: (provided) => ({
+            ...provided,
+            paddingLeft: '12px',
+            paddingRight: '2px',
+            paddingTop: 0,
+            paddingBottom: 0,
+        }),
+        indicatorsContainer: (provided) => ({
+            ...provided,
+            paddingLeft: '0px',
+        }),
+        dropdownIndicator: (provided, state) => ({
+            ...provided,
+            display: state.hasValue ? 'none' : 'flex',
+            paddingTop: '0px',
+            paddingBottom: '0px',
+            paddingRight: '6px',
+            paddingLeft: '3px',
+        }),
+        input: (provided) => ({
+            ...provided,
+            fontWeight: 'normal',
+            color: 'black',
+            textAlign: 'left',
+            margin: 0,
+            padding: 0,
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            color: '#A6A5A6',
+            textAlign: 'left',
+            fontWeight: 'normal',
+            paddingLeft: '0px',
+            paddingTop: '0px',
+            paddingBottom: '0px',
+            margin: 0,
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            cursor: 'pointer',
+        }),
+        indicatorSeparator: () => ({ display: 'none' }),
+    };
+    const customSelectStyles = {
+        control: (provided, state) => ({
+            ...provided,
+            backgroundColor: 'transparent',
+            fontSize: '14px',
+            border: '2px solid rgba(191, 152, 83, 0.2)',
+            borderRadius: '8px',
+            minHeight: '40px',
+            fontWeight: 'medium',
+            height: '40px',
+            flexWrap: 'nowrap',
+            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+            '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
+        }),
+        valueContainer: (provided) => ({
+            ...provided,
+            flexWrap: 'nowrap',
+            overflow: 'hidden',
+            paddingLeft: '12px',
+            paddingRight: '2px',
+            height: '36px',
+            alignItems: 'center',
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            color: '#999',
+            textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            position: 'absolute',
+        }),
+        menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: tableFilterMenuMaxHeight }),
+        menuList: (provided) => ({
+            ...provided,
+            maxHeight: tableFilterMenuMaxHeight,
+            paddingTop: 0,
+            paddingBottom: 0,
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            minHeight: TABLE_FILTER_OPTION_HEIGHT,
+            height: TABLE_FILTER_OPTION_HEIGHT,
+            paddingTop: 0,
+            paddingBottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            textAlign: 'left',
+            fontWeight: 'normal',
+            fontSize: '15px',
+            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+            color: 'black',
+        }),
+        singleValue: (provided) => ({
+            ...provided,
+            textAlign: 'left',
+            color: 'black',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+        }),
+        input: (provided) => ({
+            ...provided,
+            margin: 0,
+            padding: 0,
+            whiteSpace: 'nowrap',
+        }),
+        dropdownIndicator: (provided, state) => ({
+            ...provided,
+            display: state.hasValue ? 'none' : 'flex',
+            color: '#000000',
+            flexShrink: 0,
+        }),
+        clearIndicator: (provided) => ({
+            ...provided,
+            cursor: 'pointer',
+            color: '#000000',
+            flexShrink: 0,
+        }),
         indicatorSeparator: () => ({ display: 'none' }),
     };
     const nameSelectClassNames = {
         menuList: () => 'no-scrollbar scrollbar-none',
+        valueContainer: () => '!flex-nowrap !overflow-hidden',
+        placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+        singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
     };
-    const isAnyFilterSelected = selectedDate || selectedExpenseDate || selectedStartDate || selectedEndDate || timestampStartDate || timestampEndDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedBranch || selectedQuantity.trim() || selectedDescription.trim() || selectedEno;
+    const isAnyFilterSelected = selectedDate || selectedExpenseDate || selectedStartDate || selectedEndDate || timestampStartDate || timestampEndDate || selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedBranch || selectedQuantity.trim() || selectedDescription.trim() || selectedEno || overallSearch.trim();
+    const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage) || 1;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = isAnyFilterSelected ? filteredExpenses.slice(startIndex, endIndex) : [];
+    const entryCheckTableContext = useMemo(() => ({
+        ...buildEntryCheckTableContext({
+        currentItems,
+        showFilters,
+        filterRowRef,
+        totalAmount,
+        timestampStartDate,
+        setTimestampStartDate,
+        timestampEndDate,
+        setTimestampEndDate,
+        showTimestampDateRangePicker,
+        setShowTimestampDateRangePicker,
+        selectedExpenseDate,
+        setSelectedExpenseDate,
+        projectNameOptions,
+        selectedSiteName,
+        setSelectedSiteName,
+        vendorOptions,
+        selectedVendor,
+        setSelectedVendor,
+        contractorOptions,
+        selectedContractor,
+        setSelectedContractor,
+        selectedQuantity,
+        setSelectedQuantity,
+        selectedDescription,
+        setSelectedDescription,
+        categoryOptions,
+        selectedCategory,
+        setSelectedCategory,
+        accountTypeOptions,
+        selectedAccountType,
+        setSelectedAccountType,
+        branchFilterOptions,
+        selectedBranch,
+        setSelectedBranch,
+        enoOptions,
+        selectedEno,
+        setSelectedEno,
+        customStyles: tableFilterSelectStyles,
+        formatDate,
+        formatDateOnly,
+        getBranchName,
+        billArrivalFilterRef,
+        }),
+        paymentModeFilterOptions,
+        selectedPaymentMode,
+        setSelectedPaymentMode,
+    }), [
+        currentItems,
+        showFilters,
+        totalAmount,
+        timestampStartDate,
+        timestampEndDate,
+        showTimestampDateRangePicker,
+        selectedExpenseDate,
+        projectNameOptions,
+        selectedSiteName,
+        vendorOptions,
+        selectedVendor,
+        contractorOptions,
+        selectedContractor,
+        selectedQuantity,
+        selectedDescription,
+        categoryOptions,
+        selectedCategory,
+        accountTypeOptions,
+        selectedAccountType,
+        paymentModeFilterOptions,
+        selectedPaymentMode,
+        branchFilterOptions,
+        selectedBranch,
+        enoOptions,
+        selectedEno,
+        tableFilterSelectStyles,
+        branchOptions,
+    ]);
     return (
         <body className=' bg-[#FAF6ED]'>
             <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
                 <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
                 <div className="w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] shrink-0">
-                    <div className="flex flex-wrap lg:flex-nowrap gap-[12px] items-end mb-2">
+                    <div className="flex flex-wrap lg:flex-nowrap gap-[12px] items-end">
                         <div className="flex flex-col">
-                            <label className="font-bold text-left text-sm">Entry Date</label>
+                            <label className="font-semibold text-left text-[16px]">Entry Date</label>
                             <div className="mt-2 w-full max-w-[155px]">
                                 <CustomDateField
                                     value={selectedDate}
@@ -404,10 +747,10 @@ const EntryChecking = () => {
                                 />
                             </div>
                         </div>
-                        <div className="flex flex-col flex-1 max-w-[320px]">
-                            <label className="font-bold text-left text-sm">Project Name</label>
+                        <div className="flex flex-col flex-1 max-w-[320px] min-w-0">
+                            <label className="font-semibold text-left text-[16px]">Project Name</label>
                             <Select
-                                className="mt-2"
+                                className="mt-2 min-w-0 w-full"
                                 classNames={nameSelectClassNames}
                                 options={projectNameOptions}
                                 value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
@@ -417,10 +760,10 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        <div className="flex flex-col flex-1 max-w-[260px]">
-                            <label className="font-bold text-left text-sm">Vendor Name</label>
+                        <div className="flex flex-col flex-1 max-w-[260px] min-w-0">
+                            <label className="font-semibold text-left text-[16px]">Vendor Name</label>
                             <Select
-                                className="mt-2"
+                                className="mt-2 min-w-0 w-full"
                                 classNames={nameSelectClassNames}
                                 options={vendorOptions}
                                 value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
@@ -430,10 +773,10 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        <div className="flex flex-col flex-1 max-w-[260px]">
-                            <label className="font-bold text-left text-sm">Contractor Name</label>
+                        <div className="flex flex-col flex-1 max-w-[260px] min-w-0">
+                            <label className="font-semibold text-left text-[16px]">Contractor Name</label>
                             <Select
-                                className="mt-2"
+                                className="mt-2 min-w-0 w-full"
                                 classNames={nameSelectClassNames}
                                 options={contractorOptions}
                                 value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
@@ -443,10 +786,10 @@ const EntryChecking = () => {
                                 styles={customSelectStyles}
                             />
                         </div>
-                        <div className="flex flex-col flex-1 max-w-[200px]">
-                            <label className="font-bold text-left text-sm">A/C Type</label>
+                        <div className="flex flex-col flex-1 max-w-[200px] min-w-0">
+                            <label className="font-semibold text-left text-[16px]">A/C Type</label>
                             <Select
-                                className="mt-2"
+                                className="mt-2 min-w-0 w-full"
                                 classNames={nameSelectClassNames}
                                 options={accountTypeOptions.map(type => ({ value: type, label: type }))}
                                 value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
@@ -457,13 +800,13 @@ const EntryChecking = () => {
                             />
                         </div>                        
                         <div className="flex flex-col">
-                            <label className="font-bold text-left text-sm">No Of Bills</label>
+                            <label className="font-semibold text-left text-[16px]">No Of Bills</label>
                             <div className="w-full lg:w-[80px] h-[40px] p-2 mt-2 rounded-lg bg-[#F2F2F2] border-2 border-[rgba(191,152,83,0.2)] hover:border-[rgba(191,152,83,0.4)] text-left">
                                 {isAnyFilterSelected ? filteredCount : ''}
                             </div>
                         </div>
                         <div className="flex flex-col">
-                            <label className="font-bold text-left text-sm">Amount</label>
+                            <label className="font-semibold text-left text-[16px]">Amount</label>
                             <div className="w-full lg:w-[140px] h-[40px] p-2 mt-2 rounded-lg bg-[#F2F2F2] border-2 border-[rgba(191,152,83,0.2)] hover:border-[rgba(191,152,83,0.4)] text-left">
                                 {isAnyFilterSelected
                                     ? `₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}`
@@ -509,114 +852,121 @@ const EntryChecking = () => {
                                 {isAnyFilterSelected && (
                                     <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
                                         {timestampStartDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit">
-                                                <span className="font-medium">Timestamp: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit">
+                                                <span className="font-semibold">Timestamp: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
                                                 <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {timestampEndDate && !timestampStartDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium">Timestamp until: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(timestampEndDate)}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit">
+                                                <span className="font-semibold">Timestamp until: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(timestampEndDate)}</span>
                                                 <button onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium">Date: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedDate)}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit">
+                                                <span className="font-semibold">Date: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(selectedDate)}</span>
                                                 <button onClick={() => setSelectedDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedStartDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit">
-                                                <span className="font-medium">Date Range: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedStartDate)}{selectedEndDate ? ` – ${formatChipDateDMY(selectedEndDate)}` : ' onwards'}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit">
+                                                <span className="font-semibold">Date Range: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(selectedStartDate)}{selectedEndDate ? ` – ${formatChipDateDMY(selectedEndDate)}` : ' onwards'}</span>
                                                 <button onClick={() => { setSelectedStartDate(''); setSelectedEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedEndDate && !selectedStartDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium">Date Range until: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedEndDate)}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit">
+                                                <span className="font-semibold">Date Range until: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(selectedEndDate)}</span>
                                                 <button onClick={() => setSelectedEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedExpenseDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium">Date: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{formatChipDateDMY(selectedExpenseDate)}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit">
+                                                <span className="font-semibold">Date: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{formatChipDateDMY(selectedExpenseDate)}</span>
                                                 <button onClick={() => setSelectedExpenseDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
                                         {selectedQuantity.trim() && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Quantity: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedQuantity}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Quantity: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedQuantity}</span>
                                                 <button onClick={() => setSelectedQuantity('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedDescription.trim() && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Description: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedDescription}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Description: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedDescription}</span>
                                                 <button onClick={() => setSelectedDescription('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedBranch && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Branch: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{getBranchName(selectedBranch) || selectedBranch}</span>
+                                                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Branch: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{getBranchName(selectedBranch) || selectedBranch}</span>
                                                 <button onClick={() => setSelectedBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedEno && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Entry No: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedEno}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Entry No: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedEno}</span>
                                                 <button onClick={() => setSelectedEno('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedVendor && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Vendor Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedVendor}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Vendor Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedVendor}</span>
                                                 <button onClick={() => setSelectedVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedContractor && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Contractor Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedContractor}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Contractor Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedContractor}</span>
                                                 <button onClick={() => setSelectedContractor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedSiteName && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Project Name: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedSiteName}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Project Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedSiteName}</span>
                                                 <button onClick={() => setSelectedSiteName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedCategory && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Category: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedCategory}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Category: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedCategory}</span>
                                                 <button onClick={() => setSelectedCategory('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         {selectedAccountType && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">A/C Type: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedAccountType}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">A/C Type: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedAccountType}</span>
                                                 <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
+                                        {selectedPaymentMode && (
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Mode: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedPaymentMode === BLANK_VALUE ? blankOption.label : selectedPaymentMode}</span>
+                                                <button onClick={() => setSelectedPaymentMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
                                         {selectedMachineTools && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium">Tools: </span>
-                                                <span className="font-semibold text-[14px] text-[#BF9853]">{selectedMachineTools}</span>
+                                            <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit">
+                                                <span className="font-semibold">Tools: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000]">{selectedMachineTools}</span>
                                                 <button onClick={() => setSelectedMachineTools('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
@@ -627,238 +977,101 @@ const EntryChecking = () => {
                                 <button onClick={clearFilters} className='flex h-[30px] w-[30px] shrink-0 items-center justify-center'>
                                     <img className='w-full h-full' src={Reload} alt="Reload" />
                                 </button>
+                                <div className="w-[286px] min-w-[286px] translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                                    <input
+                                        type="text"
+                                        value={overallSearch}
+                                        onChange={(e) => setOverallSearch(e.target.value)}
+                                        placeholder="Search Transactions..."
+                                        className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                                    />
+                                    <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+                                </div>
                                 <span className='text-[#E4572E] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
                             </div>
                         </div>
                         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div ref={scrollRef}
-                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto no-scrollbar scrollbar-none select-none"
+                            className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto no-scrollbar scrollbar-none select-none relative"
                             onWheel={() => { filterNudgeUsedRef.current = false; }}
                             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-fixed w-full min-w-[2060px] border-collapse">
-                                <thead className="sticky top-0 z-10 bg-white">
-                                    <tr className="bg-[#FAF6ED] h-[40px] text-[16px] font-bold text-center">
-                                        <th className="pl-[12px] w-[168px] font-bold text-left">Time stamp</th>
-                                        <th className="w-[120px] pr-[1px] font-bold text-left">Date</th>
-                                        <th className="pl-[1px] pr-[1px] w-[298px] font-bold text-left">Project Name</th>
-                                        <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left">Vendor Name</th>
-                                        <th className="pl-[1px] pr-[1px] w-[218px] font-bold text-left">Contractor Name</th>
-                                        <th className="pl-[1px] pr-[1px] w-[78px] font-bold text-left">Quantity</th>
-                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right">Amount</th>
-                                        <th className="pl-[9px] pr-[1px] w-[198px] font-bold text-left">Description</th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">Category</th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">A/C Type</th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">Branch</th>
-                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-right">E.No</th>
-                                        <th className="pl-[6px] pr-[12px] w-[70px] font-bold text-center">File</th>
-                                    </tr>
-                                    {showFilters && (
-                                        <tr ref={filterRowRef} className="bg-[#eeeeee] h-[44px]">
-                                            <th className="">
-                                                <div className="relative pl-[10px] [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowTimestampDateRangePicker(true)}
-                                                        className="w-[158px] box-border h-[36px] pl-[12px] pr-[3px] py-0 text-sm font-normal bg-white text-left flex items-center justify-between"
-                                                    >
-                                                        <span className={`text-[14px] font-medium truncate flex-1 text-left ${timestampStartDate && timestampEndDate ? 'text-black font-normal' : 'text-[#A6A5A6] font-normal'}`}>
-                                                            {timestampStartDate ? (timestampEndDate ? `${timestampStartDate} – ${timestampEndDate}` : `From ${timestampStartDate}`) : 'Timestamp'}
-                                                        </span>
-                                                        <img src={CalendarIcon} alt="Calendar" className="w-[16px] h-[16px] text-gray-400 flex-shrink-0 mr-[6px] ml-[3px]" />
-                                                    </button>
-                                                    <DateRangePicker
-                                                        isOpen={showTimestampDateRangePicker}
-                                                        onClose={() => setShowTimestampDateRangePicker(false)}
-                                                        startDate={timestampStartDate}
-                                                        endDate={timestampEndDate}
-                                                        variant="dropdown"
-                                                        onApply={(from, to) => {
-                                                            setTimestampStartDate(from);
-                                                            setTimestampEndDate(to);
-                                                        }}
-                                                    />
-                                                </div>
-                                            </th>
-                                            <th className="pr-[1px]">
-                                                <div className="w-[120px]">
-                                                    <CustomDateField
-                                                        value={selectedExpenseDate}
-                                                        onChange={setSelectedExpenseDate}
-                                                        placeholder="Date"
-                                                        alwaysOpenBelow
-                                                        className={` [&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button]:!text-[14px] ${selectedExpenseDate ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'} [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]`}
-                                                    />
-                                                </div>
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[298px]"
-                                                    options={projectNameOptions}
-                                                    value={selectedSiteName ? { value: selectedSiteName, label: selectedSiteName } : null}
-                                                    onChange={(selectedOption) => setSelectedSiteName(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Project Name"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={tableFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[218px]"
-                                                    options={vendorOptions}
-                                                    value={selectedVendor ? { value: selectedVendor, label: selectedVendor } : null}
-                                                    onChange={(selectedOption) => setSelectedVendor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Vendor Name"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={tableFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[218px]"
-                                                    options={contractorOptions}
-                                                    value={selectedContractor ? { value: selectedContractor, label: selectedContractor } : null}
-                                                    onChange={(selectedOption) => setSelectedContractor(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Contractor Name"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={tableFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <input
-                                                    type="text"
-                                                    value={selectedQuantity}
-                                                    onChange={(e) => setSelectedQuantity(e.target.value)}
-                                                    placeholder="Quantity"
-                                                    className="w-[78px] h-[36px] box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white px-2 text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]"
-                                                />
-                                            </th>
-                                            <th></th>
-                                            <th className="pl-[9px] pr-[1px]">
-                                                <input
-                                                    type="text"
-                                                    value={selectedDescription}
-                                                    onChange={(e) => setSelectedDescription(e.target.value)}
-                                                    placeholder="Description"
-                                                    className="w-[190px] h-[36px] box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white px-3 text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]"
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={categoryOptions}
-                                                    value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
-                                                    onChange={(selectedOption) => setSelectedCategory(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Category"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={tableFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={accountTypeOptions.map(type => ({ value: type, label: type }))}
-                                                    value={selectedAccountType ? { value: selectedAccountType, label: selectedAccountType } : null}
-                                                    onChange={(selectedOption) => setSelectedAccountType(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="A/C Type"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={tableFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px]">
-                                                <Select
-                                                    className="w-[158px]"
-                                                    options={branchFilterOptions}
-                                                    value={selectedBranch ? branchFilterOptions.find(opt => opt.value === String(selectedBranch)) : null}
-                                                    onChange={(selectedOption) => setSelectedBranch(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Branch"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={tableFilterSelectStyles}
-                                                />
-                                            </th>
-                                            <th className="pl-[1px] pr-[1px] text-right">
-                                                <Select
-                                                    className="w-[120px]"
-                                                    options={enoOptions.map((eno) => ({ value: String(eno), label: String(eno) }))}
-                                                    value={selectedEno ? { value: String(selectedEno), label: String(selectedEno) } : null}
-                                                    onChange={(selectedOption) => setSelectedEno(selectedOption ? selectedOption.value : '')}
-                                                    placeholder="Entry No"
-                                                    menuPlacement="bottom"
-                                                    isClearable
-                                                    styles={{
-                                                        ...tableFilterSelectStyles,
-                                                        control: (provided, state) => ({
-                                                            ...(typeof tableFilterSelectStyles.control === 'function' ? tableFilterSelectStyles.control(provided, state) : provided),
-                                                            textAlign: 'right',
-                                                        }),
-                                                        valueContainer: (provided) => ({
-                                                            ...provided,
-                                                            justifyContent: 'flex-end',
-                                                            paddingLeft: '2px',
-                                                            paddingRight: '12px',
-                                                        }),
-                                                        singleValue: (provided) => ({
-                                                            ...(typeof tableFilterSelectStyles.singleValue === 'function' ? tableFilterSelectStyles.singleValue(provided) : provided),
-                                                            textAlign: 'right',
-                                                        }),
-                                                        input: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'right',
-                                                        }),
-                                                        placeholder: (provided) => ({
-                                                            ...provided,
-                                                            textAlign: 'right',
-                                                        }),
-                                                        option: (provided, state) => ({
-                                                            ...(typeof tableFilterSelectStyles.option === 'function' ? tableFilterSelectStyles.option(provided, state) : provided),
-                                                            textAlign: 'right',
-                                                        }),
-                                                    }}
-                                                />
-                                            </th>
-                                            <th></th>
-                                        </tr>
-                                    )}
-                                </thead>
-                                <tbody>
-                                    {(isAnyFilterSelected ? filteredExpenses : []).map((expense, index) => (
-                                        <tr key={index} className="odd:bg-white even:bg-[#FAF6ED] text-[14px] font-semibold h-[40px]">
-                                            <td className="pl-[12px] w-[168px] text-left font-semibold">{formatDate(expense.timestamp)}</td>
-                                            <td className="w-[120px] pr-[1px] text-left font-semibold">{formatDateOnly(expense.date)}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[298px] text-left font-semibold">{expense.siteName}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[218px] text-left font-semibold">{expense.vendor}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[218px] text-left font-semibold">{expense.contractor}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[78px] text-left font-semibold">{expense.quantity}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[98px] text-right font-semibold">
-                                                ₹{Number(expense.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="text-left pl-[9px] pr-[1px] w-[198px] font-semibold">{expense.comments}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[158px] text-left font-semibold">{expense.category}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[158px] text-left font-semibold">{expense.accountType}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[158px] text-left font-semibold">{getBranchName(expense.branch_id ?? expense.branchId ?? '') || ''}</td>
-                                            <td className="pl-[1px] pr-[1px] w-[120px] text-right font-semibold">{expense.eno}</td>
-                                            <td className="pl-[6px] pr-[12px] w-[70px] text-center">
-                                                {expense.billCopy ? (
-                                                    <a href={expense.billCopy} className="text-red-500 underline font-semibold"
-                                                        target="_blank" rel="noopener noreferrer"
-                                                    >
-                                                        View
-                                                    </a>
-                                                ) : (
-                                                    <span></span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            {!isAnyFilterSelected && expenses.length > 0 && (
+                                <div className={`absolute inset-x-0 bottom-0 flex items-center justify-center text-[16px] font-medium text-[#666666] pointer-events-none z-[1] ${showFilters ? 'top-[84px]' : 'top-[40px]'}`}>
+                                    <span>Select the filter after the data has loaded</span>
+                                </div>
+                            )}
+                            <TableProvider value={entryCheckTableContext}>
+                              <Table showActivityColumn={false} />
+                            </TableProvider>
                         </div>
+                        {isAnyFilterSelected && filteredExpenses.length > 0 && (
+                            <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-700">Items per page:</span>
+                                    <select
+                                        value={itemsPerPage}
+                                        onChange={(e) => {
+                                            setItemsPerPage(Number(e.target.value));
+                                            setCurrentPage(1);
+                                        }}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                        <option value={200}>200</option>
+                                        <option value={300}>300</option>
+                                        <option value={400}>400</option>
+                                        <option value={500}>500</option>
+                                        <option value={600}>600</option>
+                                        <option value={700}>700</option>
+                                        <option value={800}>800</option>
+                                        <option value={900}>900</option>
+                                        <option value={1000}>1000</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-700">
+                                        Showing {startIndex + 1} to {Math.min(endIndex, filteredExpenses.length)} of {filteredExpenses.length} entries
+                                    </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
+                                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        Previous
+                                    </button>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        return (
+                                            <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
+                                                className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                    }`}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}
+                                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         </div>
                     </div>
                 </div>

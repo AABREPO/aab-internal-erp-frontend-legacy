@@ -707,7 +707,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           cheque_date: paymentDetails.chequeDate || null,
           transaction_number: paymentDetails.transactionNumber || null,
           account_number: paymentDetails.accountNumber || null,
-          branch_id: activeBranchId
+          branch_id: activeBranchId,
+          entered_by: username
         };
         try {
           const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save");

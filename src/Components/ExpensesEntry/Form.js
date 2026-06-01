@@ -19,6 +19,9 @@ const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
 const SUBSCRIPTION_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-subscription/getAll';
 
+const isAdvanceAdjustmentPaymentMode = (mode) =>
+    String(mode ?? '').trim().toLowerCase() === 'advance adjustment';
+
 const resolveVendorMasterId = (item) => {
     const raw = item?.id ?? item?.vendorId ?? item?.vendor_id;
     const n = Number(raw);
@@ -264,10 +267,15 @@ const Form = ({
     const [paymentModeOptions, setPaymentModeOptions] = useState([]);
     const selectablePaymentModeOptions = useMemo(() => {
         const allModes = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+        let modes = allModes.filter(
+            (mode) => !isAdvanceAdjustmentPaymentMode(mode?.modeOfPayment)
+        );
         const hideCash =
             selectedAccountType === 'Claim Payment' || selectedAccountType === 'Sundry Payment';
-        if (!hideCash) return allModes;
-        return allModes.filter((mode) => String(mode?.modeOfPayment ?? '').trim() !== 'Cash');
+        if (hideCash) {
+            modes = modes.filter((mode) => String(mode?.modeOfPayment ?? '').trim() !== 'Cash');
+        }
+        return modes;
     }, [paymentModeOptions, selectedAccountType]);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState({
@@ -679,6 +687,10 @@ const Form = ({
         setSelectedAccountTypeId(prefillId);
     }, [selectedAccountType, accountTypeOptions]);
     useEffect(() => {
+        if (isAdvanceAdjustmentPaymentMode(paymentMode)) {
+            setPaymentMode('');
+            return;
+        }
         if (
             (selectedAccountType === 'Claim Payment' || selectedAccountType === 'Sundry Payment') &&
             paymentMode === 'Cash'
@@ -1045,7 +1057,11 @@ const Form = ({
                             if (previousEntry.comments) {
                                 setComments(previousEntry.comments);
                             }
-                            if (previousEntry.paymentMode && previousEntry.paymentMode !== 'Cash') {
+                            if (
+                                previousEntry.paymentMode &&
+                                previousEntry.paymentMode !== 'Cash' &&
+                                !isAdvanceAdjustmentPaymentMode(previousEntry.paymentMode)
+                            ) {
                                 setPaymentMode(previousEntry.paymentMode);
                             }
                             if (previousEntry.utilityValidityDays) {

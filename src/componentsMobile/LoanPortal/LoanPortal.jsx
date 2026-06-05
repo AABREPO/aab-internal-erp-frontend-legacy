@@ -22,6 +22,12 @@ const LoanPortal = ({ user, onLogout }) => {
   React.useEffect(() => {
     localStorage.setItem('loanPortalActiveTab', activeTab);
   }, [activeTab]);
+
+  React.useEffect(() => {
+    const handleEditLoanEntry = () => setActiveTab('loanform');
+    window.addEventListener('editLoanEntry', handleEditLoanEntry);
+    return () => window.removeEventListener('editLoanEntry', handleEditLoanEntry);
+  }, []);
   const handleMenuClick = () => {
     setSidebarOpen(true);
   };

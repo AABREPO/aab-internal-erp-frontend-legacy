@@ -3557,13 +3557,6 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
     };
     return (
         <div>
-            <div className="mt-[-28px] flex justify-end mr-5">
-                <h1 className="font-bold text-xl">
-                    Balance: <span style={{ color: "#E4572E" }}>
-                        {(balance - (Number(newExpense.amount) || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                    </span>
-                </h1>
-            </div>
             <div className="mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent">
                 <div className="flex justify-between">
                     <div className="text-left">
@@ -3576,6 +3569,11 @@ const WeeklyPayment = ({ username, userRoles = [] }) => {
                         </button>
                     </div>
                     <div className="-mt-4justify-end mr-6">
+                        <h1 className="font-bold text-xl">
+                            Balance: <span style={{ color: "#E4572E" }}>
+                                {(balance - (Number(newExpense.amount) || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
+                            </span>
+                        </h1>
                         {(username === 'Admin' || username === 'Mahalingam M') && (
                             <button className="font-semibold text-lg cursor-pointer flex items-center gap-2" onClick={generatePDF}>
                                 Report

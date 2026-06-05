@@ -31,7 +31,7 @@ import {
   EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
-import { syncWeeklyPaymentBillsForAdvancePortal, needsAdvancePortalPaymentModalForWeeklyBill, getAdvancePortalDisplayAmount } from '../../utils/advancePortalWeeklyPaymentBill';
+import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId } from '../../utils/advancePortalWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 
 const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
@@ -615,6 +615,30 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     };
     fetchContractorNames();
   }, []);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuilderDash/api/expenses_categories/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!response.ok) throw new Error("Network response was not ok: " + response.statusText);
+        const data = await response.json();
+        setCategoryOptions(
+          data.map((item) => ({
+            id: item.id,
+            value: item.category,
+            label: item.category,
+          }))
+        );
+      } catch (error) {
+        console.error("Fetch error: ", error);
+      }
+    };
+    fetchCategories();
+  }, []);
   useEffect(() => { setCombinedOptions([...vendorOptions, ...contractorOptions]); }, [vendorOptions, contractorOptions]);
   useEffect(() => {
     const fetchSites = async () => {
@@ -720,7 +744,13 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const compareByAdvanceIdDesc = (a, b) =>
     getAdvanceRecordId(b) - getAdvanceRecordId(a);
   const entryHasProjectName = (entry) => !isBlankish(getSiteName(entry?.project_id));
+  const isLoanPortalSourceEntry = (entry) => {
+    const sourceVal =
+      entry?.source_from ?? entry?.sourceFrom ?? entry?.source ?? '';
+    return String(sourceVal).trim() === 'Loan Portal';
+  };
   const canUserEditEntry = (entry) => {
+    if (isLoanPortalSourceEntry(entry)) return false;
     if (!entryHasProjectName(entry)) return isAdmin;
     return true;
   };
@@ -1091,6 +1121,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     return sum;
   }, 0);
   const handleEditClick = (entry) => {
+    if (isLoanPortalSourceEntry(entry)) return;
     if (!canUserEditEntry(entry)) {
       alert('Entries without a project name can only be edited by admin users.');
       return;
@@ -1113,6 +1144,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       file_url: entry.file_url || '',
       description: entry.description || '',
       bill_amount: entry.bill_amount ?? '',
+      category: entry.category || '',
+      discount_amount: entry.discount_amount ?? '',
       type: entry.type || '',
       transfer_site_id: entry.transfer_site_id ?? '',
       payment_mode: entry.payment_mode || '',
@@ -1311,6 +1344,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
         }
         payload.amount = sanitizeNumberField(payload.amount);
         payload.bill_amount = sanitizeNumberField(payload.bill_amount);
+        payload.discount_amount = sanitizeNumberField(payload.discount_amount);
         payload.refund_amount = sanitizeNumberField(payload.refund_amount);
         payload.project_id = sanitizeNumberField(payload.project_id);
         payload.transfer_site_id = sanitizeNumberField(payload.transfer_site_id);
@@ -1336,11 +1370,22 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
         if (contentType.includes('application/json')) {
           updatedRecord = await res.json();
         }
+        const sourceRecord = advanceData.find((e) => e.advancePortalId === id);
+        const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
         await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
           editedBy: username,
           branchId: activeBranchId,
           modalPaymentData,
+          expensesEntryId,
         });
+        if (expensesEntryId) {
+          await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+            editedBy: username,
+            siteOptions,
+            selectedOption,
+            branchId: activeBranchId,
+          });
+        }
         return updatedRecord;
       };
       const setAllowToEdit = async (id, allow) => {
@@ -1433,13 +1478,21 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
         }
       } else {
         const payload = buildPayload();
-        if (await needsAdvancePortalPaymentModalForWeeklyBill(editingId, payload)) {
+        if (isAdvanceOnlinePaymentModeForModal(payload.payment_mode)) {
           pendingAdvanceUpdateRef.current = { payload };
+          let existingBill = null;
+          try {
+            const bills = await fetchWeeklyPaymentBillsByAdvancePortalId(editingId);
+            existingBill = Array.isArray(bills) && bills.length > 0 ? bills[0] : null;
+          } catch (e) {
+            console.warn('Could not fetch existing weekly bill to prefill payment details', e);
+          }
           setEditPaymentModalData({
-            chequeNo: '',
-            chequeDate: '',
-            transactionNumber: '',
-            accountNumber: '',
+            chequeNo: existingBill?.cheque_number ?? existingBill?.chequeNumber ?? '',
+            chequeDate: existingBill?.cheque_date ?? existingBill?.chequeDate ?? '',
+            transactionNumber:
+              existingBill?.transaction_number ?? existingBill?.transactionNumber ?? '',
+            accountNumber: existingBill?.account_number ?? existingBill?.accountNumber ?? '',
           });
           setShowEditPaymentModal(true);
           return;
@@ -1483,11 +1536,22 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
         const errorText = await res.text();
         throw new Error(errorText || 'Failed to update record');
       }
+      const sourceRecord = advanceData.find((e) => e.advancePortalId === editingId);
+      const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
       await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
         editedBy: username,
         branchId: activeBranchId,
         modalPaymentData: editPaymentModalData,
+        expensesEntryId,
       });
+      if (expensesEntryId) {
+        await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+          editedBy: username,
+          siteOptions,
+          selectedOption,
+          branchId: activeBranchId,
+        });
+      }
       try {
         const allowRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${editingId}?allow=${false}`, {
           method: 'PUT',
@@ -2252,198 +2316,13 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
             </div>
           )}
           {isEditModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[9999]">
-              <div className="bg-white rounded-md w-[65rem] px-6">
-                <div className="flex justify-end">
-                  <button className="text-red-500 mt-3" onClick={() => {
-                    setIsEditModalOpen(false);
-                    setSelectedFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }}>
-                    <img src={cross} alt='cross' className='w-5 h-5' />
-                  </button>
-                </div>
-                <div className='overflow-y-auto  pl-[50px] pr-[50px]'>
-                  <form className="">
-                    <h2 className="text-2xl font-bold mb-5">Edit Entry</h2>
-                    <div className='text-left'>
-                      <div className='grid grid-cols-2 gap-5'>
-                        <div className=''>
-                          <label className='block font-semibold mb-2'>Select Type</label>
-                          <Select
-                            options={[
-                              { value: 'Advance', label: 'Advance' },
-                              { value: 'Bill Settlement', label: 'Bill Settlement' },
-                              { value: 'Refund', label: 'Refund' },
-                              { value: 'Transfer', label: 'Transfer' }
-                            ]}
-                            value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
-                            onChange={(selected) => {
-                              const newType = selected ? selected.value : '';
-                              setEditFormData(prev => {
-                                const updated = { ...prev, type: newType };
-                                if (newType === 'Refund') {
-                                  updated.amount = '';
-                                  updated.bill_amount = '';
-                                } else if (newType === 'Advance') {
-                                  updated.refund_amount = '';
-                                  updated.bill_amount = '';
-                                } else if (newType === 'Bill Settlement') {
-                                  updated.refund_amount = '';
-                                  updated.amount = '';
-                                } else if (newType === 'Transfer') {
-                                  updated.refund_amount = '';
-                                  updated.bill_amount = '';
-                                  updated.payment_mode = '';
-                                }
-                                return updated;
-                              });
-                            }}
-                            placeholder="Select Type..."
-                            isSearchable
-                            isClearable
-                            styles={customStyles}
-                            menuPortalTarget={document.body}
-                            menuPosition="fixed"
-                            className='w-full focus:outline-none'
-                          />
-                        </div>
-                        <div className=''>
-                          <label className='block font-semibold mb-2'>Date</label>
-                          <input
-                            type='date'
-                            placeholder='dd-mm-yyyy'
-                            value={editFormData.date}
-                            onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                            className='block w-full border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none h-[45px]'
-                          />
-                        </div>
-                        <div className=''>
-                          <label className='block font-semibold mb-2'>Contractor/Vendor</label>
-                          <Select
-                            options={combinedOptions}
-                            value={selectedOption}
-                            onChange={handleChange}
-                            className='w-full rounded-lg focus:outline-none'
-                            isSearchable
-                            isClearable
-                            styles={customStyles}
-                            menuPortalTarget={document.body}
-                            menuPosition="fixed"
-                          />
-                        </div>
-                        <div className=''>
-                          <label className='block font-semibold mb-2'>Project Name</label>
-                          <Select
-                            options={sortedSiteOptions || []}
-                            placeholder="Select a site..."
-                            isSearchable={true}
-                            value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
-                            onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
-                            styles={customStyles}
-                            isClearable
-                            className='w-full focus:outline-none'
-                            menuPortalTarget={document.body}
-                            menuPosition="fixed"
-                          />
-                        </div>
-                        {editFormData.type === 'Bill Settlement' && (
-                          <div className=''>
-                            <label className='block font-semibold mb-2'>Bill Amount</label>
-                            <input
-                              value={editFormData.bill_amount}
-                              onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
-                              className='block w-full border-2 border-[#BF9853] font-[600px] border-opacity-25 p-2 rounded-lg focus:outline-none h-[45px]'
-                            />
-                          </div>
-                        )}
-                        <div className=''>
-                          <label className='block font-semibold mb-2'>
-                            {editFormData.type === 'Transfer'
-                              ? 'Transfer Amount'
-                              : editFormData.type === 'Refund'
-                                ? 'Refund Amount'
-                                : 'Amount Given'}
-                          </label>
-                          <input
-                            value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
-                            onChange={handleAmountChange}
-                            className='block w-full no-spinner border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none h-[45px]'
-                          />
-                        </div>
-                        {editFormData.type === 'Transfer' ? (
-                          <div className=''>
-                            <label className='block font-semibold mb-2'>Transfer To</label>
-                            <Select
-                              options={sortedSiteOptions}
-                              placeholder="Select a site..."
-                              isSearchable
-                              value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
-                              onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
-                              styles={customStyles}
-                              isClearable
-                              className='w-full focus:outline-none'
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <div className=''>
-                              <label className='block font-semibold mb-2'>Payment Mode</label>
-                              <Select
-                                options={finalPaymentModeOptions}
-                                value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
-                                onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
-                                placeholder="Select"
-                                isSearchable
-                                isClearable
-                                styles={customStyles}
-                                menuPortalTarget={document.body}
-                                menuPosition="fixed"
-                                className='w-full focus:outline-none'
-                              />
-                            </div>
-                            {editFormData.type === 'Bill Settlement' && (
-                              <div className='mt-3'>
-                                <label className='block font-semibold mb-2'>Attach File</label>
-                                <div className="flex items-center gap-2">
-                                  <label htmlFor="editFileInput" className="cursor-pointer flex items-center text-orange-600 text-sm font-semibold">
-                                    <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
-                                    Attach File
-                                  </label>
-                                  <input
-                                    type="file"
-                                    id="editFileInput"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    onChange={handleFileChange}
-                                  />
-                                  {selectedFile && (
-                                    <span className="text-gray-600 text-sm">{selectedFile.name}</span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      <div className=' mt-8'>
-                        <label className='block font-semibold mb-2'>Description</label>
-                        <textarea
-                          rows={3}
-                          value={editFormData.description}
-                          onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                          className='block w-full h-[45px] border-2 border-[#BF9853] border-opacity-25 font-[600px] p-2 rounded-lg focus:outline-none'>
-                        </textarea>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-                <div className="flex justify-end gap-3 mt-4 mb-5">
+            <div className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]">
+              <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
+                <div className="flex items-center justify-between mb-6 border-b-2">
+                  <h2 className="text-xl font-normal pb-2">Edit Entry</h2>
                   <button
+                    type="button"
+                    className="text-gray-500 hover:text-black"
                     onClick={() => {
                       setIsEditModalOpen(false);
                       setSelectedFile(null);
@@ -2451,11 +2330,254 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                         fileInputRef.current.value = '';
                       }
                     }}
-                    className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded"
+                  >
+                    <img src={cross} alt="close" className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="max-h-[75vh] overflow-y-auto">
+                  <form className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-gray-500 font-normal text-left">Select Type</label>
+                      <Select
+                        options={[
+                          { value: 'Advance', label: 'Advance' },
+                          { value: 'Bill Settlement', label: 'Bill Settlement' },
+                          { value: 'Refund', label: 'Refund' },
+                          { value: 'Transfer', label: 'Transfer' }
+                        ]}
+                        value={editFormData.type ? { value: editFormData.type, label: editFormData.type } : null}
+                        onChange={(selected) => {
+                          const newType = selected ? selected.value : '';
+                          setEditFormData(prev => {
+                            const updated = { ...prev, type: newType };
+                            if (newType === 'Refund') {
+                              updated.amount = '';
+                              updated.bill_amount = '';
+                            } else if (newType === 'Advance') {
+                              updated.refund_amount = '';
+                              updated.bill_amount = '';
+                            } else if (newType === 'Bill Settlement') {
+                              updated.refund_amount = '';
+                              updated.amount = '';
+                            } else if (newType === 'Transfer') {
+                              updated.refund_amount = '';
+                              updated.bill_amount = '';
+                              updated.payment_mode = '';
+                            }
+                            return updated;
+                          });
+                        }}
+                        placeholder="Select Type..."
+                        isSearchable
+                        isClearable
+                        styles={customStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-500 font-normal text-left">Date</label>
+                      <div className="mt-1">
+                        <input
+                          type="date"
+                          placeholder="dd-mm-yyyy"
+                          value={editFormData.date}
+                          onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                          className="block w-full p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-gray-500 font-normal text-left">Contractor/Vendor</label>
+                      <Select
+                        options={combinedOptions}
+                        value={selectedOption}
+                        onChange={handleChange}
+                        className="w-full"
+                        isSearchable
+                        isClearable
+                        styles={customStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-500 font-normal text-left">Project Name</label>
+                      <Select
+                        options={sortedSiteOptions || []}
+                        placeholder="Select a site..."
+                        isSearchable={true}
+                        value={sortedSiteOptions.find(site => site.id === editFormData.project_id) || null}
+                        onChange={(selected) => setEditFormData({ ...editFormData, project_id: selected?.id || '' })}
+                        styles={customStyles}
+                        isClearable
+                        className="w-full"
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                      />
+                    </div>
+                    {editFormData.type === 'Bill Settlement' && (
+                      <>
+                        <div>
+                          <label className="block text-gray-500 font-normal text-left">Bill Amount</label>
+                          <input
+                            value={editFormData.bill_amount}
+                            onChange={(e) => setEditFormData({ ...editFormData, bill_amount: e.target.value })}
+                            className="block w-full p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-500 font-normal text-left">Category</label>
+                          <Select
+                            options={categoryOptions}
+                            value={
+                              editFormData.category
+                                ? { value: editFormData.category, label: editFormData.category }
+                                : null
+                            }
+                            onChange={(selected) =>
+                              setEditFormData((prev) => ({
+                                ...prev,
+                                category: selected ? selected.value : '',
+                              }))
+                            }
+                            placeholder="Select a category..."
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-500 font-normal text-left">Discount</label>
+                          <input
+                            value={formatWithCommas(editFormData.discount_amount)}
+                            onChange={(e) => {
+                              const rawValue = e.target.value.replace(/,/g, '');
+                              if (rawValue === '' || !isNaN(rawValue)) {
+                                setEditFormData((prev) => ({
+                                  ...prev,
+                                  discount_amount: rawValue === '' ? '' : Number(rawValue),
+                                }));
+                              }
+                            }}
+                            className="block w-full no-spinner p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <label className="block text-gray-500 font-normal text-left">
+                        {editFormData.type === 'Transfer'
+                          ? 'Transfer Amount'
+                          : editFormData.type === 'Refund'
+                            ? 'Refund Amount'
+                            : 'Amount Given'}
+                      </label>
+                      <input
+                        value={editFormData.type === 'Refund' ? formatWithCommas(editFormData.refund_amount) : formatWithCommas(editFormData.amount)}
+                        onChange={handleAmountChange}
+                        className="block w-full no-spinner p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal h-[45px]"
+                      />
+                    </div>
+                    {editFormData.type === 'Transfer' ? (
+                      <div>
+                        <label className="block text-gray-500 font-normal text-left">Transfer To</label>
+                        <Select
+                          options={sortedSiteOptions}
+                          placeholder="Select a site..."
+                          isSearchable
+                          value={sortedSiteOptions.find(site => site.id === editFormData.transfer_site_id) || null}
+                          onChange={(selected) => setEditFormData({ ...editFormData, transfer_site_id: selected?.id || '' })}
+                          styles={customStyles}
+                          isClearable
+                          className="w-full"
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-gray-500 font-normal text-left">Payment Mode</label>
+                          <Select
+                            options={finalPaymentModeOptions}
+                            value={editFormData.payment_mode ? { value: editFormData.payment_mode, label: editFormData.payment_mode } : null}
+                            onChange={(selected) => setEditFormData({ ...editFormData, payment_mode: selected ? selected.value : '' })}
+                            placeholder="Select"
+                            isSearchable
+                            isClearable
+                            styles={customStyles}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex">
+                            <label
+                              className="block text-gray-500 font-normal text-left cursor-pointer"
+                              htmlFor="editFileInput"
+                            >
+                              File URL
+                            </label>
+                            {selectedFile && (
+                              <span className="text-orange-600 ml-4 text-sm">{selectedFile.name}</span>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            name="file_url"
+                            value={editFormData.file_url || ''}
+                            onChange={(e) =>
+                              setEditFormData((prev) => ({ ...prev, file_url: e.target.value }))
+                            }
+                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                            placeholder="Paste file URL or click label to upload"
+                          />
+                          <input
+                            type="file"
+                            id="editFileInput"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleFileChange}
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div className="col-span-2">
+                      <label className="block text-gray-500 font-normal text-left">Description</label>
+                      <textarea
+                        rows={3}
+                        value={editFormData.description}
+                        onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                        className="mt-1 block w-full p-2 border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-[rgba(191,152,83,0.4)] font-normal"
+                      />
+                    </div>
+                  </form>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setSelectedFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                    className="px-4 py-2 border border-[#BF9853] rounded"
                   >
                     Cancel
                   </button>
-                  <button onClick={handleUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded" >
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    className="px-4 py-2 bg-[#BF9853] text-white rounded"
+                  >
                     Save
                   </button>
                 </div>

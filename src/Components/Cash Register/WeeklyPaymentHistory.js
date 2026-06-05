@@ -230,15 +230,17 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
     const [lastDeletedWeeklySummary, setLastDeletedWeeklySummary] = useState(null);
     const weeklySummaryFileInputRef = useRef(null);
     const fetchWeeklySummaryFile = useCallback(async () => {
-        if (!selectedWeek) {
+        if (!selectedWeek || !year) {
             setWeeklySummaryFile(null);
             setLastDeletedWeeklySummary(null);
             return;
         }
+        const weekParam = encodeURIComponent(String(selectedWeek));
+        const yearParam = encodeURIComponent(String(year));
         setWeeklySummaryLoading(true);
         try {
             const res = await fetch(
-                `${WEEKLY_SUMMARY_FILE_API}/${encodeURIComponent(String(selectedWeek))}`
+                `${WEEKLY_SUMMARY_FILE_API}/${weekParam}/${yearParam}`
             );
             if (res.ok) {
                 const data = await res.json();
@@ -249,7 +251,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 // If no active record, try to fetch the most recent deleted record
                 try {
                     const deletedRes = await fetch(
-                        `${WEEKLY_SUMMARY_FILE_API}/last-deleted/${encodeURIComponent(String(selectedWeek))}`
+                        `${WEEKLY_SUMMARY_FILE_API}/last-deleted/${weekParam}/${yearParam}`
                     );
                     if (deletedRes.ok) {
                         const deletedData = await deletedRes.json();
@@ -258,6 +260,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                             setLastDeletedWeeklySummary({
                                 id: Number(deletedId),
                                 weekNumber: String(selectedWeek),
+                                year: String(year),
                                 summaryBillCopyUrl: deletedData?.summary_bill_copy_url ?? deletedData?.summaryBillCopyUrl ?? '',
                             });
                         } else {
@@ -278,7 +281,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         } finally {
             setWeeklySummaryLoading(false);
         }
-    }, [selectedWeek]);
+    }, [selectedWeek, year]);
     const [removedBillCopyRows, setRemovedBillCopyRows] = useState({});
     const [showCategoryPopup, setShowCategoryPopup] = useState(false);
     const [categoryOptions, setCategoryOptions] = useState([]);
@@ -879,7 +882,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         const uploadFormData = new FormData();
         uploadFormData.append("files", file);
         uploadFormData.append("folder", "FileUpload / Cash_Register_Weekly_Signature_Copy");
-        uploadFormData.append("fileName", `${timestamp}-Week-${selectedWeek}-SignatureCopy`);
+        uploadFormData.append("fileName", `${timestamp}-Week-${selectedWeek}-Year-${year}-SignatureCopy`);
         const uploadResponse = await fetch(
             "https://backendaab.in/demoAabuildersDash/api/files/upload",
             { method: "POST", body: uploadFormData }
@@ -897,7 +900,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
     const handleWeeklySummaryFileChange = async (e) => {
         const file = e.target.files?.[0];
         e.target.value = "";
-        if (!file || !selectedWeek) return;
+        if (!file || !selectedWeek || !year) return;
         if (weeklySummaryFile) {
             alert("A summary bill is already uploaded for this week. Remove it first to replace.");
             return;
@@ -911,6 +914,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                 body: JSON.stringify({
                     summary_bill_copy_url: pdfUrl,
                     week_number: String(selectedWeek),
+                    year: String(year),
                 }),
             });
             const saveMsg = await saveRes.text();
@@ -962,6 +966,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             setLastDeletedWeeklySummary({
                 id: weeklySummaryFile.id,
                 weekNumber: String(selectedWeek),
+                year: String(year),
                 summaryBillCopyUrl: weeklySummaryFile?.summary_bill_copy_url ?? weeklySummaryFile?.summaryBillCopyUrl ?? '',
             });
             setWeeklySummaryFile(null);
@@ -1539,7 +1544,7 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
     }, [selectedWeek, year, activeBranchId, expenseEntryRefreshNonce]);
     useEffect(() => {
         void fetchWeeklySummaryFile();
-    }, [selectedWeek, fetchWeeklySummaryFile]);
+    }, [selectedWeek, year, fetchWeeklySummaryFile]);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === "type") {
@@ -3721,7 +3726,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                     <>
                                         {canEditDelete &&
                                             lastDeletedWeeklySummary &&
-                                            String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) && (
+                                            String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
+                                            String(lastDeletedWeeklySummary.year) === String(year) && (
                                                 <button
                                                     type="button"
                                                     disabled={weeklySummaryDeleteLoading}

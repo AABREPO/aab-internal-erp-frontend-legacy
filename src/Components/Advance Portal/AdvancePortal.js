@@ -10,7 +10,15 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
-import { syncWeeklyPaymentBillsForAdvancePortal, needsAdvancePortalPaymentModalForWeeklyBill, getAdvancePortalDisplayAmount } from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+  syncWeeklyPaymentBillsForAdvancePortal,
+  needsAdvancePortalPaymentModalForWeeklyBill,
+  getAdvancePortalDisplayAmount,
+  resolveExpensesEntryIdAfterSave,
+  buildAdvancePortalExpensesEntryLinkFields,
+  resolveAdvancePortalIdFromSaveResponse,
+  linkExpensesEntryIdToAdvancePortal,
+} from '../../utils/advancePortalWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 const advancePortalReadonlyFieldClass =
   'min-h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg bg-[#FAF6ED] px-3 flex items-center text-sm font-medium text-[#202020]';
@@ -669,6 +677,7 @@ const AdvancePortal = ({
       color: '#999',
       textAlign: 'left',
     }),
+    indicatorSeparator: () => ({ display: 'none' }),
   };
   const fetchAdvanceData = async () => {
     try {
@@ -900,6 +909,78 @@ const AdvancePortal = ({
       throw error;
     }
   };
+  const buildBillSettlementExpensesPayload = ({ date, fileUrl, accountType, includeEno = false }) => {
+    let vendor = '';
+    let contractor = '';
+    if (selectedOption?.type === 'Vendor') {
+      vendor = selectedOption.label;
+    } else if (selectedOption?.type === 'Contractor') {
+      contractor = selectedOption.label;
+    }
+    const payload = {
+      accountType,
+      date,
+      siteName: selectedSite ? selectedSite.label : '',
+      projectId: selectedSite ? selectedSite.id : null,
+      vendor,
+      vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+      contractor,
+      contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+      quantity: '',
+      amount: parseInt(billAmount) || 0,
+      category: selectedCategory ? selectedCategory.label : '',
+      comments: description,
+      machineTools: '',
+      billCopyUrl: fileUrl || '',
+      source: 'Advance Portal',
+      branchId: activeBranchId,
+      enteredBy,
+    };
+    if (eno != null) {
+      payload.eno = eno;
+    }
+    if (includeEno) {
+      payload.discount_amount = parseFloat(discountAmount) || 0;
+    }
+    return payload;
+  };
+  const saveExpensesFormEntry = async (expensesPayload) => {
+    const expensesResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(expensesPayload),
+    });
+    const responseText = await expensesResponse.text();
+    if (!expensesResponse.ok) {
+      throw new Error(`Expenses form submission failed: ${responseText}`);
+    }
+    const expensesEntryId = resolveExpensesEntryIdAfterSave(responseText);
+    if (!expensesEntryId) {
+      console.error('expenses_form/save response missing id:', responseText);
+      throw new Error(
+        'Expenses save response did not include id. Backend must return { id } from expenses_form/save.'
+      );
+    }
+    return expensesEntryId;
+  };
+  const linkBillSettlementExpenseToAdvancePortal = async (
+    advancePortalId,
+    expensesEntryId,
+    advancePayload
+  ) => {
+    if (!expensesEntryId) return;
+    if (!advancePortalId) {
+      console.warn(
+        'Advance portal save response did not include id; expenses_entry_id was sent on save payload only.'
+      );
+      return;
+    }
+    await linkExpensesEntryIdToAdvancePortal(advancePortalId, expensesEntryId, {
+      editedBy: enteredBy,
+      advancePayload,
+      buildUrl: (url) => withBranchUrl(url),
+    });
+  };
   const submitAdvanceData = async () => {
     setIsSubmitting(true); // Start loading
     setShowReviewModal(false);
@@ -1074,10 +1155,28 @@ const AdvancePortal = ({
           }
         }
       } else {
-        const payload = createPayload();
-        const { response: advanceSaveResponse } = await saveAdvancePortalWithLogs(payload, 'Advance Portal Submit');
+        let expensesEntryId = null;
+        if (selectedType === 'Bill Settlement') {
+          const expensesPayload = buildBillSettlementExpensesPayload({
+            date: dateValue,
+            fileUrl,
+            accountType: 'Bill Settlement',
+            includeEno: true,
+          });
+          expensesEntryId = await saveExpensesFormEntry(expensesPayload);
+          setEno(eno + 1);
+        }
+        const payload = createPayload(
+          expensesEntryId != null ? buildAdvancePortalExpensesEntryLinkFields(expensesEntryId) : {}
+        );
+        const { response: advanceSaveResponse, data: advanceSaveResult } =
+          await saveAdvancePortalWithLogs(payload, 'Advance Portal Submit');
         if (!advanceSaveResponse.ok) {
           throw new Error('Failed to save advance portal data');
+        }
+        if (expensesEntryId) {
+          const advancePortalId = resolveAdvancePortalIdFromSaveResponse(advanceSaveResult);
+          await linkBillSettlementExpenseToAdvancePortal(advancePortalId, expensesEntryId, payload);
         }
         // If opened from Weekly Cash Register Bill Settlement row, update that row with uploaded bill URL
         if (selectedType === 'Bill Settlement' && fileUrl) {
@@ -1090,48 +1189,6 @@ const AdvancePortal = ({
           } catch {
             // ignore
           }
-        }
-        // Also save to expenses form if Bill Settlement
-        if (selectedType === 'Bill Settlement') {
-          let vendor = '';
-          let contractor = '';
-          if (selectedOption?.type === 'Vendor') {
-            vendor = selectedOption.label;
-          } else if (selectedOption?.type === 'Contractor') {
-            contractor = selectedOption.label;
-          }
-          const expensesPayload = {
-            accountType: 'Bill Payments',
-            date: dateValue,
-            siteName: selectedSite ? selectedSite.label : '',
-            projectId: selectedSite ? selectedSite.id : null,
-            vendor: vendor,
-            vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
-            contractor: contractor,
-            contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
-            quantity: '',
-            amount: parseInt(billAmount) || 0,
-            category: selectedCategory ? selectedCategory.label : '',
-            comments: description,
-            machineTools: '',
-            billCopyUrl: fileUrl || '',
-            source: "Advance Portal",
-            branchId: activeBranchId,
-            enteredBy,
-          };
-          const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(expensesPayload),
-          });
-          if (!expensesResponse.ok) {
-            const errorText = await expensesResponse.text();
-            throw new Error(`Expenses form submission failed: ${errorText}`);
-          }
-          // Update ENo for next entry
-          setEno(eno + 1);
         }
       }
       toast.success('Advance saved successfully!', {
@@ -1460,6 +1517,17 @@ const AdvancePortal = ({
       const allData = await res.json();
       const maxEntryNo = allData.length > 0 ? Math.max(...allData.map(item => item.entry_no || 0)) : 0;
       const nextEntryNo = maxEntryNo + 1;
+      let expensesEntryId = null;
+      if (selectedType === 'Bill Settlement') {
+        const expensesPayload = buildBillSettlementExpensesPayload({
+          date: paymentModalData.date,
+          fileUrl,
+          accountType: 'Bill Settlement',
+          includeEno: true,
+        });
+        expensesEntryId = await saveExpensesFormEntry(expensesPayload);
+        setEno(eno + 1);
+      }
       // Create advance portal payload
       const advancePayload = {
         type: selectedType,
@@ -1483,6 +1551,7 @@ const AdvancePortal = ({
         branch_id: activeBranchId,
         entered_by: enteredBy,
         source: "Advance Portal",
+        ...buildAdvancePortalExpensesEntryLinkFields(expensesEntryId),
       };
       const advanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
       if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
@@ -1500,6 +1569,12 @@ const AdvancePortal = ({
       const { response: advanceResponse, data: advanceResult } = await saveAdvancePortalWithLogs(advancePayload, 'Advance Portal Payment Submit');
       if (!advanceResponse.ok) {
         throw new Error('Failed to save advance portal data');
+      }
+      if (expensesEntryId) {
+        const advancePortalId =
+          resolveAdvancePortalIdFromSaveResponse(advanceResult) ??
+          resolveAdvancePortalIdFromSaveResponse(advanceResult?.data);
+        await linkBillSettlementExpenseToAdvancePortal(advancePortalId, expensesEntryId, advancePayload);
       }
       // If opened from Weekly Cash Register Bill Settlement row, update that row with uploaded bill URL
       if (selectedType === 'Bill Settlement' && fileUrl) {
@@ -1552,51 +1627,6 @@ const AdvancePortal = ({
           throw new Error('Failed to save weekly payment bills data');
         }
         isWeeklyPaymentBillSaved = true;
-      }
-      // Also save to expenses form if Bill Settlement
-      if (selectedType === 'Bill Settlement') {
-        let vendor = '';
-        let contractor = '';
-        if (selectedOption?.type === 'Vendor') {
-          vendor = selectedOption.label;
-        } else if (selectedOption?.type === 'Contractor') {
-          contractor = selectedOption.label;
-        }
-        const expensesPayload = {
-          accountType: 'Bill Settlement',
-          eno: eno,
-          date: paymentModalData.date,
-          siteName: selectedSite ? selectedSite.label : '',
-          projectId: selectedSite ? selectedSite.id : null,
-          vendor: vendor,
-          vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
-          contractor: contractor,
-          contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
-          quantity: '',
-          amount: parseInt(billAmount) || 0,
-          discount_amount: parseFloat(discountAmount) || 0,
-          category: selectedCategory ? selectedCategory.label : '',
-          comments: description,
-          machineTools: '',
-          billCopyUrl: fileUrl || '',
-          source: "Advance Portal",
-          branchId: activeBranchId,
-          enteredBy,
-        };
-        const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(expensesPayload),
-        });
-        console.log('Expenses form response:', expensesResponse);
-        if (!expensesResponse.ok) {
-          const errorText = await expensesResponse.text();
-          throw new Error(`Expenses form submission failed: ${errorText}`);
-        }
-        // Update ENo for next entry
-        setEno(eno + 1);
       }
       const successMessage = isWeeklyPaymentBillSaved
         ? 'Advance saved successfully and added to Weekly Payment Bills!'
@@ -2022,16 +2052,23 @@ const AdvancePortal = ({
                       className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 font-medium px-2 py-2 rounded-lg focus:outline-none text-sm'>
                     </textarea>
                   </div>
-                  <div className=''>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
-                      <div className='flex items-center'>
-                        <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 text-sm">
+                  <div className='col-span-1 sm:col-span-2 min-w-0 overflow-hidden'>
+                    <div className="flex flex-row items-center gap-2 mb-2 min-w-0 w-full overflow-hidden">
+                      <div className='flex items-center shrink-0'>
+                        <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 text-sm whitespace-nowrap">
                           <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
                           Attach file
                         </label>
                         <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                       </div>
-                      {selectedAdvanceFile && <span className="text-gray-600 text-sm">{selectedAdvanceFile.name}</span>}
+                      {selectedAdvanceFile && (
+                        <span
+                          className="text-gray-600 text-sm truncate min-w-0 flex-1"
+                          title={selectedAdvanceFile.name}
+                        >
+                          {selectedAdvanceFile.name}
+                        </span>
+                      )}
                     </div>
                     <button className='bg-[#c7934c] text-white w-full sm:w-[120px] h-[33px] rounded flex items-center justify-center text-sm xl:mb-0 mb-2'
                       onClick={handleSubmit} disabled={isSubmitting || checkingDuplicate}

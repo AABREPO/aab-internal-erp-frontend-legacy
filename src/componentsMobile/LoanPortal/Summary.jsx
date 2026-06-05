@@ -651,7 +651,7 @@ const Summary = () => {
             <p className="text-[14px] font-medium text-[#9E9E9E] text-center mt-4">No loan records found</p>
           </div>
         ) : (
-          <div className="space-y-[12px] pb-[8px]">
+          <div className="space-y-[4px] pb-[8px]">
             {summaryCards.map((card, idx) => {
               const isSettled = card.isSettled;
               return (

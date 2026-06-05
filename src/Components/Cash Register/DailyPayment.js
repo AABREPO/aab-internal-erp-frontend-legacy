@@ -38,6 +38,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
         }
     };
     const enteredBy = resolveEnteredBy();
+    const canRemoveFileUrl = username === 'Admin' || username === 'Mahalingam M';
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
     const withBranchUrl = useCallback((baseUrl) => {
         const url = new URL(baseUrl);
@@ -122,6 +123,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
+    const [removedFileUrlRows, setRemovedFileUrlRows] = useState({});
     const [purposeOptions, setPurposeOptions] = useState([]);
     const [showPurposePopup, setShowPurposePopup] = useState(false);
     const [selectedPurpose, setSelectedPurpose] = useState(null);
@@ -2362,6 +2364,11 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             setDailyExpenses((prev) =>
                 prev.map((exp) => (exp.id === currentFileRow.id ? { ...exp, file_url: pdfUrl } : exp))
             );
+            setRemovedFileUrlRows((prev) => {
+                const next = { ...prev };
+                delete next[currentFileRow.id];
+                return next;
+            });
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
@@ -2370,11 +2377,73 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             alert("Error during file upload. Please try again.");
         }
     };
+    const handleRemoveFileUrl = async (row) => {
+        if (!row?.id) return;
+        const shouldRemove = window.confirm('Remove attached file?');
+        if (!shouldRemove) return;
+        try {
+            const response = await fetch(
+                `https://backendaab.in/demoAabuildersDash/api/daily-payments/${row.id}/remove-file`,
+                {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(enteredBy || username || ''),
+                }
+            );
+            if (!response.ok) {
+                throw new Error('Failed to remove file URL');
+            }
+            setDailyExpenses((prev) =>
+                prev.map((exp) => (exp.id === row.id ? { ...exp, file_url: null } : exp))
+            );
+            setRemovedFileUrlRows((prev) => ({ ...prev, [row.id]: true }));
+            if (currentFileRow?.id === row.id) {
+                setCurrentFileRow((prev) => (prev ? { ...prev, file_url: null } : prev));
+            }
+            alert('File removed successfully!');
+        } catch (error) {
+            console.error('Error removing file:', error);
+            alert('Failed to remove file. Please try again.');
+        }
+    };
+    const handleRestoreFileUrl = async (row) => {
+        if (!row?.id) return;
+        try {
+            const response = await fetch(
+                `https://backendaab.in/demoAabuildersDash/api/daily-payments/${row.id}/restore-file`,
+                {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            if (!response.ok) {
+                throw new Error('Failed to restore file URL');
+            }
+            const restored = await response.json().catch(() => null);
+            const restoredUrl = restored?.file_url ?? restored?.fileUrl ?? null;
+            setDailyExpenses((prev) =>
+                prev.map((exp) =>
+                    exp.id === row.id ? { ...exp, file_url: restoredUrl || exp.file_url } : exp
+                )
+            );
+            setRemovedFileUrlRows((prev) => {
+                const next = { ...prev };
+                delete next[row.id];
+                return next;
+            });
+            if (currentFileRow?.id === row.id && restoredUrl) {
+                setCurrentFileRow((prev) => (prev ? { ...prev, file_url: restoredUrl } : prev));
+            }
+            alert('File restored successfully!');
+        } catch (error) {
+            console.error('Error restoring file:', error);
+            alert('Failed to restore file. Please try again.');
+        }
+    };
     return (
         <body>
-            <h1 className="font-bold text-xl flex justify-end mr-5 -mt-7">
-                Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
-            </h1>
             <div className='mx-auto flex justify-between w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
                 <div>
                     {displayedWeekDays.length > 0 && (
@@ -2412,6 +2481,9 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
                 <div className="mr-5 flex gap-3">
+                    <h1 className="font-bold text-xl">
+                        Balance:<span style={{ color: "#E4572E" }}>{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
+                    </h1>
                     <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
                 </div>
             </div>
@@ -3027,48 +3099,76 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                                                                     <div className="w-[20px] h-[40px] flex items-center justify-center text-gray-500 text-sm">
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="w-[20px] h-[40px] flex items-center gap-2">
-                                                                        {row.description ? (
-                                                                            <div className="flex items-center justify-center w-full">
-                                                                                <img
-                                                                                    src={NotesEnd}
-                                                                                    alt="View Description"
-                                                                                    className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 flex-shrink-0"
-                                                                                    onClick={() => handleDescriptionClick(row)}
-                                                                                />
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex items-center justify-center w-full">
-                                                                                <img
-                                                                                    src={NotesStart}
-                                                                                    alt="Add Description"
-                                                                                    className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
-                                                                                    onClick={() => handleDescriptionClick(row)}
-                                                                                />
-                                                                            </div>
+                                                                    <div className="flex items-center gap-1 min-w-[100px] shrink-0">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDescriptionClick(row)}
+                                                                            className="inline-flex h-4 w-4 shrink-0 items-center justify-center"
+                                                                            title={row.description ? 'View Description' : 'Add Description'}
+                                                                        >
+                                                                            <img
+                                                                                src={row.description ? NotesEnd : NotesStart}
+                                                                                alt=""
+                                                                                className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
+                                                                            />
+                                                                        </button>
+                                                                        <span className="inline-flex min-w-[44px] items-center gap-1">
+                                                                            {row.file_url ? (
+                                                                                <>
+                                                                                    <a
+                                                                                        href={row.file_url}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer"
+                                                                                        title="View File"
+                                                                                    >
+                                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                                    </a>
+                                                                                    {canRemoveFileUrl && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleRemoveFileUrl(row)}
+                                                                                            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[#E4572E] text-base font-bold leading-none hover:bg-[#fff1ee]"
+                                                                                            title="Remove File"
+                                                                                        >
+                                                                                            ×
+                                                                                        </button>
+                                                                                    )}
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleFileUploadClick(row)}
+                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer"
+                                                                                        title="Upload File"
+                                                                                    >
+                                                                                        <img
+                                                                                            src={fileUpload}
+                                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
+                                                                                            alt="Upload File"
+                                                                                        />
+                                                                                    </button>
+                                                                                    <span
+                                                                                        className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center"
+                                                                                        aria-hidden="true"
+                                                                                    >
+                                                                                        <span className="text-base font-bold leading-none opacity-0">×</span>
+                                                                                    </span>
+                                                                                </>
+                                                                            )}
+                                                                        </span>
+                                                                        {canRemoveFileUrl && !row.file_url && removedFileUrlRows[row.id] && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRestoreFileUrl(row)}
+                                                                                className="shrink-0 rounded border border-[#007233] px-1 text-[9px] font-semibold leading-tight text-[#007233] hover:bg-[#e9f8f0]"
+                                                                                title="Restore Removed File"
+                                                                            >
+                                                                                Restore
+                                                                            </button>
                                                                         )}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="ml-3 flex items-center gap-1">
-                                                                {row.file_url ? (
-                                                                    <a
-                                                                        href={row.file_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="cursor-pointer"
-                                                                        title="View File"
-                                                                    >
-                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                    </a>
-                                                                ) : (
-                                                                    <button onClick={() => handleFileUploadClick(row)} className="cursor-pointer" title="Upload File" >
-                                                                        <img
-                                                                            src={fileUpload}
-                                                                            className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                            alt="Upload File"
-                                                                        />
-                                                                    </button>
                                                                 )}
                                                             </div>
                                                         </div>

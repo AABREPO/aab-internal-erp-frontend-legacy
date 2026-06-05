@@ -28,6 +28,10 @@ import {
   EdbcExpandableBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
+import {
+  resolveLoanAdvancePortalId,
+  syncAdvancePortalFromLoanEdit,
+} from '../../utils/advancePortalWeeklyPaymentBill';
 
 const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -1083,6 +1087,9 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   };
   const handleUpdate = async () => {
     try {
+      const currentEntry = loanData.find(
+        (entry) => String(entry.loanPortalId || entry.id) === String(editingId)
+      );
       const payload = {
         loanPortalId: editingId,
         type: editSelectedType,
@@ -1110,7 +1117,6 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         entry_no: editFormData.entry_no || 0,
         description: editDescription || "",
       };
-      console.log(payload);
       const res = await fetch(
         `https://backendaab.in/demoAabuildersDash/api/loans/${editingId}?editedBy=${username}`,
         {
@@ -1121,6 +1127,25 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       );
       if (!res.ok) throw new Error('Failed to update');
       const updatedDataArray = await res.json();
+
+      const advancePortalId = resolveLoanAdvancePortalId(currentEntry);
+      if (advancePortalId) {
+        try {
+          await syncAdvancePortalFromLoanEdit(advancePortalId, payload, {
+            editedBy: username,
+            siteOptions,
+            selectedOption: editSelectedOption,
+          });
+        } catch (syncErr) {
+          console.error('Failed to sync linked advance portal entry:', syncErr);
+          toast.warning('Loan updated, but linked advance portal entry could not be synced.', {
+            position: 'top-center',
+            autoClose: 4000,
+            theme: 'colored',
+          });
+        }
+      }
+
       setLoanData(prev => {
         const newData = [...prev];
         updatedDataArray.forEach(entry => {

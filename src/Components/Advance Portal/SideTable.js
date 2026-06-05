@@ -26,7 +26,46 @@ import {
   DATABASE_TABLE_FILTER_SELECT_STYLES,
   EDBC_TABLE_EDGE_TABLE_CLASS,
   EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+  useEdbcTableSort,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
+
+/** Newest date first; same date → highest entry_no first (last entered). */
+const compareSideTableByDateThenEntryNo = (a, b) => {
+  const dateA = new Date(a.date).getTime();
+  const dateB = new Date(b.date).getTime();
+  if (dateB !== dateA) return dateB - dateA;
+  return (Number(b.entry_no) || 0) - (Number(a.entry_no) || 0);
+};
+
+const sortSideTableAdvanceEntries = (entries, sortField, sortDirection, siteOptions) => {
+  if (!Array.isArray(entries)) return entries;
+  if (!sortField) return [...entries].sort(compareSideTableByDateThenEntryNo);
+  if (sortField === 'date') return [...entries].sort(compareSideTableByDateThenEntryNo);
+  return [...entries].sort((a, b) => {
+    let aValue;
+    let bValue;
+    if (sortField === 'amount') {
+      const advanceSortValue = (entry) =>
+        entry.type === 'Refund'
+          ? -(Number(entry.refund_amount) || 0)
+          : Number(entry.amount) || 0;
+      aValue = advanceSortValue(a);
+      bValue = advanceSortValue(b);
+    } else if (sortField === 'siteName') {
+      aValue = getEntryRowDisplay(a, siteOptions).transferOrRefund.toLowerCase();
+      bValue = getEntryRowDisplay(b, siteOptions).transferOrRefund.toLowerCase();
+    } else if (sortField === 'paymentMode') {
+      aValue = (a.payment_mode || '').toLowerCase();
+      bValue = (b.payment_mode || '').toLowerCase();
+    } else {
+      aValue = String(a[sortField] ?? '').toLowerCase();
+      bValue = String(b[sortField] ?? '').toLowerCase();
+    }
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return compareSideTableByDateThenEntryNo(a, b);
+  });
+};
 
 const filterEntriesForSideTable = (advanceData, selectedOption, selectedSite) =>
   (advanceData || [])
@@ -40,11 +79,7 @@ const filterEntriesForSideTable = (advanceData, selectedOption, selectedSite) =>
       const isForCurrentProject = entry.project_id === selectedSite?.id;
       return isMatchingVendor && isForCurrentProject;
     })
-    .sort((a, b) => {
-      const entryNoA = a.entry_no || 0;
-      const entryNoB = b.entry_no || 0;
-      return entryNoB - entryNoA;
-    });
+    .sort(compareSideTableByDateThenEntryNo);
 
 const getEntryRowDisplay = (entry, siteOptions) => {
   const {
@@ -94,7 +129,8 @@ const SideTable = ({
   selectedOption,
   selectedSite,
   siteOptions,
-  onEditClick,
+  onEditClick = () => {},
+  hideDiscountAndActivity = false,
 }) => {
   const [overallSearch, setOverallSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -291,6 +327,11 @@ const SideTable = ({
       ),
     [tableEntries]
   );
+  const { sortField, sortDirection, sortProps } = useEdbcTableSort();
+  const sortedTableEntries = useMemo(
+    () => sortSideTableAdvanceEntries(tableEntries, sortField, sortDirection, siteOptions),
+    [tableEntries, sortField, sortDirection, siteOptions],
+  );
   const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
   const edbc2Config = getEdbcColumnConfig(EDBC_IDS.EDBC2);
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
@@ -298,6 +339,8 @@ const SideTable = ({
   const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
   const edbc19Config = getEdbcColumnConfig(EDBC_IDS.EDBC19);
   const edbc19TdClass = edbc19Config?.tdClass || '';
+  const tableColSpan = hideDiscountAndActivity ? 5 : 7;
+  const tableWidthClass = hideDiscountAndActivity ? 'w-[788px] max-w-[788px]' : 'w-[968px] max-w-[968px]';
 
   const exportPDF = () => {
     const doc = new jsPDF();
@@ -551,12 +594,6 @@ const SideTable = ({
             />
             <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
           </div>
-          <div className="text-left md:text-right md:items-end items-end cursor-default flex justify-end shrink-0">
-            <div className="flex items-end text-center">
-              <span onClick={exportPDF} className="text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer text-sm">PDF<img src={Pdf} alt="Pdf" className="w-4 h-4" /></span>
-              <span onClick={exportCSV} className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer text-sm">XL<img src={XL} alt="XL" className="w-4 h-4" /></span>
-            </div>
-          </div>
         </div>
       </div>
       <div className="border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden w-fit max-w-full">
@@ -569,25 +606,29 @@ const SideTable = ({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <table className={`table-fixed w-[968px] max-w-[968px] border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
+          <table className={`table-fixed ${tableWidthClass} border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
             <colgroup>
               <col className={EDBC2_FIRST_COLUMN_WIDTH_CLASS} />
               <col className={edbc8Config?.columnWidthClass} />
               <col className={edbc8Config?.columnWidthClass} />
-              <col className={edbc8Config?.columnWidthClass} />
+              {!hideDiscountAndActivity && <col className={edbc8Config?.columnWidthClass} />}
               <col className={edbc3Config?.columnWidthClass} />
               <col className={edbc13Config?.columnWidthClass} />
-              <col className={edbc19Config?.columnWidthClass} />
+              {!hideDiscountAndActivity && <col className={edbc19Config?.columnWidthClass} />}
             </colgroup>
             <thead className="sticky top-0 z-10 bg-white">
               <EdbcTableHeaderRow>
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Advance" />
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Bill" />
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Discount" />
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Transfer/Refund" />
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC13} label="Mode" />
-                <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" {...sortProps} />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Advance" {...sortProps} />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Bill" {...sortProps} />
+                {!hideDiscountAndActivity && (
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Discount" {...sortProps} />
+                )}
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Transfer/Refund" {...sortProps} />
+                <EdbcColumnHeader columnId={EDBC_IDS.EDBC13} label="Mode" {...sortProps} />
+                {!hideDiscountAndActivity && (
+                  <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
+                )}
               </EdbcTableHeaderRow>
               {showFilters && (
                 <EdbcTableFilterRow ref={filterRowRef}>
@@ -598,7 +639,9 @@ const SideTable = ({
                   />
                   <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.advance} />
                   <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.bill} />
-                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.discount} />
+                  {!hideDiscountAndActivity && (
+                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.discount} />
+                  )}
                   <EdbcProjectNameFilter
                     placeholder="Transfer/Refund"
                     options={transferRefundFilterOptions}
@@ -616,25 +659,27 @@ const SideTable = ({
                     onChange={setFilterMode}
                     selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                   />
-                  <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                  {!hideDiscountAndActivity && (
+                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                  )}
                 </EdbcTableFilterRow>
               )}
             </thead>
             <tbody>
               {!selectedOption || !selectedSite ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-4 text-sm text-gray-500">
+                  <td colSpan={tableColSpan} className="text-center py-4 text-sm text-gray-500">
                     Please select a contractor/vendor and project to view advance records.
                   </td>
                 </tr>
-              ) : tableEntries.length === 0 ? (
+              ) : sortedTableEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-4 text-sm text-gray-500">
+                  <td colSpan={tableColSpan} className="text-center py-4 text-sm text-gray-500">
                     No records found for the selected contractor/vendor and project.
                   </td>
                 </tr>
               ) : (
-                tableEntries.map((entry, index) => {
+                sortedTableEntries.map((entry, index) => {
                   const row = toExpenseRow(entry);
                   const { advanceAmount, billAmount, discountDisplay, transferOrRefund, payment_mode } =
                     getEntryRowDisplay(entry, siteOptions);
@@ -666,15 +711,17 @@ const SideTable = ({
                           {billAmount}
                         </span>
                       </td>
-                      <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
-                        <span
-                          onClick={() => toggleExpandedCell(`${rowKey}-discount_amount`)}
-                          className={`block w-full cursor-pointer text-right ${expandedCells[`${rowKey}-discount_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                          title={discountDisplay}
-                        >
-                          {discountDisplay}
-                        </span>
-                      </td>
+                      {!hideDiscountAndActivity && (
+                        <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
+                          <span
+                            onClick={() => toggleExpandedCell(`${rowKey}-discount_amount`)}
+                            className={`block w-full cursor-pointer text-right ${expandedCells[`${rowKey}-discount_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                            title={discountDisplay}
+                          >
+                            {discountDisplay}
+                          </span>
+                        </td>
+                      )}
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC3}
                         expense={row}
@@ -691,44 +738,46 @@ const SideTable = ({
                         onToggleExpanded={toggleExpandedCell}
                         getDisplayValue={() => payment_mode}
                       />
-                      <td id={EDBC_IDS.EDBC19} className={edbc19TdClass}>
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <button type="button" className="rounded-full transition duration-200">
-                            <img
-                              src={edit}
-                              onClick={() => onEditClick(entry)}
-                              alt="Edit"
-                              className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                            />
-                          </button>
-                          {entry.file_url ? (
-                            <a
-                              href={entry.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="cursor-pointer"
-                              title="View File"
-                            >
+                      {!hideDiscountAndActivity && (
+                        <td id={EDBC_IDS.EDBC19} className={edbc19TdClass}>
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <button type="button" className="rounded-full transition duration-200">
                               <img
-                                src={file}
-                                className="w-5 h-4 transform hover:scale-110 transition duration-200"
-                                alt="View File"
-                                style={{ filter: 'invert(0%) brightness(0%)' }}
+                                src={edit}
+                                onClick={() => onEditClick(entry)}
+                                alt="Edit"
+                                className="w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200"
                               />
-                            </a>
-                          ) : (
-                            <div className="opacity-30">
-                              <img
-                                src={file}
-                                className="w-5 h-4"
-                                alt="No File"
-                                title="No file attached"
-                                style={{ filter: 'invert(0%) brightness(0%)' }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </td>
+                            </button>
+                            {entry.file_url ? (
+                              <a
+                                href={entry.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="cursor-pointer"
+                                title="View File"
+                              >
+                                <img
+                                  src={file}
+                                  className="w-5 h-4 transform hover:scale-110 transition duration-200"
+                                  alt="View File"
+                                  style={{ filter: 'invert(0%) brightness(0%)' }}
+                                />
+                              </a>
+                            ) : (
+                              <div className="opacity-30">
+                                <img
+                                  src={file}
+                                  className="w-5 h-4"
+                                  alt="No File"
+                                  title="No file attached"
+                                  style={{ filter: 'invert(0%) brightness(0%)' }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </EdbcTableBodyRow>
                   );
                 })

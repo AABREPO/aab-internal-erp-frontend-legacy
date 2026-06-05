@@ -11,6 +11,17 @@ import {
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
+
+/** yyyy-MM-dd for date inputs; returns '' when value is missing or not parseable. */
+const normalizeDateToYmd = (value) => {
+    if (value == null) return '';
+    const s = String(value).trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+};
+
 const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
     const resolveActiveBranchId = () => {
         try {
@@ -1623,7 +1634,9 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
     const handleEditClick = (item) => {
         setSelectedEditItem(item)
         const formData = {
-            billArrivalDate: item.bill_arrival_date ? new Date(item.bill_arrival_date).toISOString().split('T')[0] : '',
+            billArrivalDate: normalizeDateToYmd(
+                item.bill_arrival_date ?? item.billArrivalDate ?? item.bill_arrivalDate
+            ),
             vendorId: item.vendor_id ? { value: item.vendor_id, label: getVendorNameById(item.vendor_id) } : null,
             noOfBills: item.no_of_bills || item.noOfBills || '',
             extraBills: item.extra_bills || item.extraBills || '0',
@@ -1643,8 +1656,9 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         setEditLoading(true)
         try {
             const payload = {
-                bill_arrival_date: editFormData.billArrivalDate || (selectedEditItem.bill_arrival_date ?
-                    new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''),
+                bill_arrival_date: editFormData.billArrivalDate || normalizeDateToYmd(
+                    selectedEditItem.bill_arrival_date ?? selectedEditItem.billArrivalDate
+                ),
                 vendor_id: editFormData.vendorId?.id || selectedEditItem.vendor_id,
                 no_of_bills: editFormData.noOfBills !== '' && editFormData.noOfBills !== null && editFormData.noOfBills !== undefined
                     ? parseInt(editFormData.noOfBills)
@@ -1657,8 +1671,9 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                     : (selectedEditItem.total_amount || 0),
                 branch_id: activeBranchId
             }
-            const originalDate = selectedEditItem.bill_arrival_date ?
-                new Date(selectedEditItem.bill_arrival_date).toISOString().split('T')[0] : ''
+            const originalDate = normalizeDateToYmd(
+                selectedEditItem.bill_arrival_date ?? selectedEditItem.billArrivalDate
+            )
             const originalVendorId = selectedEditItem.vendor_id
             const originalNoOfBills = selectedEditItem.no_of_bills || selectedEditItem.noOfBills || 0
             const originalExtraBills = selectedEditItem.extra_bills || selectedEditItem.extraBills || 0

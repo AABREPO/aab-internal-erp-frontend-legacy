@@ -77,6 +77,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     accountNumber: ""
   });
   const [pendingFormData, setPendingFormData] = useState(null);
+  const [accountDetails, setAccountDetails] = useState([]);
   // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isReviewEditMode, setIsReviewEditMode] = useState(false);
@@ -297,12 +298,38 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     { value: 'Transfer', label: 'Transfer' }
   ], []);
 
-  // Account number options
-  const accountNumberOptions = useMemo(() => [
-    { value: '2027887700014', label: '2027887700014' },
-    { value: '2027887700015', label: '2027887700015' },
-    { value: '2027887700016', label: '2027887700016' }
-  ], []);
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+          throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setAccountDetails(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching account details:', error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
+
+  const accountNumberOptions = useMemo(
+    () =>
+      accountDetails
+        .map((account) => {
+          const accountNumber = account?.account_number ?? account?.accountNumber ?? '';
+          const value = String(accountNumber).trim();
+          if (!value) return null;
+          return { value, label: value };
+        })
+        .filter(Boolean),
+    [accountDetails]
+  );
 
   // Handle form input changes
   const handleInputChange = useCallback((field, value) => {
@@ -755,6 +782,17 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     }
     if (!paymentPopupData.amount) {
       alert("Please enter an amount.");
+      return;
+    }
+    if (!paymentPopupData.accountNumber) {
+      alert("Please select account number.");
+      return;
+    }
+    if (
+      paymentPopupData.paymentMode === "Cheque" &&
+      (!paymentPopupData.chequeNo || !paymentPopupData.chequeDate)
+    ) {
+      alert("Please enter cheque number and date.");
       return;
     }
 
@@ -1866,7 +1904,12 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                         <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
                         <Select
                           value={paymentModeOptions?.find(option => option.value === paymentPopupData.paymentMode) || null}
-                          onChange={(selected) => setPaymentPopupData({ ...paymentPopupData, paymentMode: selected ? selected.value : '' })}
+                          onChange={(selected) =>
+                            setPaymentPopupData((prev) => ({
+                              ...prev,
+                              paymentMode: selected ? selected.value : '',
+                            }))
+                          }
                           options={paymentModeOptions || []}
                           placeholder="---Select---"
                           isClearable
@@ -1918,15 +1961,30 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Account Number<span className="text-red-500">*</span>
+                              </label>
                               <Select
-                                value={accountNumberOptions.find(option => option.value === paymentPopupData.accountNumber) || null}
-                                onChange={(selected) => setPaymentPopupData(prev => ({ ...prev, accountNumber: selected ? selected.value : '' }))}
+                                value={
+                                  paymentPopupData.accountNumber
+                                    ? {
+                                        value: paymentPopupData.accountNumber,
+                                        label: paymentPopupData.accountNumber,
+                                      }
+                                    : null
+                                }
+                                onChange={(selected) =>
+                                  setPaymentPopupData((prev) => ({
+                                    ...prev,
+                                    accountNumber: selected ? selected.value : '',
+                                  }))
+                                }
                                 options={accountNumberOptions}
                                 placeholder="Select Account"
                                 isClearable
                                 isSearchable
                                 menuPortalTarget={document.body}
+                                menuPosition="fixed"
                                 styles={customStyles}
                                 className="w-full"
                               />

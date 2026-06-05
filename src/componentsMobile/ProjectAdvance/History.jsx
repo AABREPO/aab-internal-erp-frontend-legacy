@@ -4,6 +4,9 @@ import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import UploadFile from '../Images/Upload Small.svg';
 import Pen from '../Images/Pen.svg';
 import CloseIcon from '../Images/Close F.svg'
+import DeleteConfirmModal from '../PurchaseOrder/DeleteConfirmModal';
+import Edit from '../Images/edit1.png'
+import Delete from '../Images/delete.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 
 // ISO 8601 week helpers (same as AdvanceReport.js)
@@ -106,6 +109,7 @@ const History = ({ onVendorClick, user } = {}) => {
   }, [user?.userRoles]);
 
   const canEdit = modulePermissions.includes('Edit');
+  const canDelete = modulePermissions.includes('Delete');
 
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
@@ -134,13 +138,17 @@ const History = ({ onVendorClick, user } = {}) => {
   // Swipe-to-upload: same as PO History Clone - right swipe reveals upload button on left
   const [swipeStates, setSwipeStates] = useState({});
   const [uploadExpandedId, setUploadExpandedId] = useState(null);
+  const [editDeleteExpandedId, setEditDeleteExpandedId] = useState(null);
   const [uploadingForId, setUploadingForId] = useState(null);
   const [showUploadConfirmModal, setShowUploadConfirmModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'completed'
   const [itemToUploadFor, setItemToUploadFor] = useState(null);
   const cardRefs = useRef({});
   const fileInputRef = useRef(null);
   const uploadExpandedIdRef = useRef(uploadExpandedId);
+  const editDeleteExpandedIdRef = useRef(editDeleteExpandedId);
 
   const weekNum = week ? parseInt(week, 10) : null;
   const yearNum = year ? parseInt(year, 10) : null;
@@ -148,6 +156,9 @@ const History = ({ onVendorClick, user } = {}) => {
   useEffect(() => {
     uploadExpandedIdRef.current = uploadExpandedId;
   }, [uploadExpandedId]);
+  useEffect(() => {
+    editDeleteExpandedIdRef.current = editDeleteExpandedId;
+  }, [editDeleteExpandedId]);
 
   const formatDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
@@ -524,6 +535,165 @@ const History = ({ onVendorClick, user } = {}) => {
     }
   };
 
+  const handleEdit = (item) => {
+    if (!canEdit) {
+      alert("You don't have permission to edit.");
+      return;
+    }
+    if (!item) return;
+
+    const entry = item.entry || {};
+    const vendorId = entry.vendor_id;
+    const contractorId = entry.contractor_id;
+    const projectId = entry.project_id;
+
+    let selectedOption = null;
+    if (vendorId) {
+      const v = vendorOptions.find((x) => x.id === vendorId);
+      if (v) selectedOption = { value: v.label, label: v.label, id: v.id, type: 'Vendor' };
+    }
+    if (!selectedOption && contractorId) {
+      const c = contractorOptions.find((x) => x.id === contractorId);
+      if (c) selectedOption = { value: c.label, label: c.label, id: c.id, type: 'Contractor' };
+    }
+
+    const site = siteOptions.find((x) => x.id === projectId);
+    const selectedSite = site ? { value: site.value || site.label, label: site.label, id: site.id, sNo: site.sNo } : null;
+
+    // Prefill AdvanceForm using its sessionStorage reader (mobile form uses sessionStorage for initial values).
+    ['selectedType', 'selectedOption', 'selectedSite', 'overallAdvance', 'billAmount', 'advanceAmount', 'transferSiteId', 'paymentMode', 'description'].forEach(
+      (k) => sessionStorage.removeItem(k)
+    );
+
+    const resolvedType = item.type || entry.type || 'Advance';
+    const absAmount = Math.abs(parseFloat(item.amount || 0) || 0);
+    const absBillAmount = Math.abs(parseFloat(entry.bill_amount || item.amount || 0) || 0);
+    const transferSiteIdVal = entry.transfer_site_id ?? entry.transferSiteId ?? '';
+
+    sessionStorage.setItem('selectedType', JSON.stringify(resolvedType));
+    if (selectedOption) sessionStorage.setItem('selectedOption', JSON.stringify(selectedOption));
+    if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
+    sessionStorage.setItem('overallAdvance', JSON.stringify(absAmount));
+    if (resolvedType === 'Bill Settlement') {
+      sessionStorage.setItem('billAmount', JSON.stringify(absBillAmount));
+    } else {
+      sessionStorage.setItem('advanceAmount', JSON.stringify(absAmount));
+      if (resolvedType === 'Transfer') {
+        sessionStorage.setItem('transferSiteId', JSON.stringify(transferSiteIdVal));
+      }
+    }
+    sessionStorage.setItem('paymentMode', JSON.stringify(item.paymentMode || entry.payment_mode || ''));
+    sessionStorage.setItem('description', JSON.stringify(entry.description || ''));
+
+    setUploadExpandedId(null);
+    setEditDeleteExpandedId(null);
+    setSwipeStates({});
+
+    onVendorClick?.({
+      selectedOption,
+      selectedSite,
+      billDetails: {
+        ref: item.ref,
+        amount: item.amount,
+        paymentMode: item.paymentMode,
+        timestamp: item.timestamp,
+        type: item.type,
+        entryNo: entry.entry_no,
+        date: entry.date || entry.timestamp,
+      },
+    });
+  };
+
+  const requestDelete = (item) => {
+    if (!canDelete) {
+      alert("You don't have permission to delete.");
+      return;
+    }
+    setEntryToDelete(item || null);
+    setShowDeleteConfirmModal(true);
+    setUploadExpandedId(null);
+    setEditDeleteExpandedId(null);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirmModal(false);
+    setEntryToDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!canDelete) {
+      cancelDelete();
+      return;
+    }
+    if (!entryToDelete) return;
+
+    const entry = entryToDelete.entry || {};
+    const recordType = entry.type || entryToDelete.type || '';
+    const entryNo = entry.entry_no;
+
+    if (entryNo === undefined || entryNo === null) {
+      cancelDelete();
+      return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const username = user?.username || user?.name || '';
+
+    const clearedData = {
+      entry_no: entryNo,
+      date: entry.date || entry.timestamp || '',
+      amount: '',
+      project_id: '',
+      vendor_id: '',
+      contractor_id: '',
+      file_url: '',
+      description: '',
+      bill_amount: '',
+      type: '',
+      transfer_site_id: '',
+      payment_mode: '',
+      refund_amount: ''
+    };
+
+    try {
+      if (recordType === 'Transfer') {
+        const transferRecords = advanceData.filter((r) => String(r.entry_no) === String(entryNo));
+        await Promise.all(
+          transferRecords.map(async (rec) => {
+            const idToDelete = rec.advancePortalId || rec.id;
+            if (!idToDelete) return;
+            const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(clearedData),
+            });
+            if (!res.ok) throw new Error('Failed to clear transfer record');
+          })
+        );
+      } else {
+        const idToDelete = entry.advancePortalId || entry.id || entryToDelete.id;
+        if (!idToDelete) return;
+        const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${idToDelete}?editedBy=${username}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clearedData),
+        });
+        if (!res.ok) throw new Error('Failed to clear record');
+      }
+
+      setShowDeleteConfirmModal(false);
+      setEntryToDelete(null);
+      setEditDeleteExpandedId(null);
+      setUploadExpandedId(null);
+      loadAdvanceData();
+      window.dispatchEvent(new Event('advanceUpdated'));
+    } catch (err) {
+      console.error('Delete error:', err);
+      cancelDelete();
+      alert('Failed to delete record');
+    }
+  };
+
   // Attach swipe listeners - same as PurchaseOrder History
   useEffect(() => {
     const cleanups = [];
@@ -535,13 +705,13 @@ const History = ({ onVendorClick, user } = {}) => {
           const state = prev[item.id];
           if (!state) return;
           const deltaX = e.clientX - state.startX;
-          const isUploadExpanded = uploadExpandedIdRef.current === item.id;
-          if (deltaX > 0 || (isUploadExpanded && deltaX < 0)) {
+          if (deltaX !== 0) {
             newState[item.id] = {
               ...state,
               currentX: e.clientX,
               isSwiping: true,
               wasUploadExpanded: state.wasUploadExpanded,
+              wasEditDeleteExpanded: state.wasEditDeleteExpanded,
             };
             hasChanges = true;
           }
@@ -558,11 +728,23 @@ const History = ({ onVendorClick, user } = {}) => {
           const deltaX = state.currentX - state.startX;
           const absDeltaX = Math.abs(deltaX);
           const wasUploadExpanded = state.wasUploadExpanded || false;
+          const wasEditDeleteExpanded = state.wasEditDeleteExpanded || false;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX > 0) {
-              if (!wasUploadExpanded) setUploadExpandedId(item.id);
+              if (wasEditDeleteExpanded) {
+                setEditDeleteExpandedId(null);
+                setUploadExpandedId(null);
+              } else if (!wasUploadExpanded) {
+                setUploadExpandedId(item.id);
+                setEditDeleteExpandedId(null);
+              }
             } else {
-              setUploadExpandedId(null);
+              if (wasUploadExpanded) {
+                setUploadExpandedId(null);
+              } else if (!wasEditDeleteExpanded) {
+                setEditDeleteExpandedId(item.id);
+                setUploadExpandedId(null);
+              }
             }
           }
           delete newState[item.id];
@@ -582,6 +764,7 @@ const History = ({ onVendorClick, user } = {}) => {
       const touchStartHandler = (e) => {
         const touch = e.touches[0];
         const wasUploadExpanded = uploadExpandedIdRef.current === item.id;
+        const wasEditDeleteExpanded = editDeleteExpandedIdRef.current === item.id;
         setSwipeStates((prev) => ({
           ...prev,
           [item.id]: {
@@ -591,6 +774,7 @@ const History = ({ onVendorClick, user } = {}) => {
             currentY: touch.clientY,
             isSwiping: false,
             wasUploadExpanded,
+            wasEditDeleteExpanded,
           },
         }));
       };
@@ -608,8 +792,7 @@ const History = ({ onVendorClick, user } = {}) => {
             delete next[item.id];
             return next;
           }
-          const isUploadExpanded = uploadExpandedIdRef.current === item.id;
-          if (deltaX > 0 || (isUploadExpanded && deltaX < 0)) {
+          if (deltaX !== 0) {
             e.preventDefault();
             return {
               ...prev,
@@ -619,6 +802,7 @@ const History = ({ onVendorClick, user } = {}) => {
                 currentY: touch.clientY,
                 isSwiping: true,
                 wasUploadExpanded: state.wasUploadExpanded,
+                wasEditDeleteExpanded: state.wasEditDeleteExpanded,
               },
             };
           }
@@ -632,11 +816,23 @@ const History = ({ onVendorClick, user } = {}) => {
           const deltaX = state.currentX - state.startX;
           const absDeltaX = Math.abs(deltaX);
           const wasUploadExpanded = state.wasUploadExpanded || false;
+          const wasEditDeleteExpanded = state.wasEditDeleteExpanded || false;
           if (absDeltaX >= minSwipeDistance) {
             if (deltaX > 0) {
-              if (!wasUploadExpanded) setUploadExpandedId(item.id);
+              if (wasEditDeleteExpanded) {
+                setEditDeleteExpandedId(null);
+                setUploadExpandedId(null);
+              } else if (!wasUploadExpanded) {
+                setUploadExpandedId(item.id);
+                setEditDeleteExpandedId(null);
+              }
             } else {
-              setUploadExpandedId(null);
+              if (wasUploadExpanded) {
+                setUploadExpandedId(null);
+              } else if (!wasEditDeleteExpanded) {
+                setEditDeleteExpandedId(item.id);
+                setUploadExpandedId(null);
+              }
             }
           }
           const next = { ...prev };
@@ -647,6 +843,7 @@ const History = ({ onVendorClick, user } = {}) => {
       const mouseDownHandler = (e) => {
         e.preventDefault();
         const wasUploadExpanded = uploadExpandedIdRef.current === item.id;
+        const wasEditDeleteExpanded = editDeleteExpandedIdRef.current === item.id;
         setSwipeStates((prev) => ({
           ...prev,
           [item.id]: {
@@ -654,6 +851,7 @@ const History = ({ onVendorClick, user } = {}) => {
             currentX: e.clientX,
             isSwiping: false,
             wasUploadExpanded,
+            wasEditDeleteExpanded,
           },
         }));
       };
@@ -794,7 +992,10 @@ const History = ({ onVendorClick, user } = {}) => {
       {/* Cards List - Scrollable */}
       <div
         className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide mt-1 max-h-[calc(100vh-160px-80px)]"
-        onClick={() => setUploadExpandedId(null)}
+        onClick={() => {
+          setUploadExpandedId(null);
+          setEditDeleteExpandedId(null);
+        }}
       >
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-[48px]">
@@ -830,14 +1031,22 @@ const History = ({ onVendorClick, user } = {}) => {
             {filtered.map((item) => {
               const swipeState = swipeStates[item.id];
               const isUploadExpanded = uploadExpandedId === item.id;
+              const isEditDeleteExpanded = editDeleteExpandedId === item.id;
+              const swipeActionWidth = 110;
               let swipeOffset = 0;
               if (swipeState?.isSwiping) {
                 const dx = swipeState.currentX - swipeState.startX;
-                if (dx > 0) {
-                  swipeOffset = Math.min(48, dx);
+                if (dx < 0) {
+                  // Swiping left - reveal edit/delete on right (unless upload was already expanded)
+                  swipeOffset = isUploadExpanded ? Math.max(0, 48 + dx) : Math.max(-swipeActionWidth, dx);
                 } else {
-                  swipeOffset = isUploadExpanded ? Math.max(0, 48 + dx) : 0;
+                  // Swiping right - reveal upload on left (unless edit/delete was already expanded)
+                  swipeOffset = isEditDeleteExpanded
+                    ? Math.max(-swipeActionWidth, Math.min(0, -swipeActionWidth + dx))
+                    : Math.min(48, dx);
                 }
+              } else if (isEditDeleteExpanded) {
+                swipeOffset = -swipeActionWidth;
               } else if (isUploadExpanded) {
                 swipeOffset = 48;
               }
@@ -871,6 +1080,47 @@ const History = ({ onVendorClick, user } = {}) => {
                       title="Upload file"
                     >
                       <img src={UploadFile} alt="Upload File" className="w-[18px] h-[18px]" />
+                    </button>
+                  </div>
+                  {/* Edit/Delete buttons - behind card on the right, revealed on left swipe */}
+                  <div
+                    className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
+                    style={{
+                      opacity: (isEditDeleteExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20)) ? 1 : 0,
+                      transform: swipeOffset < 0
+                        ? `translateX(${Math.max(0, swipeActionWidth + swipeOffset)}px)`
+                        : `translateX(${swipeActionWidth}px)`,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isEditDeleteExpanded ? 'auto' : 'none',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(item);
+                      }}
+                      disabled={!canEdit}
+                      className={`w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm ${
+                        !canEdit ? 'opacity-50 cursor-not-allowed hover:bg-[#007233]' : ''
+                      }`}
+                      title="Edit"
+                    >
+                      <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestDelete(item);
+                      }}
+                      disabled={!canDelete}
+                      className={`w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm ${
+                        !canDelete ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
+                      }`}
+                      title="Delete"
+                    >
+                      <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
                     </button>
                   </div>
                   <div
@@ -1079,6 +1329,8 @@ const History = ({ onVendorClick, user } = {}) => {
           </div>
         </div>
       )}
+      {/* Delete confirmation modal */}
+      <DeleteConfirmModal isOpen={showDeleteConfirmModal} onCancel={cancelDelete} onConfirm={confirmDelete} />
       {/* Uploading overlay */}
       {uploadStatus === 'uploading' && (
         <div

@@ -32,6 +32,19 @@ import {
   EdbcExpandableBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
+import {
+  clearAdvancePortalRecordsOnDelete,
+  fetchAllAdvancePortalRecords,
+  resolveLoanAdvancePortalId,
+  syncAdvancePortalFromLoanEdit,
+} from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+  fetchWeeklyPaymentBillsByLoanPortalId,
+  getLoanPortalDisplayAmount,
+  isLoanOnlinePaymentModeForModal,
+  syncWeeklyPaymentBillsForLoanPortal,
+} from '../../utils/loanPortalWeeklyPaymentBill';
+import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
 
 const LOAN_FILTER_OPTION_MIN_HEIGHT_PX = 36;
 const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {
@@ -69,6 +82,16 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   const [editTransferAmount, setEditTransferAmount] = useState('');
   const [editPaymentMode, setEditPaymentMode] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
+  const [accountDetails, setAccountDetails] = useState([]);
+  const pendingLoanUpdateRef = useRef(null);
   const [combinedSitePurposeOptions, setCombinedSitePurposeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
@@ -690,20 +713,36 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     };
     fetchProjectClients();
   }, []);
+  const fetchLoanData = async () => {
+    try {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const data = await response.json();
+      setLoanData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching loan portal data:', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
+    fetchLoanData();
+  }, []);
+
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          setAccountDetails(Array.isArray(data) ? data : []);
         }
-        const data = await response.json();
-        setLoanData(data);
       } catch (error) {
-        console.error('Error fetching loan portal data:', error);
+        console.error('Error fetching account details:', error);
       }
     };
-    fetchData();
+    fetchAccountDetails();
   }, []);
   useEffect(() => {
     const fetchBranches = async () => {
@@ -1211,12 +1250,48 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           throw new Error('Failed to clear record');
         }
       }
+
+      // Mirror Advance Portal deletion behavior:
+      // if this loan record references an advance_portal_id, clear the linked advance portal records too.
+      try {
+        const linkageLoanRecords =
+          record.type === 'Transfer' ? loanData.filter((r) => r.entry_no === entryNo) : [record];
+
+        const advanceIdsToClear = [
+          ...new Set(
+            linkageLoanRecords
+              .map((r) => r.advance_portal_id ?? r.advancePortalId)
+              .filter((v) => v != null && String(v).trim() !== '')
+          ),
+        ];
+
+        if (advanceIdsToClear.length) {
+          const allAdvanceData = await fetchAllAdvancePortalRecords();
+          const processedEntryNos = new Set();
+
+          for (const advId of advanceIdsToClear) {
+            const advRecord = (allAdvanceData || []).find((a) => {
+              const rid = a.advancePortalId ?? a.advance_portal_id ?? a.id;
+              return rid != null && String(rid) === String(advId);
+            });
+            if (!advRecord) continue;
+
+            const advEntryNo = advRecord.entry_no ?? advRecord.entryNo ?? advId;
+            const entryKey = String(advEntryNo);
+            if (processedEntryNos.has(entryKey)) continue;
+            processedEntryNos.add(entryKey);
+
+            await clearAdvancePortalRecordsOnDelete(advId, advRecord, allAdvanceData, username);
+          }
+        }
+      } catch (linkErr) {
+        console.error('Failed to clear linked advance portal(s) for loan delete:', linkErr);
+      }
       toast.success("Record deleted successfully!", {
         position: "top-center",
         autoClose: 3000,
         theme: "colored",
       });
-      window.location.reload();
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(error.message || "Failed to delete record!", {
@@ -1226,66 +1301,179 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       });
     }
   };
+  const buildLoanEditPayload = (currentEntry) => {
+    const isRefund = editSelectedType === 'Refund';
+    const isTransfer = editSelectedType === 'Transfer';
+    const transferType = editTransferSelection?.type;
+    const isTransferToSite =
+      isTransfer &&
+      transferType === 'Site' &&
+      (editSelectedOption?.type === 'Vendor' || editSelectedOption?.type === 'Contractor');
+    const transferAmount = parseFloat(editTransferAmount || editFormData.loan_amount || 0) || 0;
+
+    return {
+      loanPortalId: editingId,
+      type: editSelectedType,
+      date: editFormData.date,
+      amount: isRefund
+        ? 0
+        : isTransfer
+          ? isTransferToSite
+            ? -Math.abs(transferAmount)
+            : transferAmount
+          : parseFloat(editFormData.loan_amount || 0) || 0,
+      loan_refund_amount: isRefund ? parseFloat(editFormData.loan_refund_amount || 0) : 0,
+      loan_payment_mode: isTransfer ? '' : (editPaymentMode || ''),
+      from_purpose_id: editPurpose || 0,
+      to_purpose_id: isTransfer && transferType === 'Purpose' ? (editTransferSelection?.id || 0) : 0,
+      vendor_id: editSelectedOption?.type === 'Vendor'
+        ? editSelectedOption.id
+        : (currentEntry?.vendor_id || 0),
+      contractor_id: editSelectedOption?.type === 'Contractor'
+        ? editSelectedOption.id
+        : (currentEntry?.contractor_id || 0),
+      employee_id: editSelectedOption?.type === 'Employee'
+        ? editSelectedOption.id
+        : (currentEntry?.employee_id || 0),
+      labour_id: editSelectedOption?.type === 'Labour'
+        ? editSelectedOption.id
+        : (currentEntry?.labour_id || 0),
+      project_id: editFormData.project_id || currentEntry?.project_id || 0,
+      transfer_Project_id: isTransfer && transferType === 'Site' ? (editTransferSelection?.id || 0) : 0,
+      entry_no: editFormData.entry_no || currentEntry?.entry_no || 0,
+      description: editDescription || '',
+      file_url: currentEntry?.file_url ?? currentEntry?.fileUrl ?? '',
+      advance_portal_id: currentEntry?.advance_portal_id ?? currentEntry?.advancePortalId ?? null,
+      branch_id: currentEntry?.branch_id ?? currentEntry?.branchId ?? null,
+    };
+  };
+
+  const performLoanUpdate = async (payload, modalPaymentData = null) => {
+    const currentEntry = loanData.find(
+      (entry) => String(entry.loanPortalId || entry.id) === String(editingId)
+    );
+
+    const res = await fetch(
+      `https://backendaab.in/demoAabuildersDash/api/loans/${editingId}?editedBy=${encodeURIComponent(username)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(errText || 'Failed to update');
+    }
+
+    await syncWeeklyPaymentBillsForLoanPortal(editingId, payload, {
+      editedBy: username,
+      branchId: payload.branch_id,
+      modalPaymentData,
+      purposeId: payload.from_purpose_id,
+    });
+
+    const advancePortalId = resolveLoanAdvancePortalId(currentEntry);
+    if (advancePortalId) {
+      try {
+        await syncAdvancePortalFromLoanEdit(advancePortalId, payload, {
+          editedBy: username,
+          siteOptions,
+          selectedOption: editSelectedOption,
+          branchId: payload.branch_id,
+        });
+      } catch (syncErr) {
+        console.error('Failed to sync linked advance portal entry:', syncErr);
+        toast.warning('Loan updated, but linked advance portal entry could not be synced.', {
+          position: 'top-center',
+          autoClose: 4000,
+          theme: 'colored',
+        });
+      }
+    }
+
+    await fetchLoanData();
+    setShowEditPaymentModal(false);
+    pendingLoanUpdateRef.current = null;
+    setIsEditModalOpen(false);
+    toast.success('Entry updated successfully!', {
+      position: 'top-center',
+      autoClose: 3000,
+      theme: 'colored',
+    });
+  };
+
   const handleUpdate = async () => {
     try {
-      const payload = {
-        loanPortalId: editingId,
-        type: editSelectedType,
-        date: editFormData.date,
-        amount: (editSelectedType === "Loan" || editSelectedType === "Transfer")
-          ? parseFloat(editFormData.loan_amount || 0)
-          : 0,
-        loan_refund_amount: editSelectedType === "Refund"
-          ? parseFloat(editFormData.loan_refund_amount || 0)
-          : 0,
-        loan_payment_mode: editPaymentMode || "",
-        from_purpose_id: editPurpose || 0,
-        to_purpose_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Purpose")
-          ? (editTransferSelection?.id || 0)
-          : 0,
-        vendor_id: editSelectedOption?.type === "Vendor" ? editSelectedOption.id : 0,
-        contractor_id: editSelectedOption?.type === "Contractor" ? editSelectedOption.id : 0,
-        project_id: editFormData.project_id || 0,
-        transfer_Project_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Site")
-          ? (editTransferSelection?.id || 0)
-          : 0,
-        entry_no: editFormData.entry_no || 0,
-        description: editDescription || "",
-
-      };
-      const res = await fetch(
-        `https://backendaab.in/demoAabuildersDash/api/loans/${editingId}?editedBy=${username}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
+      const currentEntry = loanData.find(
+        (entry) => String(entry.loanPortalId || entry.id) === String(editingId)
       );
-      if (!res.ok) throw new Error('Failed to update');
-      const updatedDataArray = await res.json();
-      setLoanData(prev => {
-        const newData = [...prev];
-        updatedDataArray.forEach(entry => {
-          const idx = newData.findIndex(item => item.loanPortalId === entry.loanPortalId);
-          if (idx === -1) newData.push(entry);
-          else newData[idx] = entry;
+      if (!currentEntry) {
+        toast.error('Record not found.', { position: 'top-center', autoClose: 3000, theme: 'colored' });
+        return;
+      }
+
+      const payload = buildLoanEditPayload(currentEntry);
+
+      if (payload.type === 'Loan' && isLoanOnlinePaymentModeForModal(payload.loan_payment_mode)) {
+        pendingLoanUpdateRef.current = { payload };
+        let existingBill = null;
+        try {
+          const bills = await fetchWeeklyPaymentBillsByLoanPortalId(editingId);
+          existingBill = Array.isArray(bills) && bills.length > 0 ? bills[0] : null;
+        } catch (e) {
+          console.warn('Could not fetch existing weekly bill to prefill payment details', e);
+        }
+        setEditPaymentModalData({
+          chequeNo: existingBill?.cheque_number ?? existingBill?.chequeNumber ?? '',
+          chequeDate: existingBill?.cheque_date ?? existingBill?.chequeDate ?? '',
+          transactionNumber:
+            existingBill?.transaction_number ?? existingBill?.transactionNumber ?? '',
+          accountNumber: existingBill?.account_number ?? existingBill?.accountNumber ?? '',
         });
-        return newData;
-      });
-      setIsEditModalOpen(false);
-      toast.success("Entry updated successfully!", {
-        position: "top-center",
-        autoClose: 3000,
-        theme: "colored",
-      });
-      window.location.reload();
+        setShowEditPaymentModal(true);
+        return;
+      }
+
+      await performLoanUpdate(payload);
     } catch (error) {
       console.error(error);
-      toast.error(error.message || "Failed to update entry!", {
-        position: "top-center",
+      toast.error(error.message || 'Failed to update entry!', {
+        position: 'top-center',
         autoClose: 3000,
-        theme: "colored",
+        theme: 'colored',
       });
+    }
+  };
+
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    if (
+      editPaymentMode === 'Cheque' &&
+      (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)
+    ) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingLoanUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+
+    setIsEditPaymentSubmitting(true);
+    try {
+      await performLoanUpdate(pending.payload, editPaymentModalData);
+    } catch (err) {
+      console.error('Loan payment modal update error:', err);
+      toast.error(err.message || 'Failed to update entry!', {
+        position: 'top-center',
+        autoClose: 3000,
+        theme: 'colored',
+      });
+    } finally {
+      setIsEditPaymentSubmitting(false);
     }
   };
   return (
@@ -2047,6 +2235,28 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
           purposeOptions={purposeOptions}
         />
       </div>
+      <AdvancePortalEditPaymentModal
+        isOpen={showEditPaymentModal}
+        onClose={() => {
+          setShowEditPaymentModal(false);
+          pendingLoanUpdateRef.current = null;
+        }}
+        onSubmit={handleEditPaymentModalSubmit}
+        isSubmitting={isEditPaymentSubmitting}
+        paymentMode={editPaymentMode}
+        date={editFormData.date}
+        amount={getLoanPortalDisplayAmount(
+          pendingLoanUpdateRef.current?.payload || {
+            type: editSelectedType,
+            amount: editFormData.loan_amount,
+            loan_refund_amount: editFormData.loan_refund_amount,
+          }
+        )}
+        paymentModalData={editPaymentModalData}
+        setPaymentModalData={setEditPaymentModalData}
+        accountDetails={accountDetails}
+        selectStyles={customStyles}
+      />
       <ToastContainer position="top-center" autoClose={3000} theme="colored" />
     </body>
   )

@@ -21,16 +21,29 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+    fetchWeeklyPaymentBillsByExpensesEntryId,
+    isExpenseEntryWeeklyBillAccountType,
+    isExpenseEntryNonCashPaymentMode,
+    buildExpenseEntryWeeklyBillSavePayload,
+    saveExpenseEntryWeeklyPaymentBill,
+} from '../../utils/expensesEntryWeeklyPaymentBill';
+import {
+    clearLinkedAdvancePortalForExpenseDelete,
+    formatWeeklyBillDeleteMessage,
+    formatAdvancePortalClearOnExpenseDeleteMessage,
+} from '../../utils/advancePortalWeeklyPaymentBill';
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
+import ExpenseEntryPaymentModal from './ExpenseEntryPaymentModal';
 import { Table, TableProvider } from './Table';
 import {
     TABLE_FILTER_MENU_MAX_HEIGHT_PX,
     TABLE_FILTER_OPTION_HEIGHT_PX,
+    isAdvancePortalSourceExpense,
 } from './databaseExpensesSharedColumns';
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
-const NON_CASH_PAYMENT_MODES = ['GPay', 'Gpay', 'PhonePe', 'Net Banking', 'Cheque'];
 const BLANK_VALUE = 'BLANK';
 const BLANK_LABEL = 'Blank';
 const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
@@ -38,28 +51,6 @@ const isBlankish = (value) =>
     value === null ||
     value === undefined ||
     (typeof value === 'string' && value.trim() === '');
-
-const fetchWeeklyPaymentBillsByExpensesEntryId = async (expensesEntryId) => {
-    const listResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/all`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-    });
-    if (!listResponse.ok) {
-        throw new Error('Failed to fetch bill payments');
-    }
-    const billPayments = await listResponse.json();
-    return (Array.isArray(billPayments) ? billPayments : []).filter(
-        (bill) =>
-            bill.expenses_entry_id != null &&
-            String(bill.expenses_entry_id) === String(expensesEntryId)
-    );
-};
-
-const isWeeklyBillAccountType = (accountType) =>
-    accountType === 'Claim Payment' ||
-    accountType === 'Utility Bills' ||
-    accountType === 'Sundry Payment';
 
 const getWeeklyBillTypeFromAccountType = (accountType) => {
     if (accountType === 'Claim Payment') return 'Claim Payment';
@@ -206,77 +197,6 @@ const buildWeeklyPaymentBillUpdatePayload = (
     };
 };
 
-const buildWeeklyPaymentBillSavePayload = (
-    updatedFormData,
-    expensesEntryId,
-    { modalPaymentData = null, branchId = null, enteredBy = '' } = {}
-) => {
-    const employeeId =
-        updatedFormData.employeeId ??
-        updatedFormData.employee_id ??
-        updatedFormData.labourId ??
-        updatedFormData.labour_id ??
-        null;
-
-    const chequeDateRaw = pickWeeklyBillModalOrExisting(
-        modalPaymentData,
-        null,
-        'chequeDate',
-        'cheque_date',
-        'chequeDate'
-    );
-    const chequeDate =
-        chequeDateRaw != null
-            ? normalizeWeeklyBillApiDate(chequeDateRaw) || String(chequeDateRaw).trim()
-            : null;
-
-    return {
-        date: normalizeWeeklyBillApiDate(updatedFormData.date),
-        created_at: new Date().toISOString(),
-        contractor_id: normalizeWeeklyBillNullableId(
-            updatedFormData.contractorId ?? updatedFormData.contractor_id
-        ),
-        vendor_id: normalizeWeeklyBillNullableId(updatedFormData.vendorId ?? updatedFormData.vendor_id),
-        employee_id: normalizeWeeklyBillNullableId(employeeId),
-        labour_id: null,
-        project_id: normalizeWeeklyBillNullableId(updatedFormData.projectId ?? updatedFormData.project_id),
-        type: getWeeklyBillTypeFromAccountType(updatedFormData.accountType),
-        bill_payment_mode: updatedFormData.paymentMode || null,
-        amount: parseFloat(updatedFormData.amount) || 0,
-        status: true,
-        weekly_number: null,
-        weekly_payment_expense_id: null,
-        expenses_entry_id: normalizeWeeklyBillNullableId(expensesEntryId),
-        advance_portal_id: null,
-        staff_advance_portal_id: null,
-        claim_payment_id: null,
-        cheque_number: pickWeeklyBillModalOrExisting(
-            modalPaymentData,
-            null,
-            'chequeNo',
-            'cheque_number',
-            'chequeNumber'
-        ),
-        cheque_date: chequeDate,
-        transaction_number: pickWeeklyBillModalOrExisting(
-            modalPaymentData,
-            null,
-            'transactionNumber',
-            'transaction_number',
-            'transactionNumber'
-        ),
-        account_number: pickWeeklyBillModalOrExisting(
-            modalPaymentData,
-            null,
-            'accountNumber',
-            'account_number',
-            'accountNumber'
-        ),
-        branch_id: normalizeWeeklyBillNullableId(branchId),
-        entered_by: enteredBy || null,
-    };
-};
-
 const updateWeeklyPaymentBillById = async (billId, payload) => {
     const response = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/update/${billId}`, {
         method: 'PUT',
@@ -354,9 +274,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [selectedMachineTools, setSelectedMachineTools] = useState(() => {
         return localStorage.getItem('expenseFilter_machineTools') || '';
     });
-    const [selectedDate, setSelectedDate] = useState(() => {
-        return localStorage.getItem('expenseFilter_date') || '';
-    });
     const [startDate, setStartDate] = useState(() => {
         return localStorage.getItem('expenseFilter_startDate') || '';
     });
@@ -394,6 +311,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const billArrivalFilterRef = useRef(null);
     const [showFilters, setShowFilters] = useState(false);
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+    const [showExpenseDateRangePicker, setShowExpenseDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
     const [sortField, setSortField] = useState('');
@@ -555,9 +473,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.setItem('expenseFilter_accountType', selectedAccountType);
     }, [selectedAccountType]);
 
-    useEffect(() => {
-        localStorage.setItem('expenseFilter_date', selectedDate);
-    }, [selectedDate]);
     useEffect(() => {
         localStorage.setItem('expenseFilter_startDate', startDate);
     }, [startDate]);
@@ -1335,7 +1250,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                         ? isBlankish(expense.accountType)
                         : expense.accountType === selectedAccountType)
                     : true) &&
-                (selectedDate ? expense.date === selectedDate : true) &&
                 (selectedEno
                     ? (selectedEno === BLANK_VALUE
                         ? isBlankish(expense.eno)
@@ -1489,7 +1403,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         uniqueEno.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEno);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType, selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
     useEffect(() => {
         if (filterScrollResetSkipRef.current) {
             filterScrollResetSkipRef.current = false;
@@ -1505,7 +1419,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     }, [
         selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools,
         selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType,
-        selectedDate, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno,
+        startDate, endDate, timestampStartDate, timestampEndDate, selectedEno,
         selectedStaff, selectedBillArrival, selectedQuantity, selectedDescription,
     ]);
     const handleChange = (e) => {
@@ -1607,20 +1521,30 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             billCopy: updatedBillCopy,
             editedBy: username,
         };
-        const isPaymentTypeForWeekly = isWeeklyBillAccountType(updatedFormData.accountType);
-        const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
-        if (isPaymentTypeForWeekly && isNonCashPaymentMode && editId) {
-            const existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
-            const previousExpense = expenses.find((e) => String(e.id) === String(editId));
-            const previousPaymentMode = previousExpense?.paymentMode || '';
-            const hadNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(previousPaymentMode);
-            if (existingWeeklyBills.length === 0 && !hadNonCashPaymentMode) {
-                pendingUpdateFormDataRef.current = updatedFormData;
-                setPaymentModalData({ chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
-                setShowPaymentModal(true);
-                setIsSubmitting(false);
-                return;
+        // Always ask payment details for online payment modes so user can confirm/change account number.
+        if (
+            editId &&
+            isExpenseEntryWeeklyBillAccountType(updatedFormData.accountType) &&
+            isExpenseEntryNonCashPaymentMode(updatedFormData.paymentMode)
+        ) {
+            pendingUpdateFormDataRef.current = updatedFormData;
+            let existingBill = null;
+            try {
+                const bills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
+                existingBill = Array.isArray(bills) && bills.length > 0 ? bills[0] : null;
+            } catch (e) {
+                console.warn('Could not fetch existing weekly bill to prefill payment details', e);
             }
+            setPaymentModalData({
+                chequeNo: existingBill?.cheque_number ?? existingBill?.chequeNumber ?? '',
+                chequeDate: existingBill?.cheque_date ?? existingBill?.chequeDate ?? '',
+                transactionNumber: existingBill?.transaction_number ?? existingBill?.transactionNumber ?? '',
+                accountNumber: existingBill?.account_number ?? existingBill?.accountNumber ?? '',
+                paymentMode: updatedFormData.paymentMode || '',
+            });
+            setShowPaymentModal(true);
+            setIsSubmitting(false);
+            return;
         }
         try {
             await performUpdateAndWeeklyBills(updatedFormData);
@@ -1651,24 +1575,26 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             billArrivalDate: billArrivalForApi
         };
         const updateUrl = `https://backendaab.in/demoAabuilderDash/expenses_form/update/${editId}`;
-        const isPaymentTypeForWeekly = isWeeklyBillAccountType(updatedFormData.accountType);
-        const isNonCashPaymentMode = NON_CASH_PAYMENT_MODES.includes(updatedFormData.paymentMode);
+        const expensesEntryId = editId ?? updatedFormData.id;
+        const isPaymentTypeForWeekly = isExpenseEntryWeeklyBillAccountType(updatedFormData.accountType);
+        const isNonCashPaymentMode = isExpenseEntryNonCashPaymentMode(updatedFormData.paymentMode);
         let existingWeeklyBills = [];
-        if (editId) {
-            existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(editId);
+        if (expensesEntryId) {
+            existingWeeklyBills = await fetchWeeklyPaymentBillsByExpensesEntryId(expensesEntryId);
         }
         const shouldCreateWeeklyBill =
-            isPaymentTypeForWeekly && isNonCashPaymentMode && editId && existingWeeklyBills.length === 0;
+            isPaymentTypeForWeekly && isNonCashPaymentMode && expensesEntryId && existingWeeklyBills.length === 0;
         if (
             shouldCreateWeeklyBill &&
             isPaymentModeRequiringBankRegisterLog(updatedFormData.paymentMode)
         ) {
             await postBankRegisterLogSave(
                 bankRegisterLogSaveUrlMatchingRequest(updateUrl),
-                "Expense Entry",
+                'Expense Entry',
                 {
                     bill_payment_mode: updatedFormData.paymentMode,
                     amount: updatedFormData.amount,
+                    entered_by: username,
                 }
             );
         }
@@ -1679,46 +1605,40 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         });
         if (!response.ok) throw new Error('Failed to update expense');
 
-        if (isPaymentTypeForWeekly && isNonCashPaymentMode && editId) {
+        if (isPaymentTypeForWeekly && isNonCashPaymentMode && expensesEntryId) {
             try {
                 if (existingWeeklyBills.length > 0) {
                     for (const bill of existingWeeklyBills) {
                         if (bill?.id == null) continue;
                         const weeklyPaymentBillPayload = buildWeeklyPaymentBillUpdatePayload(
                             updatedFormData,
-                            editId,
+                            expensesEntryId,
                             bill,
                             { modalPaymentData, editedBy: username }
                         );
                         await updateWeeklyPaymentBillById(bill.id, weeklyPaymentBillPayload);
                     }
                 } else if (shouldCreateWeeklyBill) {
-                    const weeklyPaymentBillPayload = buildWeeklyPaymentBillSavePayload(
+                    const weeklyPaymentBillPayload = buildExpenseEntryWeeklyBillSavePayload(
                         updatedFormData,
-                        editId,
+                        expensesEntryId,
                         {
                             modalPaymentData,
                             branchId: activeBranchId,
                             enteredBy: username,
                         }
                     );
-                    const weeklyResponse = await fetch(`${TOOLS_API_BASE}/api/weekly-payment-bills/save`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(weeklyPaymentBillPayload),
+                    await saveExpenseEntryWeeklyPaymentBill(weeklyPaymentBillPayload, {
+                        branchId: activeBranchId,
                     });
-                    if (!weeklyResponse.ok) {
-                        console.error('Weekly payment bills save failed:', await weeklyResponse.text());
-                    }
                 }
             } catch (weeklyErr) {
                 console.error('Weekly payment bills sync error:', weeklyErr);
                 throw weeklyErr;
             }
-        } else if (editId && existingWeeklyBills.length > 0) {
+        } else if (expensesEntryId && existingWeeklyBills.length > 0) {
             try {
-                const { failedCount } = await deleteRelatedWeeklyPaymentBills(editId);
+                const { failedCount } = await deleteRelatedWeeklyPaymentBills(expensesEntryId);
                 if (failedCount > 0) {
                     console.error('Some related weekly payment bills could not be deleted after expense update');
                 }
@@ -1732,12 +1652,19 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             alert('Please select account number.');
             return;
         }
-        if (formData.paymentMode === 'Cheque' && (!paymentModalData.chequeNo || !paymentModalData.chequeDate)) {
+        const pendingPaymentMode =
+            paymentModalData.paymentMode ||
+            pendingUpdateFormDataRef.current?.paymentMode ||
+            formData.paymentMode;
+        if (
+            String(pendingPaymentMode).toLowerCase() === 'cheque' &&
+            (!paymentModalData.chequeNo || !paymentModalData.chequeDate)
+        ) {
             alert('Please enter cheque number and date.');
             return;
         }
         const updatedFormData = pendingUpdateFormDataRef.current;
-        if (!updatedFormData) return;
+        if (!updatedFormData || !editId) return;
         setIsSubmitting(true);
         try {
             await performUpdateAndWeeklyBills(updatedFormData, paymentModalData);
@@ -1958,6 +1885,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }
     };
     const handleEditClick = (expense) => {
+        if (isAdvancePortalSourceExpense(expense)) {
+            return;
+        }
         setEditId(expense.id);
         setFormData({
             ...expense,
@@ -1999,6 +1929,19 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const handleDelete = async (id, username) => {
         if (window.confirm('Are you sure you want to delete this expense?')) {
             try {
+                let advanceClearMessage = '';
+                let advanceWeeklyDeleted = 0;
+                let advanceWeeklyFailed = 0;
+                try {
+                    const { weeklyBillDelete, clearedAdvanceIds } =
+                        await clearLinkedAdvancePortalForExpenseDelete(id, { editedBy: username });
+                    advanceClearMessage = formatAdvancePortalClearOnExpenseDeleteMessage(clearedAdvanceIds);
+                    advanceWeeklyDeleted = weeklyBillDelete.deletedCount;
+                    advanceWeeklyFailed = weeklyBillDelete.failedCount;
+                } catch (advanceClearError) {
+                    console.error('Failed to clear linked advance portal:', advanceClearError);
+                    advanceClearMessage = ' Failed to clear related advance portal record(s).';
+                }
                 const response = await fetch(
                     `https://backendaab.in/demoAabuilderDash/expenses_form/delete/${id}?editedBy=${encodeURIComponent(username)}`,
                     {
@@ -2009,18 +1952,14 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     let billDeleteMessage = '';
                     try {
                         const { deletedCount, failedCount } = await deleteRelatedWeeklyPaymentBills(id);
-                        if (deletedCount > 0 && failedCount === 0) {
-                            billDeleteMessage = ' Related bill payment record(s) were also deleted.';
-                        } else if (deletedCount > 0 && failedCount > 0) {
-                            billDeleteMessage = ' Some related bill payment record(s) could not be deleted.';
-                        } else if (failedCount > 0) {
-                            billDeleteMessage = ' Failed to delete related bill payment record(s).';
-                        }
+                        const totalDeleted = deletedCount + advanceWeeklyDeleted;
+                        const totalFailed = failedCount + advanceWeeklyFailed;
+                        billDeleteMessage = formatWeeklyBillDeleteMessage(totalDeleted, totalFailed);
                     } catch (billDeleteError) {
                         console.error('Failed to delete related bill payments:', billDeleteError);
                         billDeleteMessage = ' Failed to delete related bill payment record(s).';
                     }
-                    alert(`Expenses deleted successfully!!!${billDeleteMessage}`);
+                    alert(`Expenses deleted successfully!!!${advanceClearMessage}${billDeleteMessage}`);
                     try {
                         await refetchExpenses();
                     } catch (err) {
@@ -2059,7 +1998,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setSelectedPaymentMode('');
         setSelectedBranch('');
         setSelectedEnteredBy('');
-        setSelectedDate('');
         setStartDate('');
         setEndDate('');
         setTimestampStartDate('');
@@ -2085,7 +2023,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.removeItem('expenseFilter_paymentMode');
         localStorage.removeItem('expenseFilter_branch');
         localStorage.removeItem('expenseFilter_enteredBy');
-        localStorage.removeItem('expenseFilter_date');
         localStorage.removeItem('expenseFilter_startDate');
         localStorage.removeItem('expenseFilter_endDate');
         localStorage.removeItem('expenseFilter_timestampStartDate');
@@ -2213,7 +2150,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     ) : null}
                     <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div
-                            className={`text-left flex ${selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
+                            className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
                                 ? 'flex-col sm:flex-row sm:justify-between'
                                 : 'flex-row justify-between items-center'
                                 } mb-[12px] gap-[6px]`}>
@@ -2256,7 +2193,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                         className=" border rounded-md"
                                     />
                                 </button>
-                                {(selectedDate || selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
+                                {(selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
                                     <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                                         {timestampStartDate && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
@@ -2272,13 +2209,25 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 <button onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
-                                        {selectedDate && (
+                                        {startDate && endDate ? (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(startDate)} – {formatChipDateDMY(endDate)}</span>
+                                                <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        ) : startDate ? (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                                                 <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(selectedDate)}</span>
-                                                <button onClick={() => setSelectedDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(startDate)} onwards</span>
+                                                <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
-                                        )}
+                                        ) : endDate ? (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date until: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(endDate)}</span>
+                                                <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        ) : null}
                                         {selectedSiteName && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                                                 <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Project Name: </span>
@@ -2422,7 +2371,16 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 <TableProvider value={{
                                     currentItems, showFilters, filterRowRef, totalAmount, sortField, sortDirection, handleSort,
                                     timestampStartDate, setTimestampStartDate, timestampEndDate, setTimestampEndDate,
-                                    showDateRangePicker, setShowDateRangePicker, selectedDate, setSelectedDate,
+                                    showDateRangePicker, setShowDateRangePicker,
+                                    useExpenseDateRangeFilter: true,
+                                    expenseDateStartDate: startDate,
+                                    expenseDateEndDate: endDate,
+                                    showExpenseDateRangePicker,
+                                    setShowExpenseDateRangePicker,
+                                    setExpenseDateStartDate: setStartDate,
+                                    setExpenseDateEndDate: setEndDate,
+                                    selectedDate: '',
+                                    setSelectedDate: () => {},
                                     siteOptions, selectedSiteName, setSelectedSiteName, vendorOptions, selectedVendor, setSelectedVendor,
                                     contractorOptions, selectedContractor, setSelectedContractor, staffOptions, selectedStaff, setSelectedStaff,
                                     selectedQuantity, setSelectedQuantity, selectedDescription, setSelectedDescription,
@@ -2530,12 +2488,26 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             <Select
                                                 name="accountType"
                                                 value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
-                                                onChange={(selectedOption) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        accountType: selectedOption?.value || '',
-                                                    })
-                                                }
+                                                onChange={(selectedOption) => {
+                                                    const nextAccountType = selectedOption?.value || '';
+                                                    setFormData((prev) => {
+                                                        const parsed = parseFloat(String(prev.amount ?? '').replace(/,/g, ''));
+                                                        const hasAmount = prev.amount !== '' && prev.amount != null && !Number.isNaN(parsed);
+                                                        let nextAmount = prev.amount;
+                                                        if (hasAmount) {
+                                                            if (nextAccountType === 'Bill Refund') {
+                                                                nextAmount = String(-Math.abs(parsed));
+                                                            } else if (prev.accountType === 'Bill Refund') {
+                                                                nextAmount = String(Math.abs(parsed));
+                                                            }
+                                                        }
+                                                        return {
+                                                            ...prev,
+                                                            accountType: nextAccountType,
+                                                            amount: nextAmount,
+                                                        };
+                                                    });
+                                                }}
                                                 options={editAccountTypeOptions}
                                                 placeholder="Select"
                                                 isClearable
@@ -3084,112 +3056,19 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 </div>
                             </Modal>
                             {showPaymentModal && createPortal(
-                                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[10000]">
-                                    <div className="bg-white text-left rounded-xl p-6 w-[800px] max-h-[90vh] overflow-y-auto flex flex-col relative">
-                                        <h3 className="text-lg font-semibold mb-4 text-center">Payment Details</h3>
-                                        <div className="flex-1 overflow-hidden">
-                                            <div className="space-y-4 mb-4">
-                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                                    <div className="grid grid-cols-3 gap-4">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                            <CustomDateField
-                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.date) || ''}
-                                                                onChange={() => { }}
-                                                                disabled
-                                                                placeholder="Date"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                                            <input
-                                                                type="text"
-                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.amount) || ''}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
-                                                            <input
-                                                                type="text"
-                                                                value={(pendingUpdateFormDataRef.current && pendingUpdateFormDataRef.current.paymentMode) || ''}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {(formData.paymentMode === 'GPay' || formData.paymentMode === 'Gpay' || formData.paymentMode === 'PhonePe' || formData.paymentMode === 'Net Banking' || formData.paymentMode === 'Cheque') && (
-                                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
-                                                        <div className="space-y-4">
-                                                            {formData.paymentMode === 'Cheque' && (
-                                                                <div className="grid grid-cols-2 gap-4">
-                                                                    <div>
-                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No <span className="text-red-500">*</span></label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={paymentModalData.chequeNo}
-                                                                            onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                                            placeholder="Enter cheque number"
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date <span className="text-red-500">*</span></label>
-                                                                        <CustomDateField
-                                                                            value={paymentModalData.chequeDate}
-                                                                            onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
-                                                                            placeholder="Cheque date"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={paymentModalData.transactionNumber}
-                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                                        placeholder="Enter transaction number (optional)"
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number <span className="text-red-500">*</span></label>
-                                                                    <select
-                                                                        value={paymentModalData.accountNumber}
-                                                                        onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                                    >
-                                                                        <option value="">Select Account</option>
-                                                                        {accountDetails.map((account) => (
-                                                                            <option key={account.id} value={account.account_number}>
-                                                                                {account.account_number}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-end gap-3 mt-6 p-4 bg-white border-t">
-                                            <button type="button" onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg">
-                                                Cancel
-                                            </button>
-                                            <button type="button" onClick={handlePaymentModalSubmit} disabled={isSubmitting} className="px-4 py-2 bg-[#BF9853] text-white rounded-lg disabled:bg-gray-400">
-                                                {isSubmitting ? 'Saving...' : 'Submit'}
-                                            </button>
-                                        </div>
-                                        <button type="button" onClick={() => setShowPaymentModal(false)} className="absolute top-3 right-4 text-xl font-bold text-gray-500 hover:text-black">
-                                            ×
-                                        </button>
-                                    </div>
-                                </div>
+                                <ExpenseEntryPaymentModal
+                                    isOpen={showPaymentModal}
+                                    onClose={() => setShowPaymentModal(false)}
+                                    onSubmit={handlePaymentModalSubmit}
+                                    isSubmitting={isSubmitting}
+                                    paymentMode={paymentModalData.paymentMode || pendingUpdateFormDataRef.current?.paymentMode || ''}
+                                    date={pendingUpdateFormDataRef.current?.date || ''}
+                                    amount={pendingUpdateFormDataRef.current?.amount || ''}
+                                    paymentModalData={paymentModalData}
+                                    setPaymentModalData={setPaymentModalData}
+                                    accountDetails={accountDetails}
+                                    selectStyles={customStyles}
+                                />
                                 , document.body)}
                             <AuditModal
                                 show={showModal}

@@ -27,15 +27,25 @@ import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions'
 // Module-level cache that persists across component remounts
 const siteEngineersCache = { data: null };
 const supportStaffCache = { data: null };
+const PO_TAB_IDS = ['create', 'history', 'input', 'summary'];
+const isValidPurchaseOrderTab = (tab) => PO_TAB_IDS.includes(tab);
+const resolvePurchaseOrderActiveTab = () => {
+  const saved =
+    localStorage.getItem('purchaseOrderActiveTab') ||
+    localStorage.getItem('activeTab');
+  return isValidPurchaseOrderTab(saved) ? saved : 'create';
+};
+const persistPurchaseOrderActiveTab = (tab) => {
+  if (isValidPurchaseOrderTab(tab)) {
+    localStorage.setItem('purchaseOrderActiveTab', tab);
+  }
+};
 const PurchaseOrder = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState('purchase-order');
-  // Load activeTab from localStorage on mount, default to 'create'
-  const [activeTab, setActiveTab] = useState(() => {
-    const savedTab = localStorage.getItem('activeTab');
-    return savedTab || 'create';
-  });
+  // Load activeTab from PO-scoped storage (fallback: legacy activeTab key)
+  const [activeTab, setActiveTab] = useState(resolvePurchaseOrderActiveTab);
   const [showAddItems, setShowAddItems] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
@@ -1235,12 +1245,24 @@ const PurchaseOrder = ({ user, onLogout }) => {
     };
     generateViewOnlyPDF();
   }, [isViewOnlyFromHistory, isPdfGenerated, selectedVendor, selectedSite, selectedIncharge, items, poData, user, fetchPoCategory]);
-  // Save activeTab to localStorage whenever it changes
+  // Save activeTab to PO-scoped localStorage whenever it changes
   useEffect(() => {
     if (activeTab) {
-      localStorage.setItem('activeTab', activeTab);
+      persistPurchaseOrderActiveTab(activeTab);
     }
   }, [activeTab]);
+  // Recover if another module overwrote the legacy activeTab key with an invalid value
+  useEffect(() => {
+    if (!isValidPurchaseOrderTab(activeTab)) {
+      setActiveTab('create');
+    }
+  }, [activeTab]);
+  // Keep date visible in the header row (rare clears leave the row empty otherwise)
+  useEffect(() => {
+    if (activeTab === 'create' && !poData.date) {
+      setPoData((prev) => ({ ...prev, date: formatDate(getTodayDate()) }));
+    }
+  }, [activeTab, poData.date]);
   // Clear editingPO from localStorage on mount to ensure fresh start on page reload
   useEffect(() => {
     // Clear any editingPO from localStorage on page reload to start fresh
@@ -1983,7 +2005,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
             setHasOpenedAdd(true);
             // Ensure we're on the create tab to show the items
             setActiveTab('create');
-            localStorage.setItem('activeTab', 'create');
+            persistPurchaseOrderActiveTab('create');
           }
           // Clear the stored items after adding
           localStorage.removeItem('netStockSelectedItems');
@@ -2947,7 +2969,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   <button type="button" onClick={() => setShowDatePicker(true)}
                     className="text-[12px] font-semibold text-black leading-normal underline-offset-2 hover:underline"
                   >
-                    {poData.date}
+                    {poData.date || formatDate(getTodayDate())}
                   </button>
                 </div>
                 <div className="flex items-center gap-[8px]">

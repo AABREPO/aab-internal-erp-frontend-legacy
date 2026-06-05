@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import edit from '../Images/Edit.svg';
 import {
     EDBC_IDS,
@@ -19,6 +19,7 @@ import {
     EdbcBillArrivalFilter,
     EdbcExpandableBodyCell,
     EdbcActivityBodyCell,
+    isAdvancePortalSourceExpense,
     EdbcFileBodyCell,
     EdbcTableHeaderRow,
     EdbcTableFilterRow,
@@ -32,6 +33,105 @@ const BLANK_LABEL = 'Blank';
 export const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
 
 const noop = () => {};
+
+/** Sortable columns from EDBC_CONFIG — same keys EdbcColumnHeader uses for onClick. */
+export const EDBC_SORT_OPTIONS = Object.values(EDBC_IDS)
+    .map((columnId) => {
+        const config = getEdbcColumnConfig(columnId);
+        if (!config?.sortField) return null;
+        return { columnId, sortField: config.sortField };
+    })
+    .filter(Boolean);
+
+/** Pass to every EdbcColumnHeader on pages that use databaseExpensesSharedColumns headings. */
+export function getEdbcColumnHeaderSortProps(sortField, sortDirection, handleSort) {
+    if (typeof handleSort !== 'function') return {};
+    return { sortField, sortDirection, onSort: handleSort };
+}
+
+/** Shared sort toggle — field must match a sortField from EDBC_SORT_OPTIONS / EDBC_CONFIG. */
+export function useEdbcTableSort({ initialSortField = '', initialSortDirection = 'asc', onSortChange } = {}) {
+    const [sortField, setSortField] = useState(initialSortField);
+    const [sortDirection, setSortDirection] = useState(initialSortDirection);
+    const handleSort = useCallback((field) => {
+        if (!EDBC_SORT_OPTIONS.some((option) => option.sortField === field)) return;
+        if (sortField === field) {
+            setSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+        onSortChange?.(field);
+    }, [sortField, onSortChange]);
+    const sortProps = useMemo(
+        () => getEdbcColumnHeaderSortProps(sortField, sortDirection, handleSort),
+        [sortField, sortDirection, handleSort],
+    );
+    return {
+        sortField,
+        sortDirection,
+        handleSort,
+        setSortField,
+        setSortDirection,
+        sortProps,
+    };
+}
+
+/** Sort expense rows by EDBC sortField — use with useEdbcTableSort / getEdbcColumnHeaderSortProps. */
+export function sortEdbcExpenses(rows, sortField, sortDirection, resolvers = {}) {
+    if (!sortField || !Array.isArray(rows)) return rows;
+    const {
+        getMachineToolsItemIdDisplay = () => '',
+        getBranchName = () => '',
+        getExpenseBillArrivalRaw = (expense) =>
+            expense?.billArrivalDate ?? expense?.bill_arrival_date ?? '',
+    } = resolvers;
+    return [...rows].sort((a, b) => {
+        let aValue = a[sortField];
+        let bValue = b[sortField];
+        if (sortField === 'date' || sortField === 'timestamp') {
+            aValue = new Date(aValue);
+            bValue = new Date(bValue);
+        } else if (sortField === 'eno') {
+            aValue = parseInt(aValue, 10) || 0;
+            bValue = parseInt(bValue, 10) || 0;
+        } else if (sortField === 'machineTools') {
+            aValue = String(getMachineToolsItemIdDisplay(a.machineTools) || '').toLowerCase();
+            bValue = String(getMachineToolsItemIdDisplay(b.machineTools) || '').toLowerCase();
+        } else if (sortField === 'staff') {
+            const aLabourId = a.labourId || a.labour_id || a.labourID || a.labour_ID;
+            const aEmployeeId = a.employeeId || a.employee_id || a.employeeID || a.employee_ID;
+            const bLabourId = b.labourId || b.labour_id || b.labourID || b.labour_ID;
+            const bEmployeeId = b.employeeId || b.employee_id || b.employeeID || b.employee_ID;
+            aValue = aLabourId ?? aEmployeeId ?? '';
+            bValue = bLabourId ?? bEmployeeId ?? '';
+            const aNum = Number(aValue);
+            const bNum = Number(bValue);
+            if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                aValue = aNum;
+                bValue = bNum;
+            } else {
+                aValue = String(aValue || '').toLowerCase();
+                bValue = String(bValue || '').toLowerCase();
+            }
+        } else if (sortField === 'branch') {
+            aValue = String(getBranchName(a.branch_id ?? a.branchId ?? '') || '').toLowerCase();
+            bValue = String(getBranchName(b.branch_id ?? b.branchId ?? '') || '').toLowerCase();
+        } else if (sortField === 'billArrivalDate') {
+            aValue = String(getExpenseBillArrivalRaw(a) || '').slice(0, 10);
+            bValue = String(getExpenseBillArrivalRaw(b) || '').slice(0, 10);
+        } else if (sortField === 'quantity' || sortField === 'amount') {
+            aValue = Number(aValue) || 0;
+            bValue = Number(bValue) || 0;
+        } else {
+            aValue = String(aValue ?? '').toLowerCase();
+            bValue = String(bValue ?? '').toLowerCase();
+        }
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
 
 const TableContext = createContext(null);
 
@@ -341,6 +441,13 @@ export function Table({
         setShowDateRangePicker,
         selectedDate,
         setSelectedDate,
+        useExpenseDateRangeFilter = false,
+        expenseDateStartDate = '',
+        expenseDateEndDate = '',
+        showExpenseDateRangePicker = false,
+        setShowExpenseDateRangePicker = noop,
+        setExpenseDateStartDate = noop,
+        setExpenseDateEndDate = noop,
         siteOptions,
         selectedSiteName,
         setSelectedSiteName,
@@ -405,6 +512,7 @@ export function Table({
     const activityLabel = activityColumnLabel || dstCol19Label;
     const activityTdClass = getEdbcColumnConfig(EDBC_IDS.EDBC19)?.tdClass || '';
     const edbc2ColumnWidthClass = showTimestampColumn ? '' : EDBC2_FIRST_COLUMN_WIDTH_CLASS;
+    const edbcSortProps = getEdbcColumnHeaderSortProps(sortField, sortDirection, handleSort);
 
     return (
         <table className={`table-fixed w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${tableClassName || 'min-w-[1920px]'}`.trim()}>
@@ -414,130 +522,94 @@ export function Table({
                         <EdbcColumnHeader
                             columnId={EDBC_IDS.EDBC1}
                             label={dstCol1Label}
-                            sortField={sortField}
-                            sortDirection={sortDirection}
-                            onSort={handleSort}
+                            {...edbcSortProps}
                         />
                     )}
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC2}
                         label={dstCol2Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                         columnWidthClass={edbc2ColumnWidthClass}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC3}
                         label={dstCol3Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC4}
                         label={dstCol4Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC5}
                         label={dstCol5Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC6}
                         label={dstCol6Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC7}
                         label={dstCol7Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC8}
                         label={dstCol8Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC9}
                         label={dstCol9Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC10}
                         label={dstCol10Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC11}
                         label={dstCol11Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC12}
                         label={dstCol12Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC13}
                         label={dstCol13Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC14}
                         label={dstCol14Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC15}
                         label={dstCol15Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC16}
                         label={dstCol16Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC17}
                         label={dstCol17Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC18}
                         label={dstCol18Label}
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                        onSort={handleSort}
+                        {...edbcSortProps}
                     />
                     {showActivityColumn && (
                         <EdbcColumnHeader
@@ -567,11 +639,27 @@ export function Table({
                             />
                         )}
                         {showTimestampColumn ? (
-                            <EdbcDateFilter
-                                placeholder={dstCol2Label}
-                                value={selectedDate}
-                                onChange={setSelectedDate}
-                            />
+                            useExpenseDateRangeFilter ? (
+                                <EdbcTimestampFilter
+                                    columnId={EDBC_IDS.EDBC2}
+                                    placeholder={dstCol2Label}
+                                    timestampStartDate={expenseDateStartDate}
+                                    timestampEndDate={expenseDateEndDate}
+                                    isOpen={showExpenseDateRangePicker}
+                                    onOpen={() => setShowExpenseDateRangePicker(true)}
+                                    onClose={() => setShowExpenseDateRangePicker(false)}
+                                    onApply={(from, to) => {
+                                        setExpenseDateStartDate(from);
+                                        setExpenseDateEndDate(to);
+                                    }}
+                                />
+                            ) : (
+                                <EdbcDateFilter
+                                    placeholder={dstCol2Label}
+                                    value={selectedDate}
+                                    onChange={setSelectedDate}
+                                />
+                            )
                         ) : (
                             <EdbcTimestampFilter
                                 columnId={EDBC_IDS.EDBC2}
@@ -892,16 +980,24 @@ export function Table({
                         {showActivityColumn && (
                             editOnlyActivityColumn ? (
                                 <td id={EDBC_IDS.EDBC19} className={activityTdClass}>
-                                    <button
-                                        onClick={() => handleEditClick(expense)}
-                                        className="rounded-full transition duration-200"
-                                    >
-                                        <img
-                                            src={edit}
-                                            alt="Edit"
-                                            className=" w-4 h-6 transform hover:scale-110 hover:brightness-110 transition duration-200 "
-                                        />
-                                    </button>
+                                    {(() => {
+                                        const editDisabled = isAdvancePortalSourceExpense(expense);
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={editDisabled ? undefined : () => handleEditClick(expense)}
+                                                disabled={editDisabled}
+                                                title={editDisabled ? 'Edit in Advance Portal' : 'Edit'}
+                                                className={`rounded-full transition duration-200 ${editDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                <img
+                                                    src={edit}
+                                                    alt="Edit"
+                                                    className={`w-4 h-6 transition duration-200 ${editDisabled ? '' : 'transform hover:scale-110 hover:brightness-110'}`}
+                                                />
+                                            </button>
+                                        );
+                                    })()}
                                 </td>
                             ) : (
                                 <EdbcActivityBodyCell

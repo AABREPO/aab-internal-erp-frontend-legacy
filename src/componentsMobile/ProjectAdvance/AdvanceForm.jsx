@@ -14,18 +14,34 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import { resolveExpensesEntryIdAfterSave } from '../../utils/advancePortalWeeklyPaymentBill';
 
 /** Keeps dropdown mapping/render cheap on huge vendor/site lists. */
 const MAX_SELECT_OPTIONS = 500;
 
 const AdvanceForm = ({
   username = '',
+  user = null,
   userRoles = [],
   paymentModeOptions = [],
   initialFromHistory = null,
   onConsumedInitialFromHistory,
   isAdvanceTabActive = true,
 }) => {
+  const resolveEnteredBy = () => {
+    const propUsername = typeof username === 'string' ? username.trim() : '';
+    if (propUsername) return propUsername;
+    const fromUser = user?.username || user?.name || user?.userName || '';
+    if (fromUser && String(fromUser).trim()) return String(fromUser).trim();
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      return stored?.name || stored?.username || stored?.userName || '';
+    } catch {
+      return '';
+    }
+  };
+  const enteredBy = resolveEnteredBy();
+
   // Resolve module permissions — defer until Advance tab is active (avoid work when tab is hidden).
   const [modulePermissions, setModulePermissions] = useState([]);
   const canCreate = modulePermissions.includes('Create');
@@ -590,6 +606,80 @@ const AdvanceForm = ({
     return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
   };
 
+  const saveAdvancePortal = async (payload) => {
+    const bodyPayload = {
+      ...(payload && typeof payload === 'object' ? payload : {}),
+      entered_by: enteredBy,
+      source: 'Advance Portal',
+    };
+    const response = await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyPayload),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to save advance portal data');
+    }
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return response.json();
+    }
+    return null;
+  };
+
+  const buildBillSettlementExpensesPayload = ({ date, fileUrl, accountType, includeEno = false }) => {
+    let vendor = '';
+    let contractor = '';
+    if (selectedOption?.type === 'Vendor') {
+      vendor = selectedOption.label;
+    } else if (selectedOption?.type === 'Contractor') {
+      contractor = selectedOption.label;
+    }
+    const payload = {
+      accountType,
+      date,
+      siteName: selectedSite ? selectedSite.label : '',
+      projectId: selectedSite ? selectedSite.id : null,
+      vendor,
+      vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
+      contractor,
+      contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
+      quantity: '',
+      amount: parseInt(billAmount) || 0,
+      category: selectedCategory ? selectedCategory.label : '',
+      comments: description,
+      machineTools: '',
+      billCopyUrl: fileUrl || '',
+      source: 'Advance Portal',
+      branchId: activeBranchId,
+      enteredBy,
+    };
+    if (eno != null) {
+      payload.eno = eno;
+    }
+    return payload;
+  };
+
+  const saveExpensesFormEntry = async (expensesPayload) => {
+    const expensesResponse = await fetch(withBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(expensesPayload),
+    });
+    const responseText = await expensesResponse.text();
+    if (!expensesResponse.ok) {
+      throw new Error(`Expenses form submission failed: ${responseText}`);
+    }
+    const expensesEntryId = resolveExpensesEntryIdAfterSave(responseText);
+    if (!expensesEntryId) {
+      throw new Error(
+        'Expenses save response did not include id. Backend must return { id } from expenses_form/save.'
+      );
+    }
+    return expensesEntryId;
+  };
+
   // Submit advance data
   const submitAdvanceData = async () => {
     setIsSubmitting(true);
@@ -650,6 +740,8 @@ const AdvanceForm = ({
         description: description,
         file_url: fileUrl,
         branch_id: activeBranchId,
+        entered_by: enteredBy,
+        source: 'Advance Portal',
         ...overrides
       });
       if (selectedType === 'Transfer') {
@@ -672,7 +764,9 @@ const AdvanceForm = ({
             project_id: 0,
             description: "Transfer from Advance Portal",
             file_url: "",
-            branch_id: activeBranchId
+            branch_id: activeBranchId,
+            entered_by: enteredBy,
+            source: 'Advance Portal',
           };
           const loanResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save"), {
             method: "POST",
@@ -688,11 +782,7 @@ const AdvanceForm = ({
             amount: -Math.abs(amountValue),
             loan_portal_id: loanPortalId
           });
-          await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(advancePayload)
-          });
+          await saveAdvancePortal(advancePayload);
         } else if (transferSiteIdInt === 12 && selectedOption?.type === 'Vendor') {
           const vendorCarryForwardPayload = {
             type: "Transfer",
@@ -701,7 +791,10 @@ const AdvanceForm = ({
             payment_mode: paymentMode || "",
             amount: Math.abs(amountValue),
             bill_amount: 0,
-            refund_amount: 0
+            refund_amount: 0,
+            branch_id: activeBranchId,
+            entered_by: enteredBy,
+            source: "Advance Portal",
           };
           const vendorCarryForwardResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
             method: "POST",
@@ -717,11 +810,7 @@ const AdvanceForm = ({
             amount: -Math.abs(amountValue),
             vendor_carry_forward_id: vendorCarryForwardId
           });
-          await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(advancePayload)
-          });
+          await saveAdvancePortal(advancePayload);
         } else {
           const firstPayload = createPayload({ amount: -Math.abs(amountValue) });
           const secondPayload = createPayload({
@@ -730,65 +819,26 @@ const AdvanceForm = ({
             amount: Math.abs(amountValue)
           });
           await Promise.all([
-            fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(firstPayload)
-            }),
-            fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(secondPayload)
-            })
+            saveAdvancePortal(firstPayload),
+            saveAdvancePortal(secondPayload),
           ]);
         }
       } else {
-        const payload = createPayload();
-        await fetch(withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        let expensesEntryId = null;
         if (selectedType === 'Bill Settlement') {
-          let vendor = '';
-          let contractor = '';
-          if (selectedOption?.type === 'Vendor') {
-            vendor = selectedOption.label;
-          } else if (selectedOption?.type === 'Contractor') {
-            contractor = selectedOption.label;
-          }
-          const expensesPayload = {
-            accountType: 'Bill Payments',
-            eno: eno,
+          const expensesPayload = buildBillSettlementExpensesPayload({
             date: dateValue,
-            siteName: selectedSite ? selectedSite.label : '',
-            projectId: selectedSite ? selectedSite.id : null,
-            vendor: vendor,
-            vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
-            contractor: contractor,
-            contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
-            quantity: '',
-            amount: parseInt(billAmount) || 0,
-            category: selectedCategory ? selectedCategory.label : '',
-            comments: description,
-            machineTools: '',
-            billCopyUrl: fileUrl || '',
-            source: "Advance Portal",
-            branchId: activeBranchId,
-          };
-          const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(expensesPayload),
+            fileUrl,
+            accountType: 'Bill Settlement',
+            includeEno: true,
           });
-          if (!expensesResponse.ok) {
-            const errorText = await expensesResponse.text();
-            throw new Error(`Expenses form submission failed: ${errorText}`);
-          }
+          expensesEntryId = await saveExpensesFormEntry(expensesPayload);
           setEno(eno + 1);
         }
+        const payload = createPayload(
+          expensesEntryId != null ? { expenses_entry_id: expensesEntryId } : {}
+        );
+        await saveAdvancePortal(payload);
       }
       alert('Advance saved successfully!');
       window.dispatchEvent(new CustomEvent('advanceUpdated'));
@@ -946,6 +996,17 @@ const AdvanceForm = ({
       }
       const maxEntryNo = await fetchMaxEntryNoFromBranch(withBranchUrl);
       const nextEntryNo = maxEntryNo + 1;
+      let expensesEntryId = null;
+      if (selectedType === 'Bill Settlement') {
+        const expensesPayload = buildBillSettlementExpensesPayload({
+          date: paymentModalData.date,
+          fileUrl,
+          accountType: 'Bill Settlement',
+          includeEno: true,
+        });
+        expensesEntryId = await saveExpensesFormEntry(expensesPayload);
+        setEno(eno + 1);
+      }
       const advancePayload = {
         type: selectedType,
         date: paymentModalData.date,
@@ -965,6 +1026,7 @@ const AdvanceForm = ({
         description: description,
         file_url: fileUrl,
         branch_id: activeBranchId,
+        ...(expensesEntryId != null ? { expenses_entry_id: expensesEntryId } : {}),
       };
       const advanceSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/advance_portal/save');
       if (isPaymentModeRequiringBankRegisterLog(paymentModalData.paymentMode)) {
@@ -974,18 +1036,12 @@ const AdvanceForm = ({
           {
             bill_payment_mode: paymentModalData.paymentMode,
             amount: parseFloat(paymentModalData.amount) || 0,
-            entered_by: username,
+            entered_by: enteredBy,
           }
         );
       }
-      const advanceResponse = await fetch(advanceSaveUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(advancePayload)
-      });
-      if (!advanceResponse.ok) throw new Error('Failed to save advance portal data');
-      const advanceResult = await advanceResponse.json();
-      const advancePortalId = advanceResult.id ?? advanceResult.advancePortalId;
+      const advanceResult = await saveAdvancePortal(advancePayload);
+      const advancePortalId = advanceResult?.id ?? advanceResult?.advancePortalId;
 
       const weeklyPaymentBillPayload = {
         date: paymentModalData.date,
@@ -1007,7 +1063,8 @@ const AdvanceForm = ({
         cheque_date: paymentModalData.paymentMode === 'Cheque' ? paymentModalData.chequeDate : null,
         transaction_number: paymentModalData.transactionNumber || null,
         account_number: paymentModalData.accountNumber || null,
-        branch_id: activeBranchId
+        branch_id: activeBranchId,
+        entered_by: enteredBy,
       };
       const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');
       const weeklyResponse = await fetch(weeklyBillSaveUrl, {
@@ -1016,42 +1073,6 @@ const AdvanceForm = ({
         body: JSON.stringify(weeklyPaymentBillPayload)
       });
       if (!weeklyResponse.ok) throw new Error('Failed to save weekly payment bills data');
-
-      if (selectedType === 'Bill Settlement') {
-        let vendor = '';
-        let contractor = '';
-        if (selectedOption?.type === 'Vendor') vendor = selectedOption.label;
-        else if (selectedOption?.type === 'Contractor') contractor = selectedOption.label;
-        const expensesPayload = {
-          accountType: 'Bill Payments',
-          eno: eno,
-          date: paymentModalData.date,
-          siteName: selectedSite ? selectedSite.label : '',
-          projectId: selectedSite ? selectedSite.id : null,
-          vendor,
-          vendorId: selectedOption?.type === 'Vendor' ? selectedOption.id : null,
-          contractor,
-          contractorId: selectedOption?.type === 'Contractor' ? selectedOption.id : null,
-          quantity: '',
-          amount: parseInt(billAmount) || 0,
-          category: selectedCategory ? selectedCategory.label : '',
-          comments: description,
-          machineTools: '',
-          billCopyUrl: fileUrl || '',
-          source: "Advance Portal",
-          branchId: activeBranchId,
-        };
-        const expensesResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuilderDash/expenses_form/save"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(expensesPayload),
-        });
-        if (!expensesResponse.ok) {
-          const errorText = await expensesResponse.text();
-          throw new Error(`Expenses form submission failed: ${errorText}`);
-        }
-        setEno(eno + 1);
-      }
 
       alert('Advance saved successfully and added to Weekly Payment Bills!');
       window.dispatchEvent(new CustomEvent('advanceUpdated'));

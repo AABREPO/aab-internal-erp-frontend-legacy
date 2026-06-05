@@ -98,6 +98,9 @@ const ProjectAdvance = ({ user, onLogout }) => {
             style={{ display: activeTab === 'advanceform' ? 'flex' : 'none' }}
           >
             <AdvanceForm
+              user={user}
+              username={user?.username || user?.name || ''}
+              userRoles={user?.userRoles || []}
               isAdvanceTabActive={activeTab === 'advanceform'}
               initialFromHistory={initialFromHistory}
               onConsumedInitialFromHistory={() => setInitialFromHistory(null)}

@@ -10,19 +10,43 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 
 /** yyyy-MM-dd for date inputs; returns '' when value is missing or not parseable. */
 const normalizeDateToYmd = (value) => {
     if (value == null) return '';
+    if (Array.isArray(value) && value.length >= 3) {
+        const [y, m, d] = value;
+        if (y != null && m != null && d != null) {
+            return `${String(y)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+    }
     const s = String(value).trim();
     if (!s) return '';
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmy) {
+        const [, day, month, year] = dmy;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
     const d = new Date(s);
     return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 };
 
-const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
+const getBillArrivalDateRaw = (item) =>
+    item?.bill_arrival_date ?? item?.billArrivalDate ?? item?.bill_arrivalDate ?? '';
+
+/** dd/mm/yyyy for table display; returns '-' when missing or not parseable. */
+const formatBillArrivalDate = (item) => {
+    const ymd = normalizeDateToYmd(getBillArrivalDateRaw(item));
+    if (!ymd) return '-';
+    const [year, month, day] = ymd.split('-');
+    return `${day}/${month}/${year}`;
+};
+
+const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true, refreshSignal }) => {
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId")
@@ -278,9 +302,11 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             return [];
         }
     };
-    const fetchTrackerData = async () => {
-        setLoading(true);
-        setError(null);
+    const fetchTrackerData = async ({ silent = false } = {}) => {
+        if (!silent) {
+            setLoading(true);
+            setError(null);
+        }
         try {
             // Optimized backend endpoint: returns pending trackers with computed verification/entry/payment status.
             const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/pending", {
@@ -310,9 +336,16 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             setError(error.message);
             return [];
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
+    useOrbitPageSync(
+        'tracker',
+        () => {
+            void fetchTrackerData({ silent: true });
+        },
+        []
+    );
     const fetchAllTrackerDataForChecks = async () => {
         try {
             // Use BillDatabase API so checks work against ALL rows (not only pending list)
@@ -634,6 +667,10 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             fetchTrackerData();
         }
     }, [billPaymentsTabActive]);
+    useTabRefreshSignal(refreshSignal, billPaymentsTabActive, () => {
+        fetchTrackerData();
+        fetchAllTrackerDataForChecks();
+    });
     useEffect(() => {
         if (!billPaymentsTabActive) return;
         let cancelled = false;
@@ -707,16 +744,16 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         }
         if (filters.fromDate) {
             filteredData = filteredData.filter(item => {
-                const itemDate = new Date(item.bill_arrival_date);
-                const fromDate = new Date(filters.fromDate);
-                return itemDate >= fromDate;
+                const itemYmd = normalizeDateToYmd(getBillArrivalDateRaw(item));
+                if (!itemYmd) return false;
+                return itemYmd >= filters.fromDate;
             });
         }
         if (filters.toDate) {
             filteredData = filteredData.filter(item => {
-                const itemDate = new Date(item.bill_arrival_date);
-                const toDate = new Date(filters.toDate);
-                return itemDate <= toDate;
+                const itemYmd = normalizeDateToYmd(getBillArrivalDateRaw(item));
+                if (!itemYmd) return false;
+                return itemYmd <= filters.toDate;
             });
         }
         if (filters.paymentStatus) {
@@ -3329,6 +3366,12 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         if (!accountDetails || accountDetails.length === 0) {
             try { await fetchAccountDetails() } catch { }
         }
+        try {
+            const statusResult = await getPaymentStatus(bill);
+            setPaymentStatuses(prev => ({ ...prev, [bill.id]: statusResult.status }));
+        } catch {
+            // ignore; local settlement calc still applies in modal
+        }
         setShowPaymentModal(true)
     }
     const handlePaymentCancel = () => {
@@ -3387,6 +3430,16 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         const decimalPart = parts[1] ? parts[1].slice(0, 2) : ''
         return decimalPart ? `${integerPart}.${decimalPart}` : integerPart
     }
+    const parsePaymentEntryAmount = (entry) => {
+        const raw = entry?.amount ?? entry?.amountDisplay ?? ''
+        if (typeof raw === 'string') {
+            const cleaned = raw.replace(/,/g, '')
+            const numeric = parseFloat(cleaned)
+            return Number.isNaN(numeric) ? 0 : numeric
+        }
+        const numeric = parseFloat(raw)
+        return Number.isNaN(numeric) ? 0 : numeric
+    }
     const handlePaymentEntryChange = (entryId, field, value) => {
         setPaymentEntries(prev => prev.map(entry => {
             if (entry.id !== entryId) {
@@ -3416,7 +3469,16 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
     useEffect(() => {
         if (useCarryForward && carryForwardAmount > 0 && paymentEntries.length > 0 && showPaymentModal) {
             const firstEntry = paymentEntries[0];
-            const carryForwardToUse = Math.min(carryForwardAmount, remainingAmount);
+            const normalizedDiscountForCf = (() => {
+                if (typeof discount === 'string') {
+                    const cleaned = discount.replace(/,/g, '')
+                    const numeric = parseFloat(cleaned)
+                    return Number.isNaN(numeric) ? 0 : numeric
+                }
+                return Number.isFinite(discount) ? discount : 0
+            })()
+            const obligationBeforeSession = Math.max(0, remainingAmount - normalizedDiscountForCf)
+            const carryForwardToUse = Math.min(carryForwardAmount, obligationBeforeSession);
             const needsAmount = !firstEntry.amount || firstEntry.amount === '';
             const needsMode = firstEntry.mode !== 'Carry Forward';
             if ((needsAmount && carryForwardToUse > 0) || needsMode) {
@@ -3782,7 +3844,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             const regularPaymentEntries = validPaymentEntries.filter(entry => entry.mode !== 'Carry Forward');
             const carryForwardEntries = validPaymentEntries.filter(entry => entry.mode === 'Carry Forward');
             const totalPaymentAmount = regularPaymentEntries.reduce((sum, entry) => {
-                return sum + (parseFloat(entry.amount) || 0)
+                return sum + parsePaymentEntryAmount(entry)
             }, 0)
             const currentReceivedAmount = actualAmount - remainingAmount;
             const normalizedDiscount = (() => {
@@ -3793,24 +3855,24 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 }
                 return Number.isFinite(discount) ? discount : 0
             })()
-            const newTotalReceived = currentReceivedAmount + totalPaymentAmount;
-            const remainingAfterPayments = Math.max(0, actualAmount - newTotalReceived);
-            // Calculate carry forward to use: either from entries or calculated amount
-            let carryForwardToUse = 0;
-            if (carryForwardEntries.length > 0) {
-                // Sum carry forward amounts from entries
-                carryForwardToUse = carryForwardEntries.reduce((sum, entry) => {
-                    return sum + (parseFloat(entry.amount) || 0)
-                }, 0);
-            } else if (useCarryForward) {
-                // Calculate how much carry forward can be used
-                carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
-            }
-            const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
-            // Calculate excess amount: if payment total exceeds the amount needed to pay
-            const amountNeededToPay = Math.max(0, actualAmount - currentReceivedAmount - normalizedDiscount);
-            const totalPaymentBeingMade = totalPaymentAmount + carryForwardToUse;
-            const excessAmount = Math.max(0, totalPaymentBeingMade - amountNeededToPay);
+            const discountToSend = discountSubmitted ? 0 : normalizedDiscount
+            const totalRequiredToSettle = Math.max(0, actualAmount - normalizedDiscount)
+            const obligationBeforeSession = Math.max(0, totalRequiredToSettle - currentReceivedAmount)
+            const totalCfRequested = carryForwardEntries.length > 0
+                ? carryForwardEntries.reduce((sum, entry) => sum + parsePaymentEntryAmount(entry), 0)
+                : (useCarryForward
+                    ? Math.min(carryForwardAmount, Math.max(0, obligationBeforeSession - totalPaymentAmount))
+                    : 0)
+            const carryForwardToUse = Math.min(
+                totalCfRequested,
+                Math.max(0, obligationBeforeSession - totalPaymentAmount)
+            )
+            const totalContributionThisSession = totalPaymentAmount + totalCfRequested
+            const excessAmount = Math.max(0, totalContributionThisSession - obligationBeforeSession)
+            const newRemainingAmount = Math.max(
+                0,
+                totalRequiredToSettle - (currentReceivedAmount + totalPaymentAmount + carryForwardToUse)
+            )
             // Only process payment entries if there are valid ones
             const paymentDetailsPromises = validPaymentEntries.length > 0
                 ? validPaymentEntries.map(async (entry, index) => {
@@ -3856,7 +3918,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                         date: entry.date,
                         actual_amount: actualAmount,
                         amount: isCarryForward ? 0 : (parseFloat(entry.amount) || 0),
-                        discount_amount: index === 0 ? discount : 0,
+                        discount_amount: index === 0 ? discountToSend : 0,
                         carry_forward_amount: isCarryForward ? (parseFloat(entry.amount) || 0) : 0,
                         vendor_bill_payment_mode: entry.mode,
                         cheque_number: entry.chequeNo || '',
@@ -4026,19 +4088,9 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                     }
                 }
             }
-            // Handle carry forward if checkbox is checked
-            // Calculate actual carry forward amount used (from payment entries or separate entry)
-            let actualCarryForwardUsed = 0;
-            if (carryForwardEntries.length > 0) {
-                // Sum carry forward amounts from payment entries
-                actualCarryForwardUsed = carryForwardEntries.reduce((sum, entry) => {
-                    return sum + (parseFloat(entry.amount) || 0)
-                }, 0);
-            } else if (useCarryForward && carryForwardToUse > 0) {
-                // Use the separate carry forward entry amount
-                actualCarryForwardUsed = carryForwardToUse;
-            }
-            if (useCarryForward && actualCarryForwardUsed > 0) {
+            // Bill Payment carry forward: consume only the amount applied toward this bill
+            const actualCarryForwardUsed = carryForwardToUse
+            if (actualCarryForwardUsed > 0) {
                 try {
                     // Create a carry forward entry with bill_amount to subtract the used amount
                     const carryForwardPayload = {
@@ -4108,6 +4160,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                         : item
                 ))
             }
+            const billForRefresh = selectedPaymentBill;
+            const remainingAfterPayment = newRemainingAmount;
             // Capture latest payment date and other info from entries before clearing
             const paymentDates = validPaymentEntries
                 .map(e => e.date)
@@ -4124,6 +4178,23 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                 : null;
             const hasCashPayments = validPaymentEntries.some(entry => entry.mode === 'Cash');
             const hasFileUploads = validPaymentEntries.some(entry => entry.attachedFile);
+            const optimisticPaymentStatus = remainingAfterPayment === 0 ? '✓ Paid' : 'Paid';
+            if (billForRefresh && latestEntryDate) {
+                setLastPaymentDates(prev => ({
+                    ...prev,
+                    [billForRefresh.id]: latestEntryDate
+                }));
+            }
+            if (billForRefresh) {
+                setPaymentStatuses(prev => ({
+                    ...prev,
+                    [billForRefresh.id]: optimisticPaymentStatus
+                }));
+                setPaidTodayBills(prev => ({
+                    ...prev,
+                    [billForRefresh.id]: true
+                }));
+            }
             setPaymentEntries([
                 {
                     id: 1,
@@ -4147,125 +4218,6 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             setUseCarryForward(false)
             setCarryForwardData([])
             setCarryForwardAmount(0)
-            setPaymentProcessingMessage('Refreshing records…')
-            await fetchTrackerData()
-            await fetchExpensesData()
-            await fetchAllBillEntries()
-            const updatedStatusResult = await getPaymentStatus(selectedPaymentBill);
-            const updatedStatus = updatedStatusResult.status;
-            // Update last payment date - prefer the latest entry date, otherwise use fetched date
-            const finalLastPaymentDate = latestEntryDate || updatedStatusResult.lastPaymentDate;
-            if (finalLastPaymentDate) {
-                setLastPaymentDates(prev => ({
-                    ...prev,
-                    [selectedPaymentBill.id]: finalLastPaymentDate
-                }));
-            }
-            setPaymentStatuses(prev => ({
-                ...prev,
-                [selectedPaymentBill.id]: updatedStatus
-            }));
-            setPaidTodayBills(prev => ({
-                ...prev,
-                [selectedPaymentBill.id]: updatedStatusResult.paidToday
-            }));
-            // If payment is fully settled (including overpay handled as carry-forward/excess),
-            // mark purchase orders as payment complete.
-            // Use `newRemainingAmount === 0` (local calc) instead of relying on exact status string.
-            if (newRemainingAmount === 0) {
-                try {
-                    setPaymentProcessingMessage('Updating purchase order payment status…')
-                    // Fetch updated tracker data to get latest bill verifications
-                    const trackerResponse = await fetch(`https://backendaab.in/demoAabuildersDash/api/vendor-payments/tracker/${selectedPaymentBill.id}`, {
-                        method: 'GET',
-                        credentials: 'include',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
-                        if (trackerResponse.ok) {
-                        const updatedTracker = await trackerResponse.json();
-                        const vendorId = updatedTracker.vendor_id || updatedTracker.vendorId || selectedPaymentBill.vendor_id || selectedPaymentBill.vendorId;
-                            if (vendorId && updatedTracker.billVerifications && updatedTracker.billVerifications.length > 0) {
-                                const billVerifications = Array.isArray(updatedTracker.billVerifications)
-                                    ? updatedTracker.billVerifications
-                                    : [];
-
-                                const toUpper = (v) => String(v || '').toUpperCase();
-                                const getPONumber = (verification) => {
-                                    const raw = verification?.bill_number ?? verification?.billNumber ?? verification?.eno ?? '';
-                                    const s = String(raw || '').trim();
-                                    return s;
-                                };
-
-                                const validPONumbers = billVerifications
-                                    .map(getPONumber)
-                                    .filter((poNumber) => poNumber && poNumber !== 'NO_PO');
-
-                                const verifiedPONumbers = billVerifications
-                                    .filter((verification) => {
-                                        const isVerifiedByFlag = verification?.is_verified === true || verification?.is_verified === 'true';
-                                        const statusUpper = toUpper(verification?.status);
-                                        const isVerifiedByStatus = statusUpper.includes('VERIFIED');
-                                        const poNumber = getPONumber(verification);
-                                        const isNotNoPO = poNumber && poNumber !== 'NO_PO';
-                                        return (isVerifiedByFlag || isVerifiedByStatus) && isNotNoPO;
-                                    })
-                                    .map(getPONumber)
-                                    .filter((poNumber) => poNumber && poNumber !== 'NO_PO');
-
-                                // If verification status filtering fails (different backend formats),
-                                // still complete using all valid PO numbers we can extract.
-                                const poNumbersToComplete = verifiedPONumbers.length > 0 ? verifiedPONumbers : validPONumbers;
-
-                                if (poNumbersToComplete.length === 0) {
-                                    console.warn(`No valid PO numbers found to mark complete for vendorId=${vendorId}`);
-                                    return;
-                                }
-                                // Call complete payment API for each PO number individually
-                                // Each API call sends vendorId and one PO number (eno)
-                                const completePaymentPromises = poNumbersToComplete.map(async (poNumber) => {
-                                try {
-                                    const completeResponse = await fetch(
-                                        `https://backendaab.in/demoAabuildersDash/api/purchase_orders/payment/complete?vendorId=${vendorId}&eno=${encodeURIComponent(poNumber)}`,
-                                        {
-                                            method: 'PUT',
-                                            credentials: 'include',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                            }
-                                        }
-                                    );
-                                    if (!completeResponse.ok) {
-                                        const errorText = await completeResponse.text();
-                                        console.error(`Failed to mark payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, errorText);
-                                        return { success: false, poNumber, error: errorText };
-                                    }
-                                    return { success: true, poNumber };
-                                } catch (error) {
-                                    console.error(`Error marking payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, error);
-                                    return { success: false, poNumber, error: error.message };
-                                }
-                            });
-                                const results = await Promise.all(completePaymentPromises);
-                            const successful = results.filter(r => r.success);
-                            const failed = results.filter(r => !r.success);
-                            if (failed.length > 0) {
-                                console.warn(`Some purchase orders could not be marked as payment complete. Failed: ${failed.length}, Successful: ${successful.length}`);
-                                failed.forEach(f => {
-                                    console.warn(`  - PO Number ${f.poNumber}: ${f.error}`);
-                                });
-                            }
-                                if (successful.length > 0) {
-                                    console.log(`Successfully marked ${successful.length} purchase order(s) as payment complete for vendorId=${vendorId}`);
-                                }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error marking purchase orders as payment complete:', error);
-                    // Don't block the success message if this fails
-                }
-            }
             let message = 'Payment details saved successfully and added to Weekly Payment Bills';
             if (hasCashPayments) {
                 message += ' and Weekly Expenses';
@@ -4278,6 +4230,123 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             setPaymentProcessingMessage('')
             setIsProcessingPayment(false)
             setShowPaymentModal(false)
+            setSelectedPaymentBill(null)
+            setSelectedVendorAccountDetails(null)
+
+            // Refresh list data in background — saves already succeeded; don't block the modal.
+            void (async () => {
+                expensesCacheRef.current = null;
+                billEntriesCacheRef.current = null;
+                try {
+                    await Promise.all([
+                        fetchTrackerData({ silent: true }),
+                        fetchExpensesData(),
+                        fetchAllBillEntries(),
+                    ]);
+                    if (!billForRefresh) return;
+
+                    const updatedStatusResult = await getPaymentStatus(billForRefresh);
+                    const finalLastPaymentDate = latestEntryDate || updatedStatusResult.lastPaymentDate;
+                    if (finalLastPaymentDate) {
+                        setLastPaymentDates(prev => ({
+                            ...prev,
+                            [billForRefresh.id]: finalLastPaymentDate
+                        }));
+                    }
+                    setPaymentStatuses(prev => ({
+                        ...prev,
+                        [billForRefresh.id]: updatedStatusResult.status
+                    }));
+                    setPaidTodayBills(prev => ({
+                        ...prev,
+                        [billForRefresh.id]: updatedStatusResult.paidToday
+                    }));
+
+                    if (remainingAfterPayment !== 0) return;
+
+                    const trackerResponse = await fetch(
+                        `https://backendaab.in/demoAabuildersDash/api/vendor-payments/tracker/${billForRefresh.id}`,
+                        {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        }
+                    );
+                    if (!trackerResponse.ok) return;
+
+                    const updatedTracker = await trackerResponse.json();
+                    const vendorId = updatedTracker.vendor_id || updatedTracker.vendorId || billForRefresh.vendor_id || billForRefresh.vendorId;
+                    if (!vendorId || !updatedTracker.billVerifications || updatedTracker.billVerifications.length === 0) {
+                        return;
+                    }
+
+                    const billVerifications = Array.isArray(updatedTracker.billVerifications)
+                        ? updatedTracker.billVerifications
+                        : [];
+                    const toUpper = (v) => String(v || '').toUpperCase();
+                    const getPONumber = (verification) => {
+                        const raw = verification?.bill_number ?? verification?.billNumber ?? verification?.eno ?? '';
+                        return String(raw || '').trim();
+                    };
+                    const validPONumbers = billVerifications
+                        .map(getPONumber)
+                        .filter((poNumber) => poNumber && poNumber !== 'NO_PO');
+                    const verifiedPONumbers = billVerifications
+                        .filter((verification) => {
+                            const isVerifiedByFlag = verification?.is_verified === true || verification?.is_verified === 'true';
+                            const statusUpper = toUpper(verification?.status);
+                            const isVerifiedByStatus = statusUpper.includes('VERIFIED');
+                            const poNumber = getPONumber(verification);
+                            const isNotNoPO = poNumber && poNumber !== 'NO_PO';
+                            return (isVerifiedByFlag || isVerifiedByStatus) && isNotNoPO;
+                        })
+                        .map(getPONumber)
+                        .filter((poNumber) => poNumber && poNumber !== 'NO_PO');
+                    const poNumbersToComplete = verifiedPONumbers.length > 0 ? verifiedPONumbers : validPONumbers;
+
+                    if (poNumbersToComplete.length === 0) {
+                        console.warn(`No valid PO numbers found to mark complete for vendorId=${vendorId}`);
+                        return;
+                    }
+
+                    const completePaymentPromises = poNumbersToComplete.map(async (poNumber) => {
+                        try {
+                            const completeResponse = await fetch(
+                                `https://backendaab.in/demoAabuildersDash/api/purchase_orders/payment/complete?vendorId=${vendorId}&eno=${encodeURIComponent(poNumber)}`,
+                                {
+                                    method: 'PUT',
+                                    credentials: 'include',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    }
+                                }
+                            );
+                            if (!completeResponse.ok) {
+                                const errorText = await completeResponse.text();
+                                console.error(`Failed to mark payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, errorText);
+                                return { success: false, poNumber, error: errorText };
+                            }
+                            return { success: true, poNumber };
+                        } catch (error) {
+                            console.error(`Error marking payment complete for vendorId=${vendorId}, poNumber=${poNumber}:`, error);
+                            return { success: false, poNumber, error: error.message };
+                        }
+                    });
+                    const results = await Promise.all(completePaymentPromises);
+                    const successful = results.filter(r => r.success);
+                    const failed = results.filter(r => !r.success);
+                    if (failed.length > 0) {
+                        console.warn(`Some purchase orders could not be marked as payment complete. Failed: ${failed.length}, Successful: ${successful.length}`);
+                    }
+                    if (successful.length > 0) {
+                        console.log(`Successfully marked ${successful.length} purchase order(s) as payment complete for vendorId=${vendorId}`);
+                    }
+                } catch (error) {
+                    console.error('Background refresh after payment failed:', error);
+                }
+            })();
         } catch (error) {
             console.error('Error saving payment details:', error)
             alert(`Error saving payment details: ${error.message}`)
@@ -4347,16 +4416,15 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         }).format(numAmount);
     }
     const formatDateOnly = (dateString) => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
+        const ymd = normalizeDateToYmd(dateString);
+        if (!ymd) return '-';
+        const [year, month, day] = ymd.split('-');
         return `${day}/${month}/${year}`;
     }
     const formatDate = (dateString) => {
         if (!dateString) return '-';
         const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return formatDateOnly(dateString);
         date.setMinutes(date.getMinutes());
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -4506,8 +4574,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
             let aValue, bValue
             switch (sortConfig.key) {
                 case 'bill_arrival_date':
-                    aValue = new Date(a.bill_arrival_date || 0)
-                    bValue = new Date(b.bill_arrival_date || 0)
+                    aValue = normalizeDateToYmd(getBillArrivalDateRaw(a)) || '0000-00-00'
+                    bValue = normalizeDateToYmd(getBillArrivalDateRaw(b)) || '0000-00-00'
                     break
                 case 'vendor_name':
                     aValue = getVendorNameById(a.vendor_id).toLowerCase()
@@ -4893,12 +4961,34 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
         useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
             ? carryForwardAvailable - amountNeededToPay
             : 0;
+    const carryForwardFromEntries = paymentEntries
+        .filter(entry => entry.mode === 'Carry Forward')
+        .reduce((sum, entry) => sum + parsePaymentEntryAmount(entry), 0)
+    const totalRequiredToSettlePreview = Math.max(0, billTotal - discountValue)
+    const obligationBeforeSessionPreview = Math.max(0, totalRequiredToSettlePreview - existingReceived)
+    const totalCfRequestedPreview = carryForwardFromEntries > 0
+        ? carryForwardFromEntries
+        : (useCarryForward
+            ? Math.min(carryForwardAvailable, Math.max(0, obligationBeforeSessionPreview - draftPaid))
+            : 0)
+    const excessAmountPreview = Math.max(0, (draftPaid + totalCfRequestedPreview) - obligationBeforeSessionPreview)
     const projectedNetPayable =
         projectedRemainingAmount > 0
             ? projectedRemainingAmount
             : excessCarryForward > 0
                 ? -excessCarryForward
-                : 0;
+                : excessAmountPreview > 0
+                    ? -excessAmountPreview
+                    : 0;
+    const netSettlementRequired = Math.max(0, billTotal - discountValue)
+    const isSelectedBillFullyPaid = Boolean(
+        selectedPaymentBill &&
+        showPaymentModal &&
+        (
+            paymentStatuses[selectedPaymentBill.id] === '✓ Paid' ||
+            (netSettlementRequired >= 0 && existingReceived >= netSettlementRequired)
+        )
+    )
     const handleSubmitTracker = async () => {
         if (!formData.billArrivalDate) {
             alert('Please select a bill arrival date');
@@ -5141,7 +5231,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                         <span className="text-gray-400 text-xs">-</span>
                                     </td>
                                 </tr>
-                                {loading && (
+                                {loading && apiData.length === 0 && (
                                     <tr>
                                         <td colSpan="9" className="px-2 py-8 text-center text-sm text-gray-500">
                                             Loading data...
@@ -5159,7 +5249,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                     <tr key={`api-${item.id || index}`} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF6ED]'}`}>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100 align-middle">{getFilteredData().length - index}</td>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100 align-middle">
-                                            {item.bill_arrival_date ? new Date(item.bill_arrival_date).toLocaleDateString('en-GB') : '-'}
+                                            {formatBillArrivalDate(item)}
                                         </td>
                                         <td className="px-2 py-3 text-left text-sm font-semibold border-b border-gray-100 align-middle">
                                             {getVendorNameById(item.vendor_id)}
@@ -5851,20 +5941,20 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                             <div className="text-sm text-gray-500">Loading existing payment details...</div>
                                         </div>
                                     )}
-                                    {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
+                                    {!isSelectedBillFullyPaid && (
                                         <>
                                             <div className="flex-1 overflow-y-auto p-4">
                                                 {paymentEntries.map((entry, index) => (
                                                     <div key={entry.id} className="text-left p-4 shadow-lg rounded-lg">
-                                                        <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-50' : ''}`}>
+                                                        <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${isSelectedBillFullyPaid ? 'bg-gray-50' : ''}`}>
                                                             <div className="flex-1">
                                                                 <label className="block font-semibold mb-1 text-sm">Date</label>
                                                                 <input
                                                                     type="date"
                                                                     value={entry.date}
                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'date', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    disabled={isSelectedBillFullyPaid}
+                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                 />
                                                             </div>
                                                             <div className="flex-1">
@@ -5874,8 +5964,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                                     placeholder="Enter Amount"
                                                                     value={entry.amountDisplay || ''}
                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward)}
-                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    disabled={isSelectedBillFullyPaid || (index === 0 && useCarryForward)}
+                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                 />
                                                             </div>
                                                             <div className="flex-1">
@@ -5883,8 +5973,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                                 <select
                                                                     value={entry.mode || (index === 0 && useCarryForward ? 'Carry Forward' : '')}
                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'mode', e.target.value)}
-                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward)}
-                                                                    className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                    disabled={isSelectedBillFullyPaid || (index === 0 && useCarryForward)}
+                                                                    className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                 >
                                                                     <option value="">Select</option>
                                                                     {paymentModeOptions.map((opt) => (
@@ -5924,8 +6014,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                                                     value={entry.chequeNo}
                                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeNo', e.target.value)}
                                                                                     placeholder="Enter cheque number"
-                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                    disabled={isSelectedBillFullyPaid}
+                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                                 />
                                                                             </div>
                                                                             <div>
@@ -5934,8 +6024,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                                                     type="date"
                                                                                     value={entry.chequeDate}
                                                                                     onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeDate', e.target.value)}
-                                                                                    disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                    disabled={isSelectedBillFullyPaid}
+                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                                 />
                                                                             </div>
                                                                         </div>
@@ -5948,8 +6038,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                                                 value={entry.transactionNumber}
                                                                                 onChange={(e) => handlePaymentEntryChange(entry.id, 'transactionNumber', e.target.value)}
                                                                                 placeholder="Enter transaction number"
-                                                                                disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                disabled={isSelectedBillFullyPaid}
+                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                             />
                                                                         </div>
                                                                         <div>
@@ -5957,8 +6047,8 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                                             <select
                                                                                 value={entry.accountNumber}
                                                                                 onChange={(e) => handlePaymentEntryChange(entry.id, 'accountNumber', e.target.value)}
-                                                                                disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
-                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                disabled={isSelectedBillFullyPaid}
+                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                                             >
                                                                                 <option value="">Select Account</option>
                                                                                 {accountDetails.map((account) => (
@@ -5974,7 +6064,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                         )}
                                                     </div>
                                                 ))}
-                                                {paymentStatuses[selectedPaymentBill?.id] !== '✓ Paid' && (
+                                                {!isSelectedBillFullyPaid && (
                                                     <div className="flex py-3">
                                                         <button onClick={handleAddPaymentEntry}
                                                             className="text-[#E4572E] text-sm font-semibold border-dashed border-b-2 border-[#BF9853] cursor-pointer hover:text-[#c44a26] transition-colors duration-200 flex items-center gap-1"
@@ -5987,7 +6077,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                         </>
                                     )}
                                     {existingPaymentDetails && existingPaymentDetails.length > 0 && (
-                                        <div className={`p-w overflow-auto mb-8 ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
+                                        <div className={`p-w overflow-auto mb-8 ${isSelectedBillFullyPaid
                                             ? 'h-[630px]'
                                             : 'h-[300px]'
                                             }`}>
@@ -6123,18 +6213,17 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                             className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium"
                                             onClick={handlePaymentCancel}
                                         >
-                                            Cancel
+                                            {isSelectedBillFullyPaid ? 'Close' : 'Cancel'}
                                         </button>
-                                        <button className={`px-4 py-2 rounded-lg font-medium ${paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'text-white bg-[#BF9853]'}`}
-                                            onClick={handlePaymentSubmit}
-                                            disabled={paymentStatuses[selectedPaymentBill?.id] === '✓ Paid' || isProcessingPayment}
-                                        >
-                                            {isProcessingPayment
-                                                ? 'Processing…'
-                                                : paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'
-                                                    ? 'Fully Paid'
-                                                    : 'Submit'}
-                                        </button>
+                                        {!isSelectedBillFullyPaid && (
+                                            <button
+                                                className={`px-4 py-2 rounded-lg font-medium text-white bg-[#BF9853] ${isProcessingPayment ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                onClick={handlePaymentSubmit}
+                                                disabled={isProcessingPayment}
+                                            >
+                                                {isProcessingPayment ? 'Processing…' : 'Submit'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="w-80 flex flex-col">
@@ -6157,7 +6246,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                                             type="checkbox"
                                                             checked={useCarryForward}
                                                             onChange={(e) => setUseCarryForward(e.target.checked)}
-                                                            disabled={carryForwardAmount <= 0 || paymentStatuses[selectedPaymentBill?.id] === '✓ Paid'}
+                                                            disabled={carryForwardAmount <= 0 || isSelectedBillFullyPaid}
                                                             className="w-4 h-4 cursor-pointer"
                                                         />
                                                     </div>
@@ -6216,7 +6305,7 @@ const PendingBill = ({ username, userRoles = [], billPaymentsTabActive = true })
                                             <div className="space-y-3 shadow-lg rounded-lg p-4">
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Date:</span>
-                                                    <span className="font-semibold">{selectedPaymentBill ? new Date(selectedPaymentBill.bill_arrival_date).toLocaleDateString('en-GB') : '-'}</span>
+                                                    <span className="font-semibold">{selectedPaymentBill ? formatBillArrivalDate(selectedPaymentBill) : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Vendor:</span>

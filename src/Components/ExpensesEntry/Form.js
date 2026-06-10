@@ -19,6 +19,32 @@ const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
 const SUBSCRIPTION_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-subscription/getAll';
 
+const EXPENSE_FORM_FIELDS = {
+    accountType: 'Account Type',
+    utilityType: 'Utility Type',
+    date: 'Date',
+    projectName: 'Project Name',
+    vendorContractorName: 'Vendor/Contractor Name',
+    quantity: 'Quantity',
+    amount: 'Amount',
+    category: 'Category',
+    paymentMode: 'Payment Mode',
+    billArrivalDate: 'Bill Arrival Date',
+    itemName: 'Item Name',
+    machineName: 'Machine Name',
+    machineId: 'Machine ID',
+    machineTool: 'Machine Tool',
+    forTheMonthOf: 'For The Month Of',
+    validityDuration: 'Validity Duration',
+    validityType: 'Validity Type',
+    activationDate: 'Activation Date',
+    description: 'Description',
+    chequeNo: 'Cheque No',
+    chequeDate: 'Cheque Date',
+    transactionNumber: 'Transaction Number',
+    accountNumber: 'Account Number',
+};
+
 const isAdvanceAdjustmentPaymentMode = (mode) =>
     String(mode ?? '').trim().toLowerCase() === 'advance adjustment';
 
@@ -52,15 +78,8 @@ const getPropertyProfessionTaxNo = (property) =>
 const getUtilityTypeNumberLabel = (utilityTypeValue) => {
     switch (utilityTypeValue) {
         case 'Electricity':
-            return 'EB No';
-        case 'Property':
-            return 'Property Tax No';
-        case 'Water':
-            return 'Water Tax No';
-        case 'Profession':
-            return 'Profession Tax No';
         default:
-            return 'Number';
+            return 'Service Number';
     }
 };
 
@@ -239,7 +258,7 @@ const Form = ({
     const [combinedOptions, setCombinedOptions] = useState([]);
     const [selectedOption, setSelectedOption] = useState(null);
     const [selectedType, setSelectedType] = useState("");
-    const [selectedAccountType, setSelectedAccountType] = useState('');
+    const [selectedAccountType, setSelectedAccountType] = useState('Sundry Payment');
     const [selectedAccountTypeId, setSelectedAccountTypeId] = useState(null);
     const [selectedSite, setSelectedSite] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(null);
@@ -276,6 +295,13 @@ const Form = ({
         }
         return modes;
     }, [paymentModeOptions, selectedAccountType]);
+    const filteredCategoryOptions = useMemo(() => {
+        const all = Array.isArray(categoryOptions) ? categoryOptions : [];
+        if (selectedAccountType === 'Sundry Payment') return all;
+        return all.filter(
+            (opt) => String(opt?.label ?? opt?.value ?? '').trim() !== 'Machine Repair'
+        );
+    }, [categoryOptions, selectedAccountType]);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -513,6 +539,13 @@ const Form = ({
     }, [categoryOptions, selectedOption]);
 
     useEffect(() => {
+        if (selectedAccountType === 'Sundry Payment') return;
+        if (selectedCategory?.label === 'Machine Repair') {
+            applyResolvedCategoryOption(null);
+        }
+    }, [selectedAccountType, selectedCategory]);
+
+    useEffect(() => {
         const fetchToolsItemIds = async () => {
             try {
                 const response = await fetch(`${TOOLS_API_BASE}/api/tools_item_id/getAll`, {
@@ -735,6 +768,13 @@ const Form = ({
             setSelectedAccountType('Utility Bills');
         }
     }, [lockUtilityPrefillFields, selectedAccountType]);
+
+    useEffect(() => {
+        if (lockAccountTypeDisplay) return;
+        if (!selectedAccountType) {
+            setSelectedAccountType('Sundry Payment');
+        }
+    }, [lockAccountTypeDisplay, selectedAccountType]);
 
     useEffect(() => {
         const prefillDataStr = localStorage.getItem('expenseEntryPrefill');
@@ -1140,7 +1180,7 @@ const Form = ({
         }
     }, [utilityType, projectData]);
     useEffect(() => {
-        if (utilityType !== 'Telecom') {
+        if (utilityType !== 'Telecom' && utilityType !== 'Subscription') {
             setServiceStartingDate('');
         }
     }, [utilityType]);
@@ -2332,11 +2372,11 @@ const Form = ({
     const vendorOrContractorLabel = selectedOption ? `${selectedOption.label}${selectedType ? ` (${selectedType})` : ''}` : '';
     const formattedAmount = amount ? `${selectedAccountType === 'Bill Refund' ? '-' : ''}₹${formatNumber(Math.abs(amount))}` : '';
     const reviewDetails = [
-        { label: 'Account Type', value: selectedAccountType || '-' },
-        { label: 'Date', value: formatDateForReview(date) || '-' },
-        { label: 'Project Name', value: selectedSite?.label || '-' },
+        { label: EXPENSE_FORM_FIELDS.accountType, value: selectedAccountType || '-' },
+        { label: EXPENSE_FORM_FIELDS.date, value: formatDateForReview(date) || '-' },
+        { label: EXPENSE_FORM_FIELDS.projectName, value: selectedSite?.label || '-' },
         { label: 'Project Number', value: selectedSite?.sNo || '-' },
-        { label: 'Vendor / Contractor', value: vendorOrContractorLabel || '-' },
+        { label: EXPENSE_FORM_FIELDS.vendorContractorName, value: vendorOrContractorLabel || '-' },
     ];
     if (selectedType === 'Vendor' && selectedOption?.id) {
         reviewDetails.push({ label: 'Vendor ID', value: selectedOption.id });
@@ -2346,21 +2386,21 @@ const Form = ({
     }
     if (usesBillArrivalDate(selectedAccountType)) {
         reviewDetails.push({
-            label: 'Bill Arrival Date',
+            label: EXPENSE_FORM_FIELDS.billArrivalDate,
             value: formatDateForReview(billArrivalDate) || billArrivalDate || '-',
         });
     }
     reviewDetails.push(
-        { label: 'Quantity', value: quantity || '-' },
-        { label: 'Amount', value: formattedAmount || '-' },
-        { label: 'Category', value: selectedCategory?.label || '-' },
-        { label: 'Payment Mode', value: paymentMode || '-' },
-        { label: 'Utility Type', value: utilityType || '-' },
+        { label: EXPENSE_FORM_FIELDS.quantity, value: quantity || '-' },
+        { label: EXPENSE_FORM_FIELDS.amount, value: formattedAmount || '-' },
+        { label: EXPENSE_FORM_FIELDS.category, value: selectedCategory?.label || '-' },
+        { label: EXPENSE_FORM_FIELDS.paymentMode, value: paymentMode || '-' },
+        { label: EXPENSE_FORM_FIELDS.utilityType, value: utilityType || '-' },
         { label: 'Utility Number', value: selectedEbNumber?.label || '-' },
-        { label: 'Utility Months', value: selectedMonths || '-' },
-        { label: 'Validity', value: thirdInput ? `${thirdInput}${validityType ? ` ${validityType}` : ''}` : '-' },
-        { label: 'Service Start Date', value: formatDateForReview(serviceStartingDate) || '-' },
-        { label: 'Comments', value: comments || '-' },
+        { label: EXPENSE_FORM_FIELDS.forTheMonthOf, value: selectedMonths || '-' },
+        { label: EXPENSE_FORM_FIELDS.validityDuration, value: thirdInput ? `${thirdInput}${validityType ? ` ${validityType}` : ''}` : '-' },
+        { label: EXPENSE_FORM_FIELDS.activationDate, value: formatDateForReview(serviceStartingDate) || '-' },
+        { label: EXPENSE_FORM_FIELDS.description, value: comments || '-' },
     );
     const isPdfPreview = selectedFile?.type?.toLowerCase().includes('pdf');
     useEffect(() => {
@@ -2382,13 +2422,9 @@ const Form = ({
             const leftTop = leftEl.getBoundingClientRect().top;
             const commentsBottom = commentsEl.getBoundingClientRect().bottom;
             const alignHeight = Math.round(commentsBottom - leftTop);
-            const headerH =
-                Math.round(advanceHeaderRef.current?.getBoundingClientRect().height) ||
-                advanceHeaderRef.current?.offsetHeight ||
-                0;
             if (alignHeight > 0) {
                 setSideTableAreaHeight(alignHeight);
-                setSideTableContentHeight(Math.max(0, alignHeight - headerH));
+                setSideTableContentHeight(alignHeight);
             }
         };
         const scheduleSync = () => {
@@ -2413,58 +2449,181 @@ const Form = ({
     return (
         <div className={embedded ? '' : 'bg-[#FAF6ED] px-[18px] pt-[18px] flex flex-col h-[calc(100vh-104px)] overflow-hidden pb-[18px]'}>
             <style jsx>{`
-                input:hover, select:hover {
+                input:hover, select:hover, textarea:hover {
                     border-color: rgba(191, 152, 83, 0.2) !important;
                 }
-                input:focus, select:focus {
+                input:focus, select:focus, textarea:focus {
                     border-color: rgba(191, 152, 83, 1) !important;
                     outline: none !important;
+                }
+                input::placeholder,
+                textarea::placeholder {
+                    color: #6b7280 !important;
+                }
+                .expense-entry-form-date > div > div:hover {
+                    border-color: rgba(191, 152, 83, 0.2) !important;
+                }
+                .expense-entry-form-date > div > button:hover {
+                    border-color: rgba(191, 152, 83, 0.2) !important;
+                }
+                .expense-entry-form-date > div > div:focus-within {
+                    border-color: rgba(191, 152, 83, 1) !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                .expense-entry-form-date > div:focus-within > button {
+                    border-color: rgba(191, 152, 83, 1) !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                .expense-entry-form-date input:not(:placeholder-shown) {
+                    font-weight: inherit !important;
+                }
+                form input[type="text"],
+                form input[type="number"],
+                form textarea,
+                form select {
+                    padding-top: 0 !important;
+                    padding-bottom: 0 !important;
+                    margin-top: 0 !important;
+                    margin-bottom: 0 !important;
+                }
+                .expense-entry-form-date input {
+                    padding-top: 0 !important;
+                    padding-bottom: 0 !important;
                 }
             `}</style>
             {!embedded && (
                 <style>{`
+                    .expense-form-side-table-host {
+                        overflow-x: visible !important;
+                        overflow-y: hidden !important;
+                    }
                     .expense-form-side-table-host > div {
                         height: auto !important;
-                        width: fit-content !important;
+                        width: 100% !important;
+                        min-width: 0 !important;
                         max-width: 100% !important;
                         display: flex !important;
                         flex-direction: column !important;
                         min-height: 0 !important;
                     }
-                    .expense-form-side-table-host > div > div {
+                    .expense-form-side-table-host .form-side-table-h-scroll {
                         flex: none !important;
                         min-height: 0 !important;
-                        width: fit-content !important;
+                        width: 100% !important;
+                        min-width: 0 !important;
                         max-width: 100% !important;
+                        overflow-x: auto !important;
+                        display: block !important;
+                    }
+                    .expense-form-side-table-host .form-side-table-h-scroll > div {
+                        width: 978px !important;
+                        min-width: 978px !important;
+                        max-width: 978px !important;
                         display: flex !important;
                         flex-direction: column !important;
+                    }
+                    .expense-form-side-table-host .form-side-table-h-scroll > div > div:first-child {
+                        width: 978px !important;
+                        min-width: 978px !important;
+                        max-width: 978px !important;
+                        box-sizing: border-box !important;
                     }
                     .expense-form-side-table-host .border-l-8 {
                         flex: none !important;
                         min-height: 0 !important;
-                        width: fit-content !important;
-                        max-width: 100% !important;
+                        width: 978px !important;
+                        min-width: 978px !important;
+                        max-width: 978px !important;
                         display: flex !important;
                         flex-direction: column !important;
+                        overflow-x: hidden !important;
                     }
                     .expense-form-side-table-host table {
-                        width: 788px !important;
-                        max-width: none !important;
-                        min-width: 788px !important;
+                        width: 978px !important;
+                        max-width: 978px !important;
+                        min-width: 978px !important;
                     }
                     .expense-form-side-table-host .overflow-y-scroll {
+                        width: 978px !important;
+                        min-width: 978px !important;
+                        max-width: 978px !important;
                         max-height: 400px !important;
                         height: auto !important;
                         flex: none !important;
                         min-height: 0 !important;
-                        overflow-x: auto !important;
+                        overflow-x: hidden !important;
+                        overflow-y: auto !important;
+                    }
+                    .expense-form-side-table-host .overflow-y-scroll:has(table tbody > tr:only-child) {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        width: 100% !important;
+                        min-height: 280px !important;
+                    }
+                    .expense-form-side-table-host .border-l-8:has(table tbody > tr:only-child) {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        flex: 1 1 auto !important;
+                    }
+                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        flex: 1 1 auto !important;
+                        width: 100% !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
+                        min-height: 100% !important;
+                        height: 100% !important;
+                    }
+                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > thead {
+                        flex: 0 0 auto !important;
+                        width: 100% !important;
+                    }
+                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > tbody {
+                        flex: 1 1 auto !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        width: 100% !important;
+                    }
+                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > tbody > tr {
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        width: 100% !important;
+                        flex: 1 1 auto !important;
+                    }
+                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > tbody > tr > td {
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        width: 100% !important;
+                        text-align: center !important;
+                        border: none !important;
                     }
                     @media (min-width: 1280px) {
+                        .expense-form-side-table-host .overflow-y-scroll:has(table tbody > tr:only-child) {
+                            min-height: 100% !important;
+                        }
                         .expense-form-side-table-host > div {
                             height: 100% !important;
                         }
-                        .expense-form-side-table-host > div > div {
+                        .expense-form-side-table-host .form-side-table-h-scroll {
+                            height: 100% !important;
                             flex: 1 1 0% !important;
+                            min-height: 0 !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                        }
+                        .expense-form-side-table-host .form-side-table-h-scroll > div {
+                            flex: 1 1 0% !important;
+                            min-height: 0 !important;
                         }
                         .expense-form-side-table-host .border-l-8 {
                             flex: 1 1 0% !important;
@@ -2477,10 +2636,10 @@ const Form = ({
                     }
                 `}</style>
             )}
-            <div className={`px-[18px] pt-[18px] pb-[18px] bg-white rounded w-full flex-1 min-h-0 overflow-auto`}>
+            <div className={`px-[18px] pt-[18px] pb-[18px] bg-white rounded w-full flex-1 min-h-0 overflow-auto no-scrollbar scrollbar-none`}>
                 <form onSubmit={handleFormSubmit}>
-                    <div className="flex flex-col xl:grid xl:grid-cols-[max-content_minmax(0,1fr)] gap-x-[18px] gap-y-[18px] min-w-0 items-start">
-                        <div ref={leftFormColRef} className="xl:col-start-1 xl:row-start-1 space-y-3 min-w-0">
+                    <div className="flex flex-col xl:grid xl:grid-cols-[max-content_minmax(0,1fr)] gap-x-[18px] gap-y-[12px] min-w-0 items-start">
+                        <div ref={leftFormColRef} className="xl:col-start-1 xl:row-start-1 space-y-[12px]">
                             {summaryBillMode && (
                                 <div className=" rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                                     <div className="text-sm font-semibold text-orange-800">
@@ -2517,16 +2676,16 @@ const Form = ({
                                     </div>
                                 </div>
                             )}
-                            <div className='flex gap-10 flex-wrap items-start'>
-                                <div className='text-left'>
-                                    <h4 className="text-base font-semibold mb-0.5">Account Type <span className="text-[#E4572E]">*</span></h4>
+                            <div className='lg:flex gap-[16px] flex-wrap items-start'>
+                                <div className='text-left w-[300px] min-w-[300px] max-w-[300px] shrink-0'>
+                                    <h4 className="text-base font-semibold mb-[8px]">{EXPENSE_FORM_FIELDS.accountType}<span className="text-[#E4572E]">*</span></h4>
                                     {lockAccountTypeDisplay ? (
                                         <UtilityHubReadonlyField
                                             value={
                                                 selectedAccountType ||
                                                 (lockUtilityPrefillFields ? 'Utility Bills' : '')
                                             }
-                                            className="w-[290px]"
+                                            className="w-[300px]"
                                         />
                                     ) : (
                                     <Select
@@ -2539,22 +2698,22 @@ const Form = ({
                                                 selectedOption ? getAccountTypeIdFromOption(selectedOption) : null
                                             );
                                         }}
-                                        placeholder="Account Type"
+                                        placeholder={EXPENSE_FORM_FIELDS.accountType}
                                         isSearchable={true}
                                         isClearable
                                         styles={customStyles}
-                                        className="custom-select rounded-lg w-[290px] h-[40px]"
+                                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                     />
                                     )}
 
                                     {(selectedAccountType === 'Utility Bills' || lockUtilityPrefillFields) && (
-                                       <div className='mt-3 w-[290px]'>
-                                       <h4 className="text-base font-semibold mb-0.5">
-                                         Utility Type <span className="text-[#E4572E]">*</span>
+                                       <div className='mt-[12px]'>
+                                       <h4 className="text-base font-semibold mb-[8px]">
+                                         {EXPENSE_FORM_FIELDS.utilityType}<span className="text-[#E4572E]">*</span>
                                        </h4>
                                      
                                        {lockUtilityPrefillFields ? (
-                                         <UtilityHubReadonlyField value={utilityType} className="w-[290px] lg:w-[615px]" />
+                                         <UtilityHubReadonlyField value={utilityType} className="w-[616px]" />
                                        ) : (
                                        <Select
                                          options={[
@@ -2573,100 +2732,103 @@ const Form = ({
                                          onChange={(selectedOption) =>
                                            setUtilityType(selectedOption ? selectedOption.value : '')
                                          }
-                                         placeholder="Utility Type"
+                                         placeholder={EXPENSE_FORM_FIELDS.utilityType}
                                          styles={customStyles}
                                          isSearchable={true}
                                          isClearable
-                                         className="custom-select rounded-lg w-[290px] lg:w-[615px] h-[40px]"
+                                         className="custom-select rounded-lg w-[616px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                        />
                                        )}
                                      </div>
                                     )}
                                 </div>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-0.5 block">Date <span className="text-[#E4572E]">*</span></label>
-                                    <CustomDateField
-                                        value={date}
-                                        onChange={setDate}
-                                        placeholder="dd-mm-yyyy"
-                                        className="w-[290px]"
-                                        controlHeightPx={40}
-                                        alwaysOpenBelow
-                                    />
+                                    <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.date}<span className="text-[#E4572E]">*</span></label>
+                                    <div className="expense-entry-form-date w-[300px]">
+                                        <CustomDateField
+                                            value={date}
+                                            onChange={setDate}
+                                            placeholder={EXPENSE_FORM_FIELDS.date}
+                                            className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                            controlHeightPx={40}
+                                            alwaysOpenBelow
+                                            anchor="right"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                            <div className='flex gap-10'>
+                            <div className='lg:flex gap-[16px]'>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-0.5  block">Project Name <span className="text-[#E4572E]">*</span></label>
+                                    <label className="text-md font-semibold mb-[8px]  block">{EXPENSE_FORM_FIELDS.projectName}<span className="text-[#E4572E]">*</span></label>
                                     <Select
                                         options={sortedSiteOptions || []}
-                                        placeholder="Project Name."
+                                        placeholder={EXPENSE_FORM_FIELDS.projectName}
                                         isSearchable={true}
                                         value={selectedSite}
                                         onChange={setSelectedSite}
                                         styles={customStyles}
                                         isClearable
-                                        className="custom-select rounded-lg w-[290px] h-[40px] no-scrollbar scrollbar-none"
+                                        className="custom-select rounded-lg w-[300px] h-[40px] no-scrollbar scrollbar-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                     />
                                 </div>
                                 <div className='text-left'>
-                                    <div className='flex  mb-0.5'>
-                                        <label className="text-md font-semibold block">Vendor/Contractor Name <span className="text-[#E4572E]">*</span></label>
-                                        {selectedType && <span className="text-xs text-orange-600 font-semibold block ml-10 mt-1.5">{selectedType}</span>}
+                                    <div className='flex justify-between  mb-[8px]'>
+                                        <label className="text-md font-semibold block">{EXPENSE_FORM_FIELDS.vendorContractorName}<span className="text-[#E4572E]">*</span></label>
+                                        {selectedType && <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{selectedType}</span>}
                                     </div>
                                     <Select
                                         options={combinedOptions}
                                         value={selectedOption}
                                         onChange={handleChange}
-                                        placeholder="Vendor/Contractor Name"
+                                        placeholder={EXPENSE_FORM_FIELDS.vendorContractorName}
                                         styles={customStyles}
                                         isClearable
-                                        className="custom-select rounded-lg w-[290px] h-[40px] "
+                                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                     />
                                 </div>
                             </div>
-                            <div className='flex gap-10'>
+                            <div className='lg:flex gap-[16px]'>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-0.5 block">Quantity</label>
+                                    <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.quantity}</label>
                                     <input
                                         type="text"
                                         value={quantity}
                                         onChange={(e) => setQuantity(e.target.value)}
-                                        placeholder="Enter"
-                                        className="border-2 border-[#BF9853] rounded-lg px-4 py-2 w-[290px] h-[40px] focus:outline-none border-opacity-[0.20]"
+                                        placeholder={EXPENSE_FORM_FIELDS.quantity}
+                                        className="border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                     />
                                 </div>
                                 <div className='text-left'>
-                                    <label className="text-md font-semibold mb-0.5 block">Amount <span className="text-[#E4572E]">*</span></label>
-                                    <div className="relative w-[290px] h-[40px]">
-                                        <span className="absolute top-1/2 left-4 transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
+                                    <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.amount}<span className="text-[#E4572E]">*</span></label>
+                                    <div className="relative w-[300px] h-[40px]">
+                                        <span className="absolute top-1/2 left-[8px] transform -translate-y-1/2 text-gray-600 text-lg">₹</span>
                                         <input
                                             type="text"
                                             value={formatNumber(amount)}
                                             onChange={handleAmountChange}
-                                            placeholder="Enter"
+                                            placeholder={EXPENSE_FORM_FIELDS.amount}
                                             onWheel={(e) => e.target.blur()}
-                                            className="pl-8 pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20]"
+                                            className="pl-[20px] pr-4 border-2 border-[#BF9853] rounded-lg w-full h-full focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                         />
                                     </div>
                                 </div>
                             </div>
-                            <div className='flex gap-10'>
+                            <div className='lg:flex gap-[16px]'>
                                 <div className={`text-left ${selectedAccountType === 'Claim Payment' ? '' : ''}`}>
-                                    <label className="text-md font-semibold mb-0.5 block">Category <span className="text-[#E4572E]">*</span></label>
+                                    <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.category} <span className="text-[#E4572E]">*</span></label>
                                     <Select
-                                        options={categoryOptions}
+                                        options={filteredCategoryOptions}
                                         value={selectedCategory}
                                         onChange={handleCategoryChange}
                                         styles={customStyles}
                                         isClearable
-                                        placeholder="Category"
-                                        className="custom-select rounded-lg w-[290px] h-[40px]"
+                                        placeholder={EXPENSE_FORM_FIELDS.category}
+                                        className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                     />
                                 </div>
                                 {(selectedAccountType === 'Claim Payment' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Sundry Payment') ? (
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-0.5 block">Payment Mode <span className="text-[#E4572E]">*</span></label>
+                                        <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.paymentMode}<span className="text-[#E4572E]">*</span></label>
                                         <Select
                                             options={selectablePaymentModeOptions.map((mode) => ({
                                                 value: mode.modeOfPayment,
@@ -2675,47 +2837,47 @@ const Form = ({
                                             }))}
                                             value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
                                             onChange={(selectedOption) => setPaymentMode(selectedOption ? selectedOption.value : '')}
-                                            placeholder="Payment Mode"
+                                            placeholder={EXPENSE_FORM_FIELDS.paymentMode}
                                             isSearchable={true}
                                             isClearable
                                             styles={customStyles}
-                                            className="custom-select rounded-lg w-[290px] h-[40px]"
+                                            className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                         />
                                     </div>
                                 ) : usesBillArrivalDate(selectedAccountType) ? (
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-0.5 block">
-                                            Bill Arrival Date
+                                        <label className="text-md font-semibold mb-[8px] block">
+                                            {EXPENSE_FORM_FIELDS.billArrivalDate}
                                         </label>
                                         <CustomDateField
                                             value={billArrivalDate}
                                             onChange={setBillArrivalDate}
-                                            placeholder="dd-mm-yyyy"
-                                            className="w-[290px]"
+                                            placeholder={EXPENSE_FORM_FIELDS.billArrivalDate}
+                                            className="w-[300px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                             controlHeightPx={40}
                                             alwaysOpenBelow
-                                            placeholderButtonClassName="!text-sm !font-normal !text-[#808080]"
+                                            placeholderButtonClassName="!text-sm !font-normal !text-gray-500"
                                         />
                                     </div>
                                 ) : showMachineTools ? (
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-0.5 block">Item Name</label>
+                                        <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.itemName}</label>
                                         <Select
                                             options={toolsItemNameOptions}
                                             value={selectedToolsItemName}
                                             onChange={setSelectedToolsItemName}
                                             styles={customStyles}
                                             isClearable
-                                            placeholder="Item Name"
-                                            className="custom-select rounded-lg w-[290px] h-[40px]"
+                                            placeholder={EXPENSE_FORM_FIELDS.itemName}
+                                            className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                         />
                                     </div>
                                 ) : null}
                             </div>
                             {selectedAccountType === 'Sundry Payment' && showMachineTools && (
-                                <div className='flex gap-10'>
+                                <div className='lg:flex gap-[16px]'>
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-0.5 block">Machine Name <span className="text-[#E4572E]">*</span></label>
+                                        <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.machineName}<span className="text-[#E4572E]">*</span></label>
                                         <Select
                                             options={toolsItemNameOptions}
                                             value={selectedToolsItemName}
@@ -2723,12 +2885,12 @@ const Form = ({
                                             styles={customStyles}
                                             isClearable
                                             isSearchable
-                                            placeholder="Machine Name"
-                                            className="custom-select rounded-lg w-[290px] h-[40px]"
+                                            placeholder={EXPENSE_FORM_FIELDS.machineName}
+                                            className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                         />
                                     </div>
                                     <div className='text-left'>
-                                        <label className="text-md font-semibold mb-0.5 block">Machine ID <span className="text-[#E4572E]">*</span></label>
+                                        <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.machineId}<span className="text-[#E4572E]">*</span></label>
                                         <Select
                                             options={filteredMachineToolOptions}
                                             value={selectedMachineTools}
@@ -2738,12 +2900,12 @@ const Form = ({
                                             isSearchable
                                             placeholder={
                                                 !selectedToolsItemName
-                                                    ? 'Machine Name'
+                                                    ? EXPENSE_FORM_FIELDS.machineId
                                                     : filteredMachineToolOptions.length === 0
                                                         ? 'No IDs for this machine'
-                                                        : 'Machine ID'
+                                                        : EXPENSE_FORM_FIELDS.machineId
                                             }
-                                            className="custom-select rounded-lg w-[290px] h-[40px]"
+                                            className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                         />
                                     </div>
                                 </div>
@@ -2753,10 +2915,10 @@ const Form = ({
                                     selectedAccountType === 'Utility Bills' ||
                                     selectedAccountType === 'Sundry Payment' ||
                                     selectedAccountType === 'Bill Payments') && (
-                                    <div className='flex gap-10'>
-                                        <div className='w-[290px] min-w-[290px] shrink-0' aria-hidden="true" />
+                                    <div className='lg:flex gap-[16px]'>
+                                        <div className='w-[300px] min-w-[300px] shrink-0' aria-hidden="true" />
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-0.5 block">Machine Tool</label>
+                                            <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.machineTool}</label>
                                             <Select
                                                 options={filteredMachineToolOptions}
                                                 value={selectedMachineTools}
@@ -2765,12 +2927,12 @@ const Form = ({
                                                 isClearable
                                                 placeholder={
                                                     !selectedToolsItemName
-                                                        ? 'Item Name'
+                                                        ? EXPENSE_FORM_FIELDS.machineTool
                                                         : filteredMachineToolOptions.length === 0
                                                             ? 'No tools for this item'
-                                                            : 'Select a machine tool...'
+                                                            : EXPENSE_FORM_FIELDS.machineTool
                                                 }
-                                                className="custom-select rounded-lg w-[290px] h-[40px]"
+                                                className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                             />
                                         </div>
                                     </div>
@@ -2779,21 +2941,21 @@ const Form = ({
                                 (selectedAccountType === 'Claim Payment' ||
                                     selectedAccountType === 'Utility Bills' ||
                                     selectedAccountType === 'Bill Payments') && (
-                                    <div className='flex gap-10'>
+                                    <div className='lg:flex gap-[16px]'>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-0.5 block">Item Name</label>
+                                            <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.itemName}</label>
                                             <Select
                                                 options={toolsItemNameOptions}
                                                 value={selectedToolsItemName}
                                                 onChange={setSelectedToolsItemName}
                                                 styles={customStyles}
                                                 isClearable
-                                                placeholder="Item Name"
-                                                className="custom-select rounded-lg w-[290px] h-[40px]"
+                                                placeholder={EXPENSE_FORM_FIELDS.itemName}
+                                                className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                             />
                                         </div>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-0.5 block">Machine Tool</label>
+                                            <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.machineTool}</label>
                                             <Select
                                                 options={filteredMachineToolOptions}
                                                 value={selectedMachineTools}
@@ -2802,21 +2964,21 @@ const Form = ({
                                                 isClearable
                                                 placeholder={
                                                     !selectedToolsItemName
-                                                        ? 'Item Name'
+                                                        ? EXPENSE_FORM_FIELDS.machineTool
                                                         : filteredMachineToolOptions.length === 0
                                                             ? 'No tools for this item'
-                                                            : 'Select a machine tool...'
+                                                            : EXPENSE_FORM_FIELDS.machineTool
                                                 }
-                                                className="custom-select rounded-lg w-[290px] h-[40px]"
+                                                className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                             />
                                         </div>
                                     </div>
                                 )}
                             {selectedAccountType === 'Utility Bills' && (
                                 <>
-                                    <div className='flex gap-10'>
+                                    <div className='lg:flex gap-[16px]'>
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-0.5 block">
+                                            <label className="text-md font-semibold mb-[8px] block">
                                                 {getUtilityTypeNumberLabel(utilityType)}
                                             </label>
                                             <Select
@@ -2826,78 +2988,85 @@ const Form = ({
                                                 styles={customStyles}
                                                 isClearable
                                                 placeholder={`${getUtilityTypeNumberLabel(utilityType)}`}
-                                                className="custom-select rounded-lg w-[290px] h-[40px]"
+                                                className={`custom-select rounded-lg ${utilityType === 'Telecom' || utilityType === 'Subscription' ? 'w-[616px]' : 'w-[300px]'} h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500`}
                                             />
                                         </div>
+                                        {utilityType !== 'Telecom' && utilityType !== 'Subscription' && (
                                         <div className='text-left'>
-                                            <label className="text-md font-semibold mb-0.5 block">For The Month Of</label>
-                                            <CustomMonthField
-                                                value={selectedMonths}
-                                                onChange={(v) => setSelectedMonths(v)}
-                                                className="w-[290px]"
-                                                alwaysOpenBelow
-                                            />
+                                            <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.forTheMonthOf}</label>
+                                            <div className="expense-entry-form-date w-[300px]">
+                                                <CustomMonthField
+                                                    value={selectedMonths}
+                                                    onChange={(v) => setSelectedMonths(v)}
+                                                    placeholder={EXPENSE_FORM_FIELDS.forTheMonthOf}
+                                                    className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                                                    anchor="right"
+                                                    alwaysOpenAbove
+                                                />
+                                            </div>
                                         </div>
+                                        )}
                                     </div>
                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
-                                        <div className="flex gap-10 items-end">
-                                            <div className="text-left w-[290px]">
-                                                <label className="text-md font-semibold mb-0.5 block">Validity Duration<span className="text-[#E4572E]">*</span></label>
-                                                <div className="flex gap-2 w-[290px]">
+                                        <div className="lg:flex gap-[16px] items-end">
+                                            <div className="text-left w-[300px]">
+                                                <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.validityDuration}<span className="text-[#E4572E]">*</span></label>
+                                                <div className="flex gap-2 w-[300px]">
                                                     <input
                                                         type="text"
                                                         value={thirdInput}
                                                         onChange={(e) => setThirdInput(e.target.value)}
-                                                        placeholder="Enter"
-                                                        className="min-w-0 flex-1 h-[40px] border-2 border-[#BF9853] rounded-lg px-3 text-sm focus:outline-none border-opacity-20 bg-white"
+                                                        placeholder={EXPENSE_FORM_FIELDS.validityDuration}
+                                                        className="min-w-0 flex-1 h-[40px] border-2 border-[#BF9853] rounded-lg px-3 text-sm focus:outline-none border-opacity-20 bg-white text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                                     />
-                                                    <select
-                                                        value={validityType}
-                                                        onChange={(e) => setValidityType(e.target.value)}
-                                                        className={`h-[40px] w-[110px] shrink-0 border-2 border-[#BF9853] bg-white rounded-lg px-2 text-sm focus:outline-none border-opacity-20 ${validityType ? 'text-black' : 'text-[#A6A5A6]'}`}
-                                                    >
-                                                        <option value="">
-                                                            Select
-                                                        </option>
-                                                        <option value="Days">Days</option>
-                                                        <option value="Month">Month</option>
-                                                        <option value="Year">Year</option>
-                                                    </select>
+                                                    <Select
+                                                        options={[
+                                                            { value: 'Days', label: 'Days' },
+                                                            { value: 'Month', label: 'Month' },
+                                                            { value: 'Year', label: 'Year' },
+                                                        ]}
+                                                        value={validityType ? { value: validityType, label: validityType } : null}
+                                                        onChange={(selectedOption) => setValidityType(selectedOption ? selectedOption.value : '')}
+                                                        placeholder={EXPENSE_FORM_FIELDS.validityType}
+                                                        isSearchable
+                                                        isClearable
+                                                        styles={customStyles}
+                                                        className="custom-select rounded-lg w-[110px] h-[40px] text-[14px] font-semibold"
+                                                    />
                                                 </div>
                                             </div>
-                                            {utilityType === 'Telecom' && (
-                                                <div className="text-left">
-                                                    <label className="text-md font-semibold mb-0.5 block">Activation Date<span className="text-[#E4572E]">*</span></label>
+                                            <div className="text-left">
+                                                <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.activationDate}<span className="text-[#E4572E]">*</span></label>
+                                                <div className="expense-entry-form-date w-[300px]">
                                                     <CustomDateField
                                                         value={serviceStartingDate}
                                                         onChange={setServiceStartingDate}
-                                                        placeholder="Date"
-                                                        className="w-[290px]"
+                                                        placeholder={EXPENSE_FORM_FIELDS.activationDate}
+                                                        className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                                         controlHeightPx={40}
-                                                        alwaysOpenBelow
+                                                        alwaysOpenAbove
                                                     />
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                     )}
                                 </>
                             )}
                             {/* Comments + Attach + Submit kept in left column so there is no empty gap next to the advance table */}
                             <div ref={commentsSectionRef} className=" text-left">
-                                <label className="text-md font-semibold mb-0.5 block">Comments</label>
-                                <input
-                                    type="text"
+                                <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.description}</label>
+                                <textarea
                                     value={comments}
                                     onChange={(e) => setComments(e.target.value)}
-                                    placeholder="Enter Your Comments ..."
-                                    className="border-2 border-[#BF9853] rounded-md px-4 py-2 lg:w-[615px] w-80 h-[40px] focus:outline-none border-opacity-[0.20]"
+                                    placeholder={EXPENSE_FORM_FIELDS.description}
+                                    className="border-2 border-[#BF9853] rounded-md px-[8px] lg:w-[616px] w-[300px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                 />
                             </div>
-                            <div className=" flex items-center justify-between">
-                                <div className='flex'>
-                                    <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600">
-                                        <img className='w-5 h-4' alt='' src={Attach}></img>
-                                        Attach file {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund') && <span className="text-[#E4572E] ml-1">*</span>}
+                            <div className="flex items-start justify-between lg:w-[616px] w-[300px] gap-2 flex-wrap">
+                                <div className='flex shrink-0'>
+                                    <label htmlFor="fileInput" className="cursor-pointer flex items-center gap-[6px] text-orange-600">
+                                        <img className='w-[15px] h-[16px]' alt='' src={Attach}></img>
+                                        <span className="text-[14px] font-semibold">Attach file</span> {(selectedAccountType === 'Utility Bills' || selectedAccountType === 'Bill Payments' || selectedAccountType === 'Bill Refund')}
                                     </label>
                                     <input
                                         type="file"
@@ -2908,9 +3077,9 @@ const Form = ({
                                         accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
                                     />
                                 </div>
-                                {selectedFile && <span className="text-gray-600">{selectedFile.name}</span>}
+                                {selectedFile && <span className="text-gray-600 text-[12px] break-words min-w-0 text-right">{selectedFile.name}</span>}
                             </div>
-                            <div className="mt-4 flex">
+                            <div className="mt-[12px] flex">
                                 {(embedded || userPermissions.includes("Create")) && (
                                     <button
                                         type='submit'
@@ -2923,39 +3092,28 @@ const Form = ({
                             </div>
                         </div>
                         {/* Advance history table for selected project and vendor/contractor (same logic as Advance Portal) */}
-                        {embedded ? null : (
+                        {embedded || selectedAccountType === 'Utility Bills' ? null : (
                             <div
-                                className="min-w-0 w-full overflow-x-auto xl:col-start-2 xl:row-start-1"
+                                className={`min-w-0 w-full xl:col-start-2 xl:row-start-1 flex flex-col ${sideTableAreaHeight != null ? 'h-full' : ''}`}
                                 style={sideTableAreaHeight != null ? { height: `${sideTableAreaHeight}px` } : undefined}
                             >
                                 <div
-                                    className={`w-fit max-w-full min-w-0 flex flex-col ${sideTableAreaHeight != null ? 'h-full' : ''}`}
+                                    className={`expense-form-side-table-host min-h-0 overflow-hidden ${sideTableContentHeight != null ? 'flex-1 min-h-0' : ''}`}
+                                    style={
+                                        sideTableContentHeight != null
+                                            ? { height: `${sideTableContentHeight}px` }
+                                            : undefined
+                                    }
                                 >
-                                    <div
-                                        ref={advanceHeaderRef}
-                                        className="flex justify-between items-center mb-[8px] w-full min-w-0 shrink-0"
-                                    >
-                                        <h2 className="text-base font-semibold">Advance </h2>
-                                        <span className="text-base font-bold text-[#E4572E]">
-                                            ₹{projectAdvance || '0'}
-                                        </span>
-                                    </div>
-                                    <div
-                                        className={`expense-form-side-table-host min-h-0 overflow-hidden ${sideTableContentHeight != null ? 'flex-1 min-h-0' : ''}`}
-                                        style={
-                                            sideTableContentHeight != null
-                                                ? { height: `${sideTableContentHeight}px` }
-                                                : undefined
-                                        }
-                                    >
-                                        <SideTable
-                                            advanceData={advanceData}
-                                            selectedOption={selectedOption}
-                                            selectedSite={selectedSite}
-                                            siteOptions={siteOptions}
-                                            hideDiscountAndActivity
-                                        />
-                                    </div>
+                                    <SideTable
+                                        advanceData={advanceData}
+                                        selectedOption={selectedOption}
+                                        selectedSite={selectedSite}
+                                        siteOptions={siteOptions}
+                                        hideDiscountAndActivity
+                                        projectAdvance={projectAdvance}
+                                        advanceHeaderRef={advanceHeaderRef}
+                                    />
                                 </div>
                             </div>
                         )}
@@ -3087,7 +3245,7 @@ const Form = ({
                                     {isReviewEditMode ? (
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Account Type</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.accountType}</label>
                                                 {lockAccountTypeDisplay ? (
                                                     <UtilityHubReadonlyField
                                                         value={
@@ -3110,7 +3268,7 @@ const Form = ({
                                                         );
                                                     }}
                                                 >
-                                                    <option value="" disabled hidden>Account Type</option>
+                                                    <option value="" disabled hidden>{EXPENSE_FORM_FIELDS.accountType}</option>
                                                     {accountTypeOptions.map((option) => (
                                                         <option key={option.value} value={option.value}>
                                                             {option.label}
@@ -3120,20 +3278,20 @@ const Form = ({
                                                 )}
                                             </div>
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Date</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.date}</label>
                                                 <CustomDateField
                                                     value={date}
                                                     onChange={setDate}
-                                                    placeholder="dd-mm-yyyy"
+                                                    placeholder={EXPENSE_FORM_FIELDS.date}
                                                     className="w-full"
                                                     alwaysOpenBelow
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Project Name</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.projectName}</label>
                                                 <Select
                                                     options={sortedSiteOptions || []}
-                                                    placeholder="Select a site..."
+                                                    placeholder={EXPENSE_FORM_FIELDS.projectName}
                                                     isSearchable
                                                     value={selectedSite}
                                                     onChange={setSelectedSite}
@@ -3143,59 +3301,61 @@ const Form = ({
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Vendor / Contractor</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.vendorContractorName}</label>
                                                 <Select
                                                     options={combinedOptions}
                                                     value={selectedOption}
                                                     onChange={handleChange}
-                                                    placeholder="Select an Option..."
+                                                    placeholder={EXPENSE_FORM_FIELDS.vendorContractorName}
                                                     styles={customStyles}
                                                     isClearable
                                                     className="custom-select rounded-lg"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Quantity</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.quantity}</label>
                                                 <input
                                                     type="text"
                                                     value={quantity}
                                                     onChange={(e) => setQuantity(e.target.value)}
+                                                    placeholder={EXPENSE_FORM_FIELDS.quantity}
                                                     className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Amount</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.amount}</label>
                                                 <div className="relative">
                                                     <span className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-600">₹</span>
                                                     <input
                                                         type="text"
                                                         value={formatNumber(amount)}
                                                         onChange={handleAmountChange}
+                                                        placeholder={EXPENSE_FORM_FIELDS.amount}
                                                         className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg pl-7 pr-3 border-opacity-20"
                                                     />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-sm font-semibold mb-1 block">Category</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.category}</label>
                                                 <Select
-                                                    options={categoryOptions}
+                                                    options={filteredCategoryOptions}
                                                     value={selectedCategory}
                                                     onChange={handleCategoryChange}
                                                     styles={customStyles}
                                                     isClearable
-                                                    placeholder="Select a category..."
+                                                    placeholder={EXPENSE_FORM_FIELDS.category}
                                                     className="custom-select rounded-lg"
                                                 />
                                             </div>
                                             {(selectedAccountType === 'Claim Payment' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Sundry Payment') && (
                                                 <div>
-                                                    <label className="text-sm font-semibold mb-0.5 block">Payment Mode</label>
+                                                    <label className="text-sm font-semibold mb-0.5 block">{EXPENSE_FORM_FIELDS.paymentMode}</label>
                                                     <select
                                                         value={paymentMode}
                                                         onChange={(e) => setPaymentMode(e.target.value)}
                                                         className="w-full h-[45px] border-2 border-[#BF9853] bg-white rounded-lg px-3 border-opacity-20"
                                                     >
-                                                        <option value="">Select Payment Mode</option>
+                                                        <option value="">{EXPENSE_FORM_FIELDS.paymentMode}</option>
                                                         {selectablePaymentModeOptions.map(mode => (
                                                             <option key={mode.id || mode.modeOfPayment} value={mode.modeOfPayment}>
                                                                 {mode.modeOfPayment}
@@ -3207,7 +3367,7 @@ const Form = ({
                                             {(selectedAccountType === 'Utility Bills' || lockUtilityPrefillFields) && (
                                                 <>
                                                     <div>
-                                                        <label className="text-sm font-semibold mb-1 block">Utility Type</label>
+                                                        <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.utilityType}</label>
                                                         {lockUtilityPrefillFields ? (
                                                             <UtilityHubReadonlyField value={utilityType} />
                                                         ) : (
@@ -3216,7 +3376,7 @@ const Form = ({
                                                             onChange={(e) => setUtilityType(e.target.value)}
                                                             className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                         >
-                                                            <option value="" disabled hidden>Utility Type</option>
+                                                            <option value="" disabled hidden>{EXPENSE_FORM_FIELDS.utilityType}</option>
                                                             <option value="Electricity">Electricity</option>
                                                             <option value="Property">Property</option>
                                                             <option value="Water">Water</option>
@@ -3236,56 +3396,55 @@ const Form = ({
                                                             onChange={setSelectedEbNumber}
                                                             styles={customStyles}
                                                             isClearable
-                                                            placeholder={`Select ${getUtilityTypeNumberLabel(utilityType)}...`}
+                                                            placeholder={getUtilityTypeNumberLabel(utilityType)}
                                                             className="custom-select rounded-lg"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="text-sm font-semibold mb-1 block">For The Month Of</label>
+                                                        <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.forTheMonthOf}</label>
                                                         <input
                                                             type="month"
                                                             value={selectedMonths}
                                                             onChange={(e) => setSelectedMonths(e.target.value)}
+                                                            placeholder={EXPENSE_FORM_FIELDS.forTheMonthOf}
                                                             className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                         />
                                                     </div>
                                                     {(utilityType === 'Telecom' || utilityType === 'Subscription') && (
-                                                        <div className={`grid gap-3 ${utilityType === 'Telecom' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                                        <div className="grid gap-3 grid-cols-3">
                                                             <div>
-                                                                <label className="text-sm font-semibold mb-1 block">Validity</label>
+                                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.validityDuration}</label>
                                                                 <input
                                                                     type="text"
                                                                     value={thirdInput}
                                                                     onChange={(e) => setThirdInput(e.target.value)}
-                                                                    placeholder="Enter count..."
+                                                                    placeholder={EXPENSE_FORM_FIELDS.validityDuration}
                                                                     className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="text-sm font-semibold mb-1 block">Validity Type</label>
+                                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.validityType}</label>
                                                                 <select
                                                                     value={validityType}
                                                                     onChange={(e) => setValidityType(e.target.value)}
                                                                     className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                                 >
-                                                                    <option value="">--- Select ---</option>
+                                                                    <option value="">{EXPENSE_FORM_FIELDS.validityType}</option>
                                                                     <option value="Days">Days</option>
                                                                     <option value="Month">Month</option>
                                                                     <option value="Year">Year</option>
                                                                 </select>
                                                             </div>
-                                                            {utilityType === 'Telecom' && (
-                                                                <div>
-                                                                    <label className="text-sm font-semibold mb-1 block">Service Start Date</label>
-                                                                    <CustomDateField
-                                                                        value={serviceStartingDate}
-                                                                        onChange={setServiceStartingDate}
-                                                                        placeholder="dd-mm-yyyy"
-                                                                        className="w-full"
-                                                                        alwaysOpenBelow
-                                                                    />
-                                                                </div>
-                                                            )}
+                                                            <div>
+                                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.activationDate}</label>
+                                                                <CustomDateField
+                                                                    value={serviceStartingDate}
+                                                                    onChange={setServiceStartingDate}
+                                                                    placeholder={EXPENSE_FORM_FIELDS.activationDate}
+                                                                    className="w-full"
+                                                                    alwaysOpenBelow
+                                                                />
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </>
@@ -3293,24 +3452,25 @@ const Form = ({
                                             {usesBillArrivalDate(selectedAccountType) && (
                                                 <div>
                                                     <label className="text-sm font-semibold mb-1 block">
-                                                        Bill Arrival Date
+                                                        {EXPENSE_FORM_FIELDS.billArrivalDate}
                                                     </label>
                                                     <CustomDateField
                                                         value={billArrivalDate}
                                                         onChange={setBillArrivalDate}
-                                                        placeholder="dd-mm-yyyy"
+                                                        placeholder={EXPENSE_FORM_FIELDS.billArrivalDate}
                                                         className="w-full"
                                                         alwaysOpenBelow
-                                                        placeholderButtonClassName="!text-sm !font-normal !text-[#808080]"
+                                                        placeholderButtonClassName="!text-sm !font-normal !text-gray-500"
                                                     />
                                                 </div>
                                             )}
                                             <div className="col-span-2">
-                                                <label className="text-sm font-semibold mb-1 block">Comments</label>
+                                                <label className="text-sm font-semibold mb-1 block">{EXPENSE_FORM_FIELDS.description}</label>
                                                 <input
                                                     type="text"
                                                     value={comments}
                                                     onChange={(e) => setComments(e.target.value)}
+                                                    placeholder={EXPENSE_FORM_FIELDS.description}
                                                     className="w-full h-[45px] border-2 border-[#BF9853] rounded-lg px-3 border-opacity-20"
                                                 />
                                             </div>
@@ -3399,31 +3559,33 @@ const Form = ({
                                 <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.date}</label>
                                             <CustomDateField
                                                 value={paymentModalData.date}
                                                 onChange={() => {}}
-                                                placeholder="dd-mm-yyyy"
+                                                placeholder={EXPENSE_FORM_FIELDS.date}
                                                 className="w-full"
                                                 alwaysOpenBelow
                                                 disabled
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.amount}</label>
                                             <input
                                                 type="number"
                                                 value={paymentModalData.amount}
                                                 readOnly
+                                                placeholder={EXPENSE_FORM_FIELDS.amount}
                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.paymentMode}</label>
                                             <input
                                                 type="text"
                                                 value={paymentModalData.paymentMode}
                                                 readOnly
+                                                placeholder={EXPENSE_FORM_FIELDS.paymentMode}
                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600 bg-gray-100"
                                             />
                                         </div>
@@ -3436,21 +3598,21 @@ const Form = ({
                                                 {paymentModalData.paymentMode === "Cheque" && (
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No<span className="text-red-500">*</span></label>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.chequeNo}<span className="text-red-500">*</span></label>
                                                             <input
                                                                 type="text"
                                                                 value={paymentModalData.chequeNo}
                                                                 onChange={(e) => setPaymentModalData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                                placeholder="Enter cheque number"
+                                                                placeholder={EXPENSE_FORM_FIELDS.chequeNo}
                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date<span className="text-red-500">*</span></label>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.chequeDate}<span className="text-red-500">*</span></label>
                                                             <CustomDateField
                                                                 value={paymentModalData.chequeDate}
                                                                 onChange={(v) => setPaymentModalData(prev => ({ ...prev, chequeDate: v }))}
-                                                                placeholder="dd-mm-yyyy"
+                                                                placeholder={EXPENSE_FORM_FIELDS.chequeDate}
                                                                 className="w-full"
                                                                 alwaysOpenBelow
                                                             />
@@ -3459,23 +3621,23 @@ const Form = ({
                                                 )}
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.transactionNumber}</label>
                                                         <input
                                                             type="text"
                                                             value={paymentModalData.transactionNumber}
                                                             onChange={(e) => setPaymentModalData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                            placeholder="Enter transaction number (optional)"
+                                                            placeholder={EXPENSE_FORM_FIELDS.transactionNumber}
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Number<span className="text-red-500">*</span></label>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">{EXPENSE_FORM_FIELDS.accountNumber}<span className="text-red-500">*</span></label>
                                                         <select
                                                             value={paymentModalData.accountNumber}
                                                             onChange={(e) => setPaymentModalData(prev => ({ ...prev, accountNumber: e.target.value }))}
                                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                         >
-                                                            <option value="">Select Account</option>
+                                                            <option value="">{EXPENSE_FORM_FIELDS.accountNumber}</option>
                                                             {accountDetails.map((account) => (
                                                                 <option key={account.id} value={account.account_number}>
                                                                     {account.account_number}
@@ -3510,8 +3672,12 @@ export default Form;
 const customStyles = {
     control: (provided, state) => ({
         ...provided,
+        fontFamily: 'Manrope',
         borderWidth: '2px',
         borderRadius: '8px',
+        minHeight: '40px',
+        height: '40px',
+        flexWrap: 'nowrap',
         borderColor: state.isFocused
             ? 'rgba(191, 152, 83, 1)'
             : 'rgba(191, 152, 83, 0.2)',
@@ -3523,14 +3689,44 @@ const customStyles = {
         },
     }),
 
+    valueContainer: (provided, state) => ({
+        ...provided,
+        flex: '1 1 0%',
+        minWidth: 0,
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
+        paddingLeft: '12px',
+        paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+        paddingTop: 0,
+        paddingBottom: 0,
+        height: '36px',
+        alignItems: 'center',
+    }),
+
+    singleValue: (provided) => ({
+        ...provided,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        margin: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        color: 'black',
+    }),
+
+    input: (provided) => ({
+        ...provided,
+        margin: 0,
+        padding: 0,
+    }),
+
     menuList: (provided) => ({
         ...provided,
-
-        // Hide scrollbar
-        scrollbarWidth: 'none', // Firefox
-        msOverflowStyle: 'none', // IE & Edge
-
-        // Chrome, Safari
+        paddingTop: 0,
+        paddingBottom: 0,
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
         '&::-webkit-scrollbar': {
             display: 'none',
         },
@@ -3538,15 +3734,67 @@ const customStyles = {
 
     indicatorSeparator: () => ({ display: 'none' }),
 
+    indicatorsContainer: (provided) => ({
+        ...provided,
+        flex: '0 0 auto',
+        paddingLeft: '0',
+    }),
+
     dropdownIndicator: (provided, state) => ({
         ...provided,
         display: state.hasValue ? 'none' : 'flex',
-        padding: '8px',
+        color: '#000000',
+        flexShrink: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
     }),
 
     clearIndicator: (provided) => ({
         ...provided,
         cursor: 'pointer',
-        padding: '8px',
+        color: '#000000',
+        flexShrink: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: '4px',
+        paddingRight: '4px',
+    }),
+    placeholder: (provided) => ({
+        ...provided,
+        fontWeight: 'normal',
+        fontSize: '14px',
+        color: '#6b7280',
+        margin: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        textAlign: 'left',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%',
+        position: 'absolute',
+    }),
+
+    option: (provided, state) => ({
+        ...provided,
+        minHeight: 36,
+        height: 'auto',
+        paddingTop: 6,
+        paddingBottom: 6,
+        whiteSpace: 'normal',
+        display: 'flex',
+        alignItems: 'center',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTapHighlightColor: '#FAF6ED',
+        backgroundColor: state.isSelected
+            ? '#BF9853'
+            : state.isFocused
+            ? '#FAF6ED'
+            : provided.backgroundColor,
+        color: state.isSelected ? '#FFFFFF' : provided.color,
+        ':active': {
+            backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+        },
     }),
 };

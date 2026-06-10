@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 
-const ClaimPaymentCashRegister = () => {
+const ClaimPaymentCashRegister = ({ refreshSignal, isActive = true }) => {
   const [cashRegisterData, setCashRegisterData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    fetchCashRegisterData();
-  }, []);
 
   const fetchCashRegisterData = async () => {
     try {
@@ -88,6 +85,12 @@ const ClaimPaymentCashRegister = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchCashRegisterData();
+  }, []);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchCashRegisterData);
 
   const formatDateOnly = (dateString) => {
     if (!dateString) return '-';

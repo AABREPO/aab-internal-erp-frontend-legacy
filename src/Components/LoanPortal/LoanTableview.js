@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -10,6 +10,8 @@ import Reload from '../Images/Clear.svg'
 import Pdf from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 import edit from '../Images/Edit.svg';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import {
   EDBC_IDS,
   DATABASE_TABLE_FILTER_SELECT_STYLES,
@@ -32,8 +34,9 @@ import {
   resolveLoanAdvancePortalId,
   syncAdvancePortalFromLoanEdit,
 } from '../../utils/advancePortalWeeklyPaymentBill';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 
-const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -666,21 +669,26 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
     };
     fetchProjectClients();
   }, []);
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
-        setLoanData(data);
-      } catch (error) {
-        console.error('Error fetching loan portal data:', error);
+  const fetchLoanTableData = useCallback(async () => {
+    try {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
-    };
-    fetchData();
+      const data = await response.json();
+      setLoanData(data);
+    } catch (error) {
+      console.error('Error fetching loan portal data:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLoanTableData();
+  }, [fetchLoanTableData]);
+
+  useOrbitPageSync('loan', fetchLoanTableData, [fetchLoanTableData]);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchLoanTableData);
   useEffect(() => {
     const fetchBranches = async () => {
       try {
@@ -1155,8 +1163,8 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         });
         return newData;
       });
-      window.location.reload();
       setIsEditModalOpen(false);
+      notifyOrbitModuleDataChanged('loan');
       toast.success("Entry updated successfully!", {
         position: "top-center",
         autoClose: 3000,

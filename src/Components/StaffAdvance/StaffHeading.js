@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import '../Heading.css';
 import StaffAdvance from './StaffAdvance';
 import StaffTableview from './StaffTableview';
 import StaffDatabase from './StaffDatabase';
@@ -6,8 +7,8 @@ import StaffReport from './StaffReport';
 import StaffSummary from './StaffSummary';
 import StaffAddInput from './StaffAddInput';
 import MobileStaffAdvance from '../../componentsMobile/StaffAdvance/StaffAdvance';
+import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
 
-// Payment Mode options (fallback if backend fails)
 const defaultPaymentModeOptions = [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
@@ -17,14 +18,34 @@ const defaultPaymentModeOptions = [
     { value: 'Direct', label: 'Direct' },
 ];
 
+const STAFF_MODULE_TABS = ['staffAdvance', 'staffTablview', 'staffDatabase', 'staffInput', 'staffReport', 'staffSummary'];
+const STAFF_DEFAULT_TAB = 'staffAdvance';
+
+const getInitialStaffTab = (username) => {
+    const isAdmin = username === 'Mahalingam M' || username === 'Admin';
+    const allowedTabs = isAdmin
+        ? STAFF_MODULE_TABS
+        : STAFF_MODULE_TABS.filter((tab) => tab !== 'staffDatabase');
+    const savedTab = localStorage.getItem('activePaintTab');
+    if (savedTab && allowedTabs.includes(savedTab)) {
+        return savedTab;
+    }
+    return STAFF_DEFAULT_TAB;
+};
+
 const StaffHeading = ({ username, userRoles = [] }) => {
-    const [isMobile, setIsMobile] = useState(() => {
-        return window.innerWidth <= 768;
-    });
+    const isAdminStaff = username === 'Mahalingam M' || username === 'Admin';
+    const allowedTabs = isAdminStaff
+        ? STAFF_MODULE_TABS
+        : STAFF_MODULE_TABS.filter((tab) => tab !== 'staffDatabase');
+
+    const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
     useEffect(() => {
         const handleResize = () => {
-            setIsMobile(window.innerWidth <= 768);
+            setIsMobile(isMobileViewportWidth());
         };
         window.addEventListener('resize', handleResize);
         return () => {
@@ -52,20 +73,26 @@ const StaffHeading = ({ username, userRoles = [] }) => {
         fetchPaymentModes();
     }, []);
 
-    const [activeTab, setActiveTab] = useState(() => {
-        const savedTab = localStorage.getItem('activePaintTab');
-        if (savedTab === 'staffDatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
-            return 'staffAdvance';
-        }
-        return savedTab || 'staffAdvance';
-    });
+    const initialTab = getInitialStaffTab(username);
+    const [activeTab, setActiveTab] = useState(() => initialTab);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+
     useEffect(() => {
-        if (activeTab === 'staffDatabase' && (username !== 'Mahalingam M' && username !== 'Admin')) {
+        setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (activeTab === 'staffDatabase' && !isAdminStaff) {
             setActiveTab('staffAdvance');
         } else {
             localStorage.setItem('activePaintTab', activeTab);
         }
-    }, [activeTab, username]);
+    }, [activeTab, isAdminStaff]);
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        bumpRefresh();
+    };
 
     if (isMobile) {
         const storedUser = localStorage.getItem('user');
@@ -77,67 +104,46 @@ const StaffHeading = ({ username, userRoles = [] }) => {
         );
     }
 
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'staffAdvance':
-                return <StaffAdvance username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'staffTablview':
-                return <StaffTableview username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'staffDatabase':
-                return <StaffDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'staffInput':
-                return <StaffAddInput username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'staffReport':
-                return <StaffReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            case 'staffSummary':
-                return <StaffSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />;
-            default:
-                return <StaffAdvance paymentModeOptions={paymentModeOptions} />;
-        }
-    };
     return (
         <div className="bg-[#FAF6ED] w-full h-auto min-h-screen overflow-auto">
-
-            {/* Fixed border wrapper */}
             <div className="w-full xl:px-0 px-5">
-                {/* Scrolling headings only */}
                 <div className="w-full overflow-x-auto no-scrollbar xl:px-0">
                     <div className="topbar-title flex flex-nowrap xl:flex-wrap min-w-max xl:min-w-0">
                         <h2
                             className={`link ${activeTab === 'staffAdvance' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('staffAdvance')}
+                            onClick={() => handleTabChange('staffAdvance')}
                         >
                             Advance
                         </h2>
                         <h2
                             className={`link ${activeTab === 'staffTablview' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('staffTablview')}
+                            onClick={() => handleTabChange('staffTablview')}
                         >
                             Table View
                         </h2>
-                        {(username === 'Mahalingam M' || username === 'Admin') && (
+                        {isAdminStaff && (
                             <h2
                                 className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('staffDatabase')}
+                                onClick={() => handleTabChange('staffDatabase')}
                             >
                                 Database
                             </h2>
                         )}
                         <h2
                             className={`link ${activeTab === 'staffInput' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('staffInput')}
+                            onClick={() => handleTabChange('staffInput')}
                         >
                             Add Input
                         </h2>
                         <h2
                             className={`link ${activeTab === 'staffReport' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('staffReport')}
+                            onClick={() => handleTabChange('staffReport')}
                         >
                             Report
                         </h2>
                         <h2
                             className={`link ${activeTab === 'staffSummary' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('staffSummary')}
+                            onClick={() => handleTabChange('staffSummary')}
                         >
                             Summary
                         </h2>
@@ -145,9 +151,39 @@ const StaffHeading = ({ username, userRoles = [] }) => {
                 </div>
             </div>
             <div className="content">
-                {renderContent()}
+                {visitedTabs.has('staffAdvance') && (
+                    <div className={activeTab === 'staffAdvance' ? '' : 'hidden'}>
+                        <StaffAdvance username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'staffAdvance'} />
+                    </div>
+                )}
+                {visitedTabs.has('staffTablview') && (
+                    <div className={activeTab === 'staffTablview' ? '' : 'hidden'}>
+                        <StaffTableview username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'staffTablview'} />
+                    </div>
+                )}
+                {isAdminStaff && visitedTabs.has('staffDatabase') && (
+                    <div className={activeTab === 'staffDatabase' ? '' : 'hidden'}>
+                        <StaffDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'staffDatabase'} />
+                    </div>
+                )}
+                {visitedTabs.has('staffInput') && (
+                    <div className={activeTab === 'staffInput' ? '' : 'hidden'}>
+                        <StaffAddInput username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />
+                    </div>
+                )}
+                {visitedTabs.has('staffReport') && (
+                    <div className={activeTab === 'staffReport' ? '' : 'hidden'}>
+                        <StaffReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'staffReport'} />
+                    </div>
+                )}
+                {visitedTabs.has('staffSummary') && (
+                    <div className={activeTab === 'staffSummary' ? '' : 'hidden'}>
+                        <StaffSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'staffSummary'} />
+                    </div>
+                )}
             </div>
         </div>
-    )
-}
-export default StaffHeading
+    );
+};
+
+export default StaffHeading;

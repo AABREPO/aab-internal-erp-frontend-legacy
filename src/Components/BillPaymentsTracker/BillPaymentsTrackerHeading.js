@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../Heading.css';
 import PendingBill from './PendingBill';
 import BillDatabase from './BillDatabase';
@@ -30,8 +30,15 @@ const getInitialBillPaymentsTab = (canAccessDatabase) => {
 
 const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
     const canAccessDatabase = username === 'Mahalingam M' || username === 'Admin';
-    const [activeTab, setActiveTab] = useState(() => getInitialBillPaymentsTab(canAccessDatabase));
-    const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialBillPaymentsTab(canAccessDatabase)]));
+    const initialTab = getInitialBillPaymentsTab(canAccessDatabase);
+    const [activeTab, setActiveTab] = useState(() => initialTab);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const bumpRefresh = () => setRefreshNonce((n) => n + 1);
+
+    useEffect(() => {
+        setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }, [activeTab]);
 
     useEffect(() => {
         if (activeTab === 'billdatabase' && !canAccessDatabase) {
@@ -41,32 +48,23 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
         }
     }, [activeTab, canAccessDatabase]);
 
-    useEffect(() => {
-        setVisitedTabs((prev) => new Set(prev).add(activeTab));
-    }, [activeTab]);
-
-    const statementEverOpenedRef = useRef(activeTab === 'billstatement');
-    const [statementMounted, setStatementMounted] = useState(() => activeTab === 'billstatement');
-
-    useEffect(() => {
-        if (activeTab !== 'billstatement') return;
-        if (statementEverOpenedRef.current) return;
-        statementEverOpenedRef.current = true;
-        setStatementMounted(true);
-    }, [activeTab]);
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        bumpRefresh();
+    };
 
     return (
         <div className="bg-[#FAF6ED]">
             <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2 className={`link whitespace-nowrap ${activeTab === 'pendingbill' ? 'active' : ''}`} onClick={() => setActiveTab('pendingbill')}>
+                <h2 className={`link whitespace-nowrap ${activeTab === 'pendingbill' ? 'active' : ''}`} onClick={() => handleTabChange('pendingbill')}>
                     Pending Bill
                 </h2>
                 {canAccessDatabase && (
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'billdatabase' ? 'active' : ''}`} onClick={() => setActiveTab('billdatabase')} >
+                    <h2 className={`link whitespace-nowrap ${activeTab === 'billdatabase' ? 'active' : ''}`} onClick={() => handleTabChange('billdatabase')} >
                         Database
                     </h2>
                 )}
-                <h2 className={`link whitespace-nowrap ${activeTab === 'billstatement' ? 'active' : ''}`} onClick={() => setActiveTab('billstatement')} >
+                <h2 className={`link whitespace-nowrap ${activeTab === 'billstatement' ? 'active' : ''}`} onClick={() => handleTabChange('billstatement')} >
                     Statement
                 </h2>
             </div>
@@ -77,6 +75,7 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                             username={username}
                             userRoles={userRoles}
                             billPaymentsTabActive={activeTab === 'pendingbill'}
+                            refreshSignal={refreshNonce}
                         />
                     </div>
                 )}
@@ -86,15 +85,17 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                             username={username}
                             userRoles={userRoles}
                             billPaymentsTabActive={activeTab === 'billdatabase'}
+                            refreshSignal={refreshNonce}
                         />
                     </div>
                 )}
-                {statementMounted && visitedTabs.has('billstatement') && (
+                {visitedTabs.has('billstatement') && (
                     <div className={activeTab === 'billstatement' ? '' : 'hidden'}>
                         <BillStatement
                             username={username}
                             userRoles={userRoles}
                             billPaymentsTabActive={activeTab === 'billstatement'}
+                            refreshSignal={refreshNonce}
                         />
                     </div>
                 )}

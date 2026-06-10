@@ -39,8 +39,21 @@ const getInitialRentTab = (username) => {
 
 const RHeading = ({ username, userRoles = [] }) => {
   const isAdminRent = username === 'Mahalingam M' || username === 'Admin';
-  const [activeTab, setActiveTab] = useState(() => getInitialRentTab(username));
-  const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialRentTab(username)]));
+
+  const allowedTabs = isAdminRent
+    ? RENT_MODULE_TABS
+    : RENT_MODULE_TABS.filter((tab) => tab !== 'database');
+
+  const initialTab = getInitialRentTab(username);
+
+  const [activeTab, setActiveTab] = useState(() => initialTab);
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const bumpRefresh = () => setRefreshNonce((n) => n + 1);
+
+  useEffect(() => {
+    setVisitedTabs((prev) => new Set(prev).add(activeTab));
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'database' && !isAdminRent) {
@@ -50,72 +63,73 @@ const RHeading = ({ username, userRoles = [] }) => {
     }
   }, [activeTab, isAdminRent]);
 
-  useEffect(() => {
-    setVisitedTabs((prev) => new Set(prev).add(activeTab));
-  }, [activeTab]);
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    bumpRefresh();
+  };
 
   return (
     <div className="bg-[#FAF6ED]">
       <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
         <h2
           className={`link whitespace-nowrap ${activeTab === 'form' ? 'active' : ''}`}
-          onClick={() => setActiveTab('form')}
+          onClick={() => handleTabChange('form')}
         >
           Form
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'table' ? 'active' : ''}`}
-          onClick={() => setActiveTab('table')}
+          onClick={() => handleTabChange('table')}
         >
           Table View
         </h2>
         {isAdminRent && (
           <h2
             className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
-            onClick={() => setActiveTab('database')}
+            onClick={() => handleTabChange('database')}
           >
             Database
           </h2>
         )}
         <h2
           className={`link whitespace-nowrap ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => handleTabChange('dashboard')}
         >
           Dashboard
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'inputdata' ? 'active' : ''}`}
-          onClick={() => setActiveTab('inputdata')}
+          onClick={() => handleTabChange('inputdata')}
         >
           Input Data
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'summary' ? 'active' : ''}`}
-          onClick={() => setActiveTab('summary')}
+          onClick={() => handleTabChange('summary')}
         >
           Summary
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'rentalagreement' ? 'active' : ''}`}
-          onClick={() => setActiveTab('rentalagreement')}
+          onClick={() => handleTabChange('rentalagreement')}
         >
           Rental Agreement
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'tenant' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tenant')}
+          onClick={() => handleTabChange('tenant')}
         >
           Tenant
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'monthlyReport' ? 'active' : ''}`}
-          onClick={() => setActiveTab('monthlyReport')}
+          onClick={() => handleTabChange('monthlyReport')}
         >
           Monthly Report
         </h2>
         <h2
           className={`link whitespace-nowrap ${activeTab === 'ebno' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ebno')}
+          onClick={() => handleTabChange('ebno')}
         >
           EB No
         </h2>
@@ -123,22 +137,27 @@ const RHeading = ({ username, userRoles = [] }) => {
       <div className="content">
         {visitedTabs.has('form') && (
           <div className={activeTab === 'form' ? '' : 'hidden'}>
-            <Form username={username} userRoles={userRoles} />
+            <Form username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'form'} />
           </div>
         )}
         {visitedTabs.has('table') && (
           <div className={activeTab === 'table' ? '' : 'hidden'}>
-            <Table username={username} userRoles={userRoles} />
+            <Table username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'table'} />
           </div>
         )}
         {isAdminRent && visitedTabs.has('database') && (
           <div className={activeTab === 'database' ? '' : 'hidden'}>
-            <RentDatabase username={username} userRoles={userRoles} />
+            <RentDatabase username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'database'} />
           </div>
         )}
         {visitedTabs.has('dashboard') && (
           <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
-            <Dashboard username={username} userRoles={userRoles} />
+            <Dashboard
+              username={username}
+              userRoles={userRoles}
+              refreshSignal={refreshNonce}
+              isActive={activeTab === 'dashboard'}
+            />
           </div>
         )}
         {visitedTabs.has('inputdata') && (

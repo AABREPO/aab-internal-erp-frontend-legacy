@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Select from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 
 const BANK_REGISTER_6_FONT = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600;700&display=swap';
 
@@ -1995,7 +1997,7 @@ const IncomeModal = ({
 };
 
 // ---------- App ----------
-const BankRegister6Inner = () => {
+const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   const [branch,setBranch] = useState('srivilliputtur');
   const [banksForBranch, setBanksForBranch] = useState([]);
   const [bank,setBank] = useState(banksForBranch[0]?.name || "");
@@ -2039,6 +2041,15 @@ const BankRegister6Inner = () => {
     setBillPayments(sortedData);
     return sortedData;
   }, []);
+
+  useOrbitPageSync('bank-register', () => {
+    void fetchBillPayments().catch((error) => console.error("Error refreshing bill payments:", error));
+  }, [fetchBillPayments]);
+
+  useTabRefreshSignal(refreshSignal, isActive, () => {
+    void fetchBillPayments().catch((error) => console.error("Error refreshing bill payments:", error));
+  });
+
   useEffect(() => {
     const fetchAccountDetails = async () => {
       try {
@@ -3072,12 +3083,12 @@ const BankRegister6Inner = () => {
   );
 };
 
-export default function BankRegister6View () {
+export default function BankRegister6View ({ refreshSignal, isActive = true }) {
   return (
     <div className="bank-register-6-scope">
       <link rel="stylesheet" href={BANK_REGISTER_6_FONT} />
       <style dangerouslySetInnerHTML={{ __html: BANK_REGISTER_6_CSS }} />
-      <BankRegister6Inner />
+      <BankRegister6Inner refreshSignal={refreshSignal} isActive={isActive} />
     </div>
   );
 }

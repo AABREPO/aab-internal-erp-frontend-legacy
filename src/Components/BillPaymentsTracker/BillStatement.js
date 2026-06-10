@@ -11,7 +11,7 @@ import {
   parseStatementDate,
 } from './billStatementFilters';
 
-const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
+const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true, refreshSignal }) => {
   const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
   const [apiData, setApiData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -494,6 +494,33 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true 
       controller.abort();
     };
   }, [billPaymentsTabActive]);
+
+  useEffect(() => {
+    if (refreshSignal === undefined) return;
+    if (!billPaymentsTabActive) return;
+    let mounted = true;
+    const controller = new AbortController();
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await fetchStatementData(controller.signal);
+        if (!mounted) return;
+      } catch (e) {
+        if (String(e?.name || '') === 'AbortError') return;
+        if (!mounted) return;
+        setApiData([]);
+        setError(e?.message || 'Failed to load statement');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [refreshSignal, billPaymentsTabActive]);
 
   return (
     <div className="">

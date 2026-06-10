@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 import OrbitERPHeading from "./OrbitERPHeading";
 import { useSidebar } from "../../context/SidebarContext";
 
@@ -7,20 +8,23 @@ import { useSidebar } from "../../context/SidebarContext";
  * Here: one OrbitERPHeading + children (each route module stays unchanged inside its folder).
  */
 export default function OrbitAppChrome({ children, username, onLogout, branchId, brachId, disabled = false }) {
-  const { toggleSidebar } = useSidebar();
-  if (disabled) {
-    return <>{children}</>;
-  }
-  return (
-    <>
-      <OrbitERPHeading
-        displayName={username || "Admin"}
-        branchId={branchId}
-        brachId={brachId}
-        onLogoClick={toggleSidebar}
-        onSignOut={onLogout}
-      />
-      {children}
-    </>
-  );
+    const { toggleSidebar } = useSidebar();
+    const location = useLocation();
+    if (disabled) {
+        return <>{children}</>;
+    }
+    return (
+        <>
+            <OrbitERPHeading
+                displayName={username || "Admin"}
+                branchId={branchId}
+                brachId={brachId}
+                currentPath={location.pathname}
+                onLogoClick={toggleSidebar}
+                onSignOut={onLogout}
+            />
+            {children}
+        </>
+    );
 }
+

@@ -35,11 +35,14 @@ import {
   EdbcExpandableBodyCell,
   EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
+  formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
-import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, clearAdvancePortalRecordsOnDelete, deleteLinkedExpenseEntryOnAdvancePortalDelete, formatWeeklyBillDeleteMessage } from '../../utils/advancePortalWeeklyPaymentBill';
+import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, clearAdvancePortalRecordsOnDelete, deleteLinkedExpenseEntryOnAdvancePortalDelete, formatWeeklyBillDeleteMessage, resolveFilesUploadResponseUrl } from '../../utils/advancePortalWeeklyPaymentBill';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 
-const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
+const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const BLANK_VALUE = 'BLANK';
   const BLANK_LABEL = 'Blank';
   const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
@@ -74,7 +77,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [combinedOptions, setCombinedOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
   const [advanceData, setAdvanceData] = useState([]);
-  const [selectTimeStampDate, setSelectTimeStampDate] = useState('');
+  const [timestampStartDate, setTimestampStartDate] = useState('');
+  const [timestampEndDate, setTimestampEndDate] = useState('');
   const [selectDatabaseDate, setSelectDatabaseDate] = useState('');
   const [selectDatabaseContractororVendorName, setSelectDatabaseContractororVendorName] = useState('');
   const [selectDatabaseProjectName, setSelectDatabaseProjectName] = useState('');
@@ -111,6 +115,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const pendingAdvanceUpdateRef = useRef(null);
   const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
   const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editPaymentModalData, setEditPaymentModalData] = useState({
     chequeNo: '',
     chequeDate: '',
@@ -201,7 +206,12 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       if (savedFilters) {
         try {
           const filters = JSON.parse(savedFilters);
-          if (filters.selectTimeStampDate) setSelectTimeStampDate(filters.selectTimeStampDate);
+          if (filters.timestampStartDate) setTimestampStartDate(filters.timestampStartDate);
+          if (filters.timestampEndDate) setTimestampEndDate(filters.timestampEndDate);
+          else if (filters.selectTimeStampDate) {
+            setTimestampStartDate(filters.selectTimeStampDate);
+            setTimestampEndDate(filters.selectTimeStampDate);
+          }
           if (filters.selectDatabaseDate) setSelectDatabaseDate(filters.selectDatabaseDate);
           if (filters.selectDatabaseContractororVendorName) setSelectDatabaseContractororVendorName(filters.selectDatabaseContractororVendorName);
           if (filters.selectDatabaseProjectName) setSelectDatabaseProjectName(filters.selectDatabaseProjectName);
@@ -244,7 +254,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
 
   useEffect(() => {
     const filters = {
-      selectTimeStampDate,
+      timestampStartDate,
+      timestampEndDate,
       selectDatabaseDate,
       selectDatabaseContractororVendorName,
       selectDatabaseProjectName,
@@ -262,7 +273,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       showFilters
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch, showFilters]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch, showFilters]);
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
   const filterNudgeUsedRef = useRef(false);
@@ -684,10 +695,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     fetchAdvanceData();
   }, [fetchAdvanceData]);
 
-  useEffect(() => {
-    if (refreshSignal === undefined) return;
-    fetchAdvanceData();
-  }, [refreshSignal, fetchAdvanceData]);
+  useOrbitPageSync('portal', () => fetchAdvanceData(), [fetchAdvanceData]);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchAdvanceData);
   const sortedSiteOptions = siteOptions.sort((a, b) =>
     a.label.localeCompare(b.label)
   );
@@ -837,12 +847,23 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       const entryDate = new Date(entry.date);
       if (entryDate > e) return false;
     }
-    if (selectTimeStampDate) {
-      const selectedDate = new Date(selectTimeStampDate);
-      const entryTimestamp = new Date(entry.timestamp);
-      if (selectedDate.toDateString() !== entryTimestamp.toDateString()) {
-        return false;
-      }
+    if (timestampStartDate && timestampEndDate) {
+      const ts = new Date(timestampStartDate);
+      ts.setHours(0, 0, 0, 0);
+      const te = new Date(timestampEndDate);
+      te.setHours(23, 59, 59, 999);
+      const entryTimestamp = entry.timestamp ? new Date(entry.timestamp) : null;
+      if (!entryTimestamp || entryTimestamp < ts || entryTimestamp > te) return false;
+    } else if (timestampStartDate) {
+      const ts = new Date(timestampStartDate);
+      ts.setHours(0, 0, 0, 0);
+      const entryTimestamp = entry.timestamp ? new Date(entry.timestamp) : null;
+      if (!entryTimestamp || entryTimestamp < ts) return false;
+    } else if (timestampEndDate) {
+      const te = new Date(timestampEndDate);
+      te.setHours(23, 59, 59, 999);
+      const entryTimestamp = entry.timestamp ? new Date(entry.timestamp) : null;
+      if (!entryTimestamp || entryTimestamp > te) return false;
     }
     if (selectDatabaseDate) {
       const [year, month, day] = selectDatabaseDate.split("-");
@@ -1221,7 +1242,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const advCol17Label = 'Activity';
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch]);
   useEffect(() => {
     if (filterScrollResetSkipRef.current) {
       filterScrollResetSkipRef.current = false;
@@ -1235,13 +1256,14 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       scroller.scrollTop = 0;
     });
   }, [
-    selectTimeStampDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName,
+    timestampStartDate, timestampEndDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName,
     selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode,
     selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy,
     startDate, endDate,
   ]);
   const clearFilters = useCallback(() => {
-    setSelectTimeStampDate('');
+    setTimestampStartDate('');
+    setTimestampEndDate('');
     setSelectDatabaseDate('');
     setSelectDatabaseContractororVendorName('');
     setSelectDatabaseProjectName('');
@@ -1398,6 +1420,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     }
   };
   const handleUpdate = async () => {
+    if (isEditSubmitting) return;
+    setIsEditSubmitting(true);
     try {
       const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
       if (currentEntry && currentEntry.not_allow_to_edit) {
@@ -1441,7 +1465,15 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             throw new Error('Upload failed');
           }
           const uploadResult = await uploadResponse.json();
-          fileUrl = uploadResult.url;
+          fileUrl = resolveFilesUploadResponseUrl(uploadResult);
+          if (!fileUrl) {
+            throw new Error('Upload succeeded but no file URL was returned');
+          }
+          setEditFormData((prev) => ({ ...prev, file_url: fileUrl }));
+          setSelectedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');
@@ -1509,27 +1541,35 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           throw new Error(errorText || 'Failed to update record');
         }
         const contentType = res.headers.get('content-type') || '';
-        let updatedRecord = null;
         if (contentType.includes('application/json')) {
-          updatedRecord = await res.json();
+          await res.json();
+        } else {
+          await res.text();
         }
         const sourceRecord = advanceData.find((e) => e.advancePortalId === id);
         const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
-        await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
-          editedBy: username,
-          branchId: activeBranchId,
-          modalPaymentData,
-          expensesEntryId,
-        });
-        if (expensesEntryId) {
-          await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+        try {
+          await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
             editedBy: username,
-            siteOptions,
-            selectedOption,
             branchId: activeBranchId,
+            modalPaymentData,
+            expensesEntryId,
           });
+        } catch (weeklyErr) {
+          console.error('Weekly payment bill sync failed after advance edit:', weeklyErr);
         }
-        return updatedRecord;
+        if (expensesEntryId) {
+          try {
+            await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+              editedBy: username,
+              siteOptions,
+              selectedOption,
+              branchId: activeBranchId,
+            });
+          } catch (expenseErr) {
+            console.error('Linked expense sync failed after advance edit:', expenseErr);
+          }
+        }
       };
       const setAllowToEdit = async (id, allow) => {
         try {
@@ -1551,7 +1591,11 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             item.advancePortalId === editingId ? { ...item, ...payload } : item
           )
         );
-        await fetchAdvanceData();
+        try {
+          await fetchAdvanceData();
+        } catch (refreshErr) {
+          console.error('Failed to refresh advance data after edit:', refreshErr);
+        }
         setShowEditPaymentModal(false);
         pendingAdvanceUpdateRef.current = null;
         setIsEditModalOpen(false);
@@ -1559,6 +1603,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+        alert('Updated successfully!');
       };
       if (editFormData.type === 'Transfer') {
         const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
@@ -1644,15 +1689,22 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         await finishEditSuccess(payload);
         return;
       }
-      await fetchAdvanceData();
+      try {
+        await fetchAdvanceData();
+      } catch (refreshErr) {
+        console.error('Failed to refresh advance data after edit:', refreshErr);
+      }
       setIsEditModalOpen(false);
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      alert('Updated successfully!');
     } catch (err) {
       console.error('Update error:', err);
-      alert('Failed to submit edit request. Please try again.');
+      alert(err?.message || 'Failed to submit edit request. Please try again.');
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
   const handleEditPaymentModalSubmit = async () => {
@@ -1681,19 +1733,27 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       }
       const sourceRecord = advanceData.find((e) => e.advancePortalId === editingId);
       const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
-      await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
-        editedBy: username,
-        branchId: activeBranchId,
-        modalPaymentData: editPaymentModalData,
-        expensesEntryId,
-      });
-      if (expensesEntryId) {
-        await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+      try {
+        await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
           editedBy: username,
-          siteOptions,
-          selectedOption,
           branchId: activeBranchId,
+          modalPaymentData: editPaymentModalData,
+          expensesEntryId,
         });
+      } catch (weeklyErr) {
+        console.error('Weekly payment bill sync failed after advance edit:', weeklyErr);
+      }
+      if (expensesEntryId) {
+        try {
+          await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+            editedBy: username,
+            siteOptions,
+            selectedOption,
+            branchId: activeBranchId,
+          });
+        } catch (expenseErr) {
+          console.error('Linked expense sync failed after advance edit:', expenseErr);
+        }
       }
       try {
         const allowRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${editingId}?allow=${false}`, {
@@ -1711,7 +1771,11 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           item.advancePortalId === editingId ? { ...item, ...payload } : item
         )
       );
-      await fetchAdvanceData();
+      try {
+        await fetchAdvanceData();
+      } catch (refreshErr) {
+        console.error('Failed to refresh advance data after edit:', refreshErr);
+      }
       setShowEditPaymentModal(false);
       pendingAdvanceUpdateRef.current = null;
       setIsEditModalOpen(false);
@@ -1719,9 +1783,10 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      alert('Updated successfully!');
     } catch (err) {
       console.error('Update error:', err);
-      alert('Failed to submit edit request. Please try again.');
+      alert(err?.message || 'Failed to submit edit request. Please try again.');
     } finally {
       setIsEditPaymentSubmitting(false);
     }
@@ -1939,7 +2004,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       </div>
       <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
-          className={`text-left flex ${selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
+          className={`text-left flex ${timestampStartDate || timestampEndDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
             } mb-[12px] gap-[6px]`}>
@@ -1982,33 +2047,46 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                 className=" border rounded-md h-[34px]"
               />
             </button>
-            {(selectTimeStampDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
+            {(timestampStartDate || timestampEndDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
               <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                 {startDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Start Date: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{startDate}</span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(startDate)}</span>
                     <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {endDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">End Date: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{endDate}</span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(endDate)}</span>
                     <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
-                {selectTimeStampDate && (
+                {timestampStartDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Timestamp: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectTimeStampDate}</span>
-                    <button onClick={() => setSelectTimeStampDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    <span className="font-semibold text-[14px] truncate min-w-0">
+                      {timestampEndDate
+                        ? (timestampStartDate === timestampEndDate
+                            ? formatEdbcFilterDateDMY(timestampStartDate)
+                            : `${formatEdbcFilterDateDMY(timestampStartDate)} – ${formatEdbcFilterDateDMY(timestampEndDate)}`)
+                        : `${formatEdbcFilterDateDMY(timestampStartDate)} onwards`}
+                    </span>
+                    <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                )}
+                {timestampEndDate && !timestampStartDate && (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Timestamp until: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(timestampEndDate)}</span>
+                    <button onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
                 {selectDatabaseDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseDate}</span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDatabaseDate)}</span>
                     <button onClick={() => setSelectDatabaseDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
@@ -2229,13 +2307,14 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                   <EdbcTableFilterRow ref={filterRowRef}>
                     <EdbcTimestampFilter
                       placeholder={advCol1Label}
-                      timestampStartDate={selectTimeStampDate}
-                      timestampEndDate={selectTimeStampDate}
+                      timestampStartDate={timestampStartDate}
+                      timestampEndDate={timestampEndDate}
                       isOpen={showTimestampDatePicker}
                       onOpen={() => setShowTimestampDatePicker(true)}
                       onClose={() => setShowTimestampDatePicker(false)}
-                      onApply={(from) => {
-                        setSelectTimeStampDate(from || '');
+                      onApply={(from, to) => {
+                        setTimestampStartDate(from || '');
+                        setTimestampEndDate(to || '');
                         setShowTimestampDatePicker(false);
                       }}
                     />
@@ -2911,9 +2990,10 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                 <button
                   type="button"
                   onClick={handleUpdate}
-                  className="px-4 py-2 bg-[#BF9853] text-white rounded"
+                  disabled={isEditSubmitting}
+                  className={`px-4 py-2 rounded text-white ${isEditSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
                 >
-                  Save
+                  {isEditSubmitting ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
@@ -2982,7 +3062,7 @@ const formatDate = (dateString) => {
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   hours = hours ? String(hours).padStart(2, '0') : '12';
-  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+  return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
 };
 const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, siteOptions }) => {
   if (!show) return null;
@@ -3015,7 +3095,7 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     const ampm = hours >= 12 ? "PM" : "AM";
     hours = hours % 12 || 12;
     hours = String(hours).padStart(2, "0");
-    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+    return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
   };
   const formatDisplayValue = (value, field) => {
     if (
@@ -3032,7 +3112,12 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
       return value ? Number(value).toLocaleString("en-IN") : "-";
     }
     if (field.label === "Date") {
-      return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+      if (!value) return "-";
+      const date = new Date(value);
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
     }
     return value ?? "-";
   };

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import Filter from '../Images/filter (3).png';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 
-const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
+const ClaimPaymentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true }) => {
   const [claimDataList, setClaimDataList] = useState([]);
   const [siteOption, setSiteOption] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
@@ -24,7 +25,7 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-  useEffect(() => {
+  const fetchClaimDataList = () => {
     fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
       .then((response) => {
         if (!response.ok) {
@@ -39,7 +40,14 @@ const ClaimPaymentDatabase = ({ username, userRoles = [] }) => {
       .catch((err) => {
         console.error(err.message);
       });
+  };
+
+  useEffect(() => {
+    fetchClaimDataList();
   }, []);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchClaimDataList);
+
   useEffect(() => {
     const fetchSites = async () => {
       try {

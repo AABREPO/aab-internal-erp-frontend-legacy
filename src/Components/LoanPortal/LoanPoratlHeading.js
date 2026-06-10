@@ -35,8 +35,14 @@ const getInitialLoanTab = (username) => {
 };
 
 const LoanPoratlHeading = ({ username, userRoles = [] }) => {
-    const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
     const isAdminLoan = username === 'Mahalingam M' || username === 'Admin';
+    const allowedTabs = isAdminLoan
+        ? LOAN_MODULE_TABS
+        : LOAN_MODULE_TABS.filter((tab) => tab !== 'loandatabase');
+
+    const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
     useEffect(() => {
         const handleResize = () => {
@@ -48,8 +54,13 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
         };
     }, []);
 
-    const [activeTab, setActiveTab] = useState(() => getInitialLoanTab(username));
-    const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialLoanTab(username)]));
+    const initialTab = getInitialLoanTab(username);
+    const [activeTab, setActiveTab] = useState(() => initialTab);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+
+    useEffect(() => {
+        setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }, [activeTab]);
 
     useEffect(() => {
         if (activeTab === 'loandatabase' && !isAdminLoan) {
@@ -59,9 +70,10 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
         }
     }, [activeTab, isAdminLoan]);
 
-    useEffect(() => {
-        setVisitedTabs((prev) => new Set(prev).add(activeTab));
-    }, [activeTab]);
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        bumpRefresh();
+    };
 
     if (isMobile) {
         const storedUser = localStorage.getItem('user');
@@ -84,39 +96,39 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
             <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'loanportal' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loanportal')}
+                    onClick={() => handleTabChange('loanportal')}
                 >
                     Loan
                 </h2>
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'loantableview' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loantableview')}
+                    onClick={() => handleTabChange('loantableview')}
                 >
                     Table View
                 </h2>
                 {isAdminLoan && (
                     <h2
                         className={`link whitespace-nowrap ${activeTab === 'loandatabase' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('loandatabase')}
+                        onClick={() => handleTabChange('loandatabase')}
                     >
                         Database
                     </h2>
                 )}
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'loanaddinput' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loanaddinput')}
+                    onClick={() => handleTabChange('loanaddinput')}
                 >
                     Add Input
                 </h2>
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'loanreport' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loanreport')}
+                    onClick={() => handleTabChange('loanreport')}
                 >
                     Report
                 </h2>
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'loansummary' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('loansummary')}
+                    onClick={() => handleTabChange('loansummary')}
                 >
                     Summary
                 </h2>
@@ -124,17 +136,17 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
             <div className="content">
                 {visitedTabs.has('loanportal') && (
                     <div className={activeTab === 'loanportal' ? '' : 'hidden'}>
-                        <LoanPortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />
+                        <LoanPortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'loanportal'} />
                     </div>
                 )}
                 {visitedTabs.has('loantableview') && (
                     <div className={activeTab === 'loantableview' ? '' : 'hidden'}>
-                        <LoanTableview username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />
+                        <LoanTableview username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'loantableview'} />
                     </div>
                 )}
                 {isAdminLoan && visitedTabs.has('loandatabase') && (
                     <div className={activeTab === 'loandatabase' ? '' : 'hidden'}>
-                        <LoanDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />
+                        <LoanDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'loandatabase'} />
                     </div>
                 )}
                 {visitedTabs.has('loanaddinput') && (
@@ -144,12 +156,12 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
                 )}
                 {visitedTabs.has('loanreport') && (
                     <div className={activeTab === 'loanreport' ? '' : 'hidden'}>
-                        <LoanReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />
+                        <LoanReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
                     </div>
                 )}
                 {visitedTabs.has('loansummary') && (
                     <div className={activeTab === 'loansummary' ? '' : 'hidden'}>
-                        <LoanSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} />
+                        <LoanSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'loansummary'} />
                     </div>
                 )}
             </div>

@@ -1605,6 +1605,30 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 			const discountToSend = !discountSubmitted ? (Number(discount) || 0) : 0;
 			const amountNum = parseFloat(paymentForm.amount) || 0;
 			const isCarryForwardMode = paymentForm.mode === 'Carry Forward';
+			const vendorId = selectedVerifyBill?.vendor_id ?? selectedVerifyBill?.vendorId ?? null;
+			const isoDate = toYyyyMmDd(paymentForm.date);
+			// Match desktop PendingBill.js obligation / excess / carry-forward calculations
+			const existingRows = Array.isArray(bankDetails) ? bankDetails : [];
+			const currentReceivedAmount = existingRows.reduce(
+				(sum, p) => sum + (Number(p?.amount || 0) || 0) + (Number(p?.carry_forward_amount || 0) || 0),
+				0
+			);
+			const discountFromRows = existingRows.reduce((sum, p) => sum + (Number(p?.discount_amount || 0) || 0), 0);
+			const billDiscount = discountFromRows > 0 ? discountFromRows : discountToSend;
+			const totalRequiredToSettle = Math.max(0, actualAmount - billDiscount);
+			const obligationBeforeSession = Math.max(0, totalRequiredToSettle - currentReceivedAmount);
+			const totalPaymentAmount = isCarryForwardMode ? 0 : amountNum;
+			const totalCfRequested = isCarryForwardMode
+				? amountNum
+				: (useCarryForward
+					? Math.min(Number(carryForwardAmount || 0), Math.max(0, obligationBeforeSession - totalPaymentAmount))
+					: 0);
+			const carryForwardToUse = Math.min(
+				totalCfRequested,
+				Math.max(0, obligationBeforeSession - totalPaymentAmount)
+			);
+			const totalContributionThisSession = totalPaymentAmount + totalCfRequested;
+			const excessAmount = Math.max(0, totalContributionThisSession - obligationBeforeSession);
 			const paymentData = {
 				vendor_payments_tracker_id: trackerId,
 				date: toYyyyMmDd(paymentForm.date),
@@ -1643,30 +1667,6 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 			if (!res.ok) throw new Error(`Failed to save payment details: ${res.statusText}`);
 			const savedPaymentDetail = await res.json().catch(() => ({}));
 			// Also send to respective APIs based on mode (same as desktop PendingBill.js)
-			const vendorId = selectedVerifyBill?.vendor_id ?? selectedVerifyBill?.vendorId ?? null;
-			const isoDate = toYyyyMmDd(paymentForm.date);
-			// For Carry Forward payments: also write a vendor carry-forward "bill_amount" row to consume balance.
-			if (isCarryForwardMode && vendorId != null && amountNum > 0) {
-				const cfConsumePayload = {
-					date: isoDate,
-					created_at: new Date().toISOString(),
-					vendor_id: vendorId,
-					amount: 0,
-					bill_amount: amountNum,
-					refund_amount: 0,
-					vendor_payment_tracker_id: trackerId,
-					branch_id: activeBranchId
-				};
-				try {
-					await fetchWithBranch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify(cfConsumePayload)
-					});
-				} catch {
-					// ignore; main payment is already saved
-				}
-			}
 			if (paymentForm.mode !== 'Cash' && paymentForm.mode !== 'Carry Forward') {
 				const weeklyPaymentBillPayload = {
 					date: isoDate,
@@ -1735,6 +1735,50 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 					});
 				} catch {
 					// ignore (desktop logs only)
+				}
+			}
+			// Bill Payment carry forward: consume only the amount applied toward this bill
+			if (carryForwardToUse > 0 && vendorId != null) {
+				try {
+					const carryForwardPayload = {
+						type: "Bill Payment",
+						date: isoDate,
+						vendor_id: vendorId,
+						payment_mode: "Carry Forward",
+						amount: 0,
+						bill_amount: carryForwardToUse,
+						refund_amount: 0,
+						branch_id: activeBranchId
+					};
+					await fetchWithBranch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(carryForwardPayload)
+					});
+				} catch {
+					// ignore; main payment is already saved
+				}
+			}
+			// Handle excess amount: if payment total exceeds actual amount needed
+			if (excessAmount > 0 && vendorId != null) {
+				try {
+					const excessAmountPayload = {
+						type: "Extra amount",
+						date: isoDate,
+						vendor_id: vendorId,
+						payment_mode: "",
+						amount: excessAmount,
+						bill_amount: 0,
+						refund_amount: 0,
+						branch_id: activeBranchId
+					};
+					await fetchWithBranch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(excessAmountPayload)
+					});
+				} catch {
+					// ignore; main payment is already saved
 				}
 			}
 			// Refresh carry forward availability (desktop fetchCarryForwardData)

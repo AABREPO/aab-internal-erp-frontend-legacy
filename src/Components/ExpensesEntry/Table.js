@@ -267,6 +267,7 @@ export function buildEntryCheckTableContext({
 }
 
 export function buildTableViewExpenseTableContext({
+    fieldLabels,
     currentItems,
     showFilters,
     filterRowRef,
@@ -304,6 +305,9 @@ export function buildTableViewExpenseTableContext({
     branchFilterOptions,
     selectedBranch,
     setSelectedBranch,
+    enteredByOptions = [],
+    selectedEnteredBy = '',
+    setSelectedEnteredBy = noop,
     enoOptions,
     selectedEno,
     setSelectedEno,
@@ -322,6 +326,7 @@ export function buildTableViewExpenseTableContext({
     billArrivalFilterRef,
 }) {
     return {
+        fieldLabels,
         currentItems,
         showFilters,
         filterRowRef,
@@ -368,9 +373,9 @@ export function buildTableViewExpenseTableContext({
         branchFilterOptions,
         selectedBranch,
         setSelectedBranch,
-        enteredByOptions: [],
-        selectedEnteredBy: '',
-        setSelectedEnteredBy: noop,
+        enteredByOptions,
+        selectedEnteredBy,
+        setSelectedEnteredBy,
         enoOptions,
         selectedEno,
         setSelectedEno,
@@ -404,28 +409,9 @@ export function Table({
     editOnlyActivityColumn = false,
 }) {
     const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
-    const dstCol1Label = 'Timestamp';
-    const dstCol2Label = 'Date';
-    const dstCol3Label = 'Project Name';
-    const dstCol4Label = 'Vendor Name';
-    const dstCol5Label = 'Contractor Name';
-    const dstCol6Label = 'Staff Name';
-    const dstCol7Label = 'Quantity';
-    const dstCol8Label = 'Amount';
-    const dstCol9Label = 'Description';
-    const dstCol10Label = 'Category';
-    const dstCol11Label = 'Machine Tools';
-    const dstCol12Label = 'A/C Type';
-    const dstCol13Label = 'Mode';
-    const dstCol14Label = 'Source From';
-    const dstCol15Label = 'Branch';
-    const dstCol16Label = 'Entered By';
-    const dstCol17Label = 'Entry No';
-    const dstCol18Label = 'Bill Arrival';
-    const dstCol19Label = 'Activity';
-    const dstCol20Label = 'File';
 
     const {
+        fieldLabels = {},
         currentItems,
         showFilters,
         filterRowRef,
@@ -508,6 +494,27 @@ export function Table({
         fetchAuditDetails,
         username,
     } = useContext(TableContext);
+
+    const dstCol1Label = 'Timestamp';
+    const dstCol2Label = fieldLabels.date ?? 'Date';
+    const dstCol3Label = fieldLabels.projectName ?? 'Project Name';
+    const dstCol4Label = fieldLabels.vendorName ?? 'Vendor Name';
+    const dstCol5Label = fieldLabels.contractorName ?? 'Contractor Name';
+    const dstCol6Label = fieldLabels.staffName ?? 'Staff Name';
+    const dstCol7Label = fieldLabels.quantity ?? 'Quantity';
+    const dstCol8Label = fieldLabels.amount ?? 'Amount';
+    const dstCol9Label = fieldLabels.description ?? 'Description';
+    const dstCol10Label = fieldLabels.category ?? 'Category';
+    const dstCol11Label = fieldLabels.machineTools ?? 'Machine Tools';
+    const dstCol12Label = fieldLabels.accountType ?? 'A/C Type';
+    const dstCol13Label = fieldLabels.mode ?? 'Mode';
+    const dstCol14Label = fieldLabels.sourceFrom ?? 'Source From';
+    const dstCol15Label = fieldLabels.branch ?? 'Branch';
+    const dstCol16Label = fieldLabels.enteredBy ?? 'Entered By';
+    const dstCol17Label = fieldLabels.entryNo ?? 'Entry No';
+    const dstCol18Label = fieldLabels.billArrival ?? 'Bill Arrival';
+    const dstCol19Label = fieldLabels.activity ?? 'Activity';
+    const dstCol20Label = fieldLabels.file ?? 'File';
 
     const activityLabel = activityColumnLabel || dstCol19Label;
     const activityTdClass = getEdbcColumnConfig(EDBC_IDS.EDBC19)?.tdClass || '';

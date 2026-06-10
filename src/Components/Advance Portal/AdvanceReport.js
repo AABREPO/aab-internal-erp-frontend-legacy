@@ -49,7 +49,7 @@ const getCurrentWeekYear = () => {
   return thursday.getFullYear();
 };
 
-const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
+const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const BLANK_VALUE = 'BLANK';
   const BLANK_LABEL = '(Blank)';
   const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
@@ -433,8 +433,9 @@ const AdvanceReport = ({ username, userRoles = [], paymentModeOptions = [], refr
 
   useEffect(() => {
     if (refreshSignal === undefined) return;
+    if (!isActive) return;
     fetchAdvanceData();
-  }, [refreshSignal, fetchAdvanceData]);
+  }, [refreshSignal, isActive, fetchAdvanceData]);
 
   useEffect(() => {
     const loadProjectAndEmployeeMasters = async () => {

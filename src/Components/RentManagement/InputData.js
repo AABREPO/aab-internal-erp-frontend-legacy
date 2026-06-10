@@ -9,6 +9,7 @@ import Select from 'react-select';
 import attach from '../Images/Attachfile.svg';
 import CreatableSelect from 'react-select/creatable';
 import axios from 'axios';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 const InputData = ({ username, userRoles = [] }) => {
   const [tenantNameSearch, setTenantNameSearch] = useState("");
   const [paymentModeSearch, setPaymentModeSearch] = useState("");
@@ -1051,6 +1052,21 @@ const InputData = ({ username, userRoles = [] }) => {
       setMessage('Error fetching tile area names.');
     }
   };
+  const refreshRentInputData = async () => {
+    await Promise.all([
+      fetchProjects(),
+      fetchProperties(),
+      fetchSiteNames(),
+      fetchPaymentModes(),
+    ]);
+    try {
+      const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
+      setTenantLinkList(response.data);
+    } catch (error) {
+      console.error('Error refreshing tenant link data:', error);
+    }
+    notifyOrbitModuleDataChanged('rent');
+  };
   const handleSubmitPaymentMode = async (e) => {
     e.preventDefault();
     const newAccountType = { modeOfPayment };
@@ -1065,7 +1081,7 @@ const InputData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Account Type saved successfully!');
         setAccountType('');
-        window.location.reload();
+        refreshRentInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -1083,7 +1099,7 @@ const InputData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           alert("Payment Mode deleted successfully!!!");
-          window.location.reload();
+          refreshRentInputData();
         } else {
           console.error("Failed to delete the Payment Mode. Status:", response.status);
           alert("Error deleting the Payment Mode. Please try again.");
@@ -1110,7 +1126,7 @@ const InputData = ({ username, userRoles = [] }) => {
         throw new Error("Failed to save property");
       }
       const data = await response.json();
-      window.location.reload();
+      refreshRentInputData();
       setNewProperty({
         propertyName: "",
         ownerDetailsList: [{ ownerName: "", fatherName: "", mobile: "", age: "", ownerAddress: "" }],
@@ -1145,7 +1161,7 @@ const InputData = ({ username, userRoles = [] }) => {
         body: JSON.stringify(editProperties),
       });
       if (response.ok) {
-        window.location.reload();
+        refreshRentInputData();
         closeEditPropertyPopup();
       } else {
         console.error('Update failed:', response.statusText);
@@ -1165,7 +1181,7 @@ const InputData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           alert("Properties are deleted successfully!!!");
-          window.location.reload();
+          refreshRentInputData();
         } else {
           console.error("Failed to delete the Properties. Status:", response.status);
           alert("Error deleting the Properties. Please try again.");
@@ -1294,7 +1310,7 @@ const InputData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           alert("Tenant Link deleted successfully!!!");
-          window.location.reload();
+          refreshRentInputData();
         } else {
           console.error("Failed to delete the Tenant Link. Status:", response.status);
           alert("Error deleting the Tenant Link. Please try again.");
@@ -1314,7 +1330,7 @@ const InputData = ({ username, userRoles = [] }) => {
         });
         if (response.ok) {
           alert("All Tenant Links have been deleted successfully.");
-          window.location.reload();
+          refreshRentInputData();
         } else {
           console.error("Failed to delete all Tenant Links. Status:", response.status);
           alert("Error deleting the Tenant Links. Please try again.");
@@ -1437,7 +1453,7 @@ const InputData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         alert("Tenant Link saved successfully!");
         closeTenantLinkPopup();
-        window.location.reload();
+        refreshRentInputData();
       } else {
         const error = await response.json();
         console.error('Save failed:', error);
@@ -1484,7 +1500,7 @@ const InputData = ({ username, userRoles = [] }) => {
       if (response.ok) {
         alert("Tenant Link updated successfully!");
         closeEditTenantLink();
-        window.location.reload();
+        refreshRentInputData();
       } else {
         const error = await response.json();
         console.error('Update failed:', error);
@@ -1507,7 +1523,7 @@ const InputData = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditPaymentMode();
-        window.location.reload();
+        refreshRentInputData();
       } else {
         console.error('Failed to update floor name');
       }

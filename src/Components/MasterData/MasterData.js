@@ -2952,6 +2952,10 @@ const MasterData = ({ username, userRoles = [] }) => {
       return;
     }
 
+    const isOnGoingProjectPdfExport =
+      exportDataType === 'project' &&
+      String(exportProjectStatus || '').trim().toLowerCase() === 'on going';
+
     const doc = new jsPDF('landscape');
     let title = 'Export List';
     if (exportDataType === 'vendor') {
@@ -2961,7 +2965,7 @@ const MasterData = ({ username, userRoles = [] }) => {
     } else if (exportDataType === 'employee') {
       title = 'Employee List';
     } else if (exportDataType === 'project') {
-      title = 'Project List';
+      title = isOnGoingProjectPdfExport ? 'On Going Project List' : 'Project List';
     } else {
       title = 'EB Service Link List';
     }
@@ -3051,62 +3055,125 @@ const MasterData = ({ username, userRoles = [] }) => {
         12: { cellWidth: 15 }
       };
     } else if (exportDataType === 'project') {
-      tableHead = [[
-        'S.No',
-        'P.ID',
-        'Project Name',
-        'Project Reference Name',
-        'Project Category',
-        'Project Type',
-        'Floor Name',
-        'Shop No',
-        'Door No',
-        'Area',
-        'EB No',
-        'Property Tax No',
-        'Water Tax No'
-      ]];
-      const uniqueProjectKeys = new Set(
-        selectedData.map(item => (item.id ?? item.projectId ?? item.projectName ?? '').toString())
-      );
-      projectCount = uniqueProjectKeys.size;
-      tableData = selectedData.flatMap(project => {
-        const propertyDetails = Array.isArray(project.propertyDetails) && project.propertyDetails.length > 0
-          ? project.propertyDetails
-          : Array.isArray(project.propertyDetailsList) && project.propertyDetailsList.length > 0
-            ? project.propertyDetailsList
-            : [null];
-        return propertyDetails.map(detail => ([
-          rowCounter++,
-          project.projectId || '',
-          project.projectName || '',
-          project.projectReferenceName || '',
-          project.projectCategory || '',
-          detail?.projectType || '',
-          detail?.floorName || '',
-          detail?.shopNo || '',
-          detail?.doorNo || '',
-          detail?.area || '',
-          detail?.ebNo || '',
-          detail?.propertyTaxNo || '',
-          detail?.waterTaxNo || ''
-        ]));
-      });
-      columnStyles = {
-        0: { cellWidth: 11 },
-        1: { cellWidth: 10 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 26 },
-        5: { cellWidth: 16 },
-        6: { cellWidth: 23 },
-        7: { cellWidth: 15 },
-        8: { cellWidth: 15 },
-        9: { cellWidth: 13 },
-        10: { cellWidth: 25 },
-        11: { cellWidth: 27 },
-        12: { cellWidth: 23 }
-      };
+      if (isOnGoingProjectPdfExport) {
+        tableHead = [[
+          'S.No',
+          'P.ID',
+          'Project Name',
+          'Project Category',
+          'Project Type',
+          'Project Engineer',
+          'Door No',
+          'Area',
+          'EB No',
+          'Branch'
+        ]];
+        const uniqueProjectKeys = new Set(
+          selectedData.map(item => (item.id ?? item.projectId ?? item.projectName ?? '').toString())
+        );
+        projectCount = uniqueProjectKeys.size;
+        tableData = selectedData.flatMap(project => {
+          const rawSeId =
+            project.siteEngineerId ??
+            project.site_engineer_id ??
+            project.siteEngineer?.id ??
+            '';
+          const siteEngineerEmp = rawSeId === '' || rawSeId == null
+            ? null
+            : employeeList.find((e) => String(e.id ?? e.employee_id ?? e.employeeId) === String(rawSeId));
+          const siteEngineerName =
+            siteEngineerEmp?.employee_name ??
+            siteEngineerEmp?.employeeName ??
+            siteEngineerEmp?.name ??
+            '';
+          const propertyDetails = Array.isArray(project.propertyDetails) && project.propertyDetails.length > 0
+            ? project.propertyDetails
+            : Array.isArray(project.propertyDetailsList) && project.propertyDetailsList.length > 0
+              ? project.propertyDetailsList
+              : [null];
+          return propertyDetails.map(detail => ([
+            rowCounter++,
+            project.projectId || '',
+            project.projectName || '',
+            project.projectCategory || '',
+            detail?.projectType || '',
+            siteEngineerName,
+            detail?.doorNo || '',
+            detail?.area || '',
+            detail?.ebNo || '',
+            project.branch || ''
+          ]));
+        });
+        columnStyles = {
+          0: { cellWidth: 11 },
+          1: { cellWidth: 10 },
+          2: { cellWidth: 70 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 28 },
+          5: { cellWidth: 28 },
+          6: { cellWidth: 15 },
+          7: { cellWidth: 13 },
+          8: { cellWidth: 30 },
+          9: { cellWidth: 30 }
+        };
+      } else {
+        tableHead = [[
+          'S.No',
+          'P.ID',
+          'Project Name',
+          'Project Reference Name',
+          'Project Category',
+          'Project Type',
+          'Floor Name',
+          'Shop No',
+          'Door No',
+          'Area',
+          'EB No',
+          'Property Tax No',
+          'Water Tax No'
+        ]];
+        const uniqueProjectKeys = new Set(
+          selectedData.map(item => (item.id ?? item.projectId ?? item.projectName ?? '').toString())
+        );
+        projectCount = uniqueProjectKeys.size;
+        tableData = selectedData.flatMap(project => {
+          const propertyDetails = Array.isArray(project.propertyDetails) && project.propertyDetails.length > 0
+            ? project.propertyDetails
+            : Array.isArray(project.propertyDetailsList) && project.propertyDetailsList.length > 0
+              ? project.propertyDetailsList
+              : [null];
+          return propertyDetails.map(detail => ([
+            rowCounter++,
+            project.projectId || '',
+            project.projectName || '',
+            project.projectReferenceName || '',
+            project.projectCategory || '',
+            detail?.projectType || '',
+            detail?.floorName || '',
+            detail?.shopNo || '',
+            detail?.doorNo || '',
+            detail?.area || '',
+            detail?.ebNo || '',
+            detail?.propertyTaxNo || '',
+            detail?.waterTaxNo || ''
+          ]));
+        });
+        columnStyles = {
+          0: { cellWidth: 11 },
+          1: { cellWidth: 10 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 26 },
+          5: { cellWidth: 16 },
+          6: { cellWidth: 23 },
+          7: { cellWidth: 15 },
+          8: { cellWidth: 15 },
+          9: { cellWidth: 13 },
+          10: { cellWidth: 25 },
+          11: { cellWidth: 27 },
+          12: { cellWidth: 23 }
+        };
+      }
     } else {
       tableHead = [[
         'Customer ID',

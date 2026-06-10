@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import remove from '../Images/Delete.svg';
 import axios from 'axios';
 import FileUpload from '../Images/file.png';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 const Tenant = () => {
   const [fullAgreementData, setFullAgreementData] = useState([]);
   const [message, setMessage] = useState('');
@@ -216,7 +217,8 @@ const Tenant = () => {
       if (!res.ok) {
         throw new Error("Failed to update URL");
       }
-      window.location.reload();
+      await fetchAgreements();
+      notifyOrbitModuleDataChanged('rent');
     } catch (err) {
       console.error(err.message);
     }

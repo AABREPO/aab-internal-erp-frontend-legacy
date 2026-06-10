@@ -34,11 +34,14 @@ const getInitialAdvanceTab = (username) => {
 };
 
 const AdvanceHeading = ({ username, userRoles = [] }) => {
+    const isAdminAdvance = username === 'Mahalingam M' || username === 'Admin';
+    const allowedTabs = isAdminAdvance
+        ? ADVANCE_MODULE_TABS
+        : ADVANCE_MODULE_TABS.filter((tab) => tab !== 'advancedatabase');
 
     const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
     const [refreshNonce, setRefreshNonce] = useState(0);
     const bumpRefresh = () => setRefreshNonce((n) => n + 1);
-    const isAdminAdvance = username === 'Mahalingam M' || username === 'Admin';
 
     useEffect(() => {
         const handleResize = () => {
@@ -50,8 +53,13 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
         };
     }, []);
 
-    const [activeTab, setActiveTab] = useState(() => getInitialAdvanceTab(username));
-    const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialAdvanceTab(username)]));
+    const initialTab = getInitialAdvanceTab(username);
+    const [activeTab, setActiveTab] = useState(() => initialTab);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+
+    useEffect(() => {
+        setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }, [activeTab]);
 
     useEffect(() => {
         if (activeTab === 'advancedatabase' && !isAdminAdvance) {
@@ -60,10 +68,6 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
             localStorage.setItem('activePaintTab', activeTab);
         }
     }, [activeTab, isAdminAdvance]);
-
-    useEffect(() => {
-        setVisitedTabs((prev) => new Set(prev).add(activeTab));
-    }, [activeTab]);
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -125,27 +129,27 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
             <div className="content">
                 {visitedTabs.has('advanceportal') && (
                     <div className={activeTab === 'advanceportal' ? '' : 'hidden'}>
-                        <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                        <AdvancePortal username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'advanceportal'} />
                     </div>
                 )}
                 {visitedTabs.has('advacetablview') && (
                     <div className={activeTab === 'advacetablview' ? '' : 'hidden'}>
-                        <AdvanceTableView username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                        <AdvanceTableView username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'advacetablview'} />
                     </div>
                 )}
                 {isAdminAdvance && visitedTabs.has('advancedatabase') && (
                     <div className={activeTab === 'advancedatabase' ? '' : 'hidden'}>
-                        <AdvanceDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                        <AdvanceDatabase username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'advancedatabase'} />
                     </div>
                 )}
                 {visitedTabs.has('advancereport') && (
                     <div className={activeTab === 'advancereport' ? '' : 'hidden'}>
-                        <AdvanceReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                        <AdvanceReport username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'advancereport'} />
                     </div>
                 )}
                 {visitedTabs.has('advancesummary') && (
                     <div className={activeTab === 'advancesummary' ? '' : 'hidden'}>
-                        <AdvanceSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} />
+                        <AdvanceSummary username={username} userRoles={userRoles} paymentModeOptions={paymentModeOptions} refreshSignal={refreshNonce} isActive={activeTab === 'advancesummary'} />
                     </div>
                 )}
             </div>

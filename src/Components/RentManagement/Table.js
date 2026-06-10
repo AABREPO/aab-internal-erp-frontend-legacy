@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
@@ -13,8 +13,15 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+    loadRentPaymentModalData,
+    syncWeeklyPaymentBillsForRentManagement,
+} from '../../utils/rentManagementWeeklyPaymentBill';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 Modal.setAppElement('#root');
-const Table = () => {
+const Table = ({ username = '', refreshSignal, isActive = true }) => {
     const [rentForms, setRentForms] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
     const [selectedDate, setSelectedDate] = useState('');
@@ -667,41 +674,51 @@ const Table = () => {
         };
         animationFrame.current = requestAnimationFrame(step);
     };
-    useEffect(() => {
+    const applyRentFormsResponse = useCallback((responseData) => {
+        const sortedExpenses = responseData.sort((a, b) => {
+            const enoA = parseInt(a.id, 10);
+            const enoB = parseInt(b.id, 10);
+            return enoB - enoA;
+        });
+        setRentForms(sortedExpenses);
+        setFilteredRentForm(sortedExpenses);
+        const uniqueEnos = [...new Set(responseData.map(rent => rent.eno))];
+        const uniqueShopNo = [...new Set(responseData.map(rent => rent.shopNo))];
+        const uniqueTenantName = [...new Set(responseData.map(rent => rent.tenantName))];
+        const uniquePaymentMode = [...new Set(responseData.map(rent => rent.paymentMode))];
+        const uniqueFormType = [...new Set(responseData.map(rent => rent.formType))];
+        const uniqueForTheMonthOf = [...new Set(responseData.map(rent => rent.forTheMonthOf))];
+        setEnoOption(uniqueEnos);
+        setShopNoOption(uniqueShopNo);
+        setTenantNameOption(uniqueTenantName);
+        setPaymentModeOption(uniquePaymentMode);
+        setFormTypeOptions(uniqueFormType);
+        uniqueForTheMonthOf.sort();
+        const formattedMonths = uniqueForTheMonthOf.map(monthStr => {
+            const [year, month] = monthStr.split('-');
+            const date = new Date(year, parseInt(month) - 1);
+            return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+        });
+        setMonthOptions(formattedMonths);
+    }, []);
+
+    const loadRentForms = useCallback(() => {
         axios
             .get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll')
-            .then((response) => {
-                const sortedExpenses = response.data.sort((a, b) => {
-                    const enoA = parseInt(a.id, 10);
-                    const enoB = parseInt(b.id, 10);
-                    return enoB - enoA;
-                });
-                setRentForms(sortedExpenses);
-                setFilteredRentForm(sortedExpenses);
-                const uniqueEnos = [...new Set(response.data.map(rent => rent.eno))];
-                const uniqueShopNo = [...new Set(response.data.map(rent => rent.shopNo))];
-                const uniqueTenantName = [...new Set(response.data.map(rent => rent.tenantName))];
-                const uniquePaymentMode = [...new Set(response.data.map(rent => rent.paymentMode))];
-                const uniqueFormType = [...new Set(response.data.map(rent => rent.formType))];
-                const uniqueForTheMonthOf = [...new Set(response.data.map(rent => rent.forTheMonthOf))];
-                setEnoOption(uniqueEnos);
-                setShopNoOption(uniqueShopNo);
-                setTenantNameOption(uniqueTenantName);
-                setPaymentModeOption(uniquePaymentMode);
-                setFormTypeOptions(uniqueFormType);
-                uniqueForTheMonthOf.sort();
-                const formattedMonths = uniqueForTheMonthOf.map(monthStr => {
-                    const [year, month] = monthStr.split('-');
-                    const date = new Date(year, parseInt(month) - 1);
-                    return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-                });
-                setMonthOptions(formattedMonths);
-                console.log(formattedMonths);
-            })
+            .then((response) => applyRentFormsResponse(response.data))
             .catch((error) => {
                 console.error('Error fetching expenses:', error);
             });
-    }, []);
+    }, [applyRentFormsResponse]);
+
+    useEffect(() => {
+        loadRentForms();
+    }, [loadRentForms]);
+
+    useOrbitPageSync('rent', loadRentForms, [loadRentForms]);
+
+    useTabRefreshSignal(refreshSignal, isActive, loadRentForms);
+
     useEffect(() => {
         const filtered = rentForms.filter(rent => {
             const matchesShopNo = shopNo ? rent.shopNo === shopNo : true;
@@ -899,22 +916,27 @@ const Table = () => {
         });
     };
 
+    const requiresRentPaymentModal = (mode) =>
+        ["GPay", "PhonePe", "Net Banking", "Cheque", "Gpay"].includes(mode);
+
+    const openRentPaymentModal = async (overrides = {}) => {
+        const defaults = {
+            date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
+            amount: rentFormData.amount || "",
+            paymentMode: overrides.paymentMode || rentFormData.paymentMode,
+        };
+        const modalData = await loadRentPaymentModalData(editId, defaults);
+        setPaymentModalData(modalData);
+        setShowPaymentModal(true);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         // Check if payment mode requires bank details
-        if (["GPay", "PhonePe", "Net Banking", "Cheque", "Gpay"].includes(rentFormData.paymentMode)) {
+        if (requiresRentPaymentModal(rentFormData.paymentMode)) {
             // Show payment modal if not already shown
             if (!showPaymentModal) {
-                setPaymentModalData({
-                    date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
-                    amount: rentFormData.amount || "",
-                    paymentMode: rentFormData.paymentMode,
-                    chequeNo: "",
-                    chequeDate: "",
-                    transactionNumber: "",
-                    accountNumber: ""
-                });
-                setShowPaymentModal(true);
+                await openRentPaymentModal();
             }
             return;
         }
@@ -960,7 +982,8 @@ const Table = () => {
             if (response.ok) {
                 alert('Rent form updated successfully!');
                 handleCancel();
-                window.location.reload();
+                loadRentForms();
+                notifyOrbitModuleDataChanged('rent');
             } else {
                 const errorMsg = await response.text();
                 alert(`Failed to update: ${errorMsg}`);
@@ -1065,49 +1088,28 @@ const Table = () => {
             // Get the updated rental form ID
             let rentalFormId = editId;
 
-            // Submit to weekly-payment-bills API
-            // Ensure cheque_date is in YYYY-MM-DD format (it's already in this format from date input)
-            const weeklyPaymentBillPayload = {
-                date: formattedPaidOnDate,
-                created_at: new Date().toISOString(),
-                contractor_id: null,
-                vendor_id: null,
-                employee_id: null,
-                project_id: projectId,
-                type: "Rent Payment",
-                bill_payment_mode: paymentModalData.paymentMode,
-                amount: parseFloat(paymentModalData.amount || amount),
-                status: true,
-                weekly_number: "",
-                rent_management_id: rentalFormId,
-                advance_portal_id: null,
-                staff_advance_portal_id: null,
-                claim_payment_id: null,
-                expenses_entry_id: null,
-                cheque_number: paymentModalData.chequeNo || null,
-                cheque_date: paymentModalData.chequeDate || null, // Already in YYYY-MM-DD format from date input
-                transaction_number: paymentModalData.transactionNumber || null,
-                account_number: paymentModalData.accountNumber || null,
-                tenant_id: tenantNameId || null,
-                tenant_complex_name: projectReferenceName || null
-            };
-
-            const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(weeklyPaymentBillPayload)
-            });
-
-            if (!weeklyResponse.ok) {
-                const errorText = await weeklyResponse.text();
-                throw new Error(`Weekly payment bills submission failed: ${errorText}`);
-            }
+            // Sync weekly-payment-bills (update existing by rent_management_id or create new)
+            await syncWeeklyPaymentBillsForRentManagement(
+                rentalFormId,
+                {
+                    date: formattedPaidOnDate,
+                    amount: parseFloat(paymentModalData.amount || amount),
+                    payment_mode: paymentModalData.paymentMode,
+                    project_id: projectId,
+                    tenant_id: tenantNameId,
+                    tenant_complex_name: projectReferenceName,
+                },
+                {
+                    editedBy: username,
+                    modalPaymentData: paymentModalData,
+                }
+            );
 
             alert('Rent form updated successfully and added to Weekly Payment Bills!');
             setShowPaymentModal(false);
             handleCancel();
-            window.location.reload();
+            loadRentForms();
+            notifyOrbitModuleDataChanged('rent');
         } catch (error) {
             console.error('Error submitting payment:', error);
             alert(`Failed to save: ${error.message}`);
@@ -1840,23 +1842,12 @@ const Table = () => {
                                         <Select
                                             name="paymentMode"
                                             value={paymentModeOptions.find(option => option.value === rentFormData.paymentMode)}
-                                            onChange={(selectedOption) => {
+                                            onChange={async (selectedOption) => {
                                                 const newPaymentMode = selectedOption?.value || '';
                                                 setRentFormData({ ...rentFormData, paymentMode: newPaymentMode });
-                                                // Check if payment mode requires bank details
-                                                if (["GPay", "PhonePe", "Net Banking", "Cheque", "Gpay"].includes(newPaymentMode)) {
-                                                    setPaymentModalData({
-                                                        date: rentFormData.paidOnDate || new Date().toISOString().split('T')[0],
-                                                        amount: rentFormData.amount || "",
-                                                        paymentMode: newPaymentMode,
-                                                        chequeNo: "",
-                                                        chequeDate: "",
-                                                        transactionNumber: "",
-                                                        accountNumber: ""
-                                                    });
-                                                    setShowPaymentModal(true);
+                                                if (requiresRentPaymentModal(newPaymentMode)) {
+                                                    await openRentPaymentModal({ paymentMode: newPaymentMode });
                                                 } else {
-                                                    // Close modal if switching to a mode that doesn't require bank details
                                                     setShowPaymentModal(false);
                                                 }
                                             }}

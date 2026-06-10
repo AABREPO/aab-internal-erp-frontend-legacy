@@ -8,16 +8,10 @@ import edit from '../Images/Edit.svg';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import { useUtilityHubTableDragScroll } from './useUtilityHubTableDragScroll';
 import {
-    buildPropertyStyleAutoFill,
     buildTenantLinksMap,
-    computePropertyStyleFilteredProjects,
     flattenPropertyStyleRows,
-    getDefaultPropertyStyleFilters,
-    getPropertyStyleFilterOptions,
-    getTenantOptionsFromFiltered,
     expandPropertyStyleRowsByVendor,
     findPaymentForServiceMonth,
-    getVendorOptionsFromFiltered,
     getUtilityHubExportYear,
 } from './utilityHubTabFilters';
 
@@ -34,6 +28,20 @@ const getTenantLinkPhone = (tenant) =>
   ).trim();
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const getDefaultPropertyFilters = () => ({
+    year: new Date().getFullYear().toString(),
+    month: MONTH_LABELS[new Date().getMonth()],
+    paymentStatus: '',
+    vendor: '',
+    service: '',
+    doorNo: '',
+    shop: '',
+    projectName: '',
+    projectType: '',
+    tenant: '',
+    occupancyStatus: '',
+});
 
 const normalizeShopNoKey = (shopNo) => {
     const raw = (shopNo ?? '').toString().trim();
@@ -66,12 +74,11 @@ const sortProjectsPropertyDetailsByShopNo = (projects) => {
 };
 
 const PropertyTab = ({ username, userRoles = [] }) => {
-    const [filters, setFilters] = useState(() => getDefaultPropertyStyleFilters(MONTH_LABELS));
+    const [filters, setFilters] = useState(getDefaultPropertyFilters);
 
     const [projects, setProjects] = useState([]);
     const [propertyTaxPayments, setPropertyTaxPayments] = useState([]);
     const [frequencyHistory, setFrequencyHistory] = useState([]);
-    const [filteredProjects, setFilteredProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(''); // Show all by default
@@ -118,7 +125,6 @@ const PropertyTab = ({ username, userRoles = [] }) => {
 
                 setProjects(sortProjectsPropertyDetailsByShopNo(visibleProjects));
                 setHiddenProjects(sortProjectsPropertyDetailsByShopNo(hiddenList));
-                setFilteredProjects(sortProjectsPropertyDetailsByShopNo(visibleProjects));
             } catch (error) {
                 console.error('Error fetching projects:', error);
                 setError('Failed to fetch projects data');
@@ -268,21 +274,22 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         return titles;
     }, [tenantShopData]);
 
-    const sortedFilteredProjects = useMemo(
-        () => sortProjectsPropertyDetailsByShopNo(filteredProjects),
-        [filteredProjects]
-    );
-
     const getServiceNo = (property) => property?.propertyTaxNo;
 
-    const propertyTaxTableRows = useMemo(() => {
-        const rows = flattenPropertyStyleRows(sortedFilteredProjects, getServiceNo, comparePropertyShopNoAsc);
-        return expandPropertyStyleRowsByVendor(rows, propertyTaxPayments, getServiceNo, {
-            year: filters.year,
-            month: filters.month,
-            vendorFilter: filters.vendor,
-        });
-    }, [sortedFilteredProjects, propertyTaxPayments, filters.year, filters.month, filters.vendor]);
+    const tableProjects = useMemo(
+        () =>
+            sortProjectsPropertyDetailsByShopNo(
+                (projects || [])
+                    .map((project) => ({
+                        ...project,
+                        propertyDetails: (project.propertyDetails || []).filter(
+                            (property) => property?.propertyTaxNo && String(property.propertyTaxNo).trim() !== ''
+                        ),
+                    }))
+                    .filter((project) => (project.propertyDetails || []).length > 0)
+            ),
+        [projects]
+    );
 
     const hiddenPropertyTaxTableRows = useMemo(() => {
         const rows = flattenPropertyStyleRows(
@@ -293,97 +300,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         return expandPropertyStyleRowsByVendor(rows, propertyTaxPayments, getServiceNo, {
             year: filters.year,
             month: filters.month,
-            vendorFilter: filters.vendor,
+            vendorFilter: '',
         });
-    }, [hiddenProjects, propertyTaxPayments, filters.year, filters.month, filters.vendor]);
+    }, [hiddenProjects, propertyTaxPayments, filters.year, filters.month]);
 
     const tenantLinksByPropertyId = useMemo(() => buildTenantLinksMap(tenantShopData), [tenantShopData]);
     const getLinksForProperty = (propertyId) => tenantLinksByPropertyId.get(String(propertyId)) || [];
-
-    const matchesPaymentFiltersFor = (property, filterState) => {
-        const selectedMonth = filterState.month;
-        const selectedStatus = filterState.paymentStatus;
-        if (!selectedMonth && !selectedStatus) return true;
-        const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(
-                property.propertyTaxNo,
-                month,
-                property.id,
-                filterState.year,
-                filterState.vendor || undefined
-            );
-            const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
-            const isUnpaid = paymentData.amount === '0';
-            if (selectedStatus === 'Paid') return isPaid;
-            if (selectedStatus === 'Unpaid') return isUnpaid;
-            return true;
-        };
-        if (selectedMonth) return evaluateMonth(selectedMonth);
-        return monthLabels.some((month) => evaluateMonth(month));
-    };
-
-    const matchesPaymentFilters = (property) => matchesPaymentFiltersFor(property, filters);
-
-    const computeFiltered = (filterState, excludeField = null) =>
-        computePropertyStyleFilteredProjects({
-            projects,
-            selectedCategory,
-            filterState,
-            excludeField,
-            getServiceNo,
-            getLinksForProperty,
-            matchesPaymentFiltersFor,
-            payments: propertyTaxPayments,
-            comparePropertyShopNoAsc,
-        });
-
-    useEffect(() => {
-        setFilteredProjects(computeFiltered(filters));
-    }, [filters, projects, selectedCategory, propertyTaxPayments, frequencyHistory, tenantLinksByPropertyId]);
-
-    const handleFilterChange = (filterType, selectedOption) => {
-        setFilters((prev) => {
-            const next = { ...prev, [filterType]: selectedOption ? selectedOption.value : '' };
-            const rows = flattenPropertyStyleRows(computeFiltered(next), getServiceNo, comparePropertyShopNoAsc);
-            if (rows.length === 1) {
-                return {
-                    ...next,
-                    ...buildPropertyStyleAutoFill({
-                        row: rows[0],
-                        filterState: next,
-                        changedField: filterType,
-                        getServiceNo,
-                        getLinksForProperty,
-                        getPaymentData,
-                        payments: propertyTaxPayments,
-                        monthLabels: MONTH_LABELS,
-                    }),
-                };
-            }
-            return next;
-        });
-    };
-
-    const clearFilters = () => setFilters(getDefaultPropertyStyleFilters(MONTH_LABELS));
-
-    const vendorFilterOptions = useMemo(
-        () => getVendorOptionsFromFiltered(
-            filters,
-            computeFiltered,
-            (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc),
-            propertyTaxPayments,
-            projects
-        ),
-        [filters, projects, selectedCategory, propertyTaxPayments, tenantLinksByPropertyId]
-    );
-
-    const tenantFilterOptions = useMemo(
-        () => getTenantOptionsFromFiltered(filters, computeFiltered, (list) => flattenPropertyStyleRows(list, getServiceNo, comparePropertyShopNoAsc), getLinksForProperty),
-        [filters, projects, selectedCategory, propertyTaxPayments, tenantLinksByPropertyId]
-    );
-
-    const getFilterOptions = (fieldKey, excludeField) =>
-        getPropertyStyleFilterOptions(filters, fieldKey, excludeField, computeFiltered, getServiceNo);
 
     // Custom styles for react-select
     const customSelectStyles = {
@@ -644,10 +566,187 @@ const PropertyTab = ({ username, userRoles = [] }) => {
         return unpaidCount;
     };
 
+    const propertyTaxTableRows = useMemo(() => {
+        let rows = flattenPropertyStyleRows(tableProjects, getServiceNo, comparePropertyShopNoAsc);
+
+        const selectedService = String(filters.service ?? '').trim();
+        if (selectedService) {
+            rows = rows.filter(({ property }) => String(getServiceNo(property) ?? '').trim() === selectedService);
+        }
+
+        const selectedDoorNo = String(filters.doorNo ?? '').trim();
+        if (selectedDoorNo) {
+            rows = rows.filter(({ property }) => String(property?.doorNo ?? '').trim() === selectedDoorNo);
+        }
+
+        const selectedShop = String(filters.shop ?? '').trim();
+        if (selectedShop) {
+            rows = rows.filter(({ property }) => String(property?.shopNo ?? '').trim() === selectedShop);
+        }
+
+        const selectedProjectName = String(filters.projectName ?? '').trim();
+        if (selectedProjectName) {
+            rows = rows.filter(({ project }) => String(project?.projectName ?? '').trim() === selectedProjectName);
+        }
+
+        const selectedProjectType = String(filters.projectType ?? '').trim();
+        if (selectedProjectType) {
+            rows = rows.filter(({ property }) => String(property?.projectType ?? '').trim() === selectedProjectType);
+        }
+
+        if (selectedCategory) {
+            rows = rows.filter(({ project }) => String(project?.projectCategory ?? '').trim() === selectedCategory);
+        }
+
+        const selectedTenant = String(filters.tenant ?? '').trim();
+        if (selectedTenant) {
+            rows = rows.filter(({ property }) =>
+                getLinksForProperty(property.id).some(
+                    (link) => String(link?.tenantName ?? '').trim() === selectedTenant
+                )
+            );
+        }
+
+        const occupancyStatus = String(filters.occupancyStatus ?? '').trim();
+        if (occupancyStatus) {
+            rows = rows.filter(({ property }) => {
+                const links = getLinksForProperty(property.id);
+                const hasActive = links.some((link) => !link?.shopClosureDate);
+                const hasVacated = links.some((link) => !!link?.shopClosureDate);
+                if (occupancyStatus === 'occupied') return hasActive;
+                if (occupancyStatus === 'vacated') return !hasActive && hasVacated;
+                return true;
+            });
+        }
+
+        const paymentStatus = String(filters.paymentStatus ?? '').trim();
+        if (paymentStatus) {
+            const filterYear = filters.year || new Date().getFullYear().toString();
+            const filterMonth = String(filters.month ?? '').trim();
+
+            const rowMatchesPaymentStatus = (property) => {
+                const checkMonth = (month) => {
+                    const paymentData = getPaymentData(property.propertyTaxNo, month, property.id, filterYear);
+                    const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+                    const isUnpaid = paymentData.amount === '0';
+                    if (paymentStatus === 'Paid') return isPaid;
+                    if (paymentStatus === 'Unpaid') return isUnpaid;
+                    return true;
+                };
+                if (filterMonth) return checkMonth(filterMonth);
+                return monthLabels.some((month) => checkMonth(month));
+            };
+
+            rows = rows.filter(({ property }) => rowMatchesPaymentStatus(property));
+        }
+
+        return rows.map((row, index) => ({
+            ...row,
+            rowKey: `${row.project?.id ?? 'p'}-${row.property?.id ?? index}`,
+        }));
+    }, [
+        tableProjects,
+        filters.service,
+        filters.doorNo,
+        filters.shop,
+        filters.projectName,
+        filters.projectType,
+        filters.tenant,
+        filters.occupancyStatus,
+        selectedCategory,
+        filters.paymentStatus,
+        filters.month,
+        filters.year,
+        propertyTaxPayments,
+        frequencyHistory,
+        tenantLinksByPropertyId,
+    ]);
+
+    const MONTH_NUMBER_MAP = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+        'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
+        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    };
+
+    const flattenProjectsToPropertyRows = (projectList) => {
+        const rows = (projectList || []).flatMap((project) =>
+            (project.propertyDetails || [])
+                .filter((property) => property?.propertyTaxNo && property.propertyTaxNo.trim() !== '')
+                .map((property) => ({ project, property }))
+        );
+        rows.sort((a, b) => comparePropertyShopNoAsc(a.property, b.property));
+        return rows;
+    };
+
+    const handleFilterChange = (filterType, selectedOption) => {
+        setFilters((prev) => ({
+            ...prev,
+            [filterType]: selectedOption ? selectedOption.value : '',
+        }));
+    };
+
+    const clearFilters = () => {
+        setFilters(getDefaultPropertyFilters());
+        setSelectedCategory('');
+    };
+
+    const getFilterOptions = (fieldKey) => {
+        const values = new Set();
+        tableProjects.forEach((project) => {
+            if (fieldKey === 'projectName' && project.projectName) {
+                values.add(String(project.projectName));
+            } else {
+                (project.propertyDetails || []).forEach((property) => {
+                    if (fieldKey === 'doorNo' && property.doorNo) values.add(String(property.doorNo));
+                    if (fieldKey === 'shop' && property.shopNo) values.add(String(property.shopNo));
+                    if (fieldKey === 'projectType' && property.projectType) values.add(String(property.projectType));
+                    if (fieldKey === 'serviceNo' && getServiceNo(property)) values.add(String(getServiceNo(property)));
+                });
+            }
+        });
+        return Array.from(values).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((value) => ({
+            value,
+            label: value,
+        }));
+    };
+
+    const vendorFilterOptions = useMemo(() => {
+        const rows = flattenProjectsToPropertyRows(tableProjects);
+        const year = filters.year || new Date().getFullYear().toString();
+        const monthNumber = filters.month ? MONTH_NUMBER_MAP[filters.month] : null;
+        const yearMonth = monthNumber ? `${year}-${monthNumber}` : null;
+        const vendors = new Set();
+        rows.forEach(({ property }) => {
+            const serviceNo = getServiceNo(property);
+            if (!serviceNo) return;
+            const paymentsForService = propertyTaxPayments.filter((p) => p?.utilityTypeNumber === serviceNo);
+            const scoped = yearMonth
+                ? paymentsForService.filter((p) => p?.utilityForTheMonth === yearMonth)
+                : paymentsForService.filter((p) => typeof p?.utilityForTheMonth === 'string' && p.utilityForTheMonth.startsWith(`${year}-`));
+            scoped.forEach((p) => {
+                const v = p?.vendorName ?? p?.vendor ?? p?.vendor_name ?? '';
+                if (v) vendors.add(String(v));
+            });
+        });
+        return Array.from(vendors).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
+    }, [tableProjects, filters.year, filters.month, propertyTaxPayments]);
+
+    const tenantFilterOptions = useMemo(() => {
+        const rows = flattenProjectsToPropertyRows(tableProjects);
+        const names = new Set();
+        rows.forEach(({ property }) => {
+            getLinksForProperty(property.id).forEach((l) => {
+                const name = (l.tenantName || '').trim();
+                if (name) names.add(name);
+            });
+        });
+        return Array.from(names).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
+    }, [tableProjects, tenantLinksByPropertyId]);
+
     const resolveExportYear = () => getUtilityHubExportYear(filters);
 
     const buildExportRows = (exportYear = resolveExportYear()) =>
-        propertyTaxTableRows.map(({ project, property, rowVendor }, index) => {
+        propertyTaxTableRows.map(({ project, property }, index) => {
             const rowNumber = index + 1;
             const row = {
                 slNo: rowNumber,
@@ -664,13 +763,12 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                     property.propertyTaxNo,
                     month,
                     property.id,
-                    exportYear,
-                    rowVendor
+                    exportYear
                 );
                 row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
             });
 
-            row.unpaid = getUnpaidCount(property.propertyTaxNo, property.id, rowVendor);
+            row.unpaid = getUnpaidCount(property.propertyTaxNo, property.id);
             return row;
         });
 
@@ -1001,7 +1099,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Service</label>
                             <Select
-                                options={getFilterOptions('serviceNo', 'service')}
+                                options={getFilterOptions('serviceNo')}
                                 value={filters.service ? { value: filters.service, label: filters.service } : null}
                                 onChange={(selectedOption) => handleFilterChange('service', selectedOption)}
                                 placeholder="Select Service No"
@@ -1019,7 +1117,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Door No</label>
                             <Select
-                                options={getFilterOptions('doorNo', 'doorNo')}
+                                options={getFilterOptions('doorNo')}
                                 value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
                                 onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
                                 placeholder="Select Door No"
@@ -1037,7 +1135,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Shop</label>
                             <Select
-                                options={getFilterOptions('shop', 'shop')}
+                                options={getFilterOptions('shop')}
                                 value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
                                 onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
                                 placeholder="Select Shop"
@@ -1055,7 +1153,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Name</label>
                             <Select
-                                options={getFilterOptions('projectName', 'projectName')}
+                                options={getFilterOptions('projectName')}
                                 value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectName', selectedOption)}
                                 placeholder="Select Project"
@@ -1073,7 +1171,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Type</label>
                             <Select
-                                options={getFilterOptions('projectType', 'projectType')}
+                                options={getFilterOptions('projectType')}
                                 value={filters.projectType ? { value: filters.projectType, label: filters.projectType } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectType', selectedOption)}
                                 placeholder="Select Project Type"
@@ -1254,7 +1352,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        propertyTaxTableRows.map(({ project, property, rowVendor, rowKey }, index) => {
+                                        propertyTaxTableRows.map(({ project, property, rowKey }, index) => {
                                                     return (
                                                         <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>
@@ -1290,7 +1388,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                                                 {property.propertyTaxNo}
                                                             </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
-                                                                const paymentData = getPaymentData(property.propertyTaxNo, month, property.id, undefined, rowVendor);
+                                                                const paymentData = getPaymentData(property.propertyTaxNo, month, property.id, undefined);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
                                                                 const isNotRequired = paymentData.isNotRequired;
                                                                 return (
@@ -1314,7 +1412,7 @@ const PropertyTab = ({ username, userRoles = [] }) => {
                                                             })}
                                                             <td className="px-4 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
-                                                                    {getUnpaidCount(property.propertyTaxNo, property.id, rowVendor)}
+                                                                    {getUnpaidCount(property.propertyTaxNo, property.id)}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-2">

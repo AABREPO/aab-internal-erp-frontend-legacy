@@ -12,7 +12,9 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
-const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -384,6 +386,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
     setFilteredTableData([]);
     fetchRecords();
   }, [fetchRecords]);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchRecords);
 
   // Filter table data whenever tableData, empName, or purpose changes
   useEffect(() => {
@@ -766,6 +770,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       }
       resetForm();
       await fetchRecords();
+      notifyOrbitModuleDataChanged('staffadvance');
     } catch (error) {
       console.error('Error saving record:', error);
       alert('Error saving data');
@@ -1297,6 +1302,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [] }) => 
       });
       setIsEditModalOpen(false);
       await fetchRecords();
+      notifyOrbitModuleDataChanged('staffadvance');
     } catch (err) {
       console.error('Error updating record:', err);
       alert('Error updating record');

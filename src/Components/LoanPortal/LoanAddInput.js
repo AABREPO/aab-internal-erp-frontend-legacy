@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
 import cross from '../Images/cross.png';
@@ -78,7 +79,8 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 alert("Loan Type deleted successfully!!!");
-                window.location.reload();
+                await fetchLoanTypes();
+                notifyOrbitModuleDataChanged('loan');
             } else {
                 console.error("Failed to delete the Loan Type. Status:", response.status);
                 alert("Error deleting the Loan Type. Please try again.");
@@ -103,7 +105,8 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
             if (response.ok) {
                 setMessage('Loan Type saved successfully!');
                 setLoanType('');
-                window.location.reload();
+                await fetchLoanTypes();
+                notifyOrbitModuleDataChanged('loan');
             } else {
                 setMessage('Error saving loan type.');
             }
@@ -125,7 +128,8 @@ const LoanAddInput = ({ username, userRoles = [] }) => {
             });
             if (response.ok) {
                 closeEditLoanTypePopup();
-                window.location.reload();
+                await fetchLoanTypes();
+                notifyOrbitModuleDataChanged('loan');
             } else {
                 console.error('Failed to update loan type');
             }

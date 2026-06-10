@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios from 'axios';
 import Edit from '../Images/Edit.svg'
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import RentForm from './Form';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+
+const DASHBOARD_REFRESH_MS = 60_000;
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const Dashboard = () => {
+const Dashboard = ({ refreshSignal, isActive = true }) => {
     const getCurrentMonth = () => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
@@ -176,10 +180,7 @@ const Dashboard = () => {
             console.error('Error:', error);
         }
     };
-    useEffect(() => {
-        fetchRentForms();
-    }, []);
-    const fetchRentForms = async () => {
+    const loadRentForms = useCallback(async () => {
         try {
             const response = await axios.get('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');
             const list = Array.isArray(response.data) ? response.data : [];
@@ -188,43 +189,16 @@ const Dashboard = () => {
         } catch (error) {
             console.error('Error fetching rental data:', error);
         }
-    };
-
-    const openRentFormPopupForUnpaidMonth = (shop, monthIdx) => {
-        if (!shop || monthIdx == null) return;
-        const monthStr = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
-        const monthlyRent =
-            shopInfoMap?.[shop.shopNo]?.monthlyRent ??
-            shop.monthlyRent ??
-            '';
-        try {
-            sessionStorage.setItem('selectedRentType', JSON.stringify('Rent'));
-            sessionStorage.setItem('selectedMonth', JSON.stringify(monthStr));
-            sessionStorage.setItem('formShopNo', JSON.stringify(shop.shopNo));
-            sessionStorage.setItem('formTenantName', JSON.stringify(shop.tenantName));
-            sessionStorage.setItem('amount', JSON.stringify(String(monthlyRent || '')));
-            sessionStorage.setItem('calculatedRent', JSON.stringify(String(monthlyRent || '')));
-            sessionStorage.setItem('paidOnDate', JSON.stringify(new Date().toISOString().split('T')[0]));
-            sessionStorage.setItem('formPaymentMode', JSON.stringify(''));
-            sessionStorage.setItem('closureDate', JSON.stringify(''));
-        } catch (e) {
-            console.error('Failed to set rent form prefill', e);
-        }
-        setShowRentFormPopup(true);
-    };
-    useEffect(() => {
-        if (projects.length > 0) {
-            fetchTenants();
-        }
-    }, [projects]);
-    const fetchTenants = async () => {
+    }, []);
+    const loadTenants = useCallback(async (projectList = projects) => {
+        if (!Array.isArray(projectList) || projectList.length === 0) return;
         try {
             const response = await fetch('https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll');
             if (response.ok) {
                 const data = await response.json();
                 setTenantShopData(data);
                 const shopNoIdToShopNoMap = {};
-                projects
+                projectList
                     .filter(project => project.projectReferenceName)
                     .forEach(project => {
                         const propertyDetailsArray = Array.isArray(project.propertyDetails)
@@ -260,6 +234,50 @@ const Dashboard = () => {
         } catch (error) {
             console.error('Error:', error);
         }
+    }, [projects]);
+    const refreshDashboardData = useCallback(async () => {
+        await Promise.all([loadRentForms(), loadTenants()]);
+    }, [loadRentForms, loadTenants]);
+    useEffect(() => {
+        loadRentForms();
+    }, [loadRentForms]);
+    useEffect(() => {
+        if (projects.length > 0) {
+            loadTenants(projects);
+        }
+    }, [projects, loadTenants]);
+    useOrbitPageSync('rent', refreshDashboardData, [refreshDashboardData]);
+    useTabRefreshSignal(refreshSignal, isActive, refreshDashboardData);
+    useEffect(() => {
+        if (!isActive) return undefined;
+        refreshDashboardData();
+        const intervalId = window.setInterval(() => {
+            refreshDashboardData();
+        }, DASHBOARD_REFRESH_MS);
+        return () => window.clearInterval(intervalId);
+    }, [isActive, refreshDashboardData]);
+
+    const openRentFormPopupForUnpaidMonth = (shop, monthIdx) => {
+        if (!shop || monthIdx == null) return;
+        const monthStr = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
+        const monthlyRent =
+            shopInfoMap?.[shop.shopNo]?.monthlyRent ??
+            shop.monthlyRent ??
+            '';
+        try {
+            sessionStorage.setItem('selectedRentType', JSON.stringify('Rent'));
+            sessionStorage.setItem('selectedMonth', JSON.stringify(monthStr));
+            sessionStorage.setItem('formShopNo', JSON.stringify(shop.shopNo));
+            sessionStorage.setItem('formTenantName', JSON.stringify(shop.tenantName));
+            sessionStorage.setItem('amount', JSON.stringify(String(monthlyRent || '')));
+            sessionStorage.setItem('calculatedRent', JSON.stringify(String(monthlyRent || '')));
+            sessionStorage.setItem('paidOnDate', JSON.stringify(new Date().toISOString().split('T')[0]));
+            sessionStorage.setItem('formPaymentMode', JSON.stringify(''));
+            sessionStorage.setItem('closureDate', JSON.stringify(''));
+        } catch (e) {
+            console.error('Failed to set rent form prefill', e);
+        }
+        setShowRentFormPopup(true);
     };
     const formatDateOnly = (dateString) => {
         if (!dateString) return '';
@@ -691,7 +709,7 @@ const Dashboard = () => {
                         alert('Rent/Advance updated but failed to save rent history');
                     }
                 }
-                await fetchTenants();
+                await loadTenants();
                 setShowEditPopup(false);
                 setSelectedShop(null);
                 setEditRent('');
@@ -1631,7 +1649,7 @@ const Dashboard = () => {
                                 embedded
                                 onSuccess={async () => {
                                     setShowRentFormPopup(false);
-                                    await fetchRentForms();
+                                    await refreshDashboardData();
                                 }}
                             />
                         </div>

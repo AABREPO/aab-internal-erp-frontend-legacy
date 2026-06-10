@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import Select from 'react-select';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import AdvanceForm from './AdvancePortal';
 import { use } from 'react';
-const AdvanceSummary = ({ refreshSignal }) => {
+const AdvanceSummary = ({ refreshSignal, isActive = true }) => {
   const resolveActiveBranchId = useCallback(() => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -322,10 +323,7 @@ const AdvanceSummary = ({ refreshSignal }) => {
     fetchAdvanceFormData({ showLoader: true });
   }, [fetchAdvanceFormData]);
 
-  useEffect(() => {
-    if (refreshSignal === undefined) return;
-    fetchAdvanceFormData({ showLoader: false });
-  }, [refreshSignal, fetchAdvanceFormData]);
+  useTabRefreshSignal(refreshSignal, isActive, () => fetchAdvanceFormData({ showLoader: false }));
 
   const customStyles = {
     control: (provided, state) => ({

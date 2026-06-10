@@ -23,10 +23,14 @@ export function getIncomingTrackerPrefetchCache() {
   return cache;
 }
 
-export async function prefetchIncomingTrackerData({ vendorId } = {}) {
+export async function prefetchIncomingTrackerData({ vendorId, force = false } = {}) {
   if (inFlight) return inFlight;
 
-  if (isFresh() && (!vendorId || String(cache.vendorId) === String(vendorId))) {
+  if (
+    !force &&
+    isFresh() &&
+    (!vendorId || String(cache.vendorId) === String(vendorId))
+  ) {
     return cache;
   }
 

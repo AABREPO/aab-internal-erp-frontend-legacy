@@ -7,6 +7,22 @@ import { fetchWeeklyPaymentBillsByExpensesEntryId } from './expensesEntryWeeklyP
 
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 
+/** Parse /api/files/upload JSON — supports urls[], url, and legacy shapes (same as AdvancePortal.js). */
+export const resolveFilesUploadResponseUrl = (uploadResult) => {
+  if (uploadResult == null) return '';
+  if (typeof uploadResult === 'string') return uploadResult.trim();
+  if (typeof uploadResult !== 'object') return '';
+  const fromUrls = Array.isArray(uploadResult.urls) ? uploadResult.urls[0] : null;
+  return (
+    fromUrls ??
+    uploadResult.url ??
+    uploadResult.data?.url ??
+    uploadResult.fileUrl ??
+    uploadResult.downloadUrl ??
+    ''
+  );
+};
+
 const normalizeWeeklyBillNullableId = (value) => {
   if (value == null || value === '') return null;
   const n = Number(value);
@@ -267,7 +283,14 @@ export const saveWeeklyPaymentBill = async (payload, { branchId = null } = {}) =
     const errText = await response.text();
     throw new Error(`Weekly payment bill save failed: ${errText}`);
   }
-  return response.json();
+  const result = await response.json();
+  try {
+    const { notifyWeeklyPaymentBillsChanged } = await import('./orbitProjectDataSync');
+    notifyWeeklyPaymentBillsChanged();
+  } catch {
+    window.dispatchEvent(new Event('bankRegisterDataSync'));
+  }
+  return result;
 };
 
 export const updateWeeklyPaymentBillById = async (billId, payload) => {
@@ -281,7 +304,14 @@ export const updateWeeklyPaymentBillById = async (billId, payload) => {
     const errText = await response.text();
     throw new Error(`Weekly payment bill update failed: ${errText}`);
   }
-  return response.json();
+  const result = await response.json();
+  try {
+    const { notifyWeeklyPaymentBillsChanged } = await import('./orbitProjectDataSync');
+    notifyWeeklyPaymentBillsChanged();
+  } catch {
+    window.dispatchEvent(new Event('bankRegisterDataSync'));
+  }
+  return result;
 };
 
 const updateAdvancePortalWeeklyBills = async (

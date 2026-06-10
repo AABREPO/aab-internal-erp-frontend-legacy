@@ -1,25 +1,33 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
+import { calendarPanelStyle } from "./SingleDatePicker";
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => format(new Date(2024, i, 1), "MMM"));
-
-function buildYearsAround(centerYear, radius = 6) {
-  const start = Math.max(1970, centerYear - radius);
-  const end = Math.min(2100, centerYear + radius);
-  const years = [];
-  for (let y = start; y <= end; y++) years.push(y);
-  return years;
-}
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 function monthValueToDate(value) {
-  // value: "yyyy-MM"
   if (!value) return null;
   try {
-    // parseISO needs a day; append -01
     return parseISO(`${value}-01`);
   } catch {
     return null;
   }
+}
+
+function buildYearGrid(centerYear) {
+  return Array.from({ length: 12 }, (_, i) => centerYear - 5 + i);
 }
 
 export default function MonthPicker({
@@ -27,26 +35,26 @@ export default function MonthPicker({
   onClose,
   value,
   onChange,
-  anchor = "left", // "left" | "right"
+  anchor = "left",
   alwaysOpenBelow = false,
+  alwaysOpenAbove = false,
 }) {
   const selectedDate = useMemo(() => monthValueToDate(value), [value]);
   const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
+  const [viewMode, setViewMode] = useState("month");
   const [openUp, setOpenUp] = useState(false);
   const containerRef = useRef(null);
   const panelRef = useRef(null);
-  const lastMonthWheelAt = useRef(0);
-  const lastYearWheelAt = useRef(0);
 
   useEffect(() => {
     if (!isOpen) return;
     setViewDate(selectedDate || new Date());
-    setOpenUp(false);
-  }, [isOpen, selectedDate]);
+    setViewMode("month");
+    setOpenUp(!!alwaysOpenAbove);
+  }, [isOpen, selectedDate, alwaysOpenAbove]);
 
-  // If there's not enough space below, open upwards
   useEffect(() => {
-    if (!isOpen || alwaysOpenBelow) return;
+    if (!isOpen || alwaysOpenBelow || alwaysOpenAbove) return;
     const raf = requestAnimationFrame(() => {
       const trigger = containerRef.current;
       const panel = panelRef.current;
@@ -58,9 +66,8 @@ export default function MonthPicker({
       setOpenUp(wouldOverflowBottom);
     });
     return () => cancelAnimationFrame(raf);
-  }, [isOpen, alwaysOpenBelow, viewDate]);
+  }, [isOpen, alwaysOpenBelow, alwaysOpenAbove, viewDate, viewMode]);
 
-  // Close when clicking outside
   useEffect(() => {
     if (!isOpen) return;
     const onMouseDown = (e) => {
@@ -70,32 +77,6 @@ export default function MonthPicker({
     window.addEventListener("mousedown", onMouseDown);
     return () => window.removeEventListener("mousedown", onMouseDown);
   }, [isOpen, onClose]);
-
-  // Prevent background scroll while using wheel inside popup
-  useEffect(() => {
-    if (!isOpen) return;
-    const el = panelRef.current;
-    if (!el) return;
-    const onWheel = (e) => {
-      e.preventDefault();
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [isOpen]);
-
-  const years = useMemo(() => buildYearsAround(viewDate.getFullYear(), 6), [viewDate]);
-
-  const handlePickMonth = (monthIndex) => {
-    const next = new Date(viewDate);
-    next.setMonth(monthIndex);
-    setViewDate(next);
-  };
-
-  const handlePickYear = (year) => {
-    const next = new Date(viewDate);
-    next.setFullYear(year);
-    setViewDate(next);
-  };
 
   const commit = (d) => {
     onChange(format(d, "yyyy-MM"));
@@ -107,127 +88,89 @@ export default function MonthPicker({
     onClose();
   };
 
+  const viewYear = viewDate.getFullYear();
+  const yearGrid = useMemo(() => buildYearGrid(viewYear), [viewYear]);
+  const selectedMonthIndex = selectedDate ? selectedDate.getMonth() : null;
+  const selectedYear = selectedDate ? selectedDate.getFullYear() : null;
+
   if (!isOpen) return null;
 
   const panel = (
-    <div ref={panelRef} className="bg-white rounded-lg shadow-xl p-3 w-[320px] border border-gray-200">
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="h-8 px-3 rounded border border-gray-300 bg-gray-100 text-sm font-medium text-gray-800 inline-flex items-center">
-          {format(viewDate, "MMMM yyyy")}
-        </div>
+    <div
+      ref={panelRef}
+      className="bg-white rounded-lg shadow-xl border border-gray-200 box-border"
+      style={calendarPanelStyle}
+    >
+      <div className="flex justify-center mb-1.5 border-b">
+        <button
+          type="button"
+          onClick={() => setViewMode((mode) => (mode === "month" ? "year" : "month"))}
+          className="h-8 px-3 rounded bg-white text-sm font-medium text-gray-800 hover:bg-gray-100 inline-flex items-center"
+        >
+          <span>{viewYear}</span>
+        </button>
       </div>
 
-      <div className="py-1">
-        <div className="flex justify-center">
-          <div className="grid grid-cols-2 gap-4 w-[260px]">
-            <div className="flex flex-col items-center">
+      {viewMode === "month" ? (
+        <div className="h-[163px] flex flex-col">
+          <div className="grid grid-cols-3 grid-rows-4 gap-0.5 flex-1 min-h-0">
+          {MONTH_NAMES.map((name, monthIndex) => {
+            const isSelected =
+              selectedMonthIndex === monthIndex && selectedYear === viewYear;
+            return (
               <button
+                key={name}
                 type="button"
-                className="text-gray-600 hover:text-gray-900"
-                onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-                aria-label="Previous month"
+                onClick={() => commit(new Date(viewYear, monthIndex, 1))}
+                className={[
+                  "flex items-center justify-center h-full min-h-0 text-xs font-bold rounded-full text-center px-0.5",
+                  isSelected
+                    ? "bg-[#BF9853] text-white"
+                    : "text-gray-700 hover:bg-[#FAF6ED]",
+                ].join(" ")}
               >
-                ^
+                {name}
               </button>
-              <div
-                className="w-full mt-1"
-                onWheel={(e) => {
-                  e.stopPropagation();
-                  const now = Date.now();
-                  if (now - lastMonthWheelAt.current < 120) return;
-                  lastMonthWheelAt.current = now;
-                  const dir = e.deltaY > 0 ? 1 : -1;
-                  setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + dir, 1));
-                }}
-              >
-                {[-2, -1, 0, 1, 2].map((offset) => {
-                  const idx = (viewDate.getMonth() + offset + 12) % 12;
-                  const isActive = offset === 0;
-                  return (
-                    <button
-                      key={`${idx}-${offset}`}
-                      type="button"
-                      onClick={() => commit(new Date(viewDate.getFullYear(), idx, 1))}
-                      className={[
-                        "w-full text-center px-2 py-1 rounded text-sm font-bold",
-                        isActive ? "bg-blue-600 text-white" : "text-gray-800 hover:bg-gray-50",
-                      ].join(" ")}
-                    >
-                      {MONTHS[idx]}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className="text-gray-600 hover:text-gray-900 mt-1"
-                onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-                aria-label="Next month"
-              >
-                v
-              </button>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <button
-                type="button"
-                className="text-gray-600 hover:text-gray-900"
-                onClick={() => setViewDate((d) => new Date(d.getFullYear() - 1, d.getMonth(), 1))}
-                aria-label="Previous year"
-              >
-                ^
-              </button>
-              <div
-                className="w-full mt-1"
-                onWheel={(e) => {
-                  e.stopPropagation();
-                  const now = Date.now();
-                  if (now - lastYearWheelAt.current < 120) return;
-                  lastYearWheelAt.current = now;
-                  const dir = e.deltaY > 0 ? 1 : -1;
-                  setViewDate((d) => new Date(d.getFullYear() + dir, d.getMonth(), 1));
-                }}
-              >
-                {years.slice(0, 5).map((_, i) => {
-                  const offset = i - 2;
-                  const y = viewDate.getFullYear() + offset;
-                  const isActive = offset === 0;
-                  return (
-                    <button
-                      key={y}
-                      type="button"
-                      onClick={() => commit(new Date(y, viewDate.getMonth(), 1))}
-                      className={[
-                        "w-full text-center px-2 py-1 rounded text-sm font-bold",
-                        isActive ? "bg-blue-600 text-white" : "text-gray-800 hover:bg-gray-50",
-                      ].join(" ")}
-                    >
-                      {y}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className="text-gray-600 hover:text-gray-900 mt-1"
-                onClick={() => setViewDate((d) => new Date(d.getFullYear() + 1, d.getMonth(), 1))}
-                aria-label="Next year"
-              >
-                v
-              </button>
-            </div>
+            );
+          })}
           </div>
         </div>
-
-        <div className="flex items-center justify-end mt-3">
-          <button
-            type="button"
-            onClick={handleClear}
-            className="px-3 py-1.5 text-sm font-medium border border-gray-400 rounded hover:bg-gray-50"
-          >
-            Clear
-          </button>
+      ) : (
+        <div className="h-[163px] flex flex-col">
+          <div className="grid grid-cols-3 grid-rows-4 gap-0.5 flex-1 min-h-0">
+          {yearGrid.map((year) => {
+            const isSelected = year === viewYear;
+            return (
+              <button
+                key={year}
+                type="button"
+                onClick={() => {
+                  setViewDate(new Date(year, viewDate.getMonth(), 1));
+                  setViewMode("month");
+                }}
+                className={[
+                  "flex items-center justify-center h-full min-h-0 text-xs font-bold rounded-full text-center",
+                  isSelected
+                    ? "bg-[#BF9853] text-white"
+                    : "text-gray-700 hover:bg-[#FAF6ED]",
+                ].join(" ")}
+              >
+                {year}
+              </button>
+            );
+          })}
+          </div>
         </div>
+      )}
+
+      <div className="flex items-center justify-end mt-1.5 pt-1.5">
+        <button
+          type="button"
+          onClick={handleClear}
+          className="px-3 py-1.5 text-sm font-medium rounded hover:bg-gray-50"
+        >
+          Clear
+        </button>
       </div>
     </div>
   );
@@ -243,4 +186,3 @@ export default function MonthPicker({
     </div>
   );
 }
-

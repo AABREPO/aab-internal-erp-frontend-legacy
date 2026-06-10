@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import CreatableSelect from 'react-select/creatable';
 import Select from 'react-select';
 import loadingScreen from '../Images/AAlogoBlackSVG.svg';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 const RentalAgreement = () => {
     const [projects, setProjects] = useState([]);
     const [fullAgreementData, setFullAgreementData] = useState([]);
@@ -1171,7 +1172,8 @@ WITNESSES:
             if (!saveResponse.ok) throw new Error("Failed to save agreement");
             const saveResult = await saveResponse.json();
             setIsRentPopupOpen(false);
-            window.location.reload();
+            await fetchAgreements();
+            notifyOrbitModuleDataChanged('rent');
         } catch (error) {
             console.error("Error:", error);
             setIsRentPopupOpen(false);

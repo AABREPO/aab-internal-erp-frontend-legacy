@@ -17,35 +17,43 @@ const getInitialBankRegisterTab = () => {
 };
 
 const BankRegisterHeading = ({ username, userRoles = [] }) => {
-    const [activeTab, setActiveTab] = useState(() => getInitialBankRegisterTab());
-    const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialBankRegisterTab()]));
+    const initialTab = getInitialBankRegisterTab();
+    const [activeTab, setActiveTab] = useState(() => initialTab);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const bumpRefresh = () => setRefreshNonce((n) => n + 1);
+
+    useEffect(() => {
+        setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }, [activeTab]);
 
     useEffect(() => {
         localStorage.setItem('activePaintTab', activeTab);
     }, [activeTab]);
 
-    useEffect(() => {
-        setVisitedTabs((prev) => new Set(prev).add(activeTab));
-    }, [activeTab]);
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        bumpRefresh();
+    };
 
     return (
         <div className="bg-[#FAF6ED] bank-register-heading-scope">
             <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'bankregister6' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('bankregister6')}
+                    onClick={() => handleTabChange('bankregister6')}
                 >
                     Bank Payments
                 </h2>
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'bankregisterhistory' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('bankregisterhistory')}
+                    onClick={() => handleTabChange('bankregisterhistory')}
                 >
                     History
                 </h2>
                 <h2
                     className={`link whitespace-nowrap ${activeTab === 'bankregisterreconcile' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('bankregisterreconcile')}
+                    onClick={() => handleTabChange('bankregisterreconcile')}
                 >
                     Reconcile
                 </h2>
@@ -53,7 +61,7 @@ const BankRegisterHeading = ({ username, userRoles = [] }) => {
             <div className="content">
                 {visitedTabs.has('bankregister6') && (
                     <div className={activeTab === 'bankregister6' ? '' : 'hidden'}>
-                        <BankRegister6View />
+                        <BankRegister6View refreshSignal={refreshNonce} isActive={activeTab === 'bankregister6'} />
                     </div>
                 )}
                 {visitedTabs.has('bankregisterhistory') && (

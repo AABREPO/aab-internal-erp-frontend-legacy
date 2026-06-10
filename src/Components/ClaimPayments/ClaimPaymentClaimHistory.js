@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import Filter from '../Images/filter (3).png';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 
-const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
+const ClaimPaymentClaimHistory = ({ username, userRoles = [], refreshSignal, isActive = true }) => {
   const [claimDataList, setClaimDataList] = useState([]);
   const [siteOption, setSiteOption] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
@@ -24,7 +25,7 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
 
   // Fetch claim data
-  useEffect(() => {
+  const fetchClaimDataList = () => {
     fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
       .then((response) => {
         if (!response.ok) {
@@ -33,14 +34,19 @@ const ClaimPaymentClaimHistory = ({ username, userRoles = [] }) => {
         return response.json();
       })
       .then((data) => {
-        // Filter only items with accountType = 'Claim'
         const filteredData = data.filter(item => item.accountType === 'Claim Payment'|| item.accountType === 'Bill Payments + Claim');
         setClaimDataList(filteredData);
       })
       .catch((err) => {
         console.error(err.message);
       });
+  };
+
+  useEffect(() => {
+    fetchClaimDataList();
   }, []);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchClaimDataList);
 
   // Fetch sites
   useEffect(() => {

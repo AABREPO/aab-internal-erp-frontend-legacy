@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import SingleDatePicker from "./SingleDatePicker";
 import CalendarIcon from "../Images/Calendoricon.png";
@@ -39,6 +39,187 @@ function formatIsoToDisplay(iso) {
 /** In-progress yyyy-MM-dd so we do not insert dd-mm hyphens while typing a year-first date. */
 const ISO_DATE_TYPING = /^\d{4}(-\d{0,2})?(-\d{0,4})?$/;
 
+function normalizePartialMonth(month) {
+  if (!month) return "";
+  const digits = String(month).replace(/\D/g, "").slice(0, 2);
+  if (digits.length <= 1) return digits.padStart(2, "0");
+  const n = Number(digits);
+  if (n < 1) return "01";
+  if (n > 12) return "12";
+  return String(n).padStart(2, "0");
+}
+
+/** While typing — keep single month digits unpadded; cap at 12; never pull year into month. */
+function sanitizeMonthWhileTyping(month) {
+  if (!month) return "";
+  const digits = String(month).replace(/\D/g, "").slice(0, 2);
+  if (digits.length <= 1) return digits;
+  const n = Number(digits);
+  if (n > 12) return "12";
+  if (n < 1) return "1";
+  return digits;
+}
+
+function formatPartialDdMmYyyy({ day, month, year }) {
+  const monthStr = sanitizeMonthWhileTyping(month);
+  const dayStr = String(day ?? "").slice(0, 2);
+  const yearStr = String(year ?? "").slice(0, 4);
+
+  if (!dayStr && !month && !yearStr) return "";
+
+  if (!dayStr) {
+    let out = `--${monthStr}`;
+    if (monthStr.length > 0 || yearStr.length > 0) {
+      out += `-${yearStr}`;
+    }
+    return out;
+  }
+
+  let out = `${dayStr}-`;
+  if (!monthStr) {
+    out += "-";
+  } else {
+    out += monthStr;
+  }
+  if (monthStr.length > 0 || yearStr.length > 0) {
+    out += `-${yearStr}`;
+  }
+  return out;
+}
+
+/** Keep day/year in place while month is cleared or re-typed (dd-[mm]-yyyy). */
+function tryParsePartialDdMmYyyy(val) {
+  const s = String(val || "").replace(/\s/g, "");
+  if (!s.includes("-")) return null;
+
+  let m = s.match(/^--(\d{0,2})-(\d{0,4})$/);
+  if (m) return { day: "", month: m[1] ?? "", year: m[2] ?? "" };
+
+  m = s.match(/^-(\d{0,2})-(\d{0,4})$/);
+  if (m) return { day: "", month: m[1] ?? "", year: m[2] ?? "" };
+
+  m = s.match(/^(\d{2})--(\d{0,4})$/);
+  if (m) return { day: m[1], month: "", year: m[2] ?? "" };
+
+  m = s.match(/^(\d{0,2})--(\d{0,2})-(\d{0,4})$/);
+  if (m) return { day: m[1] ?? "", month: m[2] ?? "", year: m[3] ?? "" };
+
+  m = s.match(/^(\d{0,2})-(\d{0,2})-(\d{0,4})$/);
+  if (m) return { day: m[1] ?? "", month: m[2] ?? "", year: m[3] ?? "" };
+
+  m = s.match(/^(\d{2})-(\d{4,})$/);
+  if (m) return { day: "", month: m[1] ?? "", year: m[2] ?? "" };
+
+  m = s.match(/^(\d{0,2})-(\d{0,2})$/);
+  if (m) return { day: m[1] ?? "", month: m[2] ?? "", year: "" };
+
+  return null;
+}
+
+function computeCaretAfterPartialEdit(prevCaret, nextText, partial) {
+  if (partial && !partial.day) {
+    return 0;
+  }
+  if (prevCaret <= 2) {
+    const dayLen = String(partial?.day || "").length;
+    return dayLen > 0 ? Math.min(prevCaret, dayLen) : 0;
+  }
+  return Math.min(prevCaret, nextText.length);
+}
+
+/** When day/month typing makes the string longer than 10 chars, keep full year (do not truncate end). */
+function resolveOverflowDdMmYyyy(val, prevText) {
+  const s = String(val || "").replace(/\s/g, "");
+  if (s.length <= 10) return s;
+
+  const m = s.match(/^(\d+)-(\d{0,2})-(\d{0,4})$/);
+  if (!m) {
+    const prevPartial = tryParsePartialDdMmYyyy(prevText);
+    const prevYear = String(prevPartial?.year || "");
+    const doubleHyphen = s.match(/^(\d{0,2})--+(\d{0,2})-(\d{0,4})/);
+    if (doubleHyphen) {
+      let year = doubleHyphen[3] ?? "";
+      if (year.length < 4 && prevYear.length === 4) {
+        year = prevYear;
+      }
+      return formatPartialDdMmYyyy({
+        day: doubleHyphen[1] ?? "",
+        month: doubleHyphen[2] ?? "",
+        year: year || prevYear,
+      });
+    }
+    const truncated = s.slice(0, 10);
+    const truncatedPartial = tryParsePartialDdMmYyyy(truncated);
+    if (truncatedPartial && prevYear.length === 4) {
+      const y = String(truncatedPartial.year || "");
+      if (y.length < 4 && prevYear.startsWith(y)) {
+        return formatPartialDdMmYyyy({ ...truncatedPartial, year: prevYear });
+      }
+    }
+    return truncated;
+  }
+
+  let day = m[1] ?? "";
+  const month = m[2] ?? "";
+  let year = m[3] ?? "";
+  const prevPartial = tryParsePartialDdMmYyyy(prevText);
+  const prevYear = String(prevPartial?.year || "");
+
+  if (day.length > 2) {
+    day = day.slice(-2);
+  }
+  if (year.length < 4 && prevYear.length === 4) {
+    year = prevYear;
+  }
+  return formatPartialDdMmYyyy({ day, month, year: year || prevYear });
+}
+
+/** When day/month changed, keep full year; only allow shorter year if user edited year only. */
+function preserveYearFromPrevIfEditingDayMonth(partial, prevText) {
+  if (!partial) return partial;
+  const prevPartial = tryParsePartialDdMmYyyy(prevText);
+  const prevYear = String(prevPartial?.year || "");
+  if (prevYear.length !== 4) return partial;
+  const yearStr = String(partial.year || "");
+  if (yearStr.length >= 4 || !prevYear.startsWith(yearStr)) return partial;
+
+  const dayChanged = String(partial.day || "") !== String(prevPartial?.day || "");
+  const monthChanged = String(partial.month ?? "") !== String(prevPartial?.month ?? "");
+  if (dayChanged || monthChanged) {
+    return { ...partial, year: prevYear };
+  }
+  return partial;
+}
+
+function resolvePickerValueFromText(text, fallbackValue) {
+  const parsed = parseTypedDate(text);
+  if (parsed) return parsed;
+
+  const partial = tryParsePartialDdMmYyyy(text);
+  if (!partial) return fallbackValue || "";
+
+  const yearStr = String(partial.year || "");
+  if (!yearStr) return fallbackValue || "";
+  let year = parseInt(yearStr, 10);
+  if (Number.isNaN(year)) return fallbackValue || "";
+  if (yearStr.length <= 2) year += 2000;
+
+  const monthStr = normalizePartialMonth(partial.month) || String(partial.month || "");
+  if (!monthStr) return fallbackValue || "";
+  const month = parseInt(monthStr, 10);
+  if (Number.isNaN(month) || month < 1 || month > 12) return fallbackValue || "";
+
+  const dayStr = String(partial.day || "");
+  const day = dayStr ? parseInt(dayStr, 10) : 1;
+  if (Number.isNaN(day) || day < 1 || day > 31) return fallbackValue || "";
+
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return fallbackValue || "";
+  }
+  return format(d, "yyyy-MM-dd");
+}
+
 function formatDigitsAsDdMmYyyy(digits, val, prevText) {
   const d = digits.slice(0, 8);
   const v = String(val ?? "");
@@ -51,20 +232,26 @@ function formatDigitsAsDdMmYyyy(digits, val, prevText) {
     return `${d}-`;
   }
   if (d.length === 3) {
-    const monthFirstDigit = d.slice(2);
-    if (monthFirstDigit === "0") return `${d.slice(0, 2)}-0`;
-    return `${d.slice(0, 2)}-0${monthFirstDigit}`;
+    return `${d.slice(0, 2)}-${d.slice(2)}-`;
   }
   if (d.length === 4) {
-    const monthNum = Number(d.slice(2, 4));
-    if (monthNum > 12) {
-      const monthFirst = d.slice(2, 3);
-      const yearFirst = d.slice(3, 4);
-      return `${d.slice(0, 2)}-0${monthFirst}-${yearFirst}`;
+    const monthDigits = d.slice(2, 4);
+    let monthNum = Number(monthDigits);
+    if (monthNum > 12) monthNum = 12;
+    if (monthNum < 1 && monthDigits.length === 2) monthNum = Number(monthDigits.slice(0, 1)) || 1;
+    const monthPart = monthDigits.length === 1 ? monthDigits : String(monthNum);
+    return `${d.slice(0, 2)}-${monthPart}-`;
+  }
+  if (d.length >= 5 && d.length < 8) {
+    const prevPartial = tryParsePartialDdMmYyyy(p);
+    const day = d.slice(0, 2);
+    const month = d.slice(2, 4);
+    let yearDigits = d.slice(4);
+    const prevYear = String(prevPartial?.year || "");
+    if (prevYear && yearDigits.length < 4) {
+      yearDigits = (yearDigits + prevYear.slice(yearDigits.length)).slice(0, 4);
     }
-    const ddmm = `${d.slice(0, 2)}-${d.slice(2, 4)}`;
-    if (/^\d{2}-\d{2}-$/.test(p) && v.replace(/\s/g, "") === ddmm) return v.replace(/\s/g, "");
-    return `${ddmm}-`;
+    return formatPartialDdMmYyyy({ day, month, year: yearDigits });
   }
   return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}`;
 }
@@ -77,13 +264,16 @@ export default function CustomDateField({
   disabled = false,
   anchor = "left",
   alwaysOpenBelow = false,
+  alwaysOpenAbove = false,
   controlHeightPx,
   /** When empty, replaces default trigger typography (placeholder look only; calendar unchanged). */
   placeholderButtonClassName = "",
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(() => formatIsoToDisplay(value));
+  const [calendarValue, setCalendarValue] = useState(() => value || "");
   const inputRef = useRef(null);
+  const caretRef = useRef(null);
   const controlBoxStyle = controlHeightPx
     ? {
         height: `${controlHeightPx}px`,
@@ -95,63 +285,91 @@ export default function CustomDateField({
   useEffect(() => {
     if (inputRef.current === document.activeElement) return;
     setText(formatIsoToDisplay(value));
+    setCalendarValue(value || "");
   }, [value]);
 
+  useEffect(() => {
+    const resolved = resolvePickerValueFromText(text, calendarValue || value || "");
+    if (resolved) {
+      setCalendarValue(resolved);
+    }
+  }, [text]);
+
+  useLayoutEffect(() => {
+    if (caretRef.current == null) return;
+    const el = inputRef.current;
+    const pos = caretRef.current;
+    caretRef.current = null;
+    if (el) {
+      el.setSelectionRange(pos, pos);
+    }
+  }, [text]);
+
+  const applyText = (nextText, nextCaret) => {
+    caretRef.current = nextCaret;
+    setText(nextText);
+  };
+
   const commitText = () => {
-    const parsed = parseTypedDate(text);
+    const parsed = parseTypedDate(text) || resolvePickerValueFromText(text, value || calendarValue || "");
     if (parsed === "") {
       onChange("");
       setText("");
+      setCalendarValue("");
       return;
     }
     if (parsed != null) {
       onChange(parsed);
       setText(formatIsoToDisplay(parsed));
+      setCalendarValue(parsed);
       return;
     }
-    setText(formatIsoToDisplay(value));
   };
 
   const handleBlur = () => {
-    commitText();
+    // Keep in-progress text on blur; commit only via Enter or calendar.
   };
 
   const handleInputChange = (e) => {
     const val = e.target.value;
-    const compactVal = String(val || "").replace(/\s/g, "");
-    const monthCarryMatch = compactVal.match(/^(\d{2})-0([1-9])(\d)$/);
-    if (monthCarryMatch) {
-      const [, dayPart, monthFirstDigit, nextDigit] = monthCarryMatch;
-      const candidateMonth = Number(`${monthFirstDigit}${nextDigit}`);
-      if (candidateMonth >= 10 && candidateMonth <= 12) {
-        setText(`${dayPart}-${String(candidateMonth).padStart(2, "0")}-`);
-        return;
-      }
-      setText(`${dayPart}-0${monthFirstDigit}-${nextDigit}`);
-      return;
-    }
+    const caret = e.target.selectionStart ?? 0;
     if (ISO_DATE_TYPING.test(val)) {
       const y = parseInt(val.slice(0, 4), 10);
       const plausibleYear = y >= 1900 && y <= 2100;
       if (plausibleYear && val.includes("-")) {
-        setText(val.slice(0, 10));
+        applyText(val.slice(0, 10), Math.min(caret, 10));
         return;
       }
       if (plausibleYear && val.length === 4) {
-        setText(val.slice(0, 4));
+        applyText(val.slice(0, 4), Math.min(caret, 4));
         return;
       }
     }
+    const partialSegments = tryParsePartialDdMmYyyy(val);
+    if (partialSegments) {
+      const preserved = preserveYearFromPrevIfEditingDayMonth(partialSegments, text);
+      const nextText = formatPartialDdMmYyyy(preserved);
+      applyText(nextText, computeCaretAfterPartialEdit(caret, nextText, preserved));
+      return;
+    }
+    if (String(val).replace(/\s/g, "").includes("-")) {
+      const nextText = resolveOverflowDdMmYyyy(val, text);
+      applyText(nextText, Math.min(caret, nextText.length));
+      return;
+    }
     const digits = val.replace(/\D/g, "").slice(0, 8);
-    setText(formatDigitsAsDdMmYyyy(digits, val, text));
+    const nextText = formatDigitsAsDdMmYyyy(digits, val, text);
+    applyText(nextText, Math.min(caret, nextText.length));
   };
+
+  const pickerValue = calendarValue || resolvePickerValueFromText(text, value || "") || "";
 
   const inputLooksEmpty = !String(text || "").trim();
 
   return (
     <div className={`relative ${className}`}>
       <div
-        className={`relative flex items-center ${controlHeightPx ? 'w-full' : 'w-[120px] h-[36px]'} rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-[#FFFFFF] shadow-sm overflow-hidden ${
+        className={`relative flex items-center ${controlHeightPx ? 'w-[300px]' : 'w-[120px] h-[36px]'} rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-[#FFFFFF] shadow-sm overflow-hidden ${
           disabled ? "opacity-70 cursor-not-allowed bg-gray-100" : "hover:border-[rgba(191,152,83,0.4)]"
         }`}
         style={controlBoxStyle}
@@ -177,7 +395,7 @@ export default function CustomDateField({
             "min-w-0 flex-1 border-0 bg-transparent pl-[12px] pt-[2px] pb-[2px] text-sm outline-none focus:ring-0",
             inputLooksEmpty
               ? String(placeholderButtonClassName || "").trim() || "text-[12px] text-black font-normal placeholder:text-[#A6A5A6]"
-              : "!text-black !font-normal",
+              : "!text-black !font-bold",
             disabled ? "cursor-not-allowed" : "",
           ].join(" ")}
         />
@@ -195,17 +413,20 @@ export default function CustomDateField({
       </div>
 
       <SingleDatePicker
+        key={open ? `cal-${pickerValue || "empty"}` : "cal-closed"}
         isOpen={open}
         onClose={() => setOpen(false)}
-        value={value || ""}
+        value={pickerValue}
         onChange={(v) => {
           onChange(v);
           setText(formatIsoToDisplay(v));
+          setCalendarValue(v || "");
           setOpen(false);
         }}
         variant="dropdown"
         anchor={anchor}
         alwaysOpenBelow={alwaysOpenBelow}
+        alwaysOpenAbove={alwaysOpenAbove}
       />
     </div>
   );

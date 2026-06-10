@@ -58,6 +58,11 @@ const EMPTY_PROJECT_PROPERTY = {
   waterTaxNo: ''
 };
 
+const isOnGoingProject = (project) => {
+  const status = String(project?.status || '').trim().toLowerCase();
+  return status === 'on going' || status === 'ongoing';
+};
+
 const MasterData = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const canEditMasterData = useMemo(() => {
@@ -1047,6 +1052,9 @@ const MasterData = ({ user, onLogout }) => {
       : projects;
 
     const selectedFilter = String(projectNameCategoryFilter || 'All').trim();
+    if (selectedFilter === 'On Going') {
+      return base.filter((project) => isOnGoingProject(project));
+    }
     if (!selectedFilter || selectedFilter === 'All') return base;
 
     const normalizeCategory = (raw) => String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -3069,9 +3077,120 @@ const MasterData = ({ user, onLogout }) => {
     doc.save(`${fileBase}_${stamp}.pdf`);
   };
 
+  const downloadOnGoingProjectListPdf = (sourceProjects) => {
+    const selectedData = Array.isArray(sourceProjects) ? sourceProjects : [];
+    const doc = new jsPDF('landscape');
+
+    doc.setFontSize(20);
+    doc.setTextColor(191, 152, 83);
+    doc.text('On Going Project List', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+
+    const uniqueProjectKeys = new Set(
+      selectedData.map((item) => (item.id ?? item.projectId ?? item.projectName ?? '').toString())
+    );
+    const projectCount = uniqueProjectKeys.size;
+
+    if (projectCount) {
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Projects Count: ${projectCount}`, doc.internal.pageSize.getWidth() - 14, 26, { align: 'right' });
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+    }
+
+    let rowCounter = 1;
+    const tableHead = [[
+      'S.No',
+      'P.ID',
+      'Project Name',
+      'Project Category',
+      'Project Type',
+      'Project Engineer',
+      'Door No',
+      'Area',
+      'EB No',
+      'Branch'
+    ]];
+
+    const getSiteEngineerName = (project) => {
+      const rawSeId =
+        project.siteEngineerId ??
+        project.site_engineer_id ??
+        project.siteEngineer?.id ??
+        '';
+      if (rawSeId !== '' && rawSeId != null) {
+        const mapped = employeeIdToNameMap[String(rawSeId)];
+        if (mapped) return mapped;
+      }
+      return normalizeProjectForForm(project).siteEngineerName || '';
+    };
+
+    const tableData = selectedData.flatMap((project) => {
+      const propertyDetails = Array.isArray(project.propertyDetails) && project.propertyDetails.length > 0
+        ? project.propertyDetails
+        : Array.isArray(project.propertyDetailsList) && project.propertyDetailsList.length > 0
+          ? project.propertyDetailsList
+          : [null];
+      const siteEngineerName = getSiteEngineerName(project);
+      return propertyDetails.map((detail) => ([
+        rowCounter++,
+        project.projectId || '',
+        project.projectName || '',
+        project.projectCategory || '',
+        detail?.projectType || '',
+        siteEngineerName,
+        detail?.doorNo || '',
+        detail?.area || '',
+        detail?.ebNo || '',
+        project.branch || ''
+      ]));
+    });
+
+    const columnStyles = {
+      0: { cellWidth: 11 },
+      1: { cellWidth: 10 },
+      2: { cellWidth: 70 },
+      3: { cellWidth: 34 },
+      4: { cellWidth: 28 },
+      5: { cellWidth: 28 },
+      6: { cellWidth: 15 },
+      7: { cellWidth: 13 },
+      8: { cellWidth: 30 },
+      9: { cellWidth: 30 }
+    };    
+
+    doc.autoTable({
+      startY: 30,
+      head: tableHead,
+      body: tableData,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      headStyles: {
+        fillColor: [191, 152, 83],
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'center'
+      },
+      columnStyles
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    doc.save(`On_Going_Project_List_${stamp}.pdf`);
+  };
+
   const handleProjectListShare = () => {
-    const source = Array.isArray(displayedProjects) ? displayedProjects : [];
     const filterKey = String(projectNameCategoryFilter || 'All').trim();
+    if (filterKey === 'On Going') {
+      downloadOnGoingProjectListPdf(displayedProjects);
+      return;
+    }
+
+    const source = Array.isArray(displayedProjects) ? displayedProjects : [];
     const filterTitle =
       filterKey === 'Own' ? 'Own Project' : filterKey === 'Client' ? 'Client Project' : 'All Projects';
 
@@ -7186,6 +7305,24 @@ const MasterData = ({ user, onLogout }) => {
                 >
                   <img src={masterTableSortReversed ? UpDownFilter : FilterUp} alt="" className="h-[16px] w-[16px]" />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setProjectNameCategoryFilter((prev) => (prev === 'On Going' ? 'All' : 'On Going'))}
+                  title={
+                    projectNameCategoryFilter === 'On Going'
+                      ? 'Show all projects'
+                      : 'Show On Going projects only'
+                  }
+                  className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center p-0 text-[16px] leading-none transition-colors ${
+                    projectNameCategoryFilter === 'On Going'
+                      ? 'text-[#BF9853]'
+                      : 'text-gray-400'
+                  }`}
+                  aria-pressed={projectNameCategoryFilter === 'On Going'}
+                  aria-label="Filter On Going projects"
+                >
+                  ★
+                </button>
               </div>
               <button
                 type="button"
@@ -7273,7 +7410,7 @@ const MasterData = ({ user, onLogout }) => {
                       <span className="pr-[8px] text-[13px] font-medium text-black text-left">
                         <button
                           type="button"
-                          className="cursor-pointer text-left"
+                          className="inline-flex cursor-pointer items-center gap-[4px] text-left"
                           onClick={(e) => {
                             e.stopPropagation();
                             const next = normalizeProjectForForm(item);
@@ -7290,7 +7427,16 @@ const MasterData = ({ user, onLogout }) => {
                             setExpandedProjectSection(hasImageFile(next.projectPicture) ? 'project-image' : 'project-details');
                           }}
                         >
-                          {item.projectName || ''}
+                          <span>{item.projectName || ''}</span>
+                          {isOnGoingProject(item) && (
+                            <span
+                              className="text-[#BF9853] text-[14px] leading-none"
+                              title="On Going"
+                              aria-hidden
+                            >
+                              ★
+                            </span>
+                          )}
                         </button>
                       </span>
                       <span
@@ -8040,7 +8186,7 @@ const MasterData = ({ user, onLogout }) => {
           setIsProjectNameCategoryFilterModalOpen(false);
         }}
         selectedValue={projectNameCategoryFilter}
-        options={['All', 'Own', 'Client']}
+        options={['All', 'Own', 'Client', 'On Going']}
         fieldName="Project Category"
         showStarIcon={false}
       />

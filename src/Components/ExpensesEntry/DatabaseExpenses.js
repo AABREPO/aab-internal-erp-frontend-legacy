@@ -5,11 +5,12 @@ import axios from 'axios';
 import Modal from 'react-modal';
 import DateRangePicker from './DateRangePicker';
 import CustomDateField from './CustomDateField';
+import CustomMonthField from './CustomMonthField';
 import SingleDatePicker from './SingleDatePicker';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
-import Select from 'react-select';
+import Select, { components as selectComponents } from 'react-select';
 import Filter from '../Images/TableFilter.svg'
 import Search from '../Images/Searchnew.svg'
 import CalendarIcon from "../Images/Calendoricon.png";
@@ -38,15 +39,33 @@ import Pdf from '../Images/pdf.png'
 import ExpenseEntryPaymentModal from './ExpenseEntryPaymentModal';
 import { Table, TableProvider } from './Table';
 import {
-    TABLE_FILTER_MENU_MAX_HEIGHT_PX,
-    TABLE_FILTER_OPTION_HEIGHT_PX,
+    DATABASE_TABLE_FILTER_SELECT_STYLES,
     isAdvancePortalSourceExpense,
 } from './databaseExpensesSharedColumns';
+import { useExpensesListLoader } from './expensesListStore';
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const BLANK_VALUE = 'BLANK';
 const BLANK_LABEL = 'Blank';
 const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
+const EDIT_POPUP_SELECT_INDICATOR_COMPONENTS = {
+    DropdownIndicator: (props) => {
+        if (props.selectProps.value) return null;
+        return <selectComponents.DropdownIndicator {...props} />;
+    },
+    ClearIndicator: (props) => {
+        if (!props.selectProps.value) return null;
+        return <selectComponents.ClearIndicator {...props} />;
+    },
+};
+const EDIT_POPUP_SELECT_CLASSNAME = 'font-semibold text-[14px]';
+const getUtilityTypeNumberLabel = (utilityTypeValue) => {
+    switch (utilityTypeValue) {
+        case 'Electricity':
+        default:
+            return 'Service Number';
+    }
+};
 const isBlankish = (value) =>
     value === null ||
     value === undefined ||
@@ -225,8 +244,14 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         }
     }, []);
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+    const {
+        expenses,
+        expensesLoading,
+        expensesLoadingMore,
+        expensesTotalCount,
+        refetchExpenses,
+    } = useExpensesListLoader(activeBranchId);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [expenses, setExpenses] = useState([]);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [editId, setEditId] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -552,101 +577,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [projectData, setProjectData] = useState(null);
     const [ebNumberOptions, setEbNumberOptions] = useState([]);
     const [selectedEbNumber, setSelectedEbNumber] = useState(null);
-    const customStyles = useMemo(() => ({
-        control: (provided, state) => ({
-            ...provided,
-            borderWidth: '2px',
-            lineHeight: '20px',
-            fontSize: '14px',
-            fontWeight: 'normal',
-            height: '36px',
-            borderRadius: '8px',
-            textAlign: 'left',
-            borderColor: 'rgba(191, 152, 83, 0.2)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-            '&:hover': {
-                borderColor: 'rgba(191, 152, 83, 0.4)',
-            },
-        }),
-        clearIndicator: (provided) => ({
-            ...provided,
-            cursor: 'pointer',
-        }),
-        menu: (provided) => ({
-            ...provided,
-            zIndex: 999,
-            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
-        }),
-        menuPortal: (provided) => ({
-            ...provided,
-            zIndex: 9999,
-        }),
-        menuList: (provided) => ({
-            ...provided,
-            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
-            paddingTop: 0,
-            paddingBottom: 0,
-            overflowY: 'auto',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
-        }),
-        singleValue: (provided) => ({
-            ...provided,
-            color: '#111827',
-            fontWeight: 'normal',
-            marginRight: 0,
-        }),
-        valueContainer: (provided) => ({
-            ...provided,
-            paddingLeft: '12px',
-            paddingRight: '2px',
-        }),
-        indicatorsContainer: (provided) => ({
-            ...provided,
-            paddingLeft: '0px',
-        }),
-        dropdownIndicator: (provided) => ({
-            ...provided,
-            paddingTop: '0px',
-            paddingBottom: '0px',
-            paddingRight: '6px',
-            paddingLeft: '3px',
-        }),
-        option: (provided, state) => ({
-            ...provided,
-            minHeight: TABLE_FILTER_OPTION_HEIGHT_PX,
-            height: TABLE_FILTER_OPTION_HEIGHT_PX,
-            paddingTop: 0,
-            paddingBottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            textAlign: 'left',
-            fontWeight: 'normal',
-            fontSize: '15px',
-            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-            color: 'black',
-        }),
-        input: (provided) => ({
-            ...provided,
-            fontWeight: 'normal',
-            color: 'black',
-            textAlign: 'left',
-        }),
-        placeholder: (provided) => ({
-            ...provided,
-            color: '#A6A5A6',
-            textAlign: 'left',
-            fontWeight: 'normal',
-            paddingLeft: '0px',
-            paddingTop: '0px',
-            paddingBottom: '0px',
-        }),
-        indicatorSeparator: (provided) => ({
-            ...provided,
-            display: 'none',
-        }),
-    }), []);
+    const customStyles = DATABASE_TABLE_FILTER_SELECT_STYLES;
     const [modalIsOpen, setModalIsOpen] = useState(false);
 
     const fetchProjectData = async (projectId) => {
@@ -765,44 +696,6 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             window.removeEventListener("branchSelectionChanged", syncBranch);
         };
     }, [resolveActiveBranchId]);
-    const refetchExpenses = useCallback(async () => {
-        const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
-            params: activeBranchId ? { branchId: activeBranchId } : {},
-        });
-        const sortedExpenses = response.data.sort((a, b) => {
-            const enoA = parseInt(a.eno, 10);
-            const enoB = parseInt(b.eno, 10);
-            return enoB - enoA;
-        });
-        setExpenses(sortedExpenses);
-        setFilteredExpenses(sortedExpenses);
-        const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-        const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
-        const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
-        const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
-        const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
-        const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
-        const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
-        const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
-        const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
-        setAccountTypeOptions(uniqueAccountTypes);
-        setSiteOptions(siteOptions);
-        setVendorOptions(vendorOptions);
-        setContractorOptions(contractorOption);
-        setCategoryOptions(categoryOption);
-    }, [activeBranchId]);
-    useEffect(() => {
-        refetchExpenses().catch((error) => {
-            console.error('Error fetching expenses:', error);
-        });
-    }, [refetchExpenses]);
-    const prevIsActiveRef = useRef(isActive);
-    useEffect(() => {
-        if (isActive && prevIsActiveRef.current === false) {
-            void refetchExpenses();
-        }
-        prevIsActiveRef.current = isActive;
-    }, [isActive, refetchExpenses]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -1192,7 +1085,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     getMachineToolsItemIdDisplay(expense.machineTools),
                     expense.source,
                     getBranchName(expense.branch_id ?? expense.branchId),
-                    expense.enteredBy || 'Sivaprakasm',
+                    expense.enteredBy || ' ',
                     expense.eno
                 ]
                     .map((v) => String(v ?? '').toLowerCase())
@@ -1243,7 +1136,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 (selectedEnteredBy
                     ? (selectedEnteredBy === BLANK_VALUE
                         ? isBlankish(expense.enteredBy)
-                        : (expense.enteredBy || 'Sivaprakasm') === selectedEnteredBy)
+                        : (expense.enteredBy || ' ') === selectedEnteredBy)
                     : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === BLANK_VALUE
@@ -1793,6 +1686,119 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         });
         return map;
     }, [contractorOption]);
+    const editPopupCombinedVendorContractorOptions = useMemo(
+        () => [...vendorOption, ...contractorOption, ...employeeOptions, ...laboursList],
+        [vendorOption, contractorOption, employeeOptions, laboursList]
+    );
+    const editPopupSelectedVendorContractor = useMemo(() => {
+        const employeeId = formData.employeeId || formData.employee_id || formData.employeeID || formData.employee_ID;
+        const labourId = formData.labourId || formData.labour_id || formData.labourID || formData.labour_ID;
+        if (formData.vendor) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Vendor' && o.value === formData.vendor
+            ) || { value: formData.vendor, label: formData.vendor, type: 'Vendor' };
+        }
+        if (formData.contractor) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Contractor' && o.value === formData.contractor
+            ) || { value: formData.contractor, label: formData.contractor, type: 'Contractor' };
+        }
+        if (employeeId) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Employee' && String(o.id) === String(employeeId)
+            ) || employeeOptions.find((o) => String(o.id) === String(employeeId)) || {
+                value: String(employeeId),
+                label: String(employeeId),
+                type: 'Employee',
+                id: employeeId,
+            };
+        }
+        if (labourId) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Labour' && String(o.id) === String(labourId)
+            ) || laboursList.find((o) => String(o.id) === String(labourId)) || {
+                value: String(labourId),
+                label: String(labourId),
+                type: 'Labour',
+                id: labourId,
+            };
+        }
+        return null;
+    }, [formData.vendor, formData.contractor, formData.employeeId, formData.employee_id, formData.labourId, formData.labour_id, editPopupCombinedVendorContractorOptions, employeeOptions, laboursList]);
+    const editPopupVendorContractorType = formData.vendor
+        ? 'Vendor'
+        : formData.contractor
+            ? 'Contractor'
+            : (formData.employeeId || formData.employee_id || formData.employeeID || formData.employee_ID)
+                ? 'Employee'
+                : (formData.labourId || formData.labour_id || formData.labourID || formData.labour_ID)
+                    ? 'Labour'
+                    : '';
+    const handleEditPopupVendorContractorChange = (selectedOption) => {
+        if (!selectedOption) {
+            setFormData((prev) => ({
+                ...prev,
+                vendor: '',
+                vendorId: '',
+                contractor: '',
+                contractorId: '',
+                employeeId: '',
+                employee_id: null,
+                labourId: '',
+                labour_id: null,
+            }));
+            return;
+        }
+        if (selectedOption.type === 'Vendor') {
+            setFormData((prev) => ({
+                ...prev,
+                vendor: selectedOption.value || '',
+                vendorId: selectedOption.id || '',
+                contractor: '',
+                contractorId: '',
+                employeeId: '',
+                employee_id: null,
+                labourId: '',
+                labour_id: null,
+            }));
+        } else if (selectedOption.type === 'Contractor') {
+            setFormData((prev) => ({
+                ...prev,
+                contractor: selectedOption.value || '',
+                contractorId: selectedOption.id || '',
+                vendor: '',
+                vendorId: '',
+                employeeId: '',
+                employee_id: null,
+                labourId: '',
+                labour_id: null,
+            }));
+        } else if (selectedOption.type === 'Employee') {
+            setFormData((prev) => ({
+                ...prev,
+                employeeId: selectedOption.id || '',
+                employee_id: selectedOption.id || null,
+                vendor: '',
+                vendorId: '',
+                contractor: '',
+                contractorId: '',
+                labourId: '',
+                labour_id: null,
+            }));
+        } else if (selectedOption.type === 'Labour') {
+            setFormData((prev) => ({
+                ...prev,
+                labourId: selectedOption.id || '',
+                labour_id: selectedOption.id || null,
+                vendor: '',
+                vendorId: '',
+                contractor: '',
+                contractorId: '',
+                employeeId: '',
+                employee_id: null,
+            }));
+        }
+    };
     const labourIdToName = React.useMemo(() => {
         const map = {};
         laboursList.forEach(option => {
@@ -2143,6 +2149,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                     ))}
                             </div>
                         </div>
+                    ) : expensesLoading ? (
+                        <div className="w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] flex items-center justify-center min-h-[120px] text-[16px] font-medium text-[#666666]">
+                            Loading latest expenses...
+                        </div>
                     ) : sortedExpenses.length === 0 ? (
                         <div className="w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] flex items-center justify-center min-h-[120px] text-[16px] font-medium text-[#666666]">
                             No datas are matched
@@ -2198,7 +2208,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                         {timestampStartDate && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
                                                 <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">{dstCol1Label}: </span>
-                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(timestampStartDate)}{timestampEndDate ? ` – ${formatChipDateDMY(timestampEndDate)}` : ' onwards'}</span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{timestampEndDate ? (timestampStartDate === timestampEndDate ? formatChipDateDMY(timestampStartDate) : `${formatChipDateDMY(timestampStartDate)} – ${formatChipDateDMY(timestampEndDate)}`) : `${formatChipDateDMY(timestampStartDate)} onwards`}</span>
                                                 <button onClick={() => { setTimestampStartDate(''); setTimestampEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         )}
@@ -2212,7 +2222,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                         {startDate && endDate ? (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
                                                 <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                                                <span className="font-semibold text-[14px] truncate min-w-0">{formatChipDateDMY(startDate)} – {formatChipDateDMY(endDate)}</span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{startDate === endDate ? formatChipDateDMY(startDate) : `${formatChipDateDMY(startDate)} – ${formatChipDateDMY(endDate)}`}</span>
                                                 <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                             </span>
                                         ) : startDate ? (
@@ -2424,6 +2434,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 <div className="flex items-center space-x-2">
                                     <span className="text-sm text-gray-700">
                                         Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
+                                        {expensesLoadingMore ? ' (loading older records...)' : ''}
+                                        {!expensesLoadingMore && expensesTotalCount != null && expensesTotalCount > sortedExpenses.length
+                                            ? ` / ${expensesTotalCount} total`
+                                            : ''}
                                     </span>
                                 </div>
                                 <div className="flex items-center space-x-1">
@@ -2464,27 +2478,16 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                             <Modal isOpen={modalIsOpen} onRequestClose={handleCancel}
                                 contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
                                 overlayClassName="fixed inset-0 z-[9999]">
-                                <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-                                    <h2 className="text-xl font-normal mb-6 border-b-2">Edit Expense</h2>
-                                    <form className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Date</label>
-                                            <div className="mt-1">
-                                                <CustomDateField
-                                                    value={formData.date}
-                                                    onChange={(v) => {
-                                                        // Keep existing behavior: prevent clearing the main date field
-                                                        if (!v) return;
-                                                        setFormData((prev) => ({ ...prev, date: v }));
-                                                    }}
-                                                    placeholder="Select date"
-                                                    alwaysOpenBelow
-                                                    className="[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-normal"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Account Type *</label>
+                                <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-xl font-normal">Edit Expense</h2>
+                                        <span className="text-[16px] font-semibold text-[#E4572E]">{formData.eno}</span>
+                                    </div>
+                                    <form className="flex flex-col gap-[12px]">
+                                        <div className="flex gap-[16px] flex-wrap items-start">
+                                        <div className="text-left w-[300px] min-w-[300px] max-w-[300px] shrink-0">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Account Type<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
                                             <Select
                                                 name="accountType"
                                                 value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
@@ -2511,19 +2514,38 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 options={editAccountTypeOptions}
                                                 placeholder="Select"
                                                 isClearable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
                                                 styles={{
                                                     control: (base, state) => ({
                                                         ...base,
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         borderColor: 'rgba(191, 152, 83, 0.2)',
                                                         borderWidth: '2px',
                                                         borderRadius: '0.5rem',
-                                                        padding: '0.25rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
                                                         textAlign: 'left',
                                                         boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                         '&:hover': {
                                                             borderColor: 'rgba(191, 152, 83, 0.4)',
                                                         },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
                                                     }),
                                                     placeholder: (base) => ({
                                                         ...base,
@@ -2534,7 +2556,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     option: (provided, state) => ({
                                                         ...provided,
                                                         textAlign: 'left',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         fontSize: '15px',
                                                         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                         color: 'black',
@@ -2542,7 +2564,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     singleValue: (base) => ({
                                                         ...base,
                                                         color: '#111827',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                     }),
                                                     menu: (base) => ({
                                                         ...base,
@@ -2558,9 +2580,130 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 menuPlacement="bottom"
                                                 menuPosition="absolute"
                                             />
+                                            </div>
+                                            {formData.accountType === 'Utility Bills' && (
+                                                <div className="mt-[12px]">
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">Utility Type<span className="text-[#E4572E]">*</span></label>
+                                                    <div className="w-[616px]">
+                                                    <Select
+                                                        name="utilityType"
+                                                        options={[
+                                                            { value: 'Electricity', label: 'Electricity' },
+                                                            { value: 'Property', label: 'Property' },
+                                                            { value: 'Water', label: 'Water' },
+                                                            { value: 'Telecom', label: 'Telecom' },
+                                                            { value: 'Subscription', label: 'Subscription' },
+                                                        ]}
+                                                        value={[
+                                                            { value: 'Electricity', label: 'Electricity' },
+                                                            { value: 'Property', label: 'Property' },
+                                                            { value: 'Water', label: 'Water' },
+                                                            { value: 'Telecom', label: 'Telecom' },
+                                                            { value: 'Subscription', label: 'Subscription' },
+                                                        ].find((o) => o.value === formData.utilityType) || null}
+                                                        onChange={(selectedOption) => {
+                                                            setSelectedEbNumber(null);
+                                                            setEbNumberOptions([]);
+                                                            setFormData({
+                                                                ...formData,
+                                                                utilityType: selectedOption?.value || '',
+                                                                utilityTypeNumber: "",
+                                                            });
+                                                        }}
+                                                        placeholder="--- Select ---"
+                                                        isClearable
+                                                        components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                        className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                        isSearchable
+                                                        styles={{
+                                                            control: (base, state) => ({
+                                                                ...base,
+                                                                fontWeight: 600,
+                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                borderWidth: '2px',
+                                                                borderRadius: '0.5rem',
+                                                                height: '40px',
+                                                                minHeight: '40px',
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                                textAlign: 'left',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                },
+                                                            }),
+                                                            valueContainer: (base) => ({
+                                                                ...base,
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                            }),
+                                                            indicatorsContainer: (base) => ({
+                                                                ...base,
+                                                                alignItems: 'center',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none',
+                                                            }),
+                                                            placeholder: (base) => ({
+                                                                ...base,
+                                                                fontWeight: 'normal',
+                                                                color: '#6B7280',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 600,
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (base) => ({
+                                                                ...base,
+                                                                color: '#111827',
+                                                                fontWeight: 600,
+                                                            }),
+                                                            menu: (base) => ({
+                                                                ...base,
+                                                                zIndex: 999,
+                                                            }),
+                                                            menuList: (base) => ({
+                                                                ...base,
+                                                                scrollbarWidth: 'none',
+                                                                msOverflowStyle: 'none',
+                                                                '&::-webkit-scrollbar': { display: 'none' },
+                                                            }),
+                                                        }}
+                                                        menuPlacement="bottom"
+                                                        menuPosition="absolute"
+                                                    />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Site Name *</label>
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Date<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
+                                                <CustomDateField
+                                                    value={formData.date}
+                                                    onChange={(v) => {
+                                                        if (!v) return;
+                                                        setFormData((prev) => ({ ...prev, date: v }));
+                                                    }}
+                                                    placeholder="Date"
+                                                    alwaysOpenBelow
+                                                    controlHeightPx={40}
+                                                    className="w-full [&>div]:!w-full [&>div]:!max-w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div:hover]:!border-[rgba(191,152,83,0.4)] [&>div:focus-within]:!outline-none [&>div:focus-within]:!ring-0 [&>div:focus-within]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-semibold"
+                                                />
+                                            </div>
+                                        </div>
+                                        </div>
+                                        <div className="flex gap-[16px]">
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Project Name<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
                                             <Select
                                                 name="siteName"
                                                 value={siteOption.find(option => option.value === formData.siteName)}
@@ -2574,19 +2717,38 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 options={siteOption}
                                                 placeholder="Select Site"
                                                 isClearable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
                                                 styles={{
                                                     control: (base, state) => ({
                                                         ...base,
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         borderColor: 'rgba(191, 152, 83, 0.2)',
                                                         borderWidth: '2px',
                                                         borderRadius: '0.5rem',
-                                                        padding: '0.25rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
                                                         textAlign: 'left',
                                                         boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                         '&:hover': {
                                                             borderColor: 'rgba(191, 152, 83, 0.4)',
                                                         },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
                                                     }),
                                                     placeholder: (base) => ({
                                                         ...base,
@@ -2597,7 +2759,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     option: (provided, state) => ({
                                                         ...provided,
                                                         textAlign: 'left',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         fontSize: '15px',
                                                         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                         color: 'black',
@@ -2605,7 +2767,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     singleValue: (base) => ({
                                                         ...base,
                                                         color: '#111827',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                     }),
                                                     menu: (base) => ({
                                                         ...base,
@@ -2621,37 +2783,55 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 menuPlacement="bottom"
                                                 menuPosition="absolute"
                                             />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Vendor Name *</label>
+                                        <div className="text-left w-[300px]">
+                                            <div className="flex justify-between mb-[8px]">
+                                                <label className="block text-black font-semibold text-left">Associate Name<span className="text-[#E4572E]">*</span></label>
+                                                {editPopupVendorContractorType && (
+                                                    <span className="text-[14px] text-[#E4572E] font-normal">{editPopupVendorContractorType}</span>
+                                                )}
+                                            </div>
+                                            <div className="w-[300px]">
                                             <Select
-                                                name="vendor"
-                                                options={vendorOption}
-                                                value={vendorOption.find(opt => opt.value === formData.vendor)}
-                                                onChange={(selectedOption) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        vendor: selectedOption?.value || '',
-                                                        vendorId: selectedOption?.id || '',
-                                                        contractor: selectedOption ? '' : formData.contractor,
-                                                        contractorId: selectedOption ? '' : formData.contractorId
-                                                    })
-                                                }
-                                                isDisabled={!!formData.contractor}
+                                                name="vendorContractor"
+                                                options={editPopupCombinedVendorContractorOptions}
+                                                value={editPopupSelectedVendorContractor}
+                                                onChange={handleEditPopupVendorContractorChange}
                                                 isClearable
+                                                isSearchable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
                                                 styles={{
                                                     control: (base, state) => ({
                                                         ...base,
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         borderColor: 'rgba(191, 152, 83, 0.2)',
                                                         borderWidth: '2px',
                                                         borderRadius: '0.5rem',
-                                                        padding: '0.25rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
                                                         textAlign: 'left',
                                                         boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                         '&:hover': {
                                                             borderColor: 'rgba(191, 152, 83, 0.4)',
                                                         },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
                                                     }),
                                                     placeholder: (base) => ({
                                                         ...base,
@@ -2662,7 +2842,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     option: (provided, state) => ({
                                                         ...provided,
                                                         textAlign: 'left',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         fontSize: '15px',
                                                         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                         color: 'black',
@@ -2670,7 +2850,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     singleValue: (base) => ({
                                                         ...base,
                                                         color: '#111827',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                     }),
                                                     menu: (base) => ({
                                                         ...base,
@@ -2683,100 +2863,70 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         '&::-webkit-scrollbar': { display: 'none' },
                                                     }),
                                                 }}
-                                                placeholder="Select Vendor"
+                                                placeholder="Vendor/Contractor Name"
                                             />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Contractor Name *</label>
-                                            <Select
-                                                name="contractor"
-                                                options={contractorOption}
-                                                value={contractorOption.find(opt => opt.value === formData.contractor)}
-                                                onChange={(selectedOption) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        contractor: selectedOption?.value || '',
-                                                        contractorId: selectedOption?.id || '',
-                                                        vendor: selectedOption ? '' : formData.vendor,
-                                                        vendorId: selectedOption ? '' : formData.vendorId
-                                                    })
-                                                }
-                                                isDisabled={!!formData.vendor}
-                                                isClearable
-                                                styles={{
-                                                    control: (base, state) => ({
-                                                        ...base,
-                                                        fontWeight: 'normal',
-                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                        borderWidth: '2px',
-                                                        borderRadius: '0.5rem',
-                                                        padding: '0.25rem',
-                                                        textAlign: 'left',
-                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                        '&:hover': {
-                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                        },
-                                                    }),
-                                                    placeholder: (base) => ({
-                                                        ...base,
-                                                        fontWeight: 'normal',
-                                                        color: '#6B7280',
-                                                        textAlign: 'left',
-
-                                                    }),
-                                                    option: (provided, state) => ({
-                                                        ...provided,
-                                                        textAlign: 'left',
-                                                        fontWeight: 'normal',
-                                                        fontSize: '15px',
-                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                        color: 'black',
-                                                    }),
-                                                    singleValue: (base) => ({
-                                                        ...base,
-                                                        color: '#111827',
-                                                        fontWeight: 'normal',
-                                                    }),
-                                                    menu: (base) => ({
-                                                        ...base,
-                                                        zIndex: 999,
-                                                    }),
-                                                    menuList: (base) => ({
-                                                        ...base,
-                                                        scrollbarWidth: 'none',
-                                                        msOverflowStyle: 'none',
-                                                        '&::-webkit-scrollbar': { display: 'none' },
-                                                    }),
-                                                }}
-                                                placeholder="Select Contractor"
-                                            />
                                         </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Quantity *</label>
+                                        <div className="flex gap-[16px]">
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Quantity</label>
                                             <input type="text" name="quantity" value={formData.quantity} onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                placeholder="Quantity"
+                                                className="w-[300px] h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Category *</label>
+                                        <div className="text-left w-[300px] relative">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Amount<span className="text-[#E4572E]">*</span></label>
+                                            <span className="absolute top-[40px] left-3 text-gray-600 font-normal">₹</span>
+                                            <input type="text" name="amount" value={formData.amount} onChange={handleChange}
+                                                placeholder="Amount"
+                                                className="w-[300px] h-[40px] text-[14px] py-0 px-2 pl-6 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
+                                                onWheel={(e) => e.target.blur()}
+                                            />
+                                        </div>
+                                        </div>
+                                        <div className="flex gap-[16px]">
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Category<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
                                             <Select name="category" value={categoryOption.find(option => option.value === formData.category)}
                                                 onChange={(selectedOption) => setFormData({ ...formData, category: selectedOption?.value || '' })}
                                                 options={categoryOption}
                                                 placeholder="Select Category"
                                                 isClearable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
                                                 styles={{
                                                     control: (base, state) => ({
                                                         ...base,
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         borderColor: 'rgba(191, 152, 83, 0.2)',
                                                         borderWidth: '2px',
                                                         borderRadius: '0.5rem',
-                                                        padding: '0.25rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
                                                         textAlign: 'left',
                                                         boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                         '&:hover': {
                                                             borderColor: 'rgba(191, 152, 83, 0.4)',
                                                         },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
                                                     }),
                                                     placeholder: (base) => ({
                                                         ...base,
@@ -2787,7 +2937,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     option: (provided, state) => ({
                                                         ...provided,
                                                         textAlign: 'left',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         fontSize: '15px',
                                                         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                         color: 'black',
@@ -2795,7 +2945,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     singleValue: (base) => ({
                                                         ...base,
                                                         color: '#111827',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                     }),
                                                     menu: (base) => ({
                                                         ...base,
@@ -2811,47 +2961,27 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 menuPlacement="bottom"
                                                 menuPosition="absolute"
                                             />
-                                        </div>
-                                        <div className="relative">
-                                            <label className="block text-gray-500 font-normal text-left">Amount *</label>
-                                            <span className="absolute top-9 left-3 mt-[2px] text-gray-600 font-normal">₹</span>
-                                            <input type="text" name="amount" value={formData.amount} onChange={handleChange}
-                                                className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                onWheel={(e) => e.target.blur()}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Comments *</label>
-                                            <input type="text" name="comments" value={formData.comments} onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                            />
-                                        </div>
-                                        <div>
-                                            <div className=' flex'>
-                                                <label className="block text-gray-500 font-normal text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
-                                                {selectedFile && <span className="text-orange-600 ml-4">{selectedFile.name}</span>}
                                             </div>
-                                            <input type="text" name="billCopy" value={formData.billCopy} onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                            />
-                                            <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
                                         </div>
                                         {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">Bill Arrival Date</label>
-                                                <input
-                                                    type="date"
-                                                    name="billArrivalDate"
-                                                    value={formData.billArrivalDate || ''}
-                                                    onChange={handleChange}
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                />
+                                            <div className="text-left w-[300px]">
+                                                <label className="block text-black font-semibold mb-[8px] text-left">Bill Arrival Date</label>
+                                                <div className="w-[300px]">
+                                                    <CustomDateField
+                                                        value={formData.billArrivalDate || ''}
+                                                        onChange={(v) => setFormData((prev) => ({ ...prev, billArrivalDate: v }))}
+                                                        placeholder="Bill Arrival Date"
+                                                        controlHeightPx={40}
+                                                        alwaysOpenBelow
+                                                        className="w-full [&>div]:!w-full [&>div]:!max-w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div:hover]:!border-[rgba(191,152,83,0.4)] [&>div:focus-within]:!outline-none [&>div:focus-within]:!ring-0 [&>div:focus-within]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-semibold"
+                                                    />
+                                                </div>
                                             </div>
                                         )}
-                                        {/* Conditional fields based on Account Type */}
                                         {(formData.accountType === 'Claim Payment' || formData.accountType === 'Utility Bills' || formData.accountType === 'Sundry Payment') && (
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
+                                            <div className="text-left w-[300px]">
+                                                <label className="block text-black font-semibold mb-[8px] text-left">Payment Mode<span className="text-[#E4572E]">*</span></label>
+                                                <div className="w-[300px]">
                                                 <Select
                                                     name="paymentMode"
                                                     options={finalPaymentModeOptions.map((mode) => ({
@@ -2874,21 +3004,40 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     }
                                                     placeholder="Select Payment Mode"
                                                     isClearable
+                                                    components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                    className={EDIT_POPUP_SELECT_CLASSNAME}
                                                     maxMenuHeight={200}
                                                     menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                                                     styles={{
                                                         control: (base, state) => ({
                                                             ...base,
-                                                            fontWeight: 'normal',
+                                                            fontWeight: 600,
                                                             borderColor: 'rgba(191, 152, 83, 0.2)',
                                                             borderWidth: '2px',
                                                             borderRadius: '0.5rem',
-                                                            padding: '0.25rem',
+                                                            height: '40px',
+                                                            minHeight: '40px',
+                                                            alignItems: 'center',
+                                                            paddingTop: 0,
+                                                            paddingBottom: 0,
                                                             textAlign: 'left',
                                                             boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                             '&:hover': {
                                                                 borderColor: 'rgba(191, 152, 83, 0.4)',
                                                             },
+                                                        }),
+                                                        valueContainer: (base) => ({
+                                                            ...base,
+                                                            alignItems: 'center',
+                                                            paddingTop: 0,
+                                                            paddingBottom: 0,
+                                                        }),
+                                                        indicatorsContainer: (base) => ({
+                                                            ...base,
+                                                            alignItems: 'center',
+                                                        }),
+                                                        indicatorSeparator: () => ({
+                                                            display: 'none',
                                                         }),
                                                         placeholder: (base) => ({
                                                             ...base,
@@ -2899,7 +3048,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         option: (provided, state) => ({
                                                             ...provided,
                                                             textAlign: 'left',
-                                                            fontWeight: 'normal',
+                                                            fontWeight: 600,
                                                             fontSize: '15px',
                                                             backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                             color: 'black',
@@ -2907,7 +3056,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         singleValue: (base) => ({
                                                             ...base,
                                                             color: '#111827',
-                                                            fontWeight: 'normal',
+                                                            fontWeight: 600,
                                                         }),
                                                         menuPortal: (base) => ({
                                                             ...base,
@@ -2927,30 +3076,16 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     menuPlacement="bottom"
                                                     menuPosition="fixed"
                                                 />
+                                                </div>
                                             </div>
                                         )}
+                                        </div>
                                         {formData.accountType === 'Utility Bills' && (
                                             <>
-                                                <div>
-                                                    <label className="block text-gray-500 font-normal text-left">Utility Type *</label>
-                                                    <select
-                                                        name="utilityType"
-                                                        value={formData.utilityType}
-                                                        onChange={handleChange}
-                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal">
-                                                        <option value="" disabled>--- Select ---</option>
-                                                        <option value="Electricity">Electricity</option>
-                                                        <option value="Property">Property</option>
-                                                        <option value="Water">Water</option>
-                                                        <option value="Telecom">Telecom</option>
-                                                        <option value="Subscription">Subscription</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-gray-500 font-normal text-left">
-                                                        {formData.utilityType === 'Electricity' ? 'EB Number' :
-                                                            formData.utilityType === 'Property' ? 'Property Tax Number' :
-                                                                formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
+                                                <div className="flex gap-[16px]">
+                                                <div className={formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription' ? 'w-[616px]' : 'w-[300px]'}>
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">
+                                                        {getUtilityTypeNumberLabel(formData.utilityType)}
                                                     </label>
                                                     <Select
                                                         options={ebNumberOptions}
@@ -2960,14 +3095,48 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                             setFormData((prev) => ({ ...prev, utilityTypeNumber: opt?.label || "" }));
                                                         }}
                                                         isClearable
-                                                        placeholder={`Select ${formData.utilityType === 'Electricity' ? 'EB Number' :
-                                                            formData.utilityType === 'Property' ? 'Property Tax Number' :
-                                                                formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
+                                                        components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                        className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                        placeholder={getUtilityTypeNumberLabel(formData.utilityType)}
                                                         styles={{
                                                             ...customStyles,
+                                                            control: (base, state) => ({
+                                                                ...(typeof customStyles.control === 'function' ? customStyles.control(base, state) : base),
+                                                                fontWeight: 600,
+                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                borderWidth: '2px',
+                                                                borderRadius: '0.5rem',
+                                                                height: '40px',
+                                                                minHeight: '40px',
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                                textAlign: 'left',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                },
+                                                            }),
+                                                            valueContainer: (base) => ({
+                                                                ...(typeof customStyles.valueContainer === 'function' ? customStyles.valueContainer(base) : base),
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                            }),
+                                                            indicatorsContainer: (base) => ({
+                                                                ...(typeof customStyles.indicatorsContainer === 'function' ? customStyles.indicatorsContainer(base) : base),
+                                                                alignItems: 'center',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none',
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...(typeof customStyles.option === 'function' ? customStyles.option(provided, state) : provided),
+                                                                fontWeight: 600,
+                                                            }),
                                                             singleValue: (provided) => ({
                                                                 ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
-                                                                fontWeight: 'normal',
+                                                                fontWeight: 600,
                                                             }),
                                                             menuList: (base) => ({
                                                                 ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
@@ -2980,69 +3149,153 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         menuPosition="absolute"
                                                     />
                                                 </div>
-                                                <div>
-                                                    <label className="block text-gray-500 font-normal text-left">Months</label>
-                                                    <input
-                                                        type="month"
-                                                        name="utilityForTheMonth"
-                                                        value={formData.utilityForTheMonth}
-                                                        onChange={handleChange}
-                                                        placeholder="Enter months..."
-                                                        className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                    />
+                                                {formData.utilityType !== 'Telecom' && formData.utilityType !== 'Subscription' && (
+                                                <div className="w-[300px]">
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">For The Month Of</label>
+                                                    <div className="w-[300px]">
+                                                        <CustomMonthField
+                                                            value={formData.utilityForTheMonth}
+                                                            onChange={(v) => setFormData((prev) => ({ ...prev, utilityForTheMonth: v }))}
+                                                            placeholder="For The Month Of"
+                                                            className="w-full"
+                                                            alwaysOpenAbove
+                                                        />
+                                                    </div>
+                                                </div>
+                                                )}
                                                 </div>
                                                 {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
-                                                    <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-
-                                                        {/* Validity */}
-                                                        <div>
-                                                            <label className="block text-gray-500 font-normal text-left">Validity</label>
+                                                    <div className="flex gap-[16px] items-end">
+                                                        <div className="w-[300px]">
+                                                            <label className="block text-black font-semibold mb-[8px] text-left">Validity Duration<span className="text-[#E4572E]">*</span></label>
+                                                            <div className="flex gap-2 w-[300px]">
                                                             <input
                                                                 type="text"
                                                                 name="utilityValidityDays"
                                                                 value={formData.utilityValidityDays}
                                                                 onChange={handleChange}
-                                                                placeholder="Enter validity..."
-                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                                                placeholder="Validity Duration"
+                                                                className="min-w-0 flex-1 h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
                                                             />
-                                                        </div>
-
-                                                        {/* Validity Type */}
-                                                        <div>
-                                                            <label className="block text-gray-500 font-normal text-left">Validity Type</label>
-                                                            <select
+                                                            <div className="w-[110px]">
+                                                            <Select
                                                                 name="utilityValidityType"
-                                                                value={formData.utilityValidityType}
-                                                                onChange={handleChange}
-                                                                className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                            >
-                                                                <option value="">--- Select ---</option>
-                                                                <option value="Days">Days</option>
-                                                                <option value="Month">Month</option>
-                                                                <option value="Year">Year</option>
-                                                            </select>
-                                                        </div>
-
-                                                        {/* Service Start Date */}
-                                                        {formData.utilityType === 'Telecom' && (
-                                                            <div>
-                                                                <label className="block text-gray-500 font-normal text-left">Service Start Date</label>
-                                                                <div className="mt-1">
-                                                                    <CustomDateField
-                                                                        value={formData.serviceStartingDate}
-                                                                        onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
-                                                                        placeholder="Service start date"
-                                                                        className="[&>button]:!font-normal"
-                                                                    />
-                                                                </div>
+                                                                options={[
+                                                                    { value: 'Days', label: 'Days' },
+                                                                    { value: 'Month', label: 'Month' },
+                                                                    { value: 'Year', label: 'Year' },
+                                                                ]}
+                                                                value={[
+                                                                    { value: 'Days', label: 'Days' },
+                                                                    { value: 'Month', label: 'Month' },
+                                                                    { value: 'Year', label: 'Year' },
+                                                                ].find((o) => o.value === formData.utilityValidityType) || null}
+                                                                onChange={(selectedOption) =>
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        utilityValidityType: selectedOption?.value || '',
+                                                                    })
+                                                                }
+                                                                placeholder="Validity Type"
+                                                                isClearable
+                                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                                className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                                isSearchable
+                                                                styles={{
+                                                                    control: (base, state) => ({
+                                                                        ...base,
+                                                                        fontWeight: 600,
+                                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                        borderWidth: '2px',
+                                                                        borderRadius: '0.5rem',
+                                                                        height: '40px',
+                                                                        minHeight: '40px',
+                                                                        alignItems: 'center',
+                                                                        paddingTop: 0,
+                                                                        paddingBottom: 0,
+                                                                        textAlign: 'left',
+                                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                        '&:hover': {
+                                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                        },
+                                                                    }),
+                                                                    valueContainer: (base) => ({
+                                                                        ...base,
+                                                                        alignItems: 'center',
+                                                                        paddingTop: 0,
+                                                                        paddingBottom: 0,
+                                                                    }),
+                                                                    indicatorsContainer: (base) => ({
+                                                                        ...base,
+                                                                        alignItems: 'center',
+                                                                    }),
+                                                                    indicatorSeparator: () => ({
+                                                                        display: 'none',
+                                                                    }),
+                                                                    placeholder: (base) => ({
+                                                                        ...base,
+                                                                        fontWeight: 'normal',
+                                                                        color: '#6B7280',
+                                                                        textAlign: 'left',
+                                                                    }),
+                                                                    option: (provided, state) => ({
+                                                                        ...provided,
+                                                                        textAlign: 'left',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '15px',
+                                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                        color: 'black',
+                                                                    }),
+                                                                    singleValue: (base) => ({
+                                                                        ...base,
+                                                                        color: '#111827',
+                                                                        fontWeight: 600,
+                                                                    }),
+                                                                    menu: (base) => ({
+                                                                        ...base,
+                                                                        zIndex: 999,
+                                                                    }),
+                                                                    menuList: (base) => ({
+                                                                        ...base,
+                                                                        scrollbarWidth: 'none',
+                                                                        msOverflowStyle: 'none',
+                                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                                    }),
+                                                                }}
+                                                                menuPlacement="bottom"
+                                                                menuPosition="absolute"
+                                                            />
                                                             </div>
-                                                        )}
-
+                                                            </div>
+                                                        </div>
+                                                        <div className="w-[300px]">
+                                                            <label className="block text-black font-semibold mb-[8px] text-left">Activation Date<span className="text-[#E4572E]">*</span></label>
+                                                            <div className="w-[300px]">
+                                                                <CustomDateField
+                                                                    value={formData.serviceStartingDate}
+                                                                    onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
+                                                                    placeholder="Activation Date"
+                                                                    controlHeightPx={40}
+                                                                    alwaysOpenAbove
+                                                                    className="w-full [&>div]:!w-full [&>div]:!max-w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div:hover]:!border-[rgba(191,152,83,0.4)] [&>div:focus-within]:!outline-none [&>div:focus-within]:!ring-0 [&>div:focus-within]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-semibold"
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </>
                                         )}
-                                        <div className="col-span-2 flex justify-end space-x-4 mt-4 border-t-2 ">
+                                        <div className="text-left">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Description</label>
+                                            <textarea
+                                                name="comments"
+                                                value={formData.comments}
+                                                onChange={handleChange}
+                                                placeholder="Description"
+                                                className="border-2 border-[#BF9853] rounded-md px-[8px] w-[616px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none font-semibold placeholder:font-normal placeholder:text-gray-500"
+                                            />
+                                        </div>
+                                        <div className="flex justify-end space-x-4 mt-4 ">
                                             <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
                                                 Cancel
                                             </button>

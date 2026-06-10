@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import aaLogo from "../Images/AALogo.svg";
 import { canDownloadExpensesReport, downloadExpensesReport } from "../../utils/downloadExpensesReport";
+import {
+  formatOrbitLastSyncedTime,
+  runOrbitCurrentModuleSync,
+  subscribeOrbitSyncStatus,
+  startOrbitAutoSync,
+  stopOrbitAutoSync,
+} from "../../utils/orbitProjectDataSync";
 
 const IconDownload = () => (  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
     <path d="M12 4v12M6 11l6 6 6-6M5 21h14" />
@@ -17,6 +24,13 @@ const IconBell = () => (
 const IconSignOut = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7">
     <path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 17l-5-5 5-5M5 12h11" />
+  </svg>
+);
+
+const IconSync = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M4 4v5h5M20 20v-5h-5" />
+    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L4 4M3.51 15a9 9 0 0 0 14.85 3.36L20 20" />
   </svg>
 );
 
@@ -65,6 +79,15 @@ const ORBIT_TOPBAR_CSS = `
 .orbit-erp-heading-root .icon-btn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink-2);cursor:pointer;transition:all .15s;position:relative;}
 .orbit-erp-heading-root .icon-btn:hover{background:var(--cream-2);}
 .orbit-erp-heading-root .icon-btn.gold{color:var(--gold-deep);}
+.orbit-erp-heading-root .sync-btn{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink-2);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;min-width:0;}
+.orbit-erp-heading-root .sync-btn:hover:not(:disabled){background:var(--cream-2);color:var(--gold-deep);}
+.orbit-erp-heading-root .sync-btn:disabled{opacity:.72;cursor:wait;}
+.orbit-erp-heading-root .sync-btn .sync-copy{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0;}
+.orbit-erp-heading-root .sync-btn .sync-title{font-size:12px;font-weight:700;color:inherit;}
+.orbit-erp-heading-root .sync-btn .sync-time{font-size:9.5px;font-weight:500;color:var(--muted-2);max-width:110px;overflow:hidden;text-overflow:ellipsis;}
+.orbit-erp-heading-root .sync-btn .sync-icon{display:inline-flex;flex-shrink:0;}
+.orbit-erp-heading-root .sync-btn .sync-icon.spinning svg{animation:orbitSyncSpin .85s linear infinite;}
+@keyframes orbitSyncSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .orbit-erp-heading-root .avatar-mark{width:30px;height:30px;border-radius:50%;background:var(--cream-2);border:1.5px solid var(--gold);display:inline-flex;align-items:center;justify-content:center;}
 .orbit-erp-heading-root .user-pill{display:inline-flex;align-items:center;gap:7px;padding:2px 8px 2px 2px;}
 .orbit-erp-heading-root .brand-button{display:flex;align-items:center;gap:9px;cursor:pointer;background:transparent;border:none;padding:3px 6px;margin-left:-6px;border-radius:8px;transition:background .15s;}
@@ -118,6 +141,7 @@ export default function OrbitERPHeading({
   /** When true, only the brand row is shown; pair with OrbitBankRegisterStrip for tabs + tools on the row below. */
   hideEndToolbar = false,
   onSignOut,
+  currentPath = "",
 }) {
   const [branchInternal, setBranchInternal] = useState("");
   const branch = branchProp !== undefined ? branchProp : branchInternal;
@@ -239,12 +263,18 @@ export default function OrbitERPHeading({
     emitBranchChange(nextBranchId);
   };
 
-  const [notifOpen, setNotifOpen] = useState(false);  const [isDownloading, setIsDownloading] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [syncState, setSyncState] = useState({ lastSyncedAt: null, isSyncing: false });
   const [notificationsInternal] = useState([]);
   const notifications = notificationsProp !== undefined ? notificationsProp : notificationsInternal;
   const canDownloadExpenses = canDownloadExpensesReport(displayName);
 
   const popRef = useRef();
+
+  useEffect(() => {
+    return subscribeOrbitSyncStatus(setSyncState);
+  }, []);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -280,6 +310,23 @@ export default function OrbitERPHeading({
     }
   };
 
+  const handleManualSync = () => {
+    if (syncState.isSyncing) return;
+    void runOrbitCurrentModuleSync({
+      currentPath: currentPath || window.location.pathname || "",
+    });
+  };
+
+  const lastSyncedLabel = syncState.isSyncing
+    ? "Syncing..."
+    : `Last: ${formatOrbitLastSyncedTime(syncState.lastSyncedAt)}`;
+
+  useEffect(() => {
+    const pathGetter = () => currentPath || window.location.pathname || "";
+    startOrbitAutoSync(pathGetter);
+    return () => stopOrbitAutoSync();
+  }, [currentPath]);
+
   return (
     <div className="orbit-erp-heading-root">
       <style>{ORBIT_TOPBAR_CSS}</style>
@@ -294,6 +341,21 @@ export default function OrbitERPHeading({
         </div>
         {!hideEndToolbar && (
         <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            className="sync-btn desktop-only"
+            title="Sync current module data"
+            onClick={handleManualSync}
+            disabled={syncState.isSyncing}
+          >
+            <span className={`sync-icon${syncState.isSyncing ? " spinning" : ""}`}>
+              <IconSync />
+            </span>
+            <span className="sync-copy">
+              <span className="sync-title">Sync</span>
+              <span className="sync-time">{lastSyncedLabel}</span>
+            </span>
+          </button>
           {canSelectBranch ? (
             <select
               value={selectedBranchId}

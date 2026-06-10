@@ -12,8 +12,10 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 
-const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const resolveActiveBranchId = () => {
     try {
       const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -603,6 +605,18 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
     };
     fetchData();
   }, []);
+
+  useTabRefreshSignal(refreshSignal, isActive, async () => {
+    try {
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      const data = await response.json();
+      setLoanData(data);
+    } catch (error) {
+      console.error('Error refreshing loan portal data:', error);
+    }
+  });
+
   // Optimized handleChange with useCallback
   const handleChange = useCallback(async (selected) => {
     setSelectedOption(selected);
@@ -1022,6 +1036,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
             }
             const data = await response.json();
             setLoanData(data);
+            notifyOrbitModuleDataChanged('loan');
           } catch (error) {
             console.error('Error refreshing loan data:', error);
           }
@@ -1160,6 +1175,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
             }
             const data = await response.json();
             setLoanData(data);
+            notifyOrbitModuleDataChanged('loan');
           } catch (error) {
             console.error("Error refreshing loan data:", error);
           }
@@ -1357,6 +1373,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
           }
           const data = await response.json();
           setLoanData(data);
+        notifyOrbitModuleDataChanged('loan');
         } catch (error) {
           console.error('Error refreshing loan data:', error);
         }
@@ -1373,8 +1390,8 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   // Function to handle payment modal submission
   const handlePaymentModalSubmit = async () => {
     // Validate payment details
-    if (!paymentPopupData.transactionNumber || !paymentPopupData.accountNumber) {
-      toast.error("Please fill all payment details!", {
+    if (!paymentPopupData.accountNumber) {
+      toast.error("Please select an account number!", {
         position: "top-center",
         autoClose: 3000,
         theme: "colored"
@@ -1872,6 +1889,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       if (response.ok) {
         const data = await response.json();
         setLoanData(data);
+        notifyOrbitModuleDataChanged('loan');
       }
       setIsEditModalOpen(false);
       toast.success('Entry updated successfully!', {
@@ -2358,7 +2376,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                           )}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number<span className="text-red-500">*</span></label>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
                               <input
                                 type="text"
                                 value={paymentPopupData.transactionNumber}
@@ -2379,6 +2397,8 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [] }) => {
                                 placeholder="Select Account"
                                 isSearchable
                                 isClearable
+                                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                menuPosition="fixed"
                                 styles={customStyles}
                                 className="w-full focus:outline-none"
                               />

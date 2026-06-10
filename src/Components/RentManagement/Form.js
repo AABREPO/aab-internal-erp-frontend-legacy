@@ -8,6 +8,7 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import CustomMonthField from "../ExpensesEntry/CustomMonthField";
 const Form = ({ embedded = false, onSuccess } = {}) => {
     const resolveActiveBranchId = () => {
@@ -901,8 +902,9 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             setAmount('');
             setFormPaymentMode('');
             setPaidOnDate('');
-            await fetchRentalForms();
-            await fetchLatestEno();
+            notifyOrbitModuleDataChanged('rent');
+            void fetchRentalForms();
+            void fetchLatestEno();
             if (typeof onSuccess === 'function') {
                 try { await onSuccess(); } catch { }
             }
@@ -1027,8 +1029,9 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
             setAmount('');
             setFormPaymentMode('');
             setPaidOnDate('');
-            await fetchRentalForms();
-            await fetchLatestEno();
+            notifyOrbitModuleDataChanged('rent');
+            void fetchRentalForms();
+            void fetchLatestEno();
             if (typeof onSuccess === 'function') {
                 try { await onSuccess(); } catch { }
             }

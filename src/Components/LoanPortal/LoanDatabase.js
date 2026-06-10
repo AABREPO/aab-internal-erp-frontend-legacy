@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import jsPDF from "jspdf";
+import { jsPDF } from 'jspdf';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import "jspdf-autotable";
 import Select from 'react-select';
 import { ToastContainer, toast } from 'react-toastify';
@@ -47,7 +49,7 @@ import {
 import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
 
 const LOAN_FILTER_OPTION_MIN_HEIGHT_PX = 36;
-const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -729,6 +731,9 @@ const LoanDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => 
   useEffect(() => {
     fetchLoanData();
   }, []);
+  useOrbitPageSync('loan', fetchLoanData, []);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchLoanData);
 
   useEffect(() => {
     const fetchAccountDetails = async () => {

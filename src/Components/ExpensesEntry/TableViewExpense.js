@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
-import Select from 'react-select';
+import Select, { components as selectComponents } from 'react-select';
 import Filter from '../Images/TableFilter.svg'
 import Reload from '../Images/Clear.svg'
 import Search from '../Images/Searchnew.svg'
@@ -23,17 +24,42 @@ import {
 import XL from '../Images/sheets.png'
 import Pdf from '../Images/pdf.png'
 import CustomDateField from './CustomDateField';
+import CustomMonthField from './CustomMonthField';
 import ExpenseEntryPaymentModal from './ExpenseEntryPaymentModal';
 import { Calendar } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
+import SingleDatePicker from './SingleDatePicker';
 import { Table, TableProvider, buildTableViewExpenseTableContext, BLANK_VALUE, blankOption } from './Table';
 import {
-    TABLE_FILTER_MAX_VISIBLE_OPTIONS,
-    TABLE_FILTER_MENU_MAX_HEIGHT_PX,
-    TABLE_FILTER_OPTION_HEIGHT_PX,
+    DATABASE_TABLE_FILTER_SELECT_STYLES,
     isAdvancePortalSourceExpense,
 } from './databaseExpensesSharedColumns';
+import { useExpensesListLoader } from './expensesListStore';
 Modal.setAppElement('#root');
+
+const TABLE_VIEW_EXPENSE_FIELDS = {
+    date: 'Date',
+    projectName: 'Project Name',
+    vendorName: 'Vendor Name',
+    contractorName: 'Contractor Name',
+    staffName: 'Staff Name',
+    quantity: 'Quantity',
+    amount: 'Amount',
+    description: 'Description',
+    category: 'Category',
+    machineTools: 'Machine Tools',
+    accountType: 'A/C Type',
+    mode: 'Mode',
+    sourceFrom: 'Source From',
+    branch: 'Branch',
+    enteredBy: 'Entered By',
+    entryNo: 'Entry No',
+    billArrival: 'Bill Arrival',
+    activity: 'Edit',
+    file: 'File',
+    searchTransactions: 'Search Transactions...',
+};
+
 const EDIT_POPUP_UTILITY_TYPE_OPTIONS = [
     { value: 'Electricity', label: 'Electricity' },
     { value: 'Property', label: 'Property' },
@@ -46,6 +72,24 @@ const EDIT_POPUP_VALIDITY_TYPE_OPTIONS = [
     { value: 'Month', label: 'Month' },
     { value: 'Year', label: 'Year' },
 ];
+const getUtilityTypeNumberLabel = (utilityTypeValue) => {
+    switch (utilityTypeValue) {
+        case 'Electricity':
+        default:
+            return 'Service Number';
+    }
+};
+const EDIT_POPUP_SELECT_INDICATOR_COMPONENTS = {
+    DropdownIndicator: (props) => {
+        if (props.selectProps.value) return null;
+        return <selectComponents.DropdownIndicator {...props} />;
+    },
+    ClearIndicator: (props) => {
+        if (!props.selectProps.value) return null;
+        return <selectComponents.ClearIndicator {...props} />;
+    },
+};
+const EDIT_POPUP_SELECT_CLASSNAME = 'font-semibold text-[14px]';
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 
 /** API expects yyyy-MM-dd; expense form may send dd/MM/yyyy or ISO strings. */
@@ -168,50 +212,7 @@ const updateWeeklyPaymentBillById = async (billId, payload) => {
     return response.json();
 };
 
-/** Scoped styles to match DatabaseExpenses table UI. */
-const TVE_LEDGER_TABLE_UI_CSS = `
-.tve-exp-ledger-ui{
-  --gold:#D6AB60; --gold-soft:#E6C68A; --gold-deep:#B8924B;
-  --ink:#212121; --ink-2:#3a3a3a; --muted:#8a8275;
-  --cream:#FBF7F0; --cream-2:#F5EFE3; --cream-3:#FAF4E8; --row-alt:#FAF4E8;
-  --line:#EADFC8; --line-soft:#f0e9d8;
-  --green:#2f9e6e; --green-bg:#E0F1E5;
-  --red:#d23b3b; --red-bg:#FFE7E7;
-}
-.tve-exp-ledger-ui .ledger-card{background:transparent;border:none;overflow:visible;display:flex;flex:1;min-height:0;flex-direction:column;}
-.tve-exp-ledger-ui .ledger-card .accent{width:0;display:none;}
-.tve-exp-ledger-ui .ledger-card .body{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;}
-.tve-exp-ledger-ui .tve-exp-table{width:100%;table-layout:fixed;border-collapse:collapse;}
-.tve-exp-ledger-ui .tve-exp-table thead{position:sticky;top:0;z-index:10;}
-.tve-exp-ledger-ui .tve-exp-table th{
-  position:sticky;top:0;z-index:2;vertical-align:middle;white-space:nowrap;border-bottom:none;
-}
-.tve-exp-ledger-ui .tve-exp-table thead tr:first-child th{
-  background:#FAF6ED;
-  z-index:11;
-}
-.tve-exp-ledger-ui .tve-exp-table thead tr:first-child th.cursor-pointer:hover{background:#e5e7eb;}
-.tve-exp-ledger-ui .tve-exp-table th.text-right,
-.tve-exp-ledger-ui .tve-exp-table td.text-right{text-align:right;}
-.tve-exp-ledger-ui .tve-exp-table th.tve-amount-col,
-.tve-exp-ledger-ui .tve-exp-table td.tve-amount-col{text-align:right;}
-.tve-exp-ledger-ui .tve-exp-table thead tr.filter-row th{
-  position:sticky;top:var(--tve-sticky-header-h, 40px);z-index:3;background:#eeeeee;
-  height:44px;font-size:14px;font-weight:400;color:#000;
-  padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;
-}
-.tve-exp-ledger-ui .tve-exp-table.tve-filters-open thead tr:first-child th{border-bottom:0 !important;}
-.tve-exp-ledger-ui .tve-exp-table thead tr.filter-row th:first-child{z-index:4;}
-.tve-exp-ledger-ui .tve-exp-table td{
-  font-size:14px;font-weight:600;font-family:'Manrope',sans-serif;color:#000000;
-  vertical-align:middle;border-top:none;
-}
-.tve-exp-ledger-ui .tve-exp-table td.tve-col-wrap{white-space:normal;word-break:break-word;}
-.tve-exp-ledger-ui .tve-exp-table .ink{color:#000000;}
-.tve-exp-ledger-ui .num-cell{font-variant-numeric:tabular-nums;white-space:nowrap;}
-.tve-exp-ledger-ui .truncate-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.tve-exp-ledger-ui .act-cell{display:flex;align-items:center;justify-content:flex-start;gap:7px;}
-`;
+const BLANK_LABEL = 'Blank';
 
 const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const TELECOM_DIRECTORY_ENDPOINT = 'https://backendaab.in/demoAabuildersDash/api/utility-telecom/getAll';
@@ -227,8 +228,14 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         }
     }, []);
     const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId());
+    const {
+        expenses,
+        expensesLoading,
+        expensesLoadingMore,
+        expensesTotalCount,
+        refetchExpenses,
+    } = useExpensesListLoader(activeBranchId);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [expenses, setExpenses] = useState([]);
     const [filteredExpenses, setFilteredExpenses] = useState([]);
     const [exportFilteredExpenses, setExportFilteredExpenses] = useState([]);
     const [overallSearch, setOverallSearch] = useState('');
@@ -244,6 +251,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [sourceOptions, setSourceOptions] = useState([]);
     const [paymentModeFilterOptions, setPaymentModeFilterOptions] = useState([]);
     const [branchFilterOptions, setBranchFilterOptions] = useState([]);
+    const [enteredByOptions, setEnteredByOptions] = useState([]);
     const [laboursList, setLaboursList] = useState([]);
     const [employeeOptions, setEmployeeOptions] = useState([]);
     const [selectedSiteName, setSelectedSiteName] = useState(() => {
@@ -285,6 +293,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [selectedBranch, setSelectedBranch] = useState(() => {
         return localStorage.getItem('expenseFilter_branch') || '';
     });
+    const [selectedEnteredBy, setSelectedEnteredBy] = useState(() => {
+        return localStorage.getItem('expenseFilter_enteredBy') || '';
+    });
     const [accountTypeOption, setAccountTypeOption] = useState([]);
     const [editAccountTypeOptions, setEditAccountTypeOptions] = useState([]);
     const [siteOption, setSiteOption] = useState([]);
@@ -301,9 +312,11 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const scrollRef = useRef(null);
     const filterRowRef = useRef(null);
     const billArrivalFilterRef = useRef(null);
+    const [selectedBillArrival, setSelectedBillArrival] = useState('');
+    const [showBillArrivalCalendar, setShowBillArrivalCalendar] = useState(false);
+    const [billArrivalCalendarPos, setBillArrivalCalendarPos] = useState({ top: 0, left: 0 });
     const filterNudgeUsedRef = useRef(false);
     const filterScrollResetSkipRef = useRef(true);
-    const headerRowRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -379,35 +392,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         return () => cancelMomentum();
     }, []);
     useEffect(() => {
-        const STYLE_ID = 'tve-expense-ledger-table-ui-css';
-        let el = document.getElementById(STYLE_ID);
-        if (!el) {
-            el = document.createElement('style');
-            el.id = STYLE_ID;
-            document.head.appendChild(el);
-        }
-        el.textContent = TVE_LEDGER_TABLE_UI_CSS;
-    }, []);
-    /** Keeps filter-row `top` equal to sort-header height so tbody does not show between sticky rows. */
-    useLayoutEffect(() => {
-        const scroller = scrollRef.current;
-        const headerTr = headerRowRef.current;
-        if (!scroller || !headerTr) return undefined;
-        const apply = () => {
-            const h = headerTr.getBoundingClientRect().height;
-            if (h > 0) scroller.style.setProperty('--tve-sticky-header-h', `${h}px`);
-        };
-        apply();
-        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null;
-        ro?.observe(headerTr);
-        window.addEventListener('resize', apply);
-        return () => {
-            ro?.disconnect();
-            window.removeEventListener('resize', apply);
-            scroller.style.removeProperty('--tve-sticky-header-h');
-        };
-    }, [showFilters]);
-    useEffect(() => {
         localStorage.setItem('expenseFilter_siteName', selectedSiteName);
     }, [selectedSiteName]);
     useEffect(() => {
@@ -457,6 +441,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     useEffect(() => {
         localStorage.setItem('expenseFilter_branch', selectedBranch);
     }, [selectedBranch]);
+    useEffect(() => {
+        localStorage.setItem('expenseFilter_enteredBy', selectedEnteredBy);
+    }, [selectedEnteredBy]);
     const [formData, setFormData] = useState({
         accountType: '',
         date: '',
@@ -657,46 +644,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             window.removeEventListener("branchSelectionChanged", syncBranch);
         };
     }, [resolveActiveBranchId]);
-    const refetchExpenses = useCallback(async () => {
-        const response = await axios.get('https://backendaab.in/demoAabuilderDash/expenses_form/get_form', {
-            params: activeBranchId ? { branchId: activeBranchId } : {},
-        });
-        const sortedExpenses = response.data.sort((a, b) => {
-            const enoA = parseInt(a.eno, 10);
-            const enoB = parseInt(b.eno, 10);
-            return enoB - enoA;
-        });
-        setExpenses(sortedExpenses);
-        setFilteredExpenses(sortedExpenses);
-        const uniqueEnos = [...new Set(response.data.map(expense => expense.eno))];
-        const uniqueAccountTypes = [...new Set(response.data.map(expense => expense.accountType))];
-        const uniqueProjectNames = [...new Set(response.data.map(expense => expense.siteName))];
-        const siteOptions = uniqueProjectNames.map(name => ({ value: name, label: name }));
-        const uniqueVendorOptions = [...new Set(response.data.map(expense => expense.vendor))];
-        const vendorOptions = uniqueVendorOptions.map(name => ({ value: name, label: name }));
-        const uniqueContractorOptions = [...new Set(response.data.map(expense => expense.contractor))];
-        const uniqueCategoryOptions = [...new Set(response.data.map(expense => expense.category))];
-        const contractorOption = uniqueContractorOptions.map(name => ({ value: name, label: name }));
-        const categoryOption = uniqueCategoryOptions.map(name => ({ value: name, label: name }));
-        setEnoOptions(uniqueEnos);
-        setAccountTypeOptions(uniqueAccountTypes);
-        setSiteOptions(siteOptions);
-        setVendorOptions(vendorOptions);
-        setContractorOptions(contractorOption);
-        setCategoryOptions(categoryOption);
-    }, [activeBranchId]);
-    useEffect(() => {
-        refetchExpenses().catch((error) => {
-            console.error('Error fetching expenses:', error);
-        });
-    }, [refetchExpenses]);
-    const prevIsActiveRef = useRef(isActive);
-    useEffect(() => {
-        if (isActive && prevIsActiveRef.current === false) {
-            void refetchExpenses();
-        }
-        prevIsActiveRef.current = isActive;
-    }, [isActive, refetchExpenses]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -1060,6 +1007,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                     getMachineToolsItemIdDisplay(expense.machineTools),
                     expense.source,
                     getBranchName(expense.branch_id ?? expense.branchId),
+                    expense.enteredBy || ' ',
                     expense.eno,
                     formatBillArrivalDisplay(expense),
                 ]
@@ -1108,6 +1056,11 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                         ? isBlankish(expense.branch_id ?? expense.branchId)
                         : String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch))
                     : true) &&
+                (selectedEnteredBy
+                    ? (selectedEnteredBy === BLANK_VALUE
+                        ? isBlankish(expense.enteredBy)
+                        : (expense.enteredBy || ' ') === selectedEnteredBy)
+                    : true) &&
                 (selectedAccountType ?
                     (selectedAccountType === BLANK_VALUE
                         ? isBlankish(expense.accountType)
@@ -1117,6 +1070,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                     ? (selectedEno === BLANK_VALUE
                         ? isBlankish(expense.eno)
                         : String(expense.eno) === String(selectedEno))
+                    : true) &&
+                (selectedBillArrival
+                    ? expenseBillArrivalToInput(expense) === selectedBillArrival
                     : true)
             );
         });
@@ -1131,10 +1087,12 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             selectedSource,
             selectedPaymentMode,
             selectedBranch,
+            selectedEnteredBy,
             selectedAccountType,
             startDate,
             endDate,
-            selectedEno
+            selectedEno,
+            selectedBillArrival
         ].some(Boolean) || overallSearch.trim();
         setExportFilteredExpenses(anyFilterApplied ? filtered : []);
         const getOptions = (data, key) => {
@@ -1156,6 +1114,20 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         }));
         branchFilterOptionsBuilt.unshift(blankOption);
         setBranchFilterOptions(branchFilterOptionsBuilt);
+        const uniqueEnteredBy = [];
+        const seenEnteredBy = new Set();
+        filtered.forEach((item) => {
+            const enteredBy = item.enteredBy;
+            if (isBlankish(enteredBy)) return;
+            const key = String(enteredBy);
+            if (!seenEnteredBy.has(key)) {
+                seenEnteredBy.add(key);
+                uniqueEnteredBy.push(String(enteredBy));
+            }
+        });
+        const enteredByOptionsBuilt = uniqueEnteredBy.map((val) => ({ value: val, label: val }));
+        enteredByOptionsBuilt.unshift(blankOption);
+        setEnteredByOptions(enteredByOptionsBuilt);
         const uniqueToolIds = [...new Set(filtered.map((item) => item.machineTools).filter(val => !isBlankish(val)))];
         const machineToolsOptionsBuilt = uniqueToolIds.map((id) => ({
             value: String(id),
@@ -1179,15 +1151,23 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         selectedSource,
         selectedPaymentMode,
         selectedBranch,
+        selectedEnteredBy,
         selectedAccountType,
         startDate,
         endDate,
         selectedEno,
+        selectedBillArrival,
         overallSearch,
         expenses,
         machineToolsIdToLabel,
         branchOptions
     ]);
+    useEffect(() => {
+        if (!showBillArrivalCalendar) return undefined;
+        const closeCalendar = () => setShowBillArrivalCalendar(false);
+        window.addEventListener('scroll', closeCalendar, true);
+        return () => window.removeEventListener('scroll', closeCalendar, true);
+    }, [showBillArrivalCalendar]);
     useEffect(() => {
         if (filterScrollResetSkipRef.current) {
             filterScrollResetSkipRef.current = false;
@@ -1202,8 +1182,8 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         });
     }, [
         selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools,
-        selectedSource, selectedPaymentMode, selectedBranch, selectedAccountType, startDate, endDate,
-        selectedEno,
+        selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate,
+        selectedEno, selectedBillArrival,
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
@@ -1480,257 +1460,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         }
         setCurrentPage(1);
     };
-    const customStyles = useMemo(() => ({
-        control: (provided, state) => ({
-            ...provided,
-            borderWidth: '2px',
-            lineHeight: '20px',
-            fontSize: '14px',
-            fontWeight: 100,
-            minHeight: '41px',
-            height: '41px',
-            borderRadius: '8px',
-            padding: '0.15rem',
-            textAlign: 'left',
-            borderColor: 'rgba(191, 152, 83, 0.2)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-            '&:hover': {
-                borderColor: 'rgba(191, 152, 83, 0.4)',
-            },
-        }),
-        clearIndicator: (provided) => ({
-            ...provided,
-            cursor: 'pointer',
-        }),
-        menu: (provided) => ({
-            ...provided,
-            zIndex: 999,
-            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
-        }),
-        menuPortal: (provided) => ({
-            ...provided,
-            zIndex: 9999,
-        }),
-        menuList: (provided) => ({
-            ...provided,
-            maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
-            paddingTop: 0,
-            paddingBottom: 0,
-            overflowY: 'auto',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
-        }),
-        singleValue: (provided) => ({
-            ...provided,
-            color: '#111827',
-            fontWeight: 400,
-            marginRight: 0,
-        }),
-        placeholder: (provided) => ({
-            ...provided,
-            color: '#d3d5db',
-            textAlign: 'left',
-            fontWeight: 'normal',
-        }),
-        input: (provided) => ({
-            ...provided,
-            fontWeight: 400,
-        }),
-        valueContainer: (provided) => ({
-            ...provided,
-            paddingRight: '2px',
-            fontWeight: 400,
-        }),
-        indicatorsContainer: (provided) => ({
-            ...provided,
-            paddingLeft: '0px',
-        }),
-        dropdownIndicator: (provided) => ({
-            ...provided,
-            padding: '4px',
-        }),
-        option: (provided, state) => ({
-            ...provided,
-            minHeight: TABLE_FILTER_OPTION_HEIGHT_PX,
-            height: TABLE_FILTER_OPTION_HEIGHT_PX,
-            paddingTop: 0,
-            paddingBottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            textAlign: 'left',
-            fontWeight: 'normal',
-            fontSize: '15px',
-            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-            color: 'black',
-        }),
-        input: (provided) => ({
-            ...provided,
-            fontWeight: 'normal',
-            color: 'black',
-            textAlign: 'left',
-        }),
-        placeholder: (provided) => ({
-            ...provided,
-            color: '#d3d5db',
-            textAlign: 'left',
-            fontWeight: 'normal',
-        }),
-        indicatorSeparator: (provided) => ({
-            ...provided,
-            display: 'none',
-        }),
-    }), []);
-    const TABLE_FILTER_OPTION_HEIGHT = TABLE_FILTER_OPTION_HEIGHT_PX;
-    const TABLE_FILTER_MAX_VISIBLE_OPTIONS_COUNT = TABLE_FILTER_MAX_VISIBLE_OPTIONS;
-    const getTableFilterMenuMaxHeight = () => {
-        const maxLargeHeight = TABLE_FILTER_MENU_MAX_HEIGHT_PX;
-        if (typeof window === 'undefined') return maxLargeHeight;
-        if (window.innerWidth >= 1024) return maxLargeHeight;
-        const viewportSpace = Math.max(window.innerHeight - 320, TABLE_FILTER_OPTION_HEIGHT * 3);
-        const scrollSpace = scrollRef.current
-            ? Math.max(scrollRef.current.clientHeight - 120, TABLE_FILTER_OPTION_HEIGHT * 3)
-            : viewportSpace;
-        const raw = Math.min(maxLargeHeight, viewportSpace, scrollSpace);
-        const visibleCount = Math.max(
-            3,
-            Math.min(TABLE_FILTER_MAX_VISIBLE_OPTIONS_COUNT, Math.floor(raw / TABLE_FILTER_OPTION_HEIGHT))
-        );
-        return visibleCount * TABLE_FILTER_OPTION_HEIGHT;
-    };
-    const [tableFilterMenuMaxHeight, setTableFilterMenuMaxHeight] = useState(getTableFilterMenuMaxHeight);
-    useEffect(() => {
-        const updateMenuHeight = () => setTableFilterMenuMaxHeight(getTableFilterMenuMaxHeight());
-        updateMenuHeight();
-        window.addEventListener('resize', updateMenuHeight);
-        return () => window.removeEventListener('resize', updateMenuHeight);
-    }, [showFilters]);
-    const ledgerFilterSelectStyles = useMemo(() => ({
-        control: (provided, state) => ({
-            ...provided,
-            borderWidth: '2px',
-            lineHeight: '20px',
-            fontSize: '14px',
-            fontWeight: 'normal',
-            height: '36px',
-            borderRadius: '8px',
-            textAlign: 'left',
-            borderColor: 'rgba(191, 152, 83, 0.2)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-            '&:hover': {
-                borderColor: 'rgba(191, 152, 83, 0.4)',
-            },
-        }),
-        clearIndicator: (provided) => ({
-            ...provided,
-            cursor: 'pointer',
-        }),
-        menu: (provided) => ({
-            ...provided,
-            zIndex: 999,
-            maxHeight: tableFilterMenuMaxHeight,
-        }),
-        menuPortal: (provided) => ({
-            ...provided,
-            zIndex: 9999,
-        }),
-        menuList: (provided) => ({
-            ...provided,
-            maxHeight: tableFilterMenuMaxHeight,
-            paddingTop: 0,
-            paddingBottom: 0,
-            overflowY: 'auto',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
-        }),
-        singleValue: (provided) => ({
-            ...provided,
-            color: '#111827',
-            fontWeight: 'normal',
-            marginRight: 0,
-        }),
-        valueContainer: (provided) => ({
-            ...provided,
-            paddingLeft: '12px',
-            paddingRight: '2px',
-        }),
-        indicatorsContainer: (provided) => ({
-            ...provided,
-            paddingLeft: '0px',
-        }),
-        dropdownIndicator: (provided) => ({
-            ...provided,
-            paddingTop: '0px',
-            paddingBottom: '0px',
-            paddingRight: '6px',
-            paddingLeft: '3px',
-        }),
-        option: (provided, state) => ({
-            ...provided,
-            minHeight: TABLE_FILTER_OPTION_HEIGHT,
-            height: TABLE_FILTER_OPTION_HEIGHT,
-            paddingTop: 0,
-            paddingBottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            textAlign: 'left',
-            fontWeight: 'normal',
-            fontSize: '15px',
-            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-            color: 'black',
-        }),
-        input: (provided) => ({
-            ...provided,
-            fontWeight: 'normal',
-            color: 'black',
-            textAlign: 'left',
-        }),
-        placeholder: (provided) => ({
-            ...provided,
-            color: '#A6A5A6',
-            textAlign: 'left',
-            fontWeight: 'normal',
-            paddingLeft: '0px',
-            paddingTop: '0px',
-            paddingBottom: '0px',
-        }),
-        indicatorSeparator: (provided) => ({
-            ...provided,
-            display: 'none',
-        }),
-    }), [tableFilterMenuMaxHeight]);
-    const enoFilterSelectStyles = useMemo(() => ({
-        ...ledgerFilterSelectStyles,
-        control: (provided, state) => ({
-            ...(typeof ledgerFilterSelectStyles.control === 'function' ? ledgerFilterSelectStyles.control(provided, state) : provided),
-            textAlign: 'right',
-        }),
-        valueContainer: (provided) => ({
-            ...(typeof ledgerFilterSelectStyles.valueContainer === 'function' ? ledgerFilterSelectStyles.valueContainer(provided) : provided),
-            justifyContent: 'flex-end',
-            paddingLeft: '2px',
-            paddingRight: '12px',
-        }),
-        singleValue: (provided) => ({
-            ...(typeof ledgerFilterSelectStyles.singleValue === 'function' ? ledgerFilterSelectStyles.singleValue(provided) : provided),
-            textAlign: 'right',
-        }),
-        input: (provided) => ({
-            ...(typeof ledgerFilterSelectStyles.input === 'function' ? ledgerFilterSelectStyles.input(provided) : provided),
-            textAlign: 'right',
-        }),
-        placeholder: (provided) => ({
-            ...(typeof ledgerFilterSelectStyles.placeholder === 'function' ? ledgerFilterSelectStyles.placeholder(provided) : provided),
-            textAlign: 'right',
-        }),
-        option: (provided, state) => ({
-            ...(typeof ledgerFilterSelectStyles.option === 'function' ? ledgerFilterSelectStyles.option(provided, state) : provided),
-            textAlign: 'right',
-            justifyContent: 'flex-end',
-            paddingRight: '12px',
-        }),
-    }), [ledgerFilterSelectStyles]);
+    const customStyles = DATABASE_TABLE_FILTER_SELECT_STYLES;
     const sortedExpenses = [...filteredExpenses].sort((a, b) => {
         if (!sortField) return 0;
         let aValue = a[sortField];
@@ -1825,6 +1555,119 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         });
         return map;
     }, [contractorOption]);
+    const editPopupCombinedVendorContractorOptions = useMemo(
+        () => [...vendorOption, ...contractorOption, ...employeeOptions, ...laboursList],
+        [vendorOption, contractorOption, employeeOptions, laboursList]
+    );
+    const editPopupSelectedVendorContractor = useMemo(() => {
+        const employeeId = formData.employeeId || formData.employee_id || formData.employeeID || formData.employee_ID;
+        const labourId = formData.labourId || formData.labour_id || formData.labourID || formData.labour_ID;
+        if (formData.vendor) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Vendor' && o.value === formData.vendor
+            ) || { value: formData.vendor, label: formData.vendor, type: 'Vendor' };
+        }
+        if (formData.contractor) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Contractor' && o.value === formData.contractor
+            ) || { value: formData.contractor, label: formData.contractor, type: 'Contractor' };
+        }
+        if (employeeId) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Employee' && String(o.id) === String(employeeId)
+            ) || employeeOptions.find((o) => String(o.id) === String(employeeId)) || {
+                value: String(employeeId),
+                label: String(employeeId),
+                type: 'Employee',
+                id: employeeId,
+            };
+        }
+        if (labourId) {
+            return editPopupCombinedVendorContractorOptions.find(
+                (o) => o.type === 'Labour' && String(o.id) === String(labourId)
+            ) || laboursList.find((o) => String(o.id) === String(labourId)) || {
+                value: String(labourId),
+                label: String(labourId),
+                type: 'Labour',
+                id: labourId,
+            };
+        }
+        return null;
+    }, [formData.vendor, formData.contractor, formData.employeeId, formData.employee_id, formData.labourId, formData.labour_id, editPopupCombinedVendorContractorOptions, employeeOptions, laboursList]);
+    const editPopupVendorContractorType = formData.vendor
+        ? 'Vendor'
+        : formData.contractor
+            ? 'Contractor'
+            : (formData.employeeId || formData.employee_id || formData.employeeID || formData.employee_ID)
+                ? 'Employee'
+                : (formData.labourId || formData.labour_id || formData.labourID || formData.labour_ID)
+                    ? 'Labour'
+                    : '';
+    const handleEditPopupVendorContractorChange = (selectedOption) => {
+        if (!selectedOption) {
+            setFormData((prev) => ({
+                ...prev,
+                vendor: '',
+                vendorId: '',
+                contractor: '',
+                contractorId: '',
+                employeeId: '',
+                employee_id: null,
+                labourId: '',
+                labour_id: null,
+            }));
+            return;
+        }
+        if (selectedOption.type === 'Vendor') {
+            setFormData((prev) => ({
+                ...prev,
+                vendor: selectedOption.value || '',
+                vendorId: selectedOption.id || '',
+                contractor: '',
+                contractorId: '',
+                employeeId: '',
+                employee_id: null,
+                labourId: '',
+                labour_id: null,
+            }));
+        } else if (selectedOption.type === 'Contractor') {
+            setFormData((prev) => ({
+                ...prev,
+                contractor: selectedOption.value || '',
+                contractorId: selectedOption.id || '',
+                vendor: '',
+                vendorId: '',
+                employeeId: '',
+                employee_id: null,
+                labourId: '',
+                labour_id: null,
+            }));
+        } else if (selectedOption.type === 'Employee') {
+            setFormData((prev) => ({
+                ...prev,
+                employeeId: selectedOption.id || '',
+                employee_id: selectedOption.id || null,
+                vendor: '',
+                vendorId: '',
+                contractor: '',
+                contractorId: '',
+                labourId: '',
+                labour_id: null,
+            }));
+        } else if (selectedOption.type === 'Labour') {
+            setFormData((prev) => ({
+                ...prev,
+                labourId: selectedOption.id || '',
+                labour_id: selectedOption.id || null,
+                vendor: '',
+                vendorId: '',
+                contractor: '',
+                contractorId: '',
+                employeeId: '',
+                employee_id: null,
+            }));
+        }
+    };
     const labourIdToName = React.useMemo(() => {
         const map = {};
         laboursList.forEach(option => {
@@ -1945,9 +1788,11 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         setSelectedSource('');
         setSelectedPaymentMode('');
         setSelectedBranch('');
+        setSelectedEnteredBy('');
         setStartDate('');
         setEndDate('');
         setSelectedEno('');
+        setSelectedBillArrival('');
         setOverallSearch('');
         setFilteredExpenses(expenses);
         setCurrentPage(1);
@@ -1962,6 +1807,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         localStorage.removeItem('expenseFilter_source');
         localStorage.removeItem('expenseFilter_paymentMode');
         localStorage.removeItem('expenseFilter_branch');
+        localStorage.removeItem('expenseFilter_enteredBy');
         localStorage.removeItem('expenseFilter_date');
         localStorage.removeItem('expenseFilter_startDate');
         localStorage.removeItem('expenseFilter_endDate');
@@ -2016,63 +1862,71 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     };
     const tableViewExpenseContext = useMemo(() => ({
         ...buildTableViewExpenseTableContext({
-        currentItems,
-        showFilters,
-        filterRowRef,
-        totalAmount,
-        sortField,
-        sortDirection,
-        handleSort,
-        startDate,
-        setStartDate,
-        endDate,
-        setEndDate,
-        showDateRangePicker,
-        setShowDateRangePicker,
-        siteOptions,
-        selectedSiteName,
-        setSelectedSiteName,
-        vendorOptions,
-        selectedVendor,
-        setSelectedVendor,
-        contractorOptions,
-        selectedContractor,
-        setSelectedContractor,
-        categoryOptions,
-        selectedCategory,
-        setSelectedCategory,
-        accountTypeOptions,
-        selectedAccountType,
-        setSelectedAccountType,
-        machineToolsOptions,
-        selectedMachineTools,
-        setSelectedMachineTools,
-        sourceOptions,
-        selectedSource,
-        setSelectedSource,
-        branchFilterOptions,
-        selectedBranch,
-        setSelectedBranch,
-        enoOptions,
-        selectedEno,
-        setSelectedEno,
-        customStyles: ledgerFilterSelectStyles,
-        formatDate,
-        formatDateOnly,
-        getDisplaySiteName,
-        getDisplayVendorName,
-        getDisplayContractorName,
-        getDisplayStaffName,
-        getMachineToolsItemIdDisplay,
-        getBranchName,
-        formatBillArrivalDisplay,
-        handleEditClick,
-        username,
-        billArrivalFilterRef,
+            fieldLabels: TABLE_VIEW_EXPENSE_FIELDS,
+            currentItems,
+            showFilters,
+            filterRowRef,
+            totalAmount,
+            sortField,
+            sortDirection,
+            handleSort,
+            startDate,
+            setStartDate,
+            endDate,
+            setEndDate,
+            showDateRangePicker,
+            setShowDateRangePicker,
+            siteOptions,
+            selectedSiteName,
+            setSelectedSiteName,
+            vendorOptions,
+            selectedVendor,
+            setSelectedVendor,
+            contractorOptions,
+            selectedContractor,
+            setSelectedContractor,
+            categoryOptions,
+            selectedCategory,
+            setSelectedCategory,
+            accountTypeOptions,
+            selectedAccountType,
+            setSelectedAccountType,
+            machineToolsOptions,
+            selectedMachineTools,
+            setSelectedMachineTools,
+            sourceOptions,
+            selectedSource,
+            setSelectedSource,
+            branchFilterOptions,
+            selectedBranch,
+            setSelectedBranch,
+            enteredByOptions,
+            selectedEnteredBy,
+            setSelectedEnteredBy,
+            enoOptions,
+            selectedEno,
+            setSelectedEno,
+            customStyles,
+            formatDate,
+            formatDateOnly,
+            getDisplaySiteName,
+            getDisplayVendorName,
+            getDisplayContractorName,
+            getDisplayStaffName,
+            getMachineToolsItemIdDisplay,
+            getBranchName,
+            formatBillArrivalDisplay,
+            handleEditClick,
+            username,
+            billArrivalFilterRef,
         }),
         paymentModeFilterOptions,
         selectedPaymentMode,
         setSelectedPaymentMode,
+        selectedBillArrival,
+        setSelectedBillArrival,
+        setBillArrivalCalendarPos,
+        setShowBillArrivalCalendar,
     }), [
         currentItems,
         showFilters,
@@ -2100,719 +1954,362 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         selectedPaymentMode,
         branchFilterOptions,
         selectedBranch,
+        enteredByOptions,
+        selectedEnteredBy,
         enoOptions,
         selectedEno,
-        ledgerFilterSelectStyles,
+        selectedBillArrival,
     ]);
     return (
         <body className='bg-[#FAF6ED]'>
             <div className='flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]'>
                 <div className='px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]'>
-                <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                    <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || startDate || endDate || selectedEno
-                        ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
-                        <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-                            <button
-                                className=''
-                                onClick={() => {
-                                    const willOpen = !showFilters;
-                                    const scroller = scrollRef.current;
-                                    if (willOpen) {
-                                        setShowFilters(true);
-                                        if (!scroller) return;
-                                        if (scroller.scrollTop <= 0) return;
-                                        if (filterNudgeUsedRef.current) return;
-                                        filterNudgeUsedRef.current = true;
+                    <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+                        {expensesLoading && expenses.length === 0 ? (
+                            <div className="mb-[12px] flex items-center justify-center min-h-[80px] text-[16px] font-medium text-[#666666]">
+                                Loading latest expenses...
+                            </div>
+                        ) : null}
+                        <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || selectedEno || selectedBillArrival
+                            ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
+                            <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                                <button
+                                    className=''
+                                    onClick={() => {
+                                        const willOpen = !showFilters;
+                                        const scroller = scrollRef.current;
+                                        if (willOpen) {
+                                            setShowFilters(true);
+                                            if (!scroller) return;
+                                            if (scroller.scrollTop <= 0) return;
+                                            if (filterNudgeUsedRef.current) return;
+                                            filterNudgeUsedRef.current = true;
+                                            requestAnimationFrame(() => {
+                                                requestAnimationFrame(() => {
+                                                    const h = filterRowRef.current?.offsetHeight || 0;
+                                                    if (h > 0) {
+                                                        scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                    }
+                                                });
+                                            });
+                                            return;
+                                        }
+                                        const h = filterRowRef.current?.offsetHeight || 0;
+                                        setShowFilters(false);
+                                        if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                        filterNudgeUsedRef.current = false;
                                         requestAnimationFrame(() => {
                                             requestAnimationFrame(() => {
-                                                const h = filterRowRef.current?.offsetHeight || 0;
-                                                if (h > 0) {
-                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
-                                                }
+                                                scroller.scrollTop = scroller.scrollTop + h;
                                             });
                                         });
-                                        return;
-                                    }
-                                    const h = filterRowRef.current?.offsetHeight || 0;
-                                    setShowFilters(false);
-                                    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
-                                    filterNudgeUsedRef.current = false;
-                                    requestAnimationFrame(() => {
-                                        requestAnimationFrame(() => {
-                                            scroller.scrollTop = scroller.scrollTop + h;
-                                        });
-                                    });
-                                }}
-                            >
-                                <img
-                                    src={Filter}
-                                    alt="Toggle Filter"
-                                    className=" border rounded-md"
-                                />
-                            </button>
-                            {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || startDate || endDate || selectedEno) && (
-                                <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
-                                    {startDate && endDate ? (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(startDate)} – {formatChipDateDMY(endDate)}</span>
-                                            <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                        </span>
-                                    ) : startDate ? (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Date: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(startDate)} onwards</span>
-                                            <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                        </span>
-                                    ) : endDate ? (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Date until: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(endDate)}</span>
-                                            <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                        </span>
-                                    ) : null}
-                                    {selectedSiteName && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Project Name: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedSiteName}</span>
-                                            <button onClick={() => setSelectedSiteName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedVendor && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Vendor Name: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedVendor}</span>
-                                            <button onClick={() => setSelectedVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedContractor && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Contractor Name: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedContractor}</span>
-                                            <button onClick={() => setSelectedContractor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedCategory && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Category: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedCategory}</span>
-                                            <button onClick={() => setSelectedCategory('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedAccountType && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">A/C Type: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedAccountType}</span>
-                                            <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedPaymentMode && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Mode: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedPaymentMode}</span>
-                                            <button onClick={() => setSelectedPaymentMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedMachineTools && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Tools: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
-                                            <button onClick={() => setSelectedMachineTools('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedSource && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Source From: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedSource}</span>
-                                            <button onClick={() => setSelectedSource('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedBranch && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Branch: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getBranchName(selectedBranch) || selectedBranch}</span>
-                                            <button onClick={() => setSelectedBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                    {selectedEno && (
-                                        <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
-                                            <span className="font-semibold shrink-0 whitespace-nowrap">Entry No: </span>
-                                            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedEno}</span>
-                                            <button onClick={() => setSelectedEno('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div className='flex items-end gap-[6px]'>
-                            <button onClick={clearFilters} className='flex h-[30px] w-[30px] shrink-0 items-center justify-center'>
-                                <img className='w-full h-full' src={Reload} alt="Reload" />
-                            </button>
-                            <div className="w-[286px] min-w-[286px] translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-                                <input
-                                    type="text"
-                                    value={overallSearch}
-                                    onChange={(e) => setOverallSearch(e.target.value)}
-                                    placeholder="Search Transactions..."
-                                    className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-                                />
-                                <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-                            </div>
-                            <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
-                                <div className='flex items-end text-center'>
-                                    <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                                    <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="tve-exp-ledger-ui w-full flex flex-col flex-1 min-h-0 overflow-hidden">
-                        <div className="ledger-card">
-                            <div className="accent" aria-hidden="true" />
-                            <div className="body">
-                                <div
-                                    ref={scrollRef}
-                                    className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
-                                    onWheel={() => { filterNudgeUsedRef.current = false; }}
-                                    onMouseDown={handleMouseDown}
-                                    onMouseMove={handleMouseMove}
-                                    onMouseUp={handleMouseUp}
-                                    onMouseLeave={handleMouseUp}
-                                >
-                                    <TableProvider value={tableViewExpenseContext}>
-                                        <Table
-                                            showTimestampColumn={false}
-                                            showActivityColumn
-                                            activityColumnLabel="Edit"
-                                            editOnlyActivityColumn
-                                            tableClassName={`tve-exp-table min-w-[2638px]${showFilters ? ' tve-filters-open' : ''}`}
-                                        />
-                                    </TableProvider>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                        <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm text-gray-700">Items per page:</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => {
-                                        setItemsPerPage(Number(e.target.value));
-                                        setCurrentPage(1);
                                     }}
-                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
-                                    <option value={16}>16</option>
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                    <option value={100}>100</option>
-                                    <option value={200}>200</option>
-                                    <option value={300}>300</option>
-                                    <option value={400}>400</option>
-                                    <option value={500}>500</option>
-                                    <option value={600}>600</option>
-                                    <option value={700}>700</option>
-                                    <option value={800}>800</option>
-                                    <option value={900}>900</option>
-                                    <option value={1000}>1000</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm text-gray-700">
-                                    Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
-                                </span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                                <button
-                                    onClick={() => setCurrentPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    Previous
+                                    <img
+                                        src={Filter}
+                                        alt="Toggle Filter"
+                                        className=" border rounded-md"
+                                    />
                                 </button>
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let pageNum;
-                                    if (totalPages <= 5) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage <= 3) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage >= totalPages - 2) {
-                                        pageNum = totalPages - 4 + i;
-                                    } else {
-                                        pageNum = currentPage - 2 + i;
-                                    }
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            onClick={() => setCurrentPage(pageNum)}
-                                            className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
-                                                ? 'bg-[#BF9853] text-white border-[#BF9853]'
-                                                : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
-                                                }`}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-                                <button
-                                    onClick={() => setCurrentPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
-                                >
-                                    Next
+                                {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || selectedEno || selectedBillArrival) && (
+                                    <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+                                        {startDate && endDate ? (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.date}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{startDate === endDate ? formatChipDateDMY(startDate) : `${formatChipDateDMY(startDate)} – ${formatChipDateDMY(endDate)}`}</span>
+                                                <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        ) : startDate ? (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.date}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(startDate)} onwards</span>
+                                                <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        ) : endDate ? (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.date} until: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(endDate)}</span>
+                                                <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                            </span>
+                                        ) : null}
+                                        {selectedSiteName && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.projectName}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedSiteName}</span>
+                                                <button onClick={() => setSelectedSiteName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedVendor && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.vendorName}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedVendor}</span>
+                                                <button onClick={() => setSelectedVendor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedContractor && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">Contractor Name: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedContractor}</span>
+                                                <button onClick={() => setSelectedContractor('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedCategory && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.category}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedCategory}</span>
+                                                <button onClick={() => setSelectedCategory('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedAccountType && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.accountType}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedAccountType}</span>
+                                                <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedPaymentMode && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.mode}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedPaymentMode}</span>
+                                                <button onClick={() => setSelectedPaymentMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedMachineTools && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.machineTools}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getMachineToolsItemIdDisplay(selectedMachineTools)}</span>
+                                                <button onClick={() => setSelectedMachineTools('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedSource && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.sourceFrom}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedSource}</span>
+                                                <button onClick={() => setSelectedSource('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedBranch && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.branch}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{getBranchName(selectedBranch) || selectedBranch}</span>
+                                                <button onClick={() => setSelectedBranch('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedEnteredBy && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.enteredBy}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedEnteredBy === BLANK_VALUE ? BLANK_LABEL : selectedEnteredBy}</span>
+                                                <button onClick={() => setSelectedEnteredBy('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedEno && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.entryNo}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedEno}</span>
+                                                <button onClick={() => setSelectedEno('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedBillArrival && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">Bill Arrival: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{formatChipDateDMY(selectedBillArrival)}</span>
+                                                <button onClick={() => setSelectedBillArrival('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className='flex items-end gap-[6px]'>
+                                <button onClick={clearFilters} className='flex h-[30px] w-[30px] shrink-0 items-center justify-center'>
+                                    <img className='w-full h-full' src={Reload} alt="Reload" />
                                 </button>
+                                <div className="w-[286px] min-w-[286px] translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
+                                    <input
+                                        type="text"
+                                        value={overallSearch}
+                                        onChange={(e) => setOverallSearch(e.target.value)}
+                                        placeholder={TABLE_VIEW_EXPENSE_FIELDS.searchTransactions}
+                                        className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                                    />
+                                    <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+                                </div>
+                                <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
+                                    <div className='flex items-end text-center'>
+                                        <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
+                                        <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <Modal
-                            isOpen={modalIsOpen}
-                            onRequestClose={handleCancel}
-                            contentLabel="Edit Expense"
-                            className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
-                            overlayClassName="fixed inset-0 z-[9999]">
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-                                <h2 className="text-xl font-normal mb-6 border-b-2">Edit Expense</h2>
-                                <form className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Date</label>
-                                        <div className="mt-1">
-                                            <CustomDateField
-                                                value={formData.date}
-                                                onChange={(v) => {
-                                                    if (!v) return;
-                                                    setFormData((prev) => ({ ...prev, date: v }));
-                                                }}
-                                                placeholder="Select date"
-                                                alwaysOpenBelow
-                                                className="[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-normal"
-                                            />
-                                        </div>
+                        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                            <div
+                                ref={scrollRef}
+                                className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
+                                onWheel={() => { filterNudgeUsedRef.current = false; }}
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                            >
+                                <TableProvider value={tableViewExpenseContext}>
+                                    <Table
+                                        showTimestampColumn={false}
+                                        showActivityColumn
+                                        editOnlyActivityColumn
+                                        tableClassName="min-w-[2638px]"
+                                    />
+                                </TableProvider>
+                            </div>
+                            <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-700">Items per page:</span>
+                                    <select
+                                        value={itemsPerPage}
+                                        onChange={(e) => {
+                                            setItemsPerPage(Number(e.target.value));
+                                            setCurrentPage(1);
+                                        }}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        <option value={16}>16</option>
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                        <option value={200}>200</option>
+                                        <option value={300}>300</option>
+                                        <option value={400}>400</option>
+                                        <option value={500}>500</option>
+                                        <option value={600}>600</option>
+                                        <option value={700}>700</option>
+                                        <option value={800}>800</option>
+                                        <option value={900}>900</option>
+                                        <option value={1000}>1000</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-700">
+                                        Showing {startIndex + 1} to {Math.min(endIndex, sortedExpenses.length)} of {sortedExpenses.length} entries
+                                        {expensesLoadingMore ? ' (loading older records...)' : ''}
+                                        {!expensesLoadingMore && expensesTotalCount != null && expensesTotalCount > sortedExpenses.length
+                                            ? ` / ${expensesTotalCount} total`
+                                            : ''}
+                                    </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                    <button
+                                        onClick={() => setCurrentPage(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        Previous
+                                    </button>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={`px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#BF9853] ${currentPage === pageNum
+                                                    ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                                                    : 'border-gray-300 hover:bg-[#BF9853] hover:text-white'
+                                                    }`}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        onClick={() => setCurrentPage(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#BF9853] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                            <Modal
+                                isOpen={modalIsOpen}
+                                onRequestClose={handleCancel}
+                                contentLabel="Edit Expense"
+                                className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
+                                overlayClassName="fixed inset-0 z-[9999]">
+                                <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-xl font-normal">Edit Expense</h2>
+                                        <span className="text-[16px] font-semibold text-[#E4572E]"> {formData.eno}</span>
                                     </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Account Type *</label>
-                                        <Select
-                                            name="accountType"
-                                            value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
-                                            onChange={(selectedOption) => {
-                                                const nextAccountType = selectedOption?.value || '';
-                                                setFormData((prev) => {
-                                                    const parsed = parseFloat(String(prev.amount ?? '').replace(/,/g, ''));
-                                                    const hasAmount = prev.amount !== '' && prev.amount != null && !Number.isNaN(parsed);
-                                                    let nextAmount = prev.amount;
-                                                    if (hasAmount) {
-                                                        if (nextAccountType === 'Bill Refund') {
-                                                            nextAmount = String(-Math.abs(parsed));
-                                                        } else if (prev.accountType === 'Bill Refund') {
-                                                            nextAmount = String(Math.abs(parsed));
-                                                        }
-                                                    }
-                                                    return {
-                                                        ...prev,
-                                                        accountType: nextAccountType,
-                                                        amount: nextAmount,
-                                                    };
-                                                });
-                                            }}
-                                            options={editAccountTypeOptions}
-                                            placeholder="Select"
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            menuPlacement="bottom"
-                                            menuPosition="absolute"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Site Name *</label>
-                                        <Select
-                                            name="siteName"
-                                            value={siteOption.find(option => option.value === formData.siteName)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    siteName: selectedOption?.value || '',
-                                                    projectId: selectedOption?.id || ''
-                                                })
-                                            }
-                                            options={siteOption}
-                                            placeholder="Select Site"
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            menuPlacement="bottom"
-                                            menuPosition="absolute"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Vendor Name *</label>
-                                        <Select
-                                            name="vendor"
-                                            options={vendorOption}
-                                            value={vendorOption.find(opt => opt.value === formData.vendor)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    vendor: selectedOption?.value || '',
-                                                    vendorId: selectedOption?.id || '',
-                                                    contractor: selectedOption ? '' : formData.contractor,
-                                                    contractorId: selectedOption ? '' : formData.contractorId
-                                                })
-                                            }
-                                            isDisabled={!!formData.contractor}
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            placeholder="Select Vendor"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Contractor Name *</label>
-                                        <Select
-                                            name="contractor"
-                                            options={contractorOption}
-                                            value={contractorOption.find(opt => opt.value === formData.contractor)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    contractor: selectedOption?.value || '',
-                                                    contractorId: selectedOption?.id || '',
-                                                    vendor: selectedOption ? '' : formData.vendor,
-                                                    vendorId: selectedOption ? '' : formData.vendorId
-                                                })
-                                            }
-                                            isDisabled={!!formData.vendor}
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            placeholder="Select Contractor"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Quantity *</label>
-                                        <input
-                                            type="text"
-                                            name="quantity"
-                                            value={formData.quantity}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Category *</label>
-                                        <Select
-                                            name="category"
-                                            value={categoryOption.find(option => option.value === formData.category)}
-                                            onChange={(selectedOption) =>
-                                                setFormData({ ...formData, category: selectedOption?.value || '' })
-                                            }
-                                            options={categoryOption}
-                                            placeholder="Select Category"
-                                            isClearable
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                    borderWidth: '2px',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.25rem',
-                                                    textAlign: 'left',
-                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                    '&:hover': {
-                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                    },
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontWeight: 'normal',
-                                                    color: '#6B7280',
-                                                    textAlign: 'left',
-                                                }),
-                                                option: (provided, state) => ({
-                                                    ...provided,
-                                                    textAlign: 'left',
-                                                    fontWeight: 'normal',
-                                                    fontSize: '15px',
-                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                    color: 'black',
-                                                }),
-                                                singleValue: (base) => ({
-                                                    ...base,
-                                                    color: '#111827',
-                                                    fontWeight: 'normal',
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    zIndex: 999,
-                                                }),
-                                                menuList: (base) => ({
-                                                    ...base,
-                                                    scrollbarWidth: 'none',
-                                                    msOverflowStyle: 'none',
-                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                }),
-                                            }}
-                                            menuPlacement="bottom"
-                                            menuPosition="absolute"
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <label className="block text-gray-500 font-normal text-left">Amount *</label>
-                                        <span className="absolute top-9 left-3 mt-[2px] text-gray-600 font-normal">₹</span>
-                                        <input
-                                            type="text"
-                                            name="amount"
-                                            value={formData.amount}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full p-2 pl-6 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                            onWheel={(e) => e.target.blur()}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-500 font-normal text-left">Comments *</label>
-                                        <input
-                                            type="text"
-                                            name="comments"
-                                            value={formData.comments}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className=' flex'>
-                                            <label className="block text-gray-500 font-normal text-left cursor-pointer" htmlFor="fileInput">Bill Copy URL</label>
-                                            {selectedFile && <span className="text-orange-600 ml-4">{selectedFile.name}</span>}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="billCopy"
-                                            value={formData.billCopy}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                        />
-                                        <input type="file" className="hidden" id="fileInput" onChange={handleFileChange} />
-                                    </div>
-                                    {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Bill Arrival Date</label>
-                                            <input
-                                                type="date"
-                                                name="billArrivalDate"
-                                                value={formData.billArrivalDate || ''}
-                                                onChange={handleChange}
-                                                className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                            />
-                                        </div>
-                                    )}
-                                    {(formData.accountType === 'Claim Payment' || formData.accountType === 'Utility Bills' || formData.accountType === 'Sundry Payment') && (
-                                        <div>
-                                            <label className="block text-gray-500 font-normal text-left">Payment Mode *</label>
+                                    <form className="flex flex-col gap-[12px]">
+                                        <div className="flex gap-[16px] flex-wrap items-start">
+                                        <div className="text-left w-[300px] min-w-[300px] max-w-[300px] shrink-0">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Account Type<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
                                             <Select
-                                                name="paymentMode"
-                                                options={finalPaymentModeOptions.map((mode) => ({
-                                                    value: mode.modeOfPayment,
-                                                    label: mode.modeOfPayment,
-                                                }))}
-                                                value={
-                                                    finalPaymentModeOptions
-                                                        .map((mode) => ({
-                                                            value: mode.modeOfPayment,
-                                                            label: mode.modeOfPayment,
-                                                        }))
-                                                        .find((o) => o.value === formData.paymentMode) || null
-                                                }
-                                                onChange={(selectedOption) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        paymentMode: selectedOption?.value || '',
-                                                    })
-                                                }
-                                                placeholder="Select Payment Mode"
+                                                name="accountType"
+                                                value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
+                                                onChange={(selectedOption) => {
+                                                    const nextAccountType = selectedOption?.value || '';
+                                                    setFormData((prev) => {
+                                                        const parsed = parseFloat(String(prev.amount ?? '').replace(/,/g, ''));
+                                                        const hasAmount = prev.amount !== '' && prev.amount != null && !Number.isNaN(parsed);
+                                                        let nextAmount = prev.amount;
+                                                        if (hasAmount) {
+                                                            if (nextAccountType === 'Bill Refund') {
+                                                                nextAmount = String(-Math.abs(parsed));
+                                                            } else if (prev.accountType === 'Bill Refund') {
+                                                                nextAmount = String(Math.abs(parsed));
+                                                            }
+                                                        }
+                                                        return {
+                                                            ...prev,
+                                                            accountType: nextAccountType,
+                                                            amount: nextAmount,
+                                                        };
+                                                    });
+                                                }}
+                                                options={editAccountTypeOptions}
+                                                placeholder="Select"
                                                 isClearable
-                                                maxMenuHeight={200}
-                                                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
                                                 styles={{
                                                     control: (base, state) => ({
                                                         ...base,
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         borderColor: 'rgba(191, 152, 83, 0.2)',
                                                         borderWidth: '2px',
                                                         borderRadius: '0.5rem',
-                                                        padding: '0.25rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
                                                         textAlign: 'left',
                                                         boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                         '&:hover': {
                                                             borderColor: 'rgba(191, 152, 83, 0.4)',
                                                         },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
                                                     }),
                                                     placeholder: (base) => ({
                                                         ...base,
@@ -2823,7 +2320,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     option: (provided, state) => ({
                                                         ...provided,
                                                         textAlign: 'left',
-                                                        fontWeight: 'normal',
+                                                        fontWeight: 600,
                                                         fontSize: '15px',
                                                         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                         color: 'black',
@@ -2831,11 +2328,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     singleValue: (base) => ({
                                                         ...base,
                                                         color: '#111827',
-                                                        fontWeight: 'normal',
-                                                    }),
-                                                    menuPortal: (base) => ({
-                                                        ...base,
-                                                        zIndex: 10001,
+                                                        fontWeight: 600,
                                                     }),
                                                     menu: (base) => ({
                                                         ...base,
@@ -2849,39 +2342,463 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                     }),
                                                 }}
                                                 menuPlacement="bottom"
-                                                menuPosition="fixed"
+                                                menuPosition="absolute"
+                                            />
+                                            </div>
+                                            {formData.accountType === 'Utility Bills' && (
+                                                <div className="mt-[12px]">
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">Utility Type<span className="text-[#E4572E]">*</span></label>
+                                                    <div className="w-[616px]">
+                                                    <Select
+                                                        name="utilityType"
+                                                        options={EDIT_POPUP_UTILITY_TYPE_OPTIONS}
+                                                        value={EDIT_POPUP_UTILITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityType) || null}
+                                                        onChange={(selectedOption) =>
+                                                            setFormData({
+                                                                ...formData,
+                                                                utilityType: selectedOption?.value || '',
+                                                            })
+                                                        }
+                                                        placeholder="--- Select ---"
+                                                        isClearable
+                                                        isSearchable
+                                                        components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                        className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                        styles={{
+                                                            control: (base, state) => ({
+                                                                ...base,
+                                                                fontWeight: 600,
+                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                borderWidth: '2px',
+                                                                borderRadius: '0.5rem',
+                                                                height: '40px',
+                                                                minHeight: '40px',
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                                textAlign: 'left',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                },
+                                                            }),
+                                                            valueContainer: (base) => ({
+                                                                ...base,
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                            }),
+                                                            indicatorsContainer: (base) => ({
+                                                                ...base,
+                                                                alignItems: 'center',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none',
+                                                            }),
+                                                            placeholder: (base) => ({
+                                                                ...base,
+                                                                fontWeight: 'normal',
+                                                                color: '#6B7280',
+                                                                textAlign: 'left',
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...provided,
+                                                                textAlign: 'left',
+                                                                fontWeight: 600,
+                                                                fontSize: '15px',
+                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                color: 'black',
+                                                            }),
+                                                            singleValue: (base) => ({
+                                                                ...base,
+                                                                color: '#111827',
+                                                                fontWeight: 600,
+                                                            }),
+                                                            menu: (base) => ({
+                                                                ...base,
+                                                                zIndex: 999,
+                                                            }),
+                                                            menuList: (base) => ({
+                                                                ...base,
+                                                                scrollbarWidth: 'none',
+                                                                msOverflowStyle: 'none',
+                                                                '&::-webkit-scrollbar': { display: 'none' },
+                                                            }),
+                                                        }}
+                                                        menuPlacement="bottom"
+                                                        menuPosition="absolute"
+                                                    />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Date<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
+                                                <CustomDateField
+                                                    value={formData.date}
+                                                    onChange={(v) => {
+                                                        if (!v) return;
+                                                        setFormData((prev) => ({ ...prev, date: v }));
+                                                    }}
+                                                    placeholder="Date"
+                                                    alwaysOpenBelow
+                                                    controlHeightPx={40}
+                                                    className="w-full [&>div]:!w-full [&>div]:!max-w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div:hover]:!border-[rgba(191,152,83,0.4)] [&>div:focus-within]:!outline-none [&>div:focus-within]:!ring-0 [&>div:focus-within]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-semibold"
+                                                />
+                                            </div>
+                                        </div>
+                                        </div>
+                                        <div className="flex gap-[16px]">
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Project Name<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
+                                            <Select
+                                                name="siteName"
+                                                value={siteOption.find(option => option.value === formData.siteName)}
+                                                onChange={(selectedOption) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        siteName: selectedOption?.value || '',
+                                                        projectId: selectedOption?.id || ''
+                                                    })
+                                                }
+                                                options={siteOption}
+                                                placeholder="Select Site"
+                                                isClearable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 600,
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 600,
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 600,
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                menuPlacement="bottom"
+                                                menuPosition="absolute"
+                                            />
+                                            </div>
+                                        </div>
+                                        <div className="text-left w-[300px]">
+                                            <div className="flex justify-between mb-[8px]">
+                                                <label className="block text-black font-semibold text-left">Associate Name<span className="text-[#E4572E]">*</span></label>
+                                                {editPopupVendorContractorType && (
+                                                    <span className="text-[14px] text-[#E4572E] font-normal">{editPopupVendorContractorType}</span>
+                                                )}
+                                            </div>
+                                            <div className="w-[300px]">
+                                            <Select
+                                                name="vendorContractor"
+                                                options={editPopupCombinedVendorContractorOptions}
+                                                value={editPopupSelectedVendorContractor}
+                                                onChange={handleEditPopupVendorContractorChange}
+                                                isClearable
+                                                isSearchable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 600,
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 600,
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 600,
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                placeholder="Vendor/Contractor Name"
+                                            />
+                                            </div>
+                                        </div>
+                                        </div>
+                                        <div className="flex gap-[16px]">
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Quantity</label>
+                                            <input
+                                                type="text"
+                                                name="quantity"
+                                                value={formData.quantity}
+                                                onChange={handleChange}
+                                                placeholder="Quantity"
+                                                className="w-[300px] h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
                                             />
                                         </div>
-                                    )}
-                                    {formData.accountType === 'Utility Bills' && (
-                                        <>
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">Utility Type *</label>
+                                        <div className="text-left w-[300px] relative">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Amount<span className="text-[#E4572E]">*</span></label>
+                                            <span className="absolute top-[40px] left-3 text-gray-600 font-normal">₹</span>
+                                            <input
+                                                type="text"
+                                                name="amount"
+                                                value={formData.amount}
+                                                onChange={handleChange}
+                                                placeholder="Amount"
+                                                className="w-[300px] h-[40px] text-[14px] py-0 px-2 pl-6 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
+                                                onWheel={(e) => e.target.blur()}
+                                            />
+                                        </div>
+                                        </div>
+                                        <div className="flex gap-[16px]">
+                                        <div className="text-left w-[300px]">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Category<span className="text-[#E4572E]">*</span></label>
+                                            <div className="w-[300px]">
+                                            <Select
+                                                name="category"
+                                                value={categoryOption.find(option => option.value === formData.category)}
+                                                onChange={(selectedOption) =>
+                                                    setFormData({ ...formData, category: selectedOption?.value || '' })
+                                                }
+                                                options={categoryOption}
+                                                placeholder="Select Category"
+                                                isClearable
+                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        fontWeight: 600,
+                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                        borderWidth: '2px',
+                                                        borderRadius: '0.5rem',
+                                                        height: '40px',
+                                                        minHeight: '40px',
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                        textAlign: 'left',
+                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                        },
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                        paddingTop: 0,
+                                                        paddingBottom: 0,
+                                                    }),
+                                                    indicatorsContainer: (base) => ({
+                                                        ...base,
+                                                        alignItems: 'center',
+                                                    }),
+                                                    indicatorSeparator: () => ({
+                                                        display: 'none',
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        fontWeight: 'normal',
+                                                        color: '#6B7280',
+                                                        textAlign: 'left',
+                                                    }),
+                                                    option: (provided, state) => ({
+                                                        ...provided,
+                                                        textAlign: 'left',
+                                                        fontWeight: 600,
+                                                        fontSize: '15px',
+                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                        color: 'black',
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: '#111827',
+                                                        fontWeight: 600,
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 999,
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        scrollbarWidth: 'none',
+                                                        msOverflowStyle: 'none',
+                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                    }),
+                                                }}
+                                                menuPlacement="bottom"
+                                                menuPosition="absolute"
+                                            />
+                                            </div>
+                                        </div>
+                                        {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
+                                            <div className="text-left w-[300px]">
+                                                <label className="block text-black font-semibold mb-[8px] text-left">Bill Arrival Date</label>
+                                                <div className="w-[300px]">
+                                                    <CustomDateField
+                                                        value={formData.billArrivalDate || ''}
+                                                        onChange={(v) => setFormData((prev) => ({ ...prev, billArrivalDate: v }))}
+                                                        placeholder="Bill Arrival Date"
+                                                        controlHeightPx={40}
+                                                        alwaysOpenBelow
+                                                        className="w-full [&>div]:!w-full [&>div]:!max-w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div:hover]:!border-[rgba(191,152,83,0.4)] [&>div:focus-within]:!outline-none [&>div:focus-within]:!ring-0 [&>div:focus-within]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-semibold"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {(formData.accountType === 'Claim Payment' || formData.accountType === 'Utility Bills' || formData.accountType === 'Sundry Payment') && (
+                                            <div className="text-left w-[300px]">
+                                                <label className="block text-black font-semibold mb-[8px] text-left">Payment Mode<span className="text-[#E4572E]">*</span></label>
+                                                <div className="w-[300px]">
                                                 <Select
-                                                    name="utilityType"
-                                                    options={EDIT_POPUP_UTILITY_TYPE_OPTIONS}
-                                                    value={EDIT_POPUP_UTILITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityType) || null}
+                                                    name="paymentMode"
+                                                    options={finalPaymentModeOptions.map((mode) => ({
+                                                        value: mode.modeOfPayment,
+                                                        label: mode.modeOfPayment,
+                                                    }))}
+                                                    value={
+                                                        finalPaymentModeOptions
+                                                            .map((mode) => ({
+                                                                value: mode.modeOfPayment,
+                                                                label: mode.modeOfPayment,
+                                                            }))
+                                                            .find((o) => o.value === formData.paymentMode) || null
+                                                    }
                                                     onChange={(selectedOption) =>
                                                         setFormData({
                                                             ...formData,
-                                                            utilityType: selectedOption?.value || '',
+                                                            paymentMode: selectedOption?.value || '',
                                                         })
                                                     }
-                                                    placeholder="--- Select ---"
+                                                    placeholder="Select Payment Mode"
                                                     isClearable
+                                                    components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                    className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                    maxMenuHeight={200}
+                                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                                                     styles={{
                                                         control: (base, state) => ({
                                                             ...base,
-                                                            fontWeight: 'normal',
+                                                            fontWeight: 600,
                                                             borderColor: 'rgba(191, 152, 83, 0.2)',
                                                             borderWidth: '2px',
                                                             borderRadius: '0.5rem',
-                                                            padding: '0.25rem',
+                                                            height: '40px',
+                                                            minHeight: '40px',
+                                                            alignItems: 'center',
+                                                            paddingTop: 0,
+                                                            paddingBottom: 0,
                                                             textAlign: 'left',
                                                             boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
                                                             '&:hover': {
                                                                 borderColor: 'rgba(191, 152, 83, 0.4)',
                                                             },
+                                                        }),
+                                                        valueContainer: (base) => ({
+                                                            ...base,
+                                                            alignItems: 'center',
+                                                            paddingTop: 0,
+                                                            paddingBottom: 0,
+                                                        }),
+                                                        indicatorsContainer: (base) => ({
+                                                            ...base,
+                                                            alignItems: 'center',
+                                                        }),
+                                                        indicatorSeparator: () => ({
+                                                            display: 'none',
                                                         }),
                                                         placeholder: (base) => ({
                                                             ...base,
@@ -2892,7 +2809,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                         option: (provided, state) => ({
                                                             ...provided,
                                                             textAlign: 'left',
-                                                            fontWeight: 'normal',
+                                                            fontWeight: 600,
                                                             fontSize: '15px',
                                                             backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
                                                             color: 'black',
@@ -2900,7 +2817,11 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                         singleValue: (base) => ({
                                                             ...base,
                                                             color: '#111827',
-                                                            fontWeight: 'normal',
+                                                            fontWeight: 600,
+                                                        }),
+                                                        menuPortal: (base) => ({
+                                                            ...base,
+                                                            zIndex: 10001,
                                                         }),
                                                         menu: (base) => ({
                                                             ...base,
@@ -2914,183 +2835,279 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                         }),
                                                     }}
                                                     menuPlacement="bottom"
-                                                    menuPosition="absolute"
+                                                    menuPosition="fixed"
                                                 />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">
-                                                    {formData.utilityType === 'Electricity' ? 'EB Number' :
-                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
-                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}
-                                                </label>
-                                                <Select
-                                                    options={ebNumberOptions}
-                                                    value={selectedEbNumber}
-                                                    onChange={(opt) => {
-                                                        setSelectedEbNumber(opt);
-                                                        setFormData((prev) => ({ ...prev, utilityTypeNumber: opt?.label || "" }));
-                                                    }}
-                                                    isClearable
-                                                    placeholder={`Select ${formData.utilityType === 'Electricity' ? 'EB Number' :
-                                                        formData.utilityType === 'Property' ? 'Property Tax Number' :
-                                                            formData.utilityType === 'Water' ? 'Water Tax Number' : 'Number'}...`}
-                                                    styles={{
-                                                        ...customStyles,
-                                                        singleValue: (provided) => ({
-                                                            ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
-                                                            fontWeight: 'normal',
-                                                        }),
-                                                        menuList: (base) => ({
-                                                            ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
-                                                            scrollbarWidth: 'none',
-                                                            msOverflowStyle: 'none',
-                                                            '&::-webkit-scrollbar': { display: 'none' },
-                                                        }),
-                                                    }}
-                                                    menuPlacement="bottom"
-                                                    menuPosition="absolute"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-gray-500 font-normal text-left">Months</label>
-                                                <input
-                                                    type="month"
-                                                    name="utilityForTheMonth"
-                                                    value={formData.utilityForTheMonth}
-                                                    onChange={handleChange}
-                                                    placeholder="Enter months..."
-                                                    className="mt-1 block w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
-                                                />
-                                            </div>
-                                            {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
-                                                <div className="col-span-2 grid grid-cols-3 gap-4 w-full">
-
-                                                    {/* Validity */}
-                                                    <div>
-                                                        <label className="block text-gray-500 font-normal text-left">Validity</label>
-                                                        <input
-                                                            type="text"
-                                                            name="utilityValidityDays"
-                                                            value={formData.utilityValidityDays}
-                                                            onChange={handleChange}
-                                                            placeholder="Enter validity..."
-                                                            className="mt-1 w-full p-2 border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-normal"
+                                        )}
+                                        </div>
+                                        {formData.accountType === 'Utility Bills' && (
+                                            <>
+                                                <div className="flex gap-[16px]">
+                                                <div className={formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription' ? 'w-[616px]' : 'w-[300px]'}>
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">
+                                                        {getUtilityTypeNumberLabel(formData.utilityType)}
+                                                    </label>
+                                                    <Select
+                                                        options={ebNumberOptions}
+                                                        value={selectedEbNumber}
+                                                        onChange={(opt) => {
+                                                            setSelectedEbNumber(opt);
+                                                            setFormData((prev) => ({ ...prev, utilityTypeNumber: opt?.label || "" }));
+                                                        }}
+                                                        isClearable
+                                                        components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                        className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                        placeholder={getUtilityTypeNumberLabel(formData.utilityType)}
+                                                        styles={{
+                                                            ...customStyles,
+                                                            control: (base, state) => ({
+                                                                ...(typeof customStyles.control === 'function' ? customStyles.control(base, state) : base),
+                                                                fontWeight: 600,
+                                                                borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                borderWidth: '2px',
+                                                                borderRadius: '0.5rem',
+                                                                height: '40px',
+                                                                minHeight: '40px',
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                                textAlign: 'left',
+                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                '&:hover': {
+                                                                    borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                },
+                                                            }),
+                                                            valueContainer: (base) => ({
+                                                                ...(typeof customStyles.valueContainer === 'function' ? customStyles.valueContainer(base) : base),
+                                                                alignItems: 'center',
+                                                                paddingTop: 0,
+                                                                paddingBottom: 0,
+                                                            }),
+                                                            indicatorsContainer: (base) => ({
+                                                                ...(typeof customStyles.indicatorsContainer === 'function' ? customStyles.indicatorsContainer(base) : base),
+                                                                alignItems: 'center',
+                                                            }),
+                                                            indicatorSeparator: () => ({
+                                                                display: 'none',
+                                                            }),
+                                                            option: (provided, state) => ({
+                                                                ...(typeof customStyles.option === 'function' ? customStyles.option(provided, state) : provided),
+                                                                fontWeight: 600,
+                                                            }),
+                                                            singleValue: (provided) => ({
+                                                                ...(typeof customStyles.singleValue === 'function' ? customStyles.singleValue(provided) : provided),
+                                                                fontWeight: 600,
+                                                            }),
+                                                            menuList: (base) => ({
+                                                                ...(typeof customStyles.menuList === 'function' ? customStyles.menuList(base) : base),
+                                                                scrollbarWidth: 'none',
+                                                                msOverflowStyle: 'none',
+                                                                '&::-webkit-scrollbar': { display: 'none' },
+                                                            }),
+                                                        }}
+                                                        menuPlacement="bottom"
+                                                        menuPosition="absolute"
+                                                    />
+                                                </div>
+                                                {formData.utilityType !== 'Telecom' && formData.utilityType !== 'Subscription' && (
+                                                <div className="w-[300px]">
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">For The Month Of</label>
+                                                    <div className="w-[300px]">
+                                                        <CustomMonthField
+                                                            value={formData.utilityForTheMonth}
+                                                            onChange={(v) => setFormData((prev) => ({ ...prev, utilityForTheMonth: v }))}
+                                                            placeholder="For The Month Of"
+                                                            className="w-full"
+                                                            alwaysOpenAbove
                                                         />
                                                     </div>
-
-                                                    {/* Validity Type */}
-                                                    <div>
-                                                        <label className="block text-gray-500 font-normal text-left">Validity Type</label>
-                                                        <Select
-                                                            name="utilityValidityType"
-                                                            options={EDIT_POPUP_VALIDITY_TYPE_OPTIONS}
-                                                            value={EDIT_POPUP_VALIDITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityValidityType) || null}
-                                                            onChange={(selectedOption) =>
-                                                                setFormData({
-                                                                    ...formData,
-                                                                    utilityValidityType: selectedOption?.value || '',
-                                                                })
-                                                            }
-                                                            placeholder="--- Select ---"
-                                                            isClearable
-                                                            styles={{
-                                                                control: (base, state) => ({
-                                                                    ...base,
-                                                                    fontWeight: 'normal',
-                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                    borderWidth: '2px',
-                                                                    borderRadius: '0.5rem',
-                                                                    padding: '0.25rem',
-                                                                    textAlign: 'left',
-                                                                    boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
-                                                                    '&:hover': {
-                                                                        borderColor: 'rgba(191, 152, 83, 0.4)',
-                                                                    },
-                                                                }),
-                                                                placeholder: (base) => ({
-                                                                    ...base,
-                                                                    fontWeight: 'normal',
-                                                                    color: '#6B7280',
-                                                                    textAlign: 'left',
-                                                                }),
-                                                                option: (provided, state) => ({
-                                                                    ...provided,
-                                                                    textAlign: 'left',
-                                                                    fontWeight: 'normal',
-                                                                    fontSize: '15px',
-                                                                    backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                    color: 'black',
-                                                                }),
-                                                                singleValue: (base) => ({
-                                                                    ...base,
-                                                                    color: '#111827',
-                                                                    fontWeight: 'normal',
-                                                                }),
-                                                                menu: (base) => ({
-                                                                    ...base,
-                                                                    zIndex: 999,
-                                                                }),
-                                                                menuList: (base) => ({
-                                                                    ...base,
-                                                                    scrollbarWidth: 'none',
-                                                                    msOverflowStyle: 'none',
-                                                                    '&::-webkit-scrollbar': { display: 'none' },
-                                                                }),
-                                                            }}
-                                                            menuPlacement="bottom"
-                                                            menuPosition="absolute"
-                                                        />
-                                                    </div>
-
-                                                    {/* Service Start Date */}
-                                                    {formData.utilityType === 'Telecom' && (
-                                                        <div>
-                                                            <label className="block text-gray-500 font-normal text-left">Service Start Date</label>
-                                                            <div className="mt-1">
+                                                </div>
+                                                )}
+                                                </div>
+                                                {(formData.utilityType === 'Telecom' || formData.utilityType === 'Subscription') && (
+                                                    <div className="flex gap-[16px] items-end">
+                                                        <div className="w-[300px]">
+                                                            <label className="block text-black font-semibold mb-[8px] text-left">Validity Duration<span className="text-[#E4572E]">*</span></label>
+                                                            <div className="flex gap-2 w-[300px]">
+                                                            <input
+                                                                type="text"
+                                                                name="utilityValidityDays"
+                                                                value={formData.utilityValidityDays}
+                                                                onChange={handleChange}
+                                                                placeholder="Validity Duration"
+                                                                className="min-w-0 flex-1 h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
+                                                            />
+                                                            <div className="w-[110px]">
+                                                            <Select
+                                                                name="utilityValidityType"
+                                                                options={EDIT_POPUP_VALIDITY_TYPE_OPTIONS}
+                                                                value={EDIT_POPUP_VALIDITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityValidityType) || null}
+                                                                onChange={(selectedOption) =>
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        utilityValidityType: selectedOption?.value || '',
+                                                                    })
+                                                                }
+                                                                placeholder="Validity Type"
+                                                                isClearable
+                                                                isSearchable
+                                                                components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                                className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                                styles={{
+                                                                    control: (base, state) => ({
+                                                                        ...base,
+                                                                        fontWeight: 600,
+                                                                        borderColor: 'rgba(191, 152, 83, 0.2)',
+                                                                        borderWidth: '2px',
+                                                                        borderRadius: '0.5rem',
+                                                                        height: '40px',
+                                                                        minHeight: '40px',
+                                                                        alignItems: 'center',
+                                                                        paddingTop: 0,
+                                                                        paddingBottom: 0,
+                                                                        textAlign: 'left',
+                                                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+                                                                        '&:hover': {
+                                                                            borderColor: 'rgba(191, 152, 83, 0.4)',
+                                                                        },
+                                                                    }),
+                                                                    valueContainer: (base) => ({
+                                                                        ...base,
+                                                                        alignItems: 'center',
+                                                                        paddingTop: 0,
+                                                                        paddingBottom: 0,
+                                                                    }),
+                                                                    indicatorsContainer: (base) => ({
+                                                                        ...base,
+                                                                        alignItems: 'center',
+                                                                    }),
+                                                                    indicatorSeparator: () => ({
+                                                                        display: 'none',
+                                                                    }),
+                                                                    placeholder: (base) => ({
+                                                                        ...base,
+                                                                        fontWeight: 'normal',
+                                                                        color: '#6B7280',
+                                                                        textAlign: 'left',
+                                                                    }),
+                                                                    option: (provided, state) => ({
+                                                                        ...provided,
+                                                                        textAlign: 'left',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '15px',
+                                                                        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                                        color: 'black',
+                                                                    }),
+                                                                    singleValue: (base) => ({
+                                                                        ...base,
+                                                                        color: '#111827',
+                                                                        fontWeight: 600,
+                                                                    }),
+                                                                    menu: (base) => ({
+                                                                        ...base,
+                                                                        zIndex: 999,
+                                                                    }),
+                                                                    menuList: (base) => ({
+                                                                        ...base,
+                                                                        scrollbarWidth: 'none',
+                                                                        msOverflowStyle: 'none',
+                                                                        '&::-webkit-scrollbar': { display: 'none' },
+                                                                    }),
+                                                                }}
+                                                                menuPlacement="bottom"
+                                                                menuPosition="absolute"
+                                                            />
+                                                            </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="w-[300px]">
+                                                            <label className="block text-black font-semibold mb-[8px] text-left">Activation Date<span className="text-[#E4572E]">*</span></label>
+                                                            <div className="w-[300px]">
                                                                 <CustomDateField
                                                                     value={formData.serviceStartingDate}
                                                                     onChange={(v) => setFormData((prev) => ({ ...prev, serviceStartingDate: v }))}
-                                                                    placeholder="Service start date"
-                                                                    className="[&>button]:!font-normal"
+                                                                    placeholder="Activation Date"
+                                                                    controlHeightPx={40}
+                                                                    alwaysOpenAbove
+                                                                    className="w-full [&>div]:!w-full [&>div]:!max-w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div:hover]:!border-[rgba(191,152,83,0.4)] [&>div:focus-within]:!outline-none [&>div:focus-within]:!ring-0 [&>div:focus-within]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button]:!font-semibold"
                                                                 />
                                                             </div>
                                                         </div>
-                                                    )}
-
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                    <div className="col-span-2 flex justify-end space-x-4 mt-4 border-t-2 ">
-                                        <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
-                                            Cancel
-                                        </button>
-                                        <button type="submit" disabled={isSubmitting} onClick={handleSave}
-                                            className={`px-4 py-2 bg-[#BF9853] text-white rounded mt-3 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                            {isSubmitting ? 'Submitting...' : 'Submit'}
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </Modal>
-                        {showPaymentModal && (
-                            <ExpenseEntryPaymentModal
-                                isOpen={showPaymentModal}
-                                onClose={() => setShowPaymentModal(false)}
-                                onSubmit={handlePaymentModalSubmit}
-                                isSubmitting={isSubmitting}
-                                paymentMode={paymentModalData.paymentMode || pendingUpdateFormDataRef.current?.paymentMode || ''}
-                                date={pendingUpdateFormDataRef.current?.date || ''}
-                                amount={pendingUpdateFormDataRef.current?.amount || ''}
-                                paymentModalData={paymentModalData}
-                                setPaymentModalData={setPaymentModalData}
-                                accountDetails={accountDetails}
-                                selectStyles={customStyles}
-                            />
-                        )}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                        <div className="text-left">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Description</label>
+                                            <textarea
+                                                name="comments"
+                                                value={formData.comments}
+                                                onChange={handleChange}
+                                                placeholder="Description"
+                                                className="border-2 border-[#BF9853] rounded-md px-[8px] w-[616px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none font-semibold placeholder:font-normal placeholder:text-gray-500"
+                                            />
+                                        </div>
+                                        <div className="flex justify-end space-x-4 mt-4 ">
+                                            <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" disabled={isSubmitting} onClick={handleSave}
+                                                className={`px-4 py-2 bg-[#BF9853] text-white rounded mt-3 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                                {isSubmitting ? 'Submitting...' : 'Submit'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </Modal>
+                            {showPaymentModal && (
+                                <ExpenseEntryPaymentModal
+                                    isOpen={showPaymentModal}
+                                    onClose={() => setShowPaymentModal(false)}
+                                    onSubmit={handlePaymentModalSubmit}
+                                    isSubmitting={isSubmitting}
+                                    paymentMode={paymentModalData.paymentMode || pendingUpdateFormDataRef.current?.paymentMode || ''}
+                                    date={pendingUpdateFormDataRef.current?.date || ''}
+                                    amount={pendingUpdateFormDataRef.current?.amount || ''}
+                                    paymentModalData={paymentModalData}
+                                    setPaymentModalData={setPaymentModalData}
+                                    accountDetails={accountDetails}
+                                    selectStyles={customStyles}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
+            {showBillArrivalCalendar && createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 z-[9998]"
+                        aria-hidden
+                        onMouseDown={() => setShowBillArrivalCalendar(false)}
+                    />
+                    <div
+                        className="fixed z-[9999] w-0 h-0 [&>div]:!top-full [&>div]:!bottom-auto [&>div]:!mt-2 [&>div]:!mb-0 [&>div]:!right-0 [&>div]:!left-auto"
+                        style={{
+                            top: billArrivalCalendarPos.top,
+                            left: billArrivalCalendarPos.left,
+                        }}
+                    >
+                        <SingleDatePicker
+                            isOpen
+                            onClose={() => setShowBillArrivalCalendar(false)}
+                            value={selectedBillArrival || ''}
+                            onChange={(v) => {
+                                setSelectedBillArrival(v);
+                                setShowBillArrivalCalendar(false);
+                            }}
+                            variant="dropdown"
+                            anchor="right"
+                        />
+                    </div>
+                </>,
+                document.body
+            )}
         </body>
     );
 };

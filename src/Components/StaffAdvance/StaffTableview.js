@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -299,7 +302,7 @@ const EditModal = memo(({
 
 EditModal.displayName = 'EditModal';
 
-const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -340,49 +343,54 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
   const velocity = useRef({ x: 0, y: 0 });
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [recRes, empRes, purRes] = await Promise.allSettled([
-          fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all'),
-          fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
-            credentials: 'include',
-          }),
-          fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll')
-        ]);
-        const recData = recRes.status === 'fulfilled' && recRes.value.ok
-          ? await recRes.value.json()
-          : [];
-        const empData = empRes.status === 'fulfilled' && empRes.value.ok
-          ? await empRes.value.json()
-          : [];
-        const purData = purRes.status === 'fulfilled' && purRes.value.ok
-          ? await purRes.value.json()
-          : [];
-        setRecords(recData);
-        setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
-        setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
-        const failedAPIs = [];
-        if (recRes.status === 'rejected' || !recRes.value?.ok) failedAPIs.push('Staff Advance');
-        if (empRes.status === 'rejected' || !empRes.value?.ok) failedAPIs.push('Employee Details');
-        if (purRes.status === 'rejected' || !purRes.value?.ok) failedAPIs.push('Purposes');
-        if (failedAPIs.length > 0) {
-          setError(`Warning: Some data may not be available (${failedAPIs.join(', ')})`);
-        }
-      } catch (error) {
-        console.error('Error in fetchData:', error);
-        setError('Failed to load data. Please try refreshing the page.');
-        setRecords([]);
-        setEmployees([]);
-        setPurposes([]);
-      } finally {
-        setIsLoading(false);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [recRes, empRes, purRes] = await Promise.allSettled([
+        fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all'),
+        fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
+          credentials: 'include',
+        }),
+        fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll')
+      ]);
+      const recData = recRes.status === 'fulfilled' && recRes.value.ok
+        ? await recRes.value.json()
+        : [];
+      const empData = empRes.status === 'fulfilled' && empRes.value.ok
+        ? await empRes.value.json()
+        : [];
+      const purData = purRes.status === 'fulfilled' && purRes.value.ok
+        ? await purRes.value.json()
+        : [];
+      setRecords(recData);
+      setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
+      setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
+      const failedAPIs = [];
+      if (recRes.status === 'rejected' || !recRes.value?.ok) failedAPIs.push('Staff Advance');
+      if (empRes.status === 'rejected' || !empRes.value?.ok) failedAPIs.push('Employee Details');
+      if (purRes.status === 'rejected' || !purRes.value?.ok) failedAPIs.push('Purposes');
+      if (failedAPIs.length > 0) {
+        setError(`Warning: Some data may not be available (${failedAPIs.join(', ')})`);
       }
-    };
-    fetchData();
+    } catch (error) {
+      console.error('Error in fetchData:', error);
+      setError('Failed to load data. Please try refreshing the page.');
+      setRecords([]);
+      setEmployees([]);
+      setPurposes([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useOrbitPageSync('staffadvance', fetchData, [fetchData]);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchData);
   useEffect(() => {
     fetchLaboursList();
   }, []);
@@ -711,7 +719,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
       }
       const updatedRecords = await response.json();
       setIsEditModalOpen(false);
-      window.location.reload();
       setRecords(prevRecords => {
         const updatedEntryNos = new Set(updatedRecords.map(r => r.entryNo));
         const filteredRecords = prevRecords.filter(record =>
@@ -720,6 +727,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [] }) => {
         );
         return [...filteredRecords, ...updatedRecords];
       });
+      notifyOrbitModuleDataChanged('staffadvance');
     } catch (error) {
       console.error('Update error:', error);
       alert(error.message || 'Failed to update record. Please try again.');

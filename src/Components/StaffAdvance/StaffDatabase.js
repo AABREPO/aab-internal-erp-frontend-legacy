@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -8,7 +11,7 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 
-const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) => {
+const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [purposes, setPurposes] = useState([]);
@@ -43,68 +46,69 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
 
   // Fetch all data on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      let recData = [];
       try {
-        // Fetch staff advance records
-        let recData = [];
-        try {
-          const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
-          if (recRes.ok) {
-            recData = await recRes.json();
-          } else {
-            console.warn('Staff advance API not available, using empty data');
-          }
-        } catch (error) {
-          console.warn('Error fetching staff advance data:', error);
+        const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
+        if (recRes.ok) {
+          recData = await recRes.json();
+        } else {
+          console.warn('Staff advance API not available, using empty data');
         }
-
-        // Fetch employee data
-        let empData = [];
-        try {
-          const empRes = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
-            credentials: 'include',
-          });
-          if (empRes.ok) {
-            empData = await empRes.json();
-          } else {
-            console.warn('Employee API not available, using empty data');
-          }
-        } catch (error) {
-          console.warn('Error fetching employee data:', error);
-        }
-
-        // Fetch purposes data
-        let purData = [];
-        try {
-          const purRes = await fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll');
-          if (purRes.ok) {
-            purData = await purRes.json();
-          } else {
-            console.warn('Purposes API not available, using empty data');
-          }
-        } catch (error) {
-          console.warn('Error fetching purposes data:', error);
-        }
-
-        setRecords(recData);
-        setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
-        setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
       } catch (error) {
-        console.error('Error in fetchData:', error);
-        setError('Failed to load data. Some APIs may not be available.');
-        // Set empty arrays as fallback
-        setRecords([]);
-        setEmployees([]);
-        setPurposes([]);
-      } finally {
-        setIsLoading(false);
+        console.warn('Error fetching staff advance data:', error);
       }
-    };
-    fetchData();
+
+      let empData = [];
+      try {
+        const empRes = await fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
+          credentials: 'include',
+        });
+        if (empRes.ok) {
+          empData = await empRes.json();
+        } else {
+          console.warn('Employee API not available, using empty data');
+        }
+      } catch (error) {
+        console.warn('Error fetching employee data:', error);
+      }
+
+      let purData = [];
+      try {
+        const purRes = await fetch('https://backendaab.in/demoAabuildersDash/api/purposes/getAll');
+        if (purRes.ok) {
+          purData = await purRes.json();
+        } else {
+          console.warn('Purposes API not available, using empty data');
+        }
+      } catch (error) {
+        console.warn('Error fetching purposes data:', error);
+      }
+
+      setRecords(recData);
+      setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
+      setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
+    } catch (error) {
+      console.error('Error in fetchData:', error);
+      setError('Failed to load data. Some APIs may not be available.');
+      setRecords([]);
+      setEmployees([]);
+      setPurposes([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useOrbitPageSync('staffadvance', fetchData, [fetchData]);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchData);
 
   useEffect(() => {
     fetchLaboursList();
@@ -757,7 +761,6 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         throw new Error(`Update failed: ${response.statusText}`);
       }
       const updatedRecords = await response.json();
-      window.location.reload();
       setIsEditModalOpen(false);
       setRecords(prevRecords => {
         const updatedEntryNos = new Set(updatedRecords.map(r => r.entry_no));
@@ -767,6 +770,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
         );
         return [...filteredRecords, ...updatedRecords];
       });
+      notifyOrbitModuleDataChanged('staffadvance');
     } catch (error) {
       console.error('Update error:', error);
       alert(error.message || 'Failed to update record. Please try again.');
@@ -812,7 +816,13 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [] }) =>
       }
 
       console.log(`Cleared record with ID ${idToDelete}`);
-      window.location.reload(); // Refresh to reflect changes
+      setRecords((prev) =>
+        prev.filter(
+          (record) =>
+            record.staffAdvancePortalId !== idToDelete && record.id !== idToDelete
+        )
+      );
+      notifyOrbitModuleDataChanged('staffadvance');
     } catch (error) {
       console.error('Delete error:', error);
     }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
 import cross from '../Images/cross.png';
@@ -79,7 +80,8 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             });
             if (response.ok) {
                 alert("Staff Type deleted successfully!!!");
-                window.location.reload();
+                await fetchStaffTypes();
+                notifyOrbitModuleDataChanged('staffadvance');
             } else {
                 console.error("Failed to delete the Staff Type. Status:", response.status);
                 alert("Error deleting the Staff Type. Please try again.");
@@ -104,7 +106,8 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             if (response.ok) {
                 setMessage('Staff Type saved successfully!');
                 setStaffType('');
-                window.location.reload();
+                await fetchStaffTypes();
+                notifyOrbitModuleDataChanged('staffadvance');
             } else {
                 setMessage('Error saving staff type.');
             }
@@ -126,7 +129,8 @@ const StaffAddInput = ({ username, userRoles = [], paymentModeOptions = [] }) =>
             });
             if (response.ok) {
                 closeEditStaffTypePopup();
-                window.location.reload();
+                await fetchStaffTypes();
+                notifyOrbitModuleDataChanged('staffadvance');
             } else {
                 console.error('Failed to update staff type');
             }

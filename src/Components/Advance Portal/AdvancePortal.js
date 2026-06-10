@@ -19,6 +19,15 @@ import {
   resolveAdvancePortalIdFromSaveResponse,
   linkExpensesEntryIdToAdvancePortal,
 } from '../../utils/advancePortalWeeklyPaymentBill';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import {
+  appendExpenseToFormCache,
+  findDuplicateExpenses,
+  getLatestEnoFromExpenses,
+  prefetchExpensesFormData,
+  toExpenseLocalDateStr,
+} from '../../utils/expensesFormPrefetch';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 const advancePortalReadonlyFieldClass =
   'min-h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg bg-[#FAF6ED] px-3 flex items-center text-sm font-medium text-[#202020]';
@@ -51,6 +60,8 @@ const AdvancePortal = ({
   embedded = false,
   onSuccess,
   lockTypePrefill = false,
+  refreshSignal,
+  isActive = true,
 }) => {
   const resolveEnteredBy = () => {
     const propUsername = typeof username === 'string' ? username.trim() : '';
@@ -174,6 +185,9 @@ const AdvancePortal = ({
   const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
+  const duplicateCheckPromiseRef = useRef(null);
+  const duplicateBypassedRef = useRef(false);
+  const lastDuplicateCheckRef = useRef([]);
   const clearTransientFormSessionState = () => {
     // Keep selectedOption/selectedSite available for popup prefill flows.
     sessionStorage.removeItem('advanceAmount');
@@ -184,6 +198,7 @@ const AdvancePortal = ({
     sessionStorage.removeItem('transferSiteId');
   };
   const notifyParentSuccess = async () => {
+    notifyOrbitModuleDataChanged('portal');
     if (typeof onSuccess === 'function') {
       try { await onSuccess(); } catch { }
     }
@@ -514,24 +529,21 @@ const AdvancePortal = ({
   // Fetch latest ENo for expenses form
   const fetchLatestEno = async () => {
     try {
-      const response = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
-      if (!response.ok) {
-        throw new Error('Failed to fetch ENo');
-      }
-      const data = await response.json();
-      if (data.length > 0) {
-        const sortedData = data.sort((a, b) => b.eno - a.eno);
-        const lastEno = sortedData[0].eno;
-        setEno(lastEno + 1);
-      } else {
-        setEno(54173);
-      }
+      const expenses = await prefetchExpensesFormData({ branchId: activeBranchId });
+      setEno(getLatestEnoFromExpenses(expenses));
     } catch (error) {
       console.error('Error fetching latest ENo:', error);
     }
   };
   useEffect(() => {
     fetchLatestEno();
+    const onExpensesSync = () => {
+      prefetchExpensesFormData({ branchId: activeBranchId, force: true })
+        .then((expenses) => setEno(getLatestEnoFromExpenses(expenses)))
+        .catch(() => {});
+    };
+    window.addEventListener('expensesDataSync', onExpensesSync);
+    return () => window.removeEventListener('expensesDataSync', onExpensesSync);
   }, [activeBranchId]);
   useEffect(() => {
     const fetchData = async () => {
@@ -548,54 +560,12 @@ const AdvancePortal = ({
     };
     fetchData();
   }, [activeBranchId]);
-  const handleChange = async (selected) => {
+  const handleChange = (selected) => {
     setSelectedOption(selected);
     if (selected) {
       localStorage.setItem("advanceContractorVendor", JSON.stringify(selected));
     } else {
       localStorage.removeItem("advanceContractorVendor");
-    }
-    try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
-      if (!response.ok) {
-        throw new Error('Failed to fetch data');
-      }
-      const data = await response.json();
-      const total = data
-        .filter(item => {
-          return selected.type === 'Vendor'
-            ? item.vendor_id === selected.id
-            : selected.type === 'Contractor'
-              ? item.contractor_id === selected.id
-              : false;
-        })
-        .reduce((sum, curr) => sum + computeAdvanceBalanceDelta(curr), 0);
-      setOverallAdvance(total);
-    } catch (error) {
-      console.error('Error fetching or processing advance data:', error);
-      setOverallAdvance(0);
-    }
-  };
-  const calculateProjectAdvance = async (vendorOrContractor, project) => {
-    if (!vendorOrContractor || !project) {
-      setProjectAdvance('');
-      return;
-    }
-    try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll');
-      if (!response.ok) throw new Error('Failed to fetch advance portal data');
-      const data = await response.json();
-      const isVendor = vendorOrContractor.type === 'Vendor';
-      const idField = isVendor ? 'vendor_id' : 'contractor_id';
-      // Filter for only this vendor/contractor & project
-      const relevantData = data.filter(
-        item => item[idField] === vendorOrContractor.id && item.project_id === project.id
-      );
-      const total = relevantData.reduce((sum, entry) => sum + computeAdvanceBalanceDelta(entry), 0);
-      setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
-    } catch (error) {
-      console.error('Error calculating project advance:', error);
-      setProjectAdvance('');
     }
   };
   // Combine vendor and contractor options
@@ -688,6 +658,7 @@ const AdvancePortal = ({
       console.error('Error fetching advance data:', error);
     }
   };
+  useTabRefreshSignal(refreshSignal, isActive, fetchAdvanceData);
   const validateFormFields = () => {
     // --- Common validation based on type ---
     if (selectedType === 'Advance' || selectedType === 'Refund') {
@@ -742,7 +713,7 @@ const AdvancePortal = ({
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
   };
   const formatDateForDup = (dateString) => {
     if (!dateString) return '-';
@@ -753,16 +724,8 @@ const AdvancePortal = ({
     const hours = date.getHours();
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
-    const hour12 = hours % 12 || 12;
-    return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
-  };
-  const toLocalDateStr = (val) => {
-    if (!val) return '';
-    const d = new Date(val);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    const hour12 = String(hours % 12 || 12).padStart(2, '0');
+    return `${day}-${month}-${year} ${hour12}:${minutes} ${ampm}`;
   };
   const normalizeStr = (s) => (s == null ? '' : String(s).trim());
 
@@ -770,43 +733,71 @@ const AdvancePortal = ({
     const vendorLabel = normalizeStr(selectedOption?.type === 'Vendor' ? selectedOption.label : '');
     const contractorLabel = normalizeStr(selectedOption?.type === 'Contractor' ? selectedOption.label : '');
     const siteLabel = normalizeStr(selectedSite ? selectedSite.label : '');
-    const dateStr = checkDate ? (typeof checkDate === 'string' && checkDate.includes('-') ? checkDate.split('T')[0] : toLocalDateStr(checkDate)) : '';
+    const dateStr = checkDate
+      ? (typeof checkDate === 'string' && checkDate.includes('-') ? checkDate.split('T')[0] : toExpenseLocalDateStr(checkDate))
+      : '';
+    const amountNum = parseFloat(checkAmount) || 0;
+    const partyType = selectedOption?.type === 'Vendor'
+      ? 'Vendor'
+      : selectedOption?.type === 'Contractor'
+        ? 'Contractor'
+        : '';
 
     try {
-      const response = await fetch(withBranchUrl('https://backendaab.in/demoAabuilderDash/expenses_form/get_form'));
-      if (!response.ok) return [];
-      const allExpenses = await response.json();
-
-      const matching = allExpenses.filter((exp) => {
-        const expDateStr = toLocalDateStr(exp.date || exp.timestamp);
-        const expAmount = Math.abs(parseFloat(exp.amount) || 0);
-        const dateMatch = expDateStr === dateStr;
-        const amountMatch = Math.abs(expAmount - (checkAmount || 0)) < 0.01;
-        const expSiteName = normalizeStr(exp.siteName || exp.projectName || '');
-        const projectMatch =
-          (siteLabel && expSiteName && expSiteName === siteLabel) ||
-          (exp.projectId && selectedSite && Number(exp.projectId) === Number(selectedSite.id));
-        let vendorContractorMatch = false;
-        if (vendorLabel) vendorContractorMatch = normalizeStr(exp.vendor || '') === vendorLabel;
-        else if (contractorLabel) vendorContractorMatch = normalizeStr(exp.contractor || '') === contractorLabel;
-        return dateMatch && amountMatch && projectMatch && vendorContractorMatch;
+      await prefetchExpensesFormData({ branchId: activeBranchId });
+      return findDuplicateExpenses({
+        dateStr,
+        amountNum,
+        siteLabel,
+        selectedProjectId: selectedSite ? Number(selectedSite.id) : null,
+        selectedType: partyType,
+        vendorLabel,
+        contractorLabel,
+        selectedId: selectedOption ? Number(selectedOption.id) : null,
+        branchId: activeBranchId,
       });
-
-      return matching;
     } catch (err) {
       console.error('Error checking duplicate:', err);
       return [];
     }
   };
+  const startDuplicateCheck = (checkDate, checkAmount, actionAfterIgnore = null) => {
+    duplicateBypassedRef.current = false;
+    lastDuplicateCheckRef.current = [];
+    setDuplicateMatchedExpenses([]);
+    setShowDuplicateModal(false);
+    setPendingActionAfterIgnore(actionAfterIgnore);
+    setCheckingDuplicate(true);
+    const checkPromise = checkForDuplicateEntry(checkDate, checkAmount)
+      .then((duplicates) => {
+        const matches = Array.isArray(duplicates) ? duplicates : [];
+        lastDuplicateCheckRef.current = matches;
+        if (matches.length > 0 && !duplicateBypassedRef.current) {
+          setDuplicateMatchedExpenses(matches);
+          setShowDuplicateModal(true);
+        }
+        return matches;
+      })
+      .catch((err) => {
+        console.error('Error checking duplicate:', err);
+        lastDuplicateCheckRef.current = [];
+        return [];
+      })
+      .finally(() => {
+        setCheckingDuplicate(false);
+        duplicateCheckPromiseRef.current = null;
+      });
+    duplicateCheckPromiseRef.current = checkPromise;
+    return checkPromise;
+  };
   const handleDuplicateIgnore = () => {
+    duplicateBypassedRef.current = true;
     setShowDuplicateModal(false);
     setDuplicateMatchedExpenses([]);
-    if (pendingActionAfterIgnore === 'review') {
-      setPendingActionAfterIgnore(null);
-      setShowReviewModal(true);
-      setIsReviewEditMode(false);
-    } else if (pendingActionAfterIgnore === 'paymentSubmit') {
-      setPendingActionAfterIgnore(null);
+    lastDuplicateCheckRef.current = [];
+    const action = pendingActionAfterIgnore;
+    setPendingActionAfterIgnore(null);
+    if (action === 'paymentSubmit') {
       handlePaymentSubmit(true);
     }
   };
@@ -819,32 +810,33 @@ const AdvancePortal = ({
     if (!validateFormFields()) {
       return;
     }
-    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
-      const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(advanceAmount.toString().replace(/,/g, '')) || 0);
-      setCheckingDuplicate(true);
-      try {
-        const duplicates = await checkForDuplicateEntry(dateValue, checkAmount);
-        if (duplicates && duplicates.length > 0) {
-          setDuplicateMatchedExpenses(duplicates);
-          setPendingActionAfterIgnore('review');
-          setShowDuplicateModal(true);
-          setCheckingDuplicate(false);
-          return;
-        }
-      } catch (err) {
-        console.error('Duplicate check failed:', err);
-      }
-      setCheckingDuplicate(false);
-    }
     setShowReviewModal(true);
     setIsReviewEditMode(false);
+    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+      const checkAmount = selectedType === 'Bill Settlement'
+        ? (parseFloat(billAmount) || 0)
+        : (parseFloat(advanceAmount.toString().replace(/,/g, '')) || 0);
+      startDuplicateCheck(dateValue, checkAmount, 'review');
+    }
   };
-  const handleReviewConfirm = () => {
+  const handleReviewConfirm = async () => {
     if (isReviewEditMode) {
       return;
     }
     if (!validateFormFields()) {
       return;
+    }
+    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+      if (duplicateCheckPromiseRef.current) {
+        await duplicateCheckPromiseRef.current;
+      }
+      const pendingDuplicates = lastDuplicateCheckRef.current;
+      if (pendingDuplicates.length > 0 && !duplicateBypassedRef.current) {
+        setDuplicateMatchedExpenses(pendingDuplicates);
+        setPendingActionAfterIgnore('review');
+        setShowDuplicateModal(true);
+        return;
+      }
     }
     // Check if payment mode requires popup details (all modes except Cash and Direct)
     const requiresPaymentDetails = paymentMode && paymentMode !== 'Cash' && paymentMode !== 'Direct' && finalPaymentModeOptions.some(opt => opt.value === paymentMode);
@@ -868,6 +860,11 @@ const AdvancePortal = ({
   const handleReviewClose = () => {
     setShowReviewModal(false);
     setIsReviewEditMode(false);
+    setShowDuplicateModal(false);
+    setDuplicateMatchedExpenses([]);
+    duplicateBypassedRef.current = false;
+    lastDuplicateCheckRef.current = [];
+    setPendingActionAfterIgnore(null);
   };
   const handleReviewSave = () => {
     if (!validateFormFields()) {
@@ -961,6 +958,14 @@ const AdvancePortal = ({
         'Expenses save response did not include id. Backend must return { id } from expenses_form/save.'
       );
     }
+    appendExpenseToFormCache(
+      {
+        ...expensesPayload,
+        id: expensesEntryId,
+        timestamp: new Date().toISOString(),
+      },
+      activeBranchId
+    );
     return expensesEntryId;
   };
   const linkBillSettlementExpenseToAdvancePortal = async (
@@ -1210,8 +1215,6 @@ const AdvancePortal = ({
       clearTransientFormSessionState();
       try { sessionStorage.removeItem("advancePortalWeeklyExpenseIdForBillCopyUrl"); } catch { }
       fetchAdvanceData();
-      if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
       await notifyParentSuccess();
     } catch (error) {
       console.error('Error submitting data:', error);
@@ -1232,13 +1235,6 @@ const AdvancePortal = ({
     return Math.floor(diff / oneWeek) + 1;
   };
   useEffect(() => {
-    if (selectedOption && selectedSite) {
-      calculateProjectAdvance(selectedOption, selectedSite);
-    } else {
-      setProjectAdvance('');
-    }
-  }, [selectedOption, selectedSite, activeBranchId]);
-  useEffect(() => {
     if (!selectedOption) {
       setOverallAdvance(0);
       return;
@@ -1254,6 +1250,19 @@ const AdvancePortal = ({
       .reduce((sum, curr) => sum + computeAdvanceBalanceDelta(curr), 0);
     setOverallAdvance(total);
   }, [advanceData, selectedOption]);
+  useEffect(() => {
+    if (!selectedOption || !selectedSite) {
+      setProjectAdvance('');
+      return;
+    }
+    const idField = selectedOption.type === 'Vendor' ? 'vendor_id' : 'contractor_id';
+    const total = advanceData
+      .filter(
+        (item) => item[idField] === selectedOption.id && item.project_id === selectedSite.id
+      )
+      .reduce((sum, entry) => sum + computeAdvanceBalanceDelta(entry), 0);
+    setProjectAdvance(total.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+  }, [advanceData, selectedOption, selectedSite]);
   useEffect(() => {
     // Default date to today, but do NOT override Bill Settlement popup prefill
     // (WeeklyPayment sets this in sessionStorage before opening embedded popup).
@@ -1330,7 +1339,10 @@ const AdvancePortal = ({
   const formatDateForReview = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
   const vendorOrContractorLabel = selectedOption?.label || '-';
   const formattedAdvanceAmount = advanceAmount ? formatWithCommas(advanceAmount) : '-';
@@ -1448,21 +1460,24 @@ const AdvancePortal = ({
     }
 
     if (!skipDuplicateCheck && (selectedType === 'Advance' || selectedType === 'Bill Settlement')) {
-      const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(paymentModalData.amount) || 0);
+      const checkAmount = selectedType === 'Bill Settlement'
+        ? (parseFloat(billAmount) || 0)
+        : (parseFloat(paymentModalData.amount) || 0);
       setCheckingDuplicate(true);
       try {
         const duplicates = await checkForDuplicateEntry(paymentModalData.date, checkAmount);
-        if (duplicates && duplicates.length > 0) {
+        lastDuplicateCheckRef.current = Array.isArray(duplicates) ? duplicates : [];
+        if (duplicates?.length > 0 && !duplicateBypassedRef.current) {
           setDuplicateMatchedExpenses(duplicates);
           setPendingActionAfterIgnore('paymentSubmit');
           setShowDuplicateModal(true);
-          setCheckingDuplicate(false);
           return;
         }
       } catch (err) {
         console.error('Duplicate check failed:', err);
+      } finally {
+        setCheckingDuplicate(false);
       }
-      setCheckingDuplicate(false);
     }
 
     setIsSubmitting(true);
@@ -1652,8 +1667,6 @@ const AdvancePortal = ({
       clearTransientFormSessionState();
       try { sessionStorage.removeItem("advancePortalWeeklyExpenseIdForBillCopyUrl"); } catch { }
       fetchAdvanceData();
-      if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
       await notifyParentSuccess();
     } catch (error) {
       console.error('Error submitting data:', error);
@@ -1747,8 +1760,6 @@ const AdvancePortal = ({
       }
       setIsEditModalOpen(false);
       await fetchAdvanceData();
-      if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
       await notifyParentSuccess();
     } catch (err) {
       console.error(err);
@@ -1783,8 +1794,6 @@ const AdvancePortal = ({
       pendingEditUpdateRef.current = null;
       setIsEditModalOpen(false);
       await fetchAdvanceData();
-      if (selectedOption) handleChange(selectedOption);
-      if (selectedOption && selectedSite) calculateProjectAdvance(selectedOption, selectedSite);
       await notifyParentSuccess();
     } catch (err) {
       console.error(err);
@@ -2210,7 +2219,7 @@ const AdvancePortal = ({
           </div>
         )}
         {showDuplicateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
             <div className="bg-white rounded-lg w-full max-w-[1600px] max-h-[90vh] shadow-lg flex flex-col">
               <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
                 <div className="flex justify-between items-center">
@@ -2432,7 +2441,12 @@ const AdvancePortal = ({
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white text-left rounded-xl p-6 w-[1400px] h-[680px] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Review Submission</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Review Submission</h3>
+                  {checkingDuplicate && (selectedType === 'Advance' || selectedType === 'Bill Settlement') && (
+                    <p className="text-sm text-amber-700 mt-1">Checking for duplicate entries…</p>
+                  )}
+                </div>
                 <button onClick={handleReviewClose} className="text-2xl font-bold text-gray-400 hover:text-gray-700">
                   ×
                 </button>

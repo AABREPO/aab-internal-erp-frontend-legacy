@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import axios from 'axios';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import {
-  postBankRegisterLogSave,
+    postBankRegisterLogSave,
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import Filter from '../Images/filter (3).png'
-const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive = true }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [extraRows, setExtraRows] = useState([]);
@@ -99,8 +101,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
     }
   }, [username]);
 
-  useEffect(() => {
-    // Fetch data from the API
+  const fetchClaimDataList = () => {
     fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form')
       .then((response) => {
         if (!response.ok) {
@@ -109,14 +110,19 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
         return response.json();
       })
       .then((data) => {
-        // Filter only items with accountType = 'Claim'
         const filteredData = data.filter(item => item.accountType === 'Claim Payment' || item.accountType === 'Bill Payments + Claim');
         setClaimDataList(filteredData);
       })
       .catch((err) => {
         console.error(err.message);
       });
+  };
+
+  useEffect(() => {
+    fetchClaimDataList();
   }, []);
+
+  useTabRefreshSignal(refreshSignal, isActive, fetchClaimDataList);
 
   useEffect(() => {
     const fetchSites = async () => {
@@ -465,8 +471,9 @@ const ClaimPaymentSummary = ({ username, userRoles = [] }) => {
       } else {
         alert("Payment saved successfully!");
       }
-      window.location.reload();
       setShowModal(false);
+      notifyOrbitModuleDataChanged('Claim');
+      fetchClaimDataList();
     } catch (error) {
       console.error("Error saving payment:", error);
       alert("Error occurred while saving payment.");

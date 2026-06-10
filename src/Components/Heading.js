@@ -8,6 +8,19 @@ import EntryChecking from './ExpensesEntry/EntryCheck';
 import WeeklyPaymentHistory from './Cash Register/WeeklyPaymentHistory';
 import DailyHistory from './Cash Register/DailyHistory';
 import Log from './ExpensesEntry/DatabaseExpenseHistoryLog';
+
+const EXPENSE_MODULE_TABS = [
+    'expense-entry',
+    'tableview',
+    'database',
+    'log',
+    'addInput',
+    'entryCheck',
+    'weeklyUploadHistory',
+    'dailyUpload',
+];
+const EXPENSE_DEFAULT_TAB = 'expense-entry';
+
 const getInitialExpenseTab = (username) => {
     const prefillData = localStorage.getItem('expenseEntryPrefill');
     if (prefillData) {
@@ -17,13 +30,24 @@ const getInitialExpenseTab = (username) => {
     if (savedTab === 'database' && (username !== 'Mahalingam M' && username !== 'Admin' && username !== 'Marimuthu A')) {
         return 'expense-entry';
     }
-    return savedTab || 'expense-entry';
+    return savedTab || EXPENSE_DEFAULT_TAB;
 };
 
 const Heading = ({ username, userRoles = [] }) => {
-    const [activeTab, setActiveTab] = useState(() => getInitialExpenseTab(username));
-    const [visitedTabs, setVisitedTabs] = useState(() => new Set([getInitialExpenseTab(username)]));
     const isAdminExpense = username === 'Mahalingam M' || username === 'Admin' || username === 'Marimuthu A';
+    const allowedTabs = isAdminExpense
+        ? EXPENSE_MODULE_TABS
+        : EXPENSE_MODULE_TABS.filter((tab) => !['database', 'log', 'addInput'].includes(tab));
+
+    const initialTab = getInitialExpenseTab(username);
+    const [activeTab, setActiveTab] = useState(() => initialTab);
+    const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const bumpRefresh = () => setRefreshNonce((n) => n + 1);
+
+    useEffect(() => {
+        setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }, [activeTab]);
 
     useEffect(() => {
         if (activeTab === 'database' && !isAdminExpense) {
@@ -33,64 +57,65 @@ const Heading = ({ username, userRoles = [] }) => {
         }
     }, [activeTab, username, isAdminExpense]);
 
-    useEffect(() => {
-        setVisitedTabs((prev) => new Set(prev).add(activeTab));
-    }, [activeTab]);
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        bumpRefresh();
+    };
 
     return (
         <div className="bg-[#FAF6ED]">
             <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
                 <h2 className={`link whitespace-nowrap ${activeTab === 'expense-entry' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('expense-entry')}>
+                    onClick={() => handleTabChange('expense-entry')}>
                     Form
                 </h2>
                 <h2 className={`link whitespace-nowrap ${activeTab === 'tableview' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('tableview')}>
+                    onClick={() => handleTabChange('tableview')}>
                     Table View
                 </h2>
                 {isAdminExpense && (
                     <>
                         <h2 className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('database')}>
+                            onClick={() => handleTabChange('database')}>
                             Database
                         </h2>
                         <h2 className={`link whitespace-nowrap ${activeTab === 'log' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('log')}>
+                            onClick={() => handleTabChange('log')}>
                             Log
                         </h2>
                         <h2 className={`link whitespace-nowrap ${activeTab === 'addInput' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('addInput')}>
+                            onClick={() => handleTabChange('addInput')}>
                             Input Data
                         </h2>                        
                     </>
                 )}
                 <h2 className={`link whitespace-nowrap ${activeTab === 'entryCheck' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('entryCheck')}>
+                    onClick={() => handleTabChange('entryCheck')}>
                     Entry Check
                 </h2>
                 <h2 className={`link whitespace-nowrap ${activeTab === 'weeklyUploadHistory' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('weeklyUploadHistory')}>
+                    onClick={() => handleTabChange('weeklyUploadHistory')}>
                     Weekly Uploads
                 </h2>
                 <h2 className={`link whitespace-nowrap ${activeTab === 'dailyUpload' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('dailyUpload')}>
+                    onClick={() => handleTabChange('dailyUpload')}>
                     Daily Upload
                 </h2>
             </div>
             <div className="content">
                 {visitedTabs.has('expense-entry') && (
                     <div className={activeTab === 'expense-entry' ? '' : 'hidden'}>
-                        <Form username={username} userRoles={userRoles} />
+                        <Form username={username} userRoles={userRoles} refreshSignal={refreshNonce} isActive={activeTab === 'expense-entry'} />
                     </div>
                 )}
                 {visitedTabs.has('tableview') && (
                     <div className={activeTab === 'tableview' ? '' : 'hidden'}>
-                        <Tableview username={username} userRoles={userRoles} isActive={activeTab === 'tableview'} />
+                        <Tableview username={username} userRoles={userRoles} isActive={activeTab === 'tableview'} refreshSignal={refreshNonce} />
                     </div>
                 )}
                 {isAdminExpense && visitedTabs.has('database') && (
                     <div className={activeTab === 'database' ? '' : 'hidden'}>
-                        <Database username={username} userRoles={userRoles} isActive={activeTab === 'database'} />
+                        <Database username={username} userRoles={userRoles} isActive={activeTab === 'database'} refreshSignal={refreshNonce} />
                     </div>
                 )}
                 {isAdminExpense && visitedTabs.has('addInput') && (

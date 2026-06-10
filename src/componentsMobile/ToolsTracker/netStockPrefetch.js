@@ -21,9 +21,9 @@ export function getToolsNetStockPrefetchCache() {
   return cache;
 }
 
-export async function prefetchToolsNetStockData() {
+export async function prefetchToolsNetStockData({ force = false } = {}) {
   if (inFlight) return inFlight;
-  if (isFresh()) return cache;
+  if (!force && isFresh()) return cache;
 
   inFlight = (async () => {
     const base8081 = 'https://backendaab.in/demoAabuilderDash/api';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import Select from 'react-select';
 import axios from "axios";
 import edit from '../Images/Edit.svg';
@@ -10,9 +10,32 @@ import {
     bankRegisterLogSaveUrlMatchingRequest,
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 
 // BillDatabase component - displays fully paid bills (verified + entered + fully paid with tick)
-const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }) => {
+const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true, refreshSignal }) => {
+    const resolveActiveBranchId = () => {
+        try {
+            const selectedBranchId = localStorage.getItem("selectedBranchId")
+            const user = JSON.parse(localStorage.getItem("user") || "{}")
+            const fallbackBranchId = user?.branchId ?? user?.branch_id ?? user?.brachId
+            const resolved = Number(selectedBranchId || fallbackBranchId)
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : null
+        } catch {
+            return null
+        }
+    }
+    const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId())
+    useEffect(() => {
+        const syncBranch = () => {
+            const nextBranchId = resolveActiveBranchId()
+            setActiveBranchId((prevBranchId) => (prevBranchId === nextBranchId ? prevBranchId : nextBranchId))
+        }
+        syncBranch()
+        window.addEventListener('branchSelectionChanged', syncBranch)
+        return () => window.removeEventListener('branchSelectionChanged', syncBranch)
+    }, [])
     const [apiData, setApiData] = useState([])
     // Modal states (match PendingBill style popups)
     const [showModal, setShowModal] = useState(false)
@@ -62,7 +85,20 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
     const [numberInputLocked, setNumberInputLocked] = useState(false)
     const [hasStartedEditing, setHasStartedEditing] = useState(false)
     const [previousEntryNumbers, setPreviousEntryNumbers] = useState({})
-    const [paymentEntries, setPaymentEntries] = useState([])
+    const [paymentEntries, setPaymentEntries] = useState([
+        {
+            id: 1,
+            date: '',
+            amount: '',
+            amountDisplay: '',
+            mode: '',
+            attachedFile: null,
+            chequeNo: '',
+            chequeDate: '',
+            transactionNumber: '',
+            accountNumber: ''
+        }
+    ])
     const [additionalFields, setAdditionalFields] = useState([])
     const [billData, setBillData] = useState([])
     const [serialNumber, setSerialNumber] = useState(1)
@@ -107,6 +143,22 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
     const [carryForwardData, setCarryForwardData] = useState([])
     const [useCarryForward, setUseCarryForward] = useState(false)
     const [carryForwardAmount, setCarryForwardAmount] = useState(0)
+    const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+    const [paymentProcessingMessage, setPaymentProcessingMessage] = useState('')
+    const [paidTodayBills, setPaidTodayBills] = useState({})
+    const [lastPaymentDates, setLastPaymentDates] = useState({})
+    const defaultPaymentModeOptions = useMemo(() => ([
+        { value: "Cash", label: "Cash" },
+        { value: "Direct", label: "Direct" },
+        { value: "Net Banking", label: "Net Banking" },
+        { value: "Gpay", label: "Gpay" },
+        { value: "PhonePe", label: "PhonePe" },
+        { value: "Cheque", label: "Cheque" },
+    ]), [])
+    const [paymentModeOptions, setPaymentModeOptions] = useState(() => ([
+        { value: "Carry Forward", label: "Carry Forward" },
+        ...defaultPaymentModeOptions
+    ]))
 
     // Edit modal states
     const [showEditModal, setShowEditModal] = useState(false)
@@ -772,36 +824,75 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             setCarryForwardAmount(0);
         }
     };
-    const handlePaymentClick = async (item) => {
-        setSelectedPaymentBill(item)
-        findVendorAccountDetails(item?.vendor_id)
-        const billTotal = parseFloat(item?.total_amount || 0)
-        const existingPayments = await fetchExistingPaymentDetails(item.id)
-        let received = 0
-        let totalDiscount = 0
+    const handlePaymentClick = async (bill) => {
+        setSelectedPaymentBill(bill)
+        const billAmount = parseFloat(bill.total_amount) || 0;
+        setActualAmount(billAmount);
+        const existingPayments = await fetchExistingPaymentDetails(bill.id);
+        let receivedAmount = 0;
+        let totalDiscount = 0;
         if (existingPayments && existingPayments.length > 0) {
-            received = existingPayments.reduce((sum, payment) => {
+            receivedAmount = existingPayments.reduce((sum, payment) => {
                 const amount = parseFloat(payment.amount) || 0;
                 const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
                 return sum + amount + carryForwardAmount;
             }, 0);
-            totalDiscount = existingPayments.reduce((sum, p) => sum + (parseFloat(p.discount_amount) || 0), 0)
+            totalDiscount = existingPayments.reduce((sum, payment) => sum + (payment.discount_amount || 0), 0);
         }
-        // Database payment modal is view-only; entries are not edited here (use Pending Bill to add payments)
-        setPaymentEntries([])
-        setReceivedAmount(received)
-        setDiscount(totalDiscount)
-        setDiscountSubmitted(totalDiscount > 0)
-        setActualAmount(billTotal)
-        setRemainingAmount(Math.max(0, billTotal - received))
-        setUseCarryForward(false); // Reset checkbox
-        const vendorId = item.vendor_id || item.vendorId
+        const remainingAmount = Math.max(0, billAmount - receivedAmount);
+        setRemainingAmount(remainingAmount);
+        setDiscount(totalDiscount);
+        setDiscountSubmitted(totalDiscount > 0);
+        setUseCarryForward(false);
+        setPaymentEntries([
+            {
+                id: 1,
+                date: '',
+                amount: '',
+                amountDisplay: '',
+                mode: '',
+                attachedFile: null,
+                chequeNo: '',
+                chequeDate: '',
+                transactionNumber: '',
+                accountNumber: ''
+            }
+        ]);
+        const vendorId = bill.vendor_id || bill.vendorId
         if (vendorId) {
-            // Fetch carry forward data for this vendor
             await fetchCarryForwardData(vendorId);
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (response.ok) {
+                    const vendorData = await response.json();
+                    const vendorDetails = vendorData.find(vendor => vendor.id === vendorId);
+                    setSelectedVendorAccountDetails(vendorDetails || null);
+                } else {
+                    setSelectedVendorAccountDetails(null);
+                }
+            } catch (error) {
+                console.error("Error fetching vendor details:", error);
+                setSelectedVendorAccountDetails(null);
+            }
         } else {
+            setSelectedVendorAccountDetails(null)
             setCarryForwardData([]);
             setCarryForwardAmount(0);
+        }
+        if (!accountDetails || accountDetails.length === 0) {
+            try { await fetchAccountDetails() } catch { }
+        }
+        try {
+            const statusResult = await getPaymentStatus(bill);
+            setPaymentStatuses(prev => ({ ...prev, [bill.id]: statusResult.status }));
+        } catch {
+            // ignore; local settlement calc still applies in modal
         }
         setShowPaymentModal(true)
     }
@@ -1479,9 +1570,23 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
         doc.save(fileName)
     }
     const handlePaymentCancel = () => {
+        if (isProcessingPayment) return;
         setShowPaymentModal(false)
         setSelectedPaymentBill(null)
-        setPaymentEntries([])
+        setPaymentEntries([
+            {
+                id: 1,
+                date: '',
+                amount: '',
+                amountDisplay: '',
+                mode: '',
+                attachedFile: null,
+                chequeNo: '',
+                chequeDate: '',
+                transactionNumber: '',
+                accountNumber: ''
+            }
+        ])
         setExistingPaymentDetails(null)
         setLoadingPaymentDetails(false)
         setDiscount(0)
@@ -1504,6 +1609,16 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
         const integerPart = parts[0] || ''
         const decimalPart = parts[1] ? parts[1].slice(0, 2) : ''
         return decimalPart ? `${integerPart}.${decimalPart}` : integerPart
+    }
+    const parsePaymentEntryAmount = (entry) => {
+        const raw = entry?.amount ?? entry?.amountDisplay ?? ''
+        if (typeof raw === 'string') {
+            const cleaned = raw.replace(/,/g, '')
+            const numeric = parseFloat(cleaned)
+            return Number.isNaN(numeric) ? 0 : numeric
+        }
+        const numeric = parseFloat(raw)
+        return Number.isNaN(numeric) ? 0 : numeric
     }
     const handlePaymentEntryChange = (entryId, field, value) => {
         setPaymentEntries(prev => prev.map(entry => {
@@ -1809,27 +1924,38 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
     useEffect(() => {
         if (useCarryForward && carryForwardAmount > 0 && paymentEntries.length > 0 && showPaymentModal) {
             const firstEntry = paymentEntries[0];
-            // Only auto-fill if amount is empty
-            if (!firstEntry.amount || firstEntry.amount === '') {
-                const carryForwardToUse = Math.min(carryForwardAmount, remainingAmount);
-                if (carryForwardToUse > 0) {
-                    const displayValue = formatIndianCurrency(carryForwardToUse);
-                    setPaymentEntries(prev => prev.map((entry, index) => {
-                        if (index === 0) {
-                            return {
-                                ...entry,
+            const normalizedDiscountForCf = (() => {
+                if (typeof discount === 'string') {
+                    const cleaned = discount.replace(/,/g, '')
+                    const numeric = parseFloat(cleaned)
+                    return Number.isNaN(numeric) ? 0 : numeric
+                }
+                return Number.isFinite(discount) ? discount : 0
+            })()
+            const obligationBeforeSession = Math.max(0, remainingAmount - normalizedDiscountForCf)
+            const carryForwardToUse = Math.min(carryForwardAmount, obligationBeforeSession);
+            const needsAmount = !firstEntry.amount || firstEntry.amount === '';
+            const needsMode = firstEntry.mode !== 'Carry Forward';
+            if ((needsAmount && carryForwardToUse > 0) || needsMode) {
+                setPaymentEntries(prev => prev.map((entry, index) => {
+                    if (index === 0) {
+                        const displayValue = needsAmount && carryForwardToUse > 0
+                            ? formatIndianCurrency(carryForwardToUse)
+                            : (entry.amountDisplay || entry.amount || '');
+                        return {
+                            ...entry,
+                            ...(needsAmount && carryForwardToUse > 0 ? {
                                 amount: carryForwardToUse.toString(),
                                 amountDisplay: displayValue,
-                                mode: entry.mode || 'Carry Forward',
                                 date: entry.date || new Date().toISOString().split('T')[0]
-                            };
-                        }
-                        return entry;
-                    }));
-                }
+                            } : {}),
+                            mode: 'Carry Forward'
+                        };
+                    }
+                    return entry;
+                }));
             }
         } else if (!useCarryForward && paymentEntries.length > 0 && showPaymentModal) {
-            // Clear amount when unchecked if it was set by carry forward
             const firstEntry = paymentEntries[0];
             if (firstEntry.mode === 'Carry Forward' && firstEntry.amount) {
                 setPaymentEntries(prev => prev.map((entry, index) => {
@@ -1847,6 +1973,15 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [useCarryForward, carryForwardAmount, remainingAmount, showPaymentModal])
+
+    const getISOWeekNumber = (date) => {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+        const yearStart = new Date(d.getFullYear(), 0, 1);
+        const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        return weekNo;
+    };
 
     const handlePaymentSubmit = async () => {
         // Check if using carry forward only (no payment entries needed)
@@ -1875,6 +2010,8 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                 return
             }
         }
+        setIsProcessingPayment(true)
+        setPaymentProcessingMessage('Saving payment details…')
         try {
             // Filter out empty payment entries (for carry forward only case)
             const validPaymentEntries = paymentEntries.filter(entry =>
@@ -1884,23 +2021,35 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             const regularPaymentEntries = validPaymentEntries.filter(entry => entry.mode !== 'Carry Forward');
             const carryForwardEntries = validPaymentEntries.filter(entry => entry.mode === 'Carry Forward');
             const totalPaymentAmount = regularPaymentEntries.reduce((sum, entry) => {
-                return sum + (parseFloat(entry.amount) || 0)
+                return sum + parsePaymentEntryAmount(entry)
             }, 0)
             const currentReceivedAmount = actualAmount - remainingAmount;
-            const newTotalReceived = currentReceivedAmount + totalPaymentAmount;
-            const remainingAfterPayments = Math.max(0, actualAmount - newTotalReceived);
-            // Calculate carry forward to use: either from entries or calculated amount
-            let carryForwardToUse = 0;
-            if (carryForwardEntries.length > 0) {
-                // Sum carry forward amounts from entries
-                carryForwardToUse = carryForwardEntries.reduce((sum, entry) => {
-                    return sum + (parseFloat(entry.amount) || 0)
-                }, 0);
-            } else if (useCarryForward) {
-                // Calculate how much carry forward can be used
-                carryForwardToUse = Math.min(carryForwardAmount, remainingAfterPayments);
-            }
-            const newRemainingAmount = Math.max(0, remainingAfterPayments - carryForwardToUse);
+            const normalizedDiscount = (() => {
+                if (typeof discount === 'string') {
+                    const cleaned = discount.replace(/,/g, '')
+                    const numeric = parseFloat(cleaned)
+                    return Number.isNaN(numeric) ? 0 : numeric
+                }
+                return Number.isFinite(discount) ? discount : 0
+            })()
+            const discountToSend = discountSubmitted ? 0 : normalizedDiscount
+            const totalRequiredToSettle = Math.max(0, actualAmount - normalizedDiscount)
+            const obligationBeforeSession = Math.max(0, totalRequiredToSettle - currentReceivedAmount)
+            const totalCfRequested = carryForwardEntries.length > 0
+                ? carryForwardEntries.reduce((sum, entry) => sum + parsePaymentEntryAmount(entry), 0)
+                : (useCarryForward
+                    ? Math.min(carryForwardAmount, Math.max(0, obligationBeforeSession - totalPaymentAmount))
+                    : 0)
+            const carryForwardToUse = Math.min(
+                totalCfRequested,
+                Math.max(0, obligationBeforeSession - totalPaymentAmount)
+            )
+            const totalContributionThisSession = totalPaymentAmount + totalCfRequested
+            const excessAmount = Math.max(0, totalContributionThisSession - obligationBeforeSession)
+            const newRemainingAmount = Math.max(
+                0,
+                totalRequiredToSettle - (currentReceivedAmount + totalPaymentAmount + carryForwardToUse)
+            )
             // Only process payment entries if there are valid ones
             const paymentDetailsPromises = validPaymentEntries.length > 0
                 ? validPaymentEntries.map(async (entry, index) => {
@@ -1949,14 +2098,15 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         date: entry.date,
                         actual_amount: actualAmount,
                         amount: isCarryForward ? 0 : (parseFloat(entry.amount) || 0),
-                        discount_amount: index === 0 ? discount : 0,
+                        discount_amount: index === 0 ? discountToSend : 0,
                         carry_forward_amount: isCarryForward ? (parseFloat(entry.amount) || 0) : 0,
                         vendor_bill_payment_mode: entry.mode,
                         cheque_number: entry.chequeNo || '',
                         cheque_date: entry.chequeDate || '',
                         transaction_number: entry.transactionNumber || '',
                         account_number: entry.accountNumber || '',
-                        bill_url: billUrl
+                        bill_url: billUrl,
+                        branch_id: activeBranchId
                     }
                     const vendorTrackerSaveUrl = "https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save";
                     if (isPaymentModeRequiringBankRegisterLog(entry.mode)) {
@@ -2003,7 +2153,8 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         cheque_date: '',
                         transaction_number: '',
                         account_number: '',
-                        bill_url: ''
+                        bill_url: '',
+                        branch_id: activeBranchId
                     };
                     const carryForwardPaymentResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-bill-tracker/save", {
                         method: "POST",
@@ -2052,6 +2203,8 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         vendor_payment_tracker_id: selectedPaymentBill.id,
                         tenant_id: null,
                         tenant_complex_name: null,
+                        branch_id: activeBranchId,
+                        entered_by: username,
                     };
                     try {
                         const weeklyPaymentBillResponse = await fetch(
@@ -2083,8 +2236,8 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         project_id: 10,
                         type: "Vendor Bill Payment",
                         amount: parseFloat(entry.amount) || 0,
-                        status: true,
-                        weekly_number: "",
+                        status: false,
+                        weekly_number: entry.date ? getISOWeekNumber(entry.date) : "",
                         period_start_date: null,
                         period_end_date: null,
                         advance_portal_id: null,
@@ -2094,7 +2247,9 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         expenses_entry_id: null,
                         vendor_payment_tracker_id: selectedPaymentBill.id,
                         send_to_expenses_entry: false,
-                        bill_copy_url: billUrl
+                        bill_copy_url: billUrl,
+                        branch_id: activeBranchId,
+                        entered_by: username
                     };
                     try {
                         const weeklyExpenseResponse = await fetch(
@@ -2115,21 +2270,10 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                     }
                 }
             }
-            // Handle carry forward if checkbox is checked
-            // Calculate actual carry forward amount used (from payment entries or separate entry)
-            let actualCarryForwardUsed = 0;
-            if (carryForwardEntries.length > 0) {
-                // Sum carry forward amounts from payment entries
-                actualCarryForwardUsed = carryForwardEntries.reduce((sum, entry) => {
-                    return sum + (parseFloat(entry.amount) || 0)
-                }, 0);
-            } else if (useCarryForward && carryForwardToUse > 0) {
-                // Use the separate carry forward entry amount
-                actualCarryForwardUsed = carryForwardToUse;
-            }
-            if (useCarryForward && actualCarryForwardUsed > 0) {
+            // Bill Payment carry forward: consume only the amount applied toward this bill
+            const actualCarryForwardUsed = carryForwardToUse
+            if (actualCarryForwardUsed > 0) {
                 try {
-                    // Create a carry forward entry with bill_amount to subtract the used amount
                     const carryForwardPayload = {
                         type: "Bill Payment",
                         date: validPaymentEntries.length > 0
@@ -2139,7 +2283,8 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                         payment_mode: "Carry Forward",
                         amount: 0,
                         bill_amount: actualCarryForwardUsed,
-                        refund_amount: 0
+                        refund_amount: 0,
+                        branch_id: activeBranchId
                     };
                     const carryForwardResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
                         method: "POST",
@@ -2155,6 +2300,48 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                     console.error("Error updating carry forward:", error);
                 }
             }
+            if (excessAmount > 0) {
+                try {
+                    const excessAmountPayload = {
+                        type: "Extra amount",
+                        date: validPaymentEntries.length > 0
+                            ? validPaymentEntries[0]?.date
+                            : new Date().toISOString().split('T')[0],
+                        vendor_id: selectedPaymentBill.vendor_id,
+                        payment_mode: "",
+                        amount: excessAmount,
+                        bill_amount: 0,
+                        refund_amount: 0,
+                        branch_id: activeBranchId
+                    };
+                    const excessAmountResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor_carry_forward/save", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(excessAmountPayload)
+                    });
+                    if (!excessAmountResponse.ok) {
+                        console.error("Failed to save excess amount to carry forward");
+                    } else {
+                        console.log("Excess amount saved to carry forward successfully:", excessAmount);
+                    }
+                } catch (error) {
+                    console.error("Error saving excess amount to carry forward:", error);
+                }
+            }
+            const paymentDates = validPaymentEntries
+                .map(e => e.date)
+                .filter(d => d);
+            if (useCarryForward && carryForwardToUse > 0) {
+                const carryForwardDate = validPaymentEntries.length > 0
+                    ? validPaymentEntries[0]?.date
+                    : new Date().toISOString().split('T')[0];
+                paymentDates.push(carryForwardDate);
+            }
+            const latestEntryDate = paymentDates.length > 0
+                ? paymentDates.sort((a, b) => new Date(b) - new Date(a))[0]
+                : null;
+            const hasCashPayments = validPaymentEntries.some(entry => entry.mode === 'Cash');
+            const hasFileUploads = validPaymentEntries.some(entry => entry.attachedFile);
 
             setShowPaymentModal(false)
             setPaymentEntries([
@@ -2180,21 +2367,45 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             setUseCarryForward(false)
             setCarryForwardData([])
             setCarryForwardAmount(0)
+            setPaymentProcessingMessage('Refreshing records…')
 
             await fetchTrackerData()
             await fetchExpensesData()
             await fetchAllBillEntries()
-            const updatedStatus = await getPaymentStatus(selectedPaymentBill);
-
+            const updatedStatusResult = await getPaymentStatus(selectedPaymentBill);
+            const updatedStatus = updatedStatusResult.status;
+            const finalLastPaymentDate = latestEntryDate || updatedStatusResult.lastPaymentDate;
+            if (finalLastPaymentDate) {
+                setLastPaymentDates(prev => ({
+                    ...prev,
+                    [selectedPaymentBill.id]: finalLastPaymentDate
+                }));
+            }
             setPaymentStatuses(prev => ({
                 ...prev,
                 [selectedPaymentBill.id]: updatedStatus
             }));
+            setPaidTodayBills(prev => ({
+                ...prev,
+                [selectedPaymentBill.id]: updatedStatusResult.paidToday
+            }));
 
-            alert('Payment details saved successfully!');
+            let message = 'Payment details saved successfully and added to Weekly Payment Bills';
+            if (hasCashPayments) {
+                message += ' and Weekly Expenses';
+            }
+            if (hasFileUploads) {
+                message += ' with file attachments';
+            }
+            message += '!';
+            alert(message);
+            setPaymentProcessingMessage('')
+            setIsProcessingPayment(false)
         } catch (error) {
             console.error('Error saving payment details:', error)
             alert(`Error saving payment details: ${error.message}`)
+            setPaymentProcessingMessage('')
+            setIsProcessingPayment(false)
         }
     }
 
@@ -2260,9 +2471,11 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
     };
 
     // Fetch tracker data
-    const fetchTrackerData = async () => {
-        setLoading(true);
-        setError(null)
+    const fetchTrackerData = async ({ silent = false } = {}) => {
+        if (!silent) {
+            setLoading(true);
+            setError(null);
+        }
         try {
             // Mirror mobile Database.jsx exactly (non-paged endpoint)
             const response = await fetch("https://backendaab.in/demoAabuildersDash/api/vendor-payments/trackers/enriched/paid", {
@@ -2294,9 +2507,16 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             console.error("Error fetching tracker data:", error);
             setError(error.message);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
+    useOrbitPageSync(
+        'tracker',
+        () => {
+            void fetchTrackerData({ silent: true });
+        },
+        []
+    );
 
     // Fetch all bill entries
     const fetchAllBillEntries = async () => {
@@ -2470,11 +2690,11 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                 }
             });
             if (!response.ok) {
-                return 'To Pay'
+                return { status: 'To Pay', lastPaymentDate: null, paidToday: false }
             }
             const paymentDetails = await response.json();
             if (!paymentDetails || paymentDetails.length === 0) {
-                return 'To Pay'
+                return { status: 'To Pay', lastPaymentDate: null, paidToday: false }
             }
             const totalPaid = paymentDetails.reduce((sum, payment) => {
                 const amount = parseFloat(payment.amount) || 0;
@@ -2484,16 +2704,50 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             const totalDiscount = paymentDetails.reduce((sum, payment) => sum + (parseFloat(payment.discount_amount) || 0), 0);
             const actualAmount = parseFloat(item.total_amount) || 0;
             const remainingAmount = Math.max(0, actualAmount - totalPaid - totalDiscount);
-            if (remainingAmount === 0) {
-                return '✓ Paid'
-            } else if (totalPaid > 0) {
-                return 'Paid'
-            } else {
-                return 'To Pay'
+            let lastPaymentDate = null;
+            if (paymentDetails.length > 0) {
+                const dates = paymentDetails
+                    .map(p => p.date)
+                    .filter(d => d)
+                    .sort((a, b) => new Date(b) - new Date(a));
+                if (dates.length > 0) {
+                    lastPaymentDate = dates[0];
+                }
             }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(today);
+            todayEnd.setHours(23, 59, 59, 999);
+            let paidToday = false;
+            for (const payment of paymentDetails) {
+                if (payment.timestamp || payment.created_at) {
+                    const paymentTimestamp = new Date(payment.timestamp || payment.created_at);
+                    if (paymentTimestamp >= today && paymentTimestamp <= todayEnd) {
+                        paidToday = true;
+                        break;
+                    }
+                }
+                if (payment.date) {
+                    const paymentDate = new Date(payment.date);
+                    paymentDate.setHours(0, 0, 0, 0);
+                    if (paymentDate.getTime() === today.getTime()) {
+                        paidToday = true;
+                        break;
+                    }
+                }
+            }
+            let status;
+            if (remainingAmount === 0) {
+                status = '✓ Paid'
+            } else if (totalPaid > 0) {
+                status = 'Paid'
+            } else {
+                status = 'To Pay'
+            }
+            return { status, lastPaymentDate, paidToday }
         } catch (error) {
             console.error('Error fetching payment status:', error);
-            return 'To Pay'
+            return { status: 'To Pay', lastPaymentDate: null, paidToday: false }
         }
     }
     // Get button class for styling (copied from PendingBill)
@@ -2660,8 +2914,8 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
         if (!apiData || apiData.length === 0) return;
         try {
             const statusPromises = apiData.map(async (item) => {
-                const status = await getPaymentStatus(item);
-                return { id: item.id, status };
+                const result = await getPaymentStatus(item);
+                return { id: item.id, status: result.status };
             });
             const results = await Promise.all(statusPromises);
             const statusMap = {};
@@ -2816,6 +3070,7 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             fetchTrackerData();
         }
     }, [billPaymentsTabActive]);
+    useTabRefreshSignal(refreshSignal, billPaymentsTabActive, fetchTrackerData);
     useEffect(() => {
         fetchVendorNames();
         fetchContractorNames();
@@ -2879,12 +3134,100 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
         }
     };
     useEffect(() => {
+        const normalizeMode = (modeOfPayment) => {
+            const raw = String(modeOfPayment || "").trim();
+            const lower = raw.toLowerCase();
+            if (lower === "gpay") return "Gpay";
+            if (lower === "phonepe") return "PhonePe";
+            if (lower === "cheque") return "Cheque";
+            if (lower === "cash") return "Cash";
+            if (lower === "direct") return "Direct";
+            if (lower === "net banking" || lower === "netbanking") return "Net Banking";
+            return raw;
+        };
+        const fetchPaymentModes = async () => {
+            try {
+                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll");
+                if (!response.ok) return;
+                const data = await response.json();
+                const backendOptions = (Array.isArray(data) ? data : [])
+                    .map((m) => normalizeMode(m?.modeOfPayment))
+                    .filter(Boolean)
+                    .map((mode) => ({ value: mode, label: mode }));
+                const uniqueByValue = new Map();
+                backendOptions.forEach((opt) => uniqueByValue.set(opt.value, opt));
+                defaultPaymentModeOptions.forEach((opt) => uniqueByValue.set(opt.value, opt));
+                const merged = Array.from(uniqueByValue.values());
+                setPaymentModeOptions([{ value: "Carry Forward", label: "Carry Forward" }, ...merged]);
+            } catch (e) {
+                // keep fallback options
+            }
+        };
+        fetchPaymentModes();
+    }, [defaultPaymentModeOptions]);
+    useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions]);
     }, [vendorOptions, contractorOptions]);
     // Backend already returns only fully-paid enriched rows for the list.
     const baseData = apiData;
     const filteredData = getFilteredData(baseData);
     const sortedData = applySorting(filteredData);
+    const draftPaymentTotal = paymentEntries
+        .filter(entry => entry.mode !== 'Carry Forward')
+        .reduce((sum, entry) => sum + parsePaymentEntryAmount(entry), 0)
+    const existingReceivedAmount = Math.max(0, actualAmount - remainingAmount)
+    const normalizedDiscount = (() => {
+        if (typeof discount === 'string') {
+            const cleaned = discount.replace(/,/g, '')
+            const numeric = parseFloat(cleaned)
+            return Number.isNaN(numeric) ? 0 : numeric
+        }
+        return Number.isFinite(discount) ? discount : 0
+    })()
+    const billTotal = actualAmount || 0;
+    const existingReceived = existingReceivedAmount || 0;
+    const draftPaid = draftPaymentTotal || 0;
+    const discountValue = normalizedDiscount || 0;
+    const carryForwardAvailable = carryForwardAmount || 0;
+    const remainingAfterPayments = Math.max(0, billTotal - existingReceived - draftPaid)
+    const amountNeededToPay = Math.max(0, remainingAfterPayments - discountValue)
+    const carryForwardToUse = useCarryForward
+        ? Math.min(carryForwardAvailable, amountNeededToPay)
+        : 0;
+    const projectedRemainingAmount = Math.max(0, remainingAfterPayments - discountValue - carryForwardToUse)
+    const liveReceivedAmount = Math.min(billTotal, existingReceived + draftPaid + carryForwardToUse)
+    const excessCarryForward =
+        useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
+            ? carryForwardAvailable - amountNeededToPay
+            : 0;
+    const carryForwardFromEntries = paymentEntries
+        .filter(entry => entry.mode === 'Carry Forward')
+        .reduce((sum, entry) => sum + parsePaymentEntryAmount(entry), 0)
+    const totalRequiredToSettlePreview = Math.max(0, billTotal - discountValue)
+    const obligationBeforeSessionPreview = Math.max(0, totalRequiredToSettlePreview - existingReceived)
+    const totalCfRequestedPreview = carryForwardFromEntries > 0
+        ? carryForwardFromEntries
+        : (useCarryForward
+            ? Math.min(carryForwardAvailable, Math.max(0, obligationBeforeSessionPreview - draftPaid))
+            : 0)
+    const excessAmountPreview = Math.max(0, (draftPaid + totalCfRequestedPreview) - obligationBeforeSessionPreview)
+    const projectedNetPayable =
+        projectedRemainingAmount > 0
+            ? projectedRemainingAmount
+            : excessCarryForward > 0
+                ? -excessCarryForward
+                : excessAmountPreview > 0
+                    ? -excessAmountPreview
+                    : 0;
+    const netSettlementRequired = Math.max(0, billTotal - discountValue)
+    const isSelectedBillFullyPaid = Boolean(
+        selectedPaymentBill &&
+        showPaymentModal &&
+        (
+            paymentStatuses[selectedPaymentBill.id] === '✓ Paid' ||
+            (netSettlementRequired >= 0 && existingReceived >= netSettlementRequired)
+        )
+    )
     return (
         <div className="">
             <div className="bg-white p-5  mb-5 ml-10 mr-10 h-[128px]">
@@ -3552,13 +3895,29 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
             )}
             {showPaymentModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg w-[1100px] h-[780px] overflow-auto shadow-lg flex flex-col">
+                    <div className="relative bg-white rounded-lg w-[1100px] h-[780px] overflow-hidden shadow-lg flex flex-col">
+                        {isProcessingPayment && (
+                            <div
+                                className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90 backdrop-blur-[2px]"
+                                role="status"
+                                aria-live="polite"
+                                aria-busy="true"
+                            >
+                                <div className="w-12 h-12 border-4 border-[#BF9853] border-t-transparent rounded-full animate-spin mb-4" />
+                                <p className="text-lg font-semibold text-[#BF9853]">Work in progress</p>
+                                <p className="mt-2 text-sm text-gray-600 text-center max-w-md px-6">
+                                    {paymentProcessingMessage || 'Please wait while we complete your payment.'}
+                                </p>
+                                <p className="mt-3 text-xs text-gray-500 text-center max-w-md px-6">
+                                    Do not close this window or refresh the page.
+                                </p>
+                            </div>
+                        )}
                         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-semibold text-left flex-1">
-                                    Payment Report : {existingPaymentDetails?.length || 0}
-                                </h3>
+                                <h3 className="text-lg font-semibold text-center flex-1">Entry Payment Details</h3>
                                 <button
+                                    disabled={isProcessingPayment}
                                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl font-bold"
                                     onClick={handlePaymentCancel}
                                 >
@@ -3566,304 +3925,326 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true }
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-hidden">
+                        <div className={`flex-1 overflow-hidden ${isProcessingPayment ? 'pointer-events-none select-none opacity-60' : ''}`}>
                             <div className="flex gap-10 h-full">
-                                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+                                <div className="flex-1 flex flex-col">
                                     {loadingPaymentDetails && (
                                         <div className="px-6 py-4 text-center">
                                             <div className="text-sm text-gray-500">Loading existing payment details...</div>
                                         </div>
                                     )}
-                                    {!loadingPaymentDetails && (!existingPaymentDetails || existingPaymentDetails.length === 0) && (
-                                        <div className="px-6 py-10 text-center text-sm text-gray-500">
-                                            No payment records for this bill.
-                                        </div>
-                                    )}
-                                    {existingPaymentDetails && existingPaymentDetails.length > 0 && (
-                                        <div className="pl-4 pr-4 pb-4 mb-2">
-                                            <h4 className="text-sm font-semibold text-gray-700 mt-2">Previous Payment Details:</h4>
-                                            <div className="space-y-4">
-                                                {[...existingPaymentDetails].reverse().map((payment, index) => {
-                                                    const totalPayments = existingPaymentDetails.length;
-                                                    const paymentNumber = totalPayments - index;
-                                                    return (
-                                                        <div key={payment.id || index} className="text-left p-4 shadow-lg rounded-lg mb-4">
-                                                            <div className="mb-2">
-                                                                <span className="text-sm font-bold text-gray-700">Payment - {paymentNumber}</span>
+                                    {!isSelectedBillFullyPaid && (
+                                        <>
+                                            <div className="flex-1 overflow-y-auto p-4">
+                                                {paymentEntries.map((entry, index) => (
+                                                    <div key={entry.id} className="text-left p-4 shadow-lg rounded-lg">
+                                                        <div className={`flex gap-4 border border-[#BF9853] border-opacity-35 rounded-md p-4 ${isSelectedBillFullyPaid ? 'bg-gray-50' : ''}`}>
+                                                            <div className="flex-1">
+                                                                <label className="block font-semibold mb-1 text-sm">Date</label>
+                                                                <input
+                                                                    type="date"
+                                                                    value={entry.date}
+                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'date', e.target.value)}
+                                                                    disabled={isSelectedBillFullyPaid}
+                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                />
                                                             </div>
-                                                            <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
-                                                                <div className='grid grid-cols-3 gap-4'>
-                                                                    <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Date</label>
-                                                                        <input
-                                                                            type="date"
-                                                                            value={payment.date}
-                                                                            readOnly
-                                                                            className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Amount</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={(() => {
-                                                                                const amount = parseFloat(payment.amount) || 0;
-                                                                                const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
-                                                                                const totalAmount = amount + carryForwardAmount;
-                                                                                return totalAmount > 0 ? formatIndianCurrency(totalAmount) : '';
-                                                                            })()}
-                                                                            readOnly
-                                                                            className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="block font-semibold mb-1 text-sm">Mode</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={payment.vendor_bill_payment_mode || ''}
-                                                                            readOnly
-                                                                            className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <div className='grid grid-cols-2 gap-4 mt-2'>
-                                                                    {payment.cheque_number && (
-                                                                        <div>
-                                                                            <label className="block font-semibold mb-1 text-sm">Cheque No</label>
-                                                                            <input
-                                                                                type="text"
-                                                                                value={payment.cheque_number}
-                                                                                readOnly
-                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                    {payment.cheque_date && (
-                                                                        <div>
-                                                                            <label className="block font-semibold mb-1 text-sm">Cheque Date</label>
-                                                                            <input
-                                                                                type="date"
-                                                                                value={payment.cheque_date}
-                                                                                readOnly
-                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                    {payment.transaction_number && (
-                                                                        <div>
-                                                                            <label className="block font-semibold mb-1 text-sm">Transaction No</label>
-                                                                            <input
-                                                                                type="text"
-                                                                                value={payment.transaction_number}
-                                                                                readOnly
-                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                    {payment.account_number && (
-                                                                        <div>
-                                                                            <label className="block font-semibold mb-1 text-sm">Account No</label>
-                                                                            <input
-                                                                                type="text"
-                                                                                value={payment.account_number}
-                                                                                readOnly
-                                                                                className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm"
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="mt-4 pt-4 border-t border-[#BF9853] border-opacity-20">
-                                                                    {payment.bill_url ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                if (payment.bill_url) {
-                                                                                    window.open(payment.bill_url, '_blank', 'noopener,noreferrer');
-                                                                                }
-                                                                            }}
-                                                                            className="px-4 py-2 text-sm font-medium text-[#BF9853] hover:underline cursor-pointer rounded-lg transition-colors duration-200"
-                                                                        >
-                                                                            View
-                                                                        </button>
-                                                                    ) : (
-                                                                        <div>
-                                                                            <input
-                                                                                id={`existing-payment-file-${payment.id}`}
-                                                                                type="file"
-                                                                                accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
-                                                                                className="hidden"
-                                                                                onChange={(e) => handleExistingPaymentFileUpload(payment.id, e.target.files[0])}
-                                                                            />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => document.getElementById(`existing-payment-file-${payment.id}`).click()}
-                                                                                className="px-4 py-2 text-sm font-medium text-[#E4572E] hover:underline  transition-colors duration-200"
-                                                                            >
-                                                                                Attach File
-                                                                            </button>
+                                                            <div className="flex-1">
+                                                                <label className="block font-semibold mb-1 text-sm">Amount</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Enter Amount"
+                                                                    value={entry.amountDisplay || ''}
+                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'amount', e.target.value)}
+                                                                    disabled={isSelectedBillFullyPaid || (index === 0 && useCarryForward)}
+                                                                    className={`w-[150px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <label className="block font-semibold mb-1 text-sm">Mode</label>
+                                                                <select
+                                                                    value={entry.mode || (index === 0 && useCarryForward ? 'Carry Forward' : '')}
+                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'mode', e.target.value)}
+                                                                    disabled={isSelectedBillFullyPaid || (index === 0 && useCarryForward)}
+                                                                    className={`w-[180px] h-[35px] px-3 border-2 border-[#BF9853] border-opacity-35 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid || (index === 0 && useCarryForward) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                >
+                                                                    <option value="">Select</option>
+                                                                    {paymentModeOptions.map((opt) => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div className="mt-1 px-6">
+                                                                    <button type="button" className="text-[#E4572E] text-sm flex items-center gap-1"
+                                                                        onClick={() => document.getElementById(`file-input-${entry.id}`).click()}
+                                                                    >
+                                                                        Attach file
+                                                                    </button>
+                                                                    <input
+                                                                        id={`file-input-${entry.id}`}
+                                                                        type="file"
+                                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*"
+                                                                        className="hidden"
+                                                                        onChange={(e) => handleFileAttachment(entry.id, e.target.files[0])}
+                                                                    />
+                                                                    {entry.attachedFile && (
+                                                                        <div className="mt-1 text-xs text-gray-600">
+                                                                            {entry.attachedFile.name}
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    );
-                                                })}
+                                                        {(entry.mode === "Gpay" || entry.mode === "GPay" || entry.mode === "PhonePe" || entry.mode === "Net Banking" || entry.mode === "Cheque") && (
+                                                            <div className="mt-4 p-4 border border-[#BF9853] border-opacity-25 rounded-lg">
+                                                                <div className="space-y-4">
+                                                                    {entry.mode === "Cheque" && (
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div>
+                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={entry.chequeNo}
+                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeNo', e.target.value)}
+                                                                                    placeholder="Enter cheque number"
+                                                                                    disabled={isSelectedBillFullyPaid}
+                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                                                <input
+                                                                                    type="date"
+                                                                                    value={entry.chequeDate}
+                                                                                    onChange={(e) => handlePaymentEntryChange(entry.id, 'chequeDate', e.target.value)}
+                                                                                    disabled={isSelectedBillFullyPaid}
+                                                                                    className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="grid grid-cols-2 gap-4">
+                                                                        <div>
+                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={entry.transactionNumber}
+                                                                                onChange={(e) => handlePaymentEntryChange(entry.id, 'transactionNumber', e.target.value)}
+                                                                                placeholder="Enter transaction number"
+                                                                                disabled={isSelectedBillFullyPaid}
+                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                                            <select
+                                                                                value={entry.accountNumber}
+                                                                                onChange={(e) => handlePaymentEntryChange(entry.id, 'accountNumber', e.target.value)}
+                                                                                disabled={isSelectedBillFullyPaid}
+                                                                                className={`w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-25 rounded-md text-sm focus:outline-none ${isSelectedBillFullyPaid ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                                            >
+                                                                                <option value="">Select Account</option>
+                                                                                {accountDetails.map((account) => (
+                                                                                    <option key={account.id} value={account.account_number}>
+                                                                                        {account.account_number}
+                                                                                    </option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {!isSelectedBillFullyPaid && (
+                                                    <div className="flex py-3">
+                                                        <button onClick={handleAddPaymentEntry}
+                                                            className="text-[#E4572E] text-sm font-semibold border-dashed border-b-2 border-[#BF9853] cursor-pointer hover:text-[#c44a26] transition-colors duration-200 flex items-center gap-1"
+                                                        >
+                                                            <span className="text-red-500">+</span> Add on
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                    {existingPaymentDetails && existingPaymentDetails.length > 0 && (
+                                        <div className={`p-w overflow-auto mb-8 ${isSelectedBillFullyPaid
+                                            ? 'h-[630px]'
+                                            : 'h-[300px]'
+                                            }`}>
+                                            <h4 className="text-sm font-semibold text-gray-700">Previous Payment Details:</h4>
+                                            <div className="space-y-4">
+                                                {[...existingPaymentDetails].reverse().map((payment, index) => (
+                                                    <div key={payment.id || index} className="text-left p-3 shadow-lg rounded-lg mb-4">
+                                                        <h5 className="text-sm font-semibold text-gray-800 mb-2">Payment - {existingPaymentDetails.length - index}</h5>
+                                                        <div className=" border border-[#BF9853] border-opacity-35 rounded-md p-4">
+                                                            <div className='grid grid-cols-3 gap-4'>
+                                                                <div>
+                                                                    <label className="block font-semibold mb-1 text-sm">Date</label>
+                                                                    <input type="date" value={payment.date} readOnly className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm " />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block font-semibold mb-1 text-sm">Amount</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={(() => {
+                                                                            const amount = parseFloat(payment.amount) || 0;
+                                                                            const carryForwardAmount = parseFloat(payment.carry_forward_amount) || 0;
+                                                                            const totalAmount = amount + carryForwardAmount;
+                                                                            return totalAmount > 0 ? formatIndianCurrency(totalAmount) : '';
+                                                                        })()}
+                                                                        readOnly
+                                                                        className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm "
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block font-semibold mb-1 text-sm">Mode</label>
+                                                                    <input type="text" value={payment.vendor_bill_payment_mode || ''} readOnly className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm " />
+                                                                </div>
+                                                            </div>
+                                                            <div className='grid grid-cols-2 gap-4 mt-2'>
+                                                                {payment.cheque_number && (
+                                                                    <div>
+                                                                        <label className="block font-semibold mb-1 text-sm">Cheque No</label>
+                                                                        <input type="text" value={payment.cheque_number} readOnly className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm " />
+                                                                    </div>
+                                                                )}
+                                                                {payment.cheque_date && (
+                                                                    <div>
+                                                                        <label className="block font-semibold mb-1 text-sm">Cheque Date</label>
+                                                                        <input type="date" value={payment.cheque_date} readOnly className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm " />
+                                                                    </div>
+                                                                )}
+                                                                {payment.transaction_number && (
+                                                                    <div>
+                                                                        <label className="block font-semibold mb-1 text-sm">Transaction No</label>
+                                                                        <input type="text" value={payment.transaction_number} readOnly className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm " />
+                                                                    </div>
+                                                                )}
+                                                                {payment.account_number && (
+                                                                    <div>
+                                                                        <label className="block font-semibold mb-1 text-sm">Account No</label>
+                                                                        <input type="text" value={payment.account_number} readOnly className="w-full h-[35px] px-3 border-2 border-[#BF9853] border-opacity-30 rounded-md text-sm" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className='mt-2'>
+                                                                {payment.bill_url ? (
+                                                                    <button type="button" onClick={() => payment.bill_url && window.open(payment.bill_url, '_blank', 'noopener,noreferrer')}
+                                                                        className="px-4 py-2 text-sm font-medium text-[#BF9853] hover:underline cursor-pointer rounded-lg transition-colors duration-200">
+                                                                        View
+                                                                    </button>
+                                                                ) : (
+                                                                    <div>
+                                                                        <input id={`existing-payment-file-${payment.id}`} type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,application/pdf,image/*" className="hidden"
+                                                                            onChange={(e) => handleExistingPaymentFileUpload(payment.id, e.target.files[0])} />
+                                                                        <button type="button" onClick={() => document.getElementById(`existing-payment-file-${payment.id}`).click()}
+                                                                            className="px-4 py-2 text-sm font-medium text-[#E4572E] hover:underline transition-colors duration-200">
+                                                                            Attach File
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex justify-end gap-3 bg-white mb-4 px-4">
+                                    <div className="flex justify-end gap-3 bg-white mb-2">
                                         <button
-                                            type="button"
-                                            className="px-6 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium hover:bg-[#FAF6ED] transition-colors"
+                                            disabled={isProcessingPayment}
+                                            className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg font-medium"
                                             onClick={handlePaymentCancel}
                                         >
-                                            Close
+                                            {isSelectedBillFullyPaid ? 'Close' : 'Cancel'}
                                         </button>
+                                        {!isSelectedBillFullyPaid && (
+                                            <button
+                                                className={`px-4 py-2 rounded-lg font-medium text-white bg-[#BF9853] ${isProcessingPayment ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                onClick={handlePaymentSubmit}
+                                                disabled={isProcessingPayment}
+                                            >
+                                                {isProcessingPayment ? 'Processing…' : 'Submit'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="w-80 flex flex-col">
                                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                        {(() => {
-                                            // Calculate draft payment total excluding carry forward entries (carry forward is handled separately)
-                                            const draftPaymentTotal = paymentEntries
-                                                .filter(entry => entry.mode !== 'Carry Forward')
-                                                .reduce((sum, entry) => {
-                                                    const rawAmount = typeof entry.amount === 'string' ? entry.amount.replace(/,/g, '') : entry.amount
-                                                    const numericAmount = parseFloat(rawAmount)
-                                                    if (Number.isNaN(numericAmount)) {
-                                                        return sum
-                                                    }
-                                                    return sum + numericAmount
-                                                }, 0)
-                                            const existingReceivedAmount = Math.max(0, actualAmount - remainingAmount)
-                                            const normalizedDiscount = (() => {
-                                                if (typeof discount === 'string') {
-                                                    const cleaned = discount.replace(/,/g, '')
-                                                    const numeric = parseFloat(cleaned)
-                                                    return Number.isNaN(numeric) ? 0 : numeric
-                                                }
-                                                return Number.isFinite(discount) ? discount : 0
-                                            })()
-                                            // -----------------------------
-                                            // BASIC NORMALIZED VALUES
-                                            // -----------------------------
-                                            const billTotal = actualAmount || 0;
-                                            const existingReceived = existingReceivedAmount || 0;
-                                            const draftPaid = draftPaymentTotal || 0;
-                                            const discountValue = normalizedDiscount || 0;
-                                            const carryForwardAvailable = carryForwardAmount || 0;
-                                            // -----------------------------
-                                            // REMAINING BILL AFTER PREVIOUS PAYMENTS
-                                            // -----------------------------
-                                            const remainingAfterPayments = Math.max(
-                                                0,
-                                                billTotal - existingReceived - draftPaid
-                                            );
-                                            // -----------------------------
-                                            // AMOUNT NEEDED TO SETTLE BILL (AFTER DISCOUNT)
-                                            // -----------------------------
-                                            const amountNeededToPay = Math.max(
-                                                0,
-                                                remainingAfterPayments - discountValue
-                                            );
-                                            // -----------------------------
-                                            // CARRY FORWARD TO USE
-                                            // -----------------------------
-                                            const carryForwardToUse = useCarryForward
-                                                ? Math.min(carryForwardAvailable, amountNeededToPay)
-                                                : 0;
-                                            // -----------------------------
-                                            // FINAL REMAINING BILL AFTER CARRY FORWARD
-                                            // -----------------------------
-                                            const projectedRemainingAmount = Math.max(
-                                                0,
-                                                remainingAfterPayments - carryForwardToUse
-                                            );
-                                            // -----------------------------
-                                            // LIVE RECEIVED AMOUNT (PREVIOUS + CURRENT + CF)
-                                            // -----------------------------
-                                            const liveReceivedAmount = Math.min(
-                                                billTotal,
-                                                existingReceived + draftPaid + carryForwardToUse
-                                            );
-                                            // -----------------------------
-                                            // REMAINING CARRY FORWARD BALANCE
-                                            // -----------------------------
-                                            const remainingCarryForward = useCarryForward
-                                                ? Math.max(0, carryForwardAvailable - carryForwardToUse)
-                                                : carryForwardAvailable;
-                                            // -----------------------------
-                                            // NET PAYABLE (FINAL)
-                                            // -----------------------------
-                                            const excessCarryForward =
-                                                useCarryForward && carryForwardToUse > 0 && carryForwardAvailable > amountNeededToPay
-                                                    ? carryForwardAvailable - amountNeededToPay
-                                                    : 0;
-                                            const projectedNetPayable =
-                                                projectedRemainingAmount > 0
-                                                    ? projectedRemainingAmount
-                                                    : excessCarryForward > 0
-                                                        ? -excessCarryForward
-                                                        : 0;
-                                            return (
-                                                <div className="text-left">
-                                                    <h4 className="text-lg font-semibold mb-2">Summary</h4>
-                                                    <div className="space-y-3 shadow-lg rounded-lg p-4">
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-600">Total Payable:</span>
-                                                            <span className="font-semibold">{formatIndianCurrency(actualAmount)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-600">Received Amount:</span>
-                                                            <span className="font-semibold">{formatIndianCurrency(liveReceivedAmount)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-gray-600">Carry Forward:</span>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={useCarryForward}
-                                                                    disabled
-                                                                    title="View only — add or adjust payments from Pending Bill"
-                                                                    className="w-4 h-4 cursor-not-allowed opacity-60"
-                                                                />
-                                                            </div>
-                                                            <span className={`font-semibold ${useCarryForward ? 'text-green-600' : ''}`}>
-                                                                {formatIndianCurrency(carryForwardAvailable)}
-                                                            </span>
-                                                        </div>
-                                                        <hr className="border-gray-300" />
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-600">Total Amount:</span>
-                                                            <span className="font-semibold">{formatIndianCurrency(projectedRemainingAmount)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-600">Discount:</span>
-                                                            <input
-                                                                type="text"
-                                                                value={
-                                                                    discount === 0
-                                                                        ? ''
-                                                                        : discount.toLocaleString('en-IN')
-                                                                }
-                                                                readOnly
-                                                                tabIndex={-1}
-                                                                className="w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded bg-gray-50 cursor-default"
-                                                                placeholder="0"
-                                                                title="View only — discount is shown from saved payments"
-                                                            />
-                                                        </div>
-                                                        <hr className="border-gray-300" />
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-600">Net Payable:</span>
-                                                            <span className={`font-bold ${projectedNetPayable <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                {formatIndianCurrency(projectedNetPayable)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                        <div className="text-left">
+                                            <h4 className="text-lg font-semibold mb-2">Summary</h4>
+                                            <div className="space-y-3 shadow-lg rounded-lg p-4">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Total Payable:</span>
+                                                    <span className="font-semibold">{formatIndianCurrency(actualAmount)}</span>
                                                 </div>
-                                            );
-                                        })()}
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Received Amount:</span>
+                                                    <span className="font-semibold">{formatIndianCurrency(liveReceivedAmount)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-gray-600">Carry Forward:</span>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={useCarryForward}
+                                                            onChange={(e) => setUseCarryForward(e.target.checked)}
+                                                            disabled={carryForwardAmount <= 0 || isSelectedBillFullyPaid}
+                                                            className="w-4 h-4 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                    <span className={`font-semibold ${useCarryForward ? 'text-green-600' : ''}`}>
+                                                        {formatIndianCurrency(carryForwardAvailable)}
+                                                    </span>
+                                                </div>
+                                                <hr className="border-gray-300" />
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Total Amount:</span>
+                                                    <span className="font-semibold">{formatIndianCurrency(projectedRemainingAmount)}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Discount:</span>
+                                                    <input
+                                                        type="text"
+                                                        value={
+                                                            discount === 0
+                                                                ? ''
+                                                                : discount.toLocaleString('en-IN')
+                                                        }
+                                                        onChange={(e) => {
+                                                            if (!discountSubmitted) {
+                                                                const rawValue = e.target.value.replace(/,/g, '').replace(/\D/g, '');
+                                                                const newDiscount = Number(rawValue) || 0;
+                                                                setDiscount(newDiscount);
+                                                            }
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (!discountSubmitted && e.key === 'Backspace' && discount === 0) {
+                                                                setDiscount('');
+                                                            }
+                                                        }}
+                                                        disabled={discountSubmitted}
+                                                        className={`w-24 h-6 px-2 no-spinner text-right text-xs border pl-4 border-gray-300 rounded focus:outline-none ${discountSubmitted ? 'bg-gray-100 cursor-not-allowed' : ''
+                                                            }`}
+                                                        placeholder="0"
+                                                        title={
+                                                            discountSubmitted
+                                                                ? 'Discount already applied in previous payment'
+                                                                : 'Enter discount amount'
+                                                        }
+                                                    />
+                                                </div>
+                                                <hr className="border-gray-300" />
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Net Payable:</span>
+                                                    <span className={`font-bold ${projectedNetPayable <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {formatIndianCurrency(projectedNetPayable)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div className="text-left">
                                             <h4 className="text-lg font-semibold mb-2">Vendor Details</h4>
                                             <div className="space-y-3 shadow-lg rounded-lg p-4">

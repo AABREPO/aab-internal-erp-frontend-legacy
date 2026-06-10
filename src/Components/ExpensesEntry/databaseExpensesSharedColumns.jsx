@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import Select from 'react-select';
 import DateRangePicker from './DateRangePicker';
 import CustomDateField from './CustomDateField';
@@ -48,7 +48,7 @@ const EDBC3_FILTER_W = 'w-[298px]';
 const EDBC4_COLUMN_W = 'w-[218px]';
 const EDBC5_COLUMN_W = 'w-[218px]';
 const EDBC6_COLUMN_W = 'w-[218px]';
-const EDBC7_COLUMN_W = 'w-[78px]';
+const EDBC7_COLUMN_W = 'w-[98px]';
 const EDBC8_HEADER_W = 'w-[120px]';
 const EDBC8_BODY_W = 'w-[98px]';
 const EDBC9_COLUMN_W = 'w-[198px]';
@@ -78,9 +78,15 @@ const EDBC_BILL_ARRIVAL_FILTER_FIELD_CLASS =
  */
 export const EDBC_FILTER_CONTROL_HEIGHT_PX = 38;
 
-/** Table filter dropdown: 8 fully visible options (36px each). */
+/** Table filter dropdown: single-line option min height; long labels wrap up to 2 lines. */
 export const TABLE_FILTER_OPTION_HEIGHT_PX = 36;
+export const TABLE_FILTER_OPTION_LINE_HEIGHT_PX = 18;
+export const TABLE_FILTER_OPTION_MAX_LINES = 2;
+export const TABLE_FILTER_OPTION_VERTICAL_PADDING_PX = 12;
+export const TABLE_FILTER_OPTION_WRAPPED_MAX_HEIGHT_PX =
+    TABLE_FILTER_OPTION_LINE_HEIGHT_PX * TABLE_FILTER_OPTION_MAX_LINES + TABLE_FILTER_OPTION_VERTICAL_PADDING_PX;
 export const TABLE_FILTER_MAX_VISIBLE_OPTIONS = 8;
+/** Menu scroll cap: 8 rows at single-line option height (wrapped rows may scroll sooner). */
 export const TABLE_FILTER_MENU_MAX_HEIGHT_PX =
     TABLE_FILTER_OPTION_HEIGHT_PX * TABLE_FILTER_MAX_VISIBLE_OPTIONS;
 
@@ -102,7 +108,7 @@ export const EDBC_TABLE_BODY_ROW_CLASS = `odd:bg-white even:bg-[#FAF6ED] text-[1
 
 /** First/last visible column edge padding — apply on the shared table element in Table.js. */
 export const EDBC_TABLE_EDGE_TABLE_CLASS =
-    '[&_thead_tr>th:first-child]:!pl-[12px] [&_tbody_tr>td:first-child]:!pl-[12px] [&_thead_tr>th:last-child]:!pr-[12px] [&_tbody_tr>td:last-child]:!pr-[12px] [&_thead_tr>th:first-child>div]:!pl-0 [&_thead_tr>th#EDBC-2:first-child]:!w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!w-[130px]';
+    '[&_thead_tr>th:first-child]:!pl-[12px] [&_tbody_tr>td:first-child]:!pl-[12px] [&_thead_tr>th:last-child]:!pr-[12px] [&_tbody_tr>td:last-child]:!pr-[12px] [&_thead_tr>th:first-child>div]:!pl-0 [&_thead_tr>th#EDBC-2:first-child]:!w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!w-[130px] [&_thead>tr:first-child>th#EDBC-17]:!pr-[9px] [&_tbody_tr>td#EDBC-17]:!pr-[9px] [&_thead_tr:nth-child(2)>th#EDBC-17]:!pr-0 [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!min-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!max-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!min-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!max-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!box-border';
 
 /**
  * Column layout per DST id.
@@ -261,18 +267,18 @@ const EDBC_CONFIG = {
         sortField: 'eno',
         columnWidthClass: EDBC17_COLUMN_W,
         filterWidthClass: EDBC17_COLUMN_W,
-        headerClass: `pl-[1px] pr-[1px] ${EDBC17_COLUMN_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
-        filterThClass: 'pl-[1px] pr-[1px] text-right',
-        tdClass: `pl-[1px] pr-[1px] ${EDBC17_COLUMN_W} text-right`,
+        headerClass: `pl-[1px] pr-[9px] ${EDBC17_COLUMN_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
+        filterThClass: 'pl-[1px] pr-0 text-right',
+        tdClass: `pl-[1px] pr-[9px] ${EDBC17_COLUMN_W} text-right`,
         bodyCellKey: 'eno',
     },
     [EDBC_IDS.EDBC18]: {
         sortField: 'billArrivalDate',
         columnWidthClass: EDBC18_COLUMN_W,
         filterWidthClass: 'w-[98px]',
-        headerClass: `pl-[1px] pr-[1px] ${EDBC18_COLUMN_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
+        headerClass: `pl-[1px] pr-[9px] ${EDBC18_COLUMN_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
         filterThClass: 'pl-[1px] pr-[1px] text-right',
-        tdClass: `pl-[1px] pr-[1px] ${EDBC18_COLUMN_W} text-right whitespace-nowrap`,
+        tdClass: `pl-[1px] pr-[9px] ${EDBC18_COLUMN_W} text-right whitespace-nowrap`,
         bodyCellKey: 'billArrival',
     },
     [EDBC_IDS.EDBC19]: {
@@ -413,32 +419,70 @@ const applyEdbc2WidthClass = (className, columnWidthClass) => {
         .replace(EDBC2_FILTER_W, columnWidthClass);
 };
 
-/** Table filter Select styles used by DST-1/2/3 filter row (Database Expenses table). */
-export const DATABASE_TABLE_FILTER_SELECT_STYLES = {
+const buildTableFilterOptionStyles = (textAlign = 'left') => ({
+    minHeight: `${TABLE_FILTER_OPTION_HEIGHT_PX}px`,
+    height: 'auto',
+    maxHeight: `${TABLE_FILTER_OPTION_WRAPPED_MAX_HEIGHT_PX}px`,
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: textAlign === 'right' ? 'flex-end' : 'flex-start',
+    textAlign,
+    fontWeight: 'normal',
+    fontSize: '14px',
+    lineHeight: `${TABLE_FILTER_OPTION_LINE_HEIGHT_PX}px`,
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    overflowWrap: 'break-word',
+    overflow: 'hidden',
+});
+
+const buildTableFilterSingleValueStyles = (textAlign = 'left') => ({
+    color: '#111827',
+    fontWeight: 'normal',
+    marginRight: 0,
+    textAlign,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+});
+
+/** Table filter Select styles used by DST filter row (Database Expenses / Table View). */
+export const createDatabaseTableFilterSelectStyles = ({
+    menuMaxHeight = TABLE_FILTER_MENU_MAX_HEIGHT_PX,
+    controlHeightPx = EDBC_FILTER_CONTROL_HEIGHT_PX,
+} = {}) => ({
     control: (provided, state) => ({
         ...provided,
         borderWidth: '2px',
-        lineHeight: '20px',
+        lineHeight: `${TABLE_FILTER_OPTION_LINE_HEIGHT_PX}px`,
         fontSize: '14px',
         fontWeight: 'normal',
-        height: `${EDBC_FILTER_CONTROL_HEIGHT_PX}px`,
-        minHeight: `${EDBC_FILTER_CONTROL_HEIGHT_PX}px`,
+        minHeight: `${controlHeightPx}px`,
+        height: `${controlHeightPx}px`,
+        maxHeight: `${controlHeightPx}px`,
         borderRadius: '8px',
         textAlign: 'left',
         borderColor: 'rgba(191, 152, 83, 0.2)',
         boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+        boxSizing: 'border-box',
+        alignItems: 'center',
         '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
     }),
     clearIndicator: (provided) => ({ ...provided, cursor: 'pointer' }),
     menu: (provided) => ({
         ...provided,
         zIndex: 999,
-        maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
+        maxHeight: `${menuMaxHeight}px`,
     }),
     menuPortal: (provided) => ({ ...provided, zIndex: 9999 }),
     menuList: (provided) => ({
         ...provided,
-        maxHeight: `${TABLE_FILTER_MENU_MAX_HEIGHT_PX}px`,
+        maxHeight: `${menuMaxHeight}px`,
         paddingTop: 0,
         paddingBottom: 0,
         overflowY: 'auto',
@@ -448,18 +492,22 @@ export const DATABASE_TABLE_FILTER_SELECT_STYLES = {
     }),
     singleValue: (provided) => ({
         ...provided,
-        color: '#111827',
-        fontWeight: 'normal',
-        marginRight: 0,
+        ...buildTableFilterSingleValueStyles('left'),
     }),
     valueContainer: (provided) => ({
         ...provided,
         paddingLeft: '12px',
         paddingRight: '2px',
+        paddingTop: '2px',
+        paddingBottom: '2px',
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
     }),
     indicatorsContainer: (provided) => ({
         ...provided,
         paddingLeft: '0px',
+        alignSelf: 'stretch',
+        alignItems: 'center',
     }),
     dropdownIndicator: (provided) => ({
         ...provided,
@@ -470,15 +518,7 @@ export const DATABASE_TABLE_FILTER_SELECT_STYLES = {
     }),
     option: (provided, state) => ({
         ...provided,
-        minHeight: TABLE_FILTER_OPTION_HEIGHT_PX,
-        height: TABLE_FILTER_OPTION_HEIGHT_PX,
-        paddingTop: 0,
-        paddingBottom: 0,
-        display: 'flex',
-        alignItems: 'center',
-        textAlign: 'left',
-        fontWeight: 'normal',
-        fontSize: '15px',
+        ...buildTableFilterOptionStyles('left'),
         backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
         color: 'black',
     }),
@@ -498,13 +538,26 @@ export const DATABASE_TABLE_FILTER_SELECT_STYLES = {
         paddingBottom: '0px',
     }),
     indicatorSeparator: () => ({ display: 'none' }),
-};
+});
+
+export const DATABASE_TABLE_FILTER_SELECT_STYLES = createDatabaseTableFilterSelectStyles();
 
 const TIMESTAMP_FILTER_BUTTON_STYLES =
     '[&>button]:!border-2 [&>button]:!border-[rgba(191,152,83,0.2)] [&>button]:!rounded-lg [&>button]:!shadow-none [&>button:hover]:!border-[rgba(191,152,83,0.4)] [&>button:focus]:!outline-none [&>button:focus]:!ring-0 [&>button:focus]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)] [&>button:focus-visible]:!outline-none [&>button:focus-visible]:!ring-0 [&>button:focus-visible]:!shadow-[0_0_0_1px_rgba(191,152,83,0.4)]';
 
 const TIMESTAMP_FILTER_WRAPPER_CLASS =
     `relative pl-[10px] ${TIMESTAMP_FILTER_BUTTON_STYLES}`;
+
+/** Display filter dates as dd-mm-yyyy (internal storage stays yyyy-mm-dd). */
+export const formatEdbcFilterDateDMY = (dateString) => {
+    if (!dateString) return '';
+    const parts = String(dateString).split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+        const [y, m, d] = parts;
+        return `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
+    }
+    return String(dateString);
+};
 
 const DATE_FILTER_FIELD_CLASS =
     ' [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)]';
@@ -613,12 +666,29 @@ export const EdbcTimestampFilter = ({
     onApply,
     columnWidthClass = '',
 }) => {
+    const triggerRef = useRef(null);
     const config = EDBC_CONFIG[columnId];
     if (!config) return null;
     let { filterWidthClass, filterThClass } = config;
     if (columnId === EDBC_IDS.EDBC2 && columnWidthClass) {
         filterWidthClass = columnWidthClass;
     }
+    const isDateColumn = columnId === EDBC_IDS.EDBC2;
+    const formattedStart = timestampStartDate ? formatEdbcFilterDateDMY(timestampStartDate) : '';
+    const formattedEnd = timestampEndDate ? formatEdbcFilterDateDMY(timestampEndDate) : '';
+    let filterLabel = placeholder;
+    if (timestampStartDate) {
+        if (timestampEndDate) {
+            filterLabel = timestampStartDate === timestampEndDate
+                ? formattedStart
+                : `${formattedStart} – ${formattedEnd}`;
+        } else {
+            filterLabel = `From ${formattedStart}`;
+        }
+    } else if (timestampEndDate) {
+        filterLabel = `Until ${formattedEnd}`;
+    }
+    const hasDateFilter = Boolean(timestampStartDate || timestampEndDate);
     const wrapperClass = columnId === EDBC_IDS.EDBC1
         ? TIMESTAMP_FILTER_WRAPPER_CLASS
         : `relative ${filterWidthClass} ${TIMESTAMP_FILTER_BUTTON_STYLES}`;
@@ -626,25 +696,33 @@ export const EdbcTimestampFilter = ({
     <th id={columnId} className={filterThClass}>
         <div className={wrapperClass}>
             <button
+                ref={triggerRef}
                 type="button"
                 onClick={onOpen}
                 style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                className={`${filterWidthClass} box-border pl-[12px] pr-[3px] py-0 text-sm font-normal bg-white text-left flex items-center justify-between`}
+                className={`${filterWidthClass} box-border pl-[12px] ${isDateColumn ? 'pr-0' : 'pr-[3px]'} py-0 text-sm font-normal bg-white text-left flex items-center overflow-hidden ${isDateColumn ? '' : 'justify-between'}`}
             >
                 <span
-                    className={`text-[14px] font-medium truncate flex-1 text-left ${timestampStartDate && timestampEndDate ? 'text-black font-normal' : 'text-[#A6A5A6] font-normal'}`}
+                    title={hasDateFilter ? filterLabel : undefined}
+                    className={`text-[14px] flex-1 min-w-0 text-left truncate overflow-hidden text-ellipsis whitespace-nowrap ${hasDateFilter ? 'text-black font-bold' : 'text-[#A6A5A6] font-normal'}`}
                 >
-                    {timestampStartDate
-                        ? timestampEndDate
-                            ? `${timestampStartDate} – ${timestampEndDate}`
-                            : `From ${timestampStartDate}`
-                        : placeholder}
+                    {hasDateFilter ? filterLabel : placeholder}
                 </span>
+                {isDateColumn ? (
+                    <span className="shrink-0 ml-auto mr-[6px] w-[18px] h-[18px] flex items-center justify-center">
+                        <img
+                            src={CalendarIcon}
+                            alt="Calendar"
+                            className="w-[16px] h-[16px] text-gray-400 flex-shrink-0"
+                        />
+                    </span>
+                ) : (
                 <img
                     src={CalendarIcon}
                     alt="Calendar"
-                    className="w-[16px] h-[16px] text-gray-400 flex-shrink-0 mr-[6px] ml-[3px]"
+                    className={`w-[16px] h-[16px] text-gray-400 flex-shrink-0 mr-[6px] ml-[3px]`}
                 />
+                )}
             </button>
             <DateRangePicker
                 isOpen={isOpen}
@@ -653,6 +731,7 @@ export const EdbcTimestampFilter = ({
                 endDate={timestampEndDate}
                 variant="dropdown"
                 controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                anchorRef={triggerRef}
                 onApply={onApply}
             />
         </div>
@@ -784,7 +863,7 @@ const resolveSelectFilterValue = (value, blankOption, blankValue) => {
     return { value, label: value };
 };
 
-const buildRightAlignedSelectStyles = (selectStyles) => ({
+export const buildRightAlignedTableFilterSelectStyles = (selectStyles) => ({
     ...selectStyles,
     control: (provided, state) => ({
         ...(typeof selectStyles.control === 'function' ? selectStyles.control(provided, state) : provided),
@@ -797,8 +876,9 @@ const buildRightAlignedSelectStyles = (selectStyles) => ({
         paddingRight: '0px',
     }),
     singleValue: (provided) => ({
-        ...(typeof selectStyles.singleValue === 'function' ? selectStyles.singleValue(provided) : provided),
-        textAlign: 'right',
+        ...provided,
+        ...(typeof selectStyles.singleValue === 'function' ? selectStyles.singleValue(provided) : {}),
+        ...buildTableFilterSingleValueStyles('right'),
     }),
     input: (provided) => ({
         ...(typeof selectStyles.input === 'function' ? selectStyles.input(provided) : provided),
@@ -811,12 +891,15 @@ const buildRightAlignedSelectStyles = (selectStyles) => ({
         marginRight: 0,
     }),
     option: (provided, state) => ({
-        ...(typeof selectStyles.option === 'function' ? selectStyles.option(provided, state) : provided),
-        textAlign: 'right',
-        justifyContent: 'flex-end',
-        paddingRight: '12px',
+        ...provided,
+        ...buildTableFilterOptionStyles('right'),
+        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+        color: 'black',
     }),
 });
+
+/** @deprecated Use buildRightAlignedTableFilterSelectStyles */
+export const buildRightAlignedSelectStyles = buildRightAlignedTableFilterSelectStyles;
 
 /** Generic EDBC select filter (EDBC-4+). */
 export const EdbcSelectFilter = ({
@@ -836,7 +919,31 @@ export const EdbcSelectFilter = ({
     const resolvedValue = selectValue !== undefined
         ? selectValue
         : resolveSelectFilterValue(value, blankOption, blankValue);
-    const styles = textAlign === 'right' ? buildRightAlignedSelectStyles(selectStyles) : selectStyles;
+    const baseStyles =
+        textAlign === 'right' ? buildRightAlignedTableFilterSelectStyles(selectStyles) : selectStyles;
+    const styles = columnId === EDBC_IDS.EDBC17
+        ? {
+            ...baseStyles,
+            container: (provided) => ({
+                ...(typeof baseStyles.container === 'function' ? baseStyles.container(provided) : provided),
+                width: 120,
+                minWidth: 120,
+                maxWidth: 120,
+            }),
+            control: (provided, state) => {
+                const controlBase = typeof baseStyles.control === 'function'
+                    ? baseStyles.control(provided, state)
+                    : provided;
+                return {
+                    ...controlBase,
+                    width: 120,
+                    minWidth: 120,
+                    maxWidth: 120,
+                    boxSizing: 'border-box',
+                };
+            },
+        }
+        : baseStyles;
     return (
         <th id={columnId} className={config.filterThClass}>
             <Select

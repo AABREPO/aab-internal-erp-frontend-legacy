@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
 import cross from '../Images/cross.png';
@@ -211,7 +212,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("File upload failed!");
     }
-    window.location.reload();
+    refreshAllInputData();
   };
   const handleUploadVendorNames = async () => {
     if (!file) {
@@ -231,7 +232,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("File upload failed!");
     }
-    window.location.reload();
+    refreshAllInputData();
   };
   const handleUploadContractorNames = async () => {
     if (!file) {
@@ -251,7 +252,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("File upload failed!");
     }
-    window.location.reload();
+    refreshAllInputData();
   };
   const handleUploadcategory = async () => {
     if (!file) {
@@ -271,7 +272,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("File upload failed!");
     }
-    window.location.reload();
+    refreshAllInputData();
   };
   const handleUploadMachineTools = async () => {
     if (!file) {
@@ -291,7 +292,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("File upload failed!");
     }
-    window.location.reload();
+    refreshAllInputData();
   };
   const handleUploadAccountType = async () => {
     if (!file) {
@@ -311,7 +312,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       console.error("Error uploading file:", error);
       alert("File upload failed!");
     }
-    window.location.reload();
+    refreshAllInputData();
   };
   const handleAllSiteNameDelete = async () => {
     const confirmed = window.confirm("Are you sure you want to delete all Site Names?");
@@ -587,6 +588,16 @@ const DTableView = ({ username, userRoles = [] }) => {
       setMessage('Error fetching tile area names.');
     }
   };
+  const refreshAllInputData = () => {
+    void fetchSiteNames();
+    void fetchVendorNames();
+    void fetchContractorNames();
+    void fetchCategories();
+    void fetchMachinTools();
+    void fetchAccountType();
+    void fetchWeeklyType();
+    notifyOrbitModuleDataChanged('expense-entry');
+  };
   const handleSubmitSiteNames = async (e) => {
     e.preventDefault();
     const newSiteNames = { siteName, siteNo };
@@ -600,7 +611,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         setMessage('Site name saved successfully!');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -623,7 +634,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Area name saved successfully!');
         setMachineTool('');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -646,7 +657,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Account Type saved successfully!');
         setAccountType('');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -669,7 +680,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Weekly Type saved successfully!');
         setWeeklyType('');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -692,7 +703,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Area name saved successfully!');
         setVendorName('');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -715,7 +726,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Area name saved successfully!');
         setContractorName('');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -738,7 +749,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       if (response.ok) {
         setMessage('Area name saved successfully!');
         setCategory('');
-        window.location.reload();
+        refreshAllInputData();
       } else {
         setMessage('Error saving area name.');
       }
@@ -754,7 +765,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Site Name deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the site name. Status:", response.status);
         alert("Error deleting the site name. Please try again.");
@@ -776,7 +787,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditSiteNamePopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -796,7 +807,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditVendorPopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -816,7 +827,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditContractorPopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -836,7 +847,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditCategoryPopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -856,7 +867,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditAccountTypePopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -876,7 +887,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditWeeklyTypePopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -896,7 +907,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         closeEditMachineToolsPopup();
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error('Failed to update floor name');
       }
@@ -911,7 +922,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Vendor Name deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the vendor name. Status:", response.status);
         alert("Error deleting the vendor name. Please try again.");
@@ -928,7 +939,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Contractor Name deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the Contractor name. Status:", response.status);
         alert("Error deleting the Contractor name. Please try again.");
@@ -945,7 +956,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Categories deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the Categories. Status:", response.status);
         alert("Error deleting the Categories. Please try again.");
@@ -962,7 +973,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Account Type deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the Account Type. Status:", response.status);
         alert("Error deleting the Account Type. Please try again.");
@@ -979,7 +990,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Weekly Type deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the Account Type. Status:", response.status);
         alert("Error deleting the Account Type. Please try again.");
@@ -996,7 +1007,7 @@ const DTableView = ({ username, userRoles = [] }) => {
       });
       if (response.ok) {
         alert("Machine Tools deleted successfully!!!");
-        window.location.reload();
+        refreshAllInputData();
       } else {
         console.error("Failed to delete the Machine Tools. Status:", response.status);
         alert("Error deleting the Machine Tools. Please try again.");

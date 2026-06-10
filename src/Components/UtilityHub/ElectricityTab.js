@@ -11,7 +11,6 @@ import {
     flattenPropertyStyleRows,
     expandPropertyStyleRowsByVendor,
     findPaymentForServiceMonth,
-    propertyHasVendorForFilter,
     getUtilityHubExportYear,
 } from './utilityHubTabFilters';
 
@@ -81,7 +80,6 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     const [projects, setProjects] = useState([]);
     const [electricityPayments, setElectricityPayments] = useState([]);
     const [frequencyHistory, setFrequencyHistory] = useState([]);
-    const [filteredProjects, setFilteredProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState('');
@@ -123,7 +121,6 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                 const sortedHidden = sortProjectsPropertyDetailsByShopNo(hiddenProjects);
                 setProjects(sortedVisible);
                 setHiddenProjects(sortedHidden);
-                setFilteredProjects(sortedVisible);
             } catch (error) {
                 console.error('Error fetching projects:', error);
                 setError('Failed to fetch projects data');
@@ -287,21 +284,23 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return tenantLinksByPropertyId.get(String(propertyId)) || [];
     };
 
-    const sortedFilteredProjects = useMemo(
-        () => sortProjectsPropertyDetailsByShopNo(filteredProjects),
-        [filteredProjects]
-    );
-
     const getServiceNo = (property) => property?.ebNo;
 
-    const electricityTableRows = useMemo(() => {
-        const rows = flattenPropertyStyleRows(sortedFilteredProjects, getServiceNo, comparePropertyShopNoAsc);
-        return expandPropertyStyleRowsByVendor(rows, electricityPayments, getServiceNo, {
-            year: filters.year,
-            month: filters.month,
-            vendorFilter: filters.vendor,
-        });
-    }, [sortedFilteredProjects, electricityPayments, filters.year, filters.month, filters.vendor]);
+    /** All visible projects with EB numbers. */
+    const tableProjects = useMemo(
+        () =>
+            sortProjectsPropertyDetailsByShopNo(
+                (projects || [])
+                    .map((project) => ({
+                        ...project,
+                        propertyDetails: (project.propertyDetails || []).filter(
+                            (property) => property?.ebNo && String(property.ebNo).trim() !== ''
+                        ),
+                    }))
+                    .filter((project) => (project.propertyDetails || []).length > 0)
+            ),
+        [projects]
+    );
 
     const hiddenElectricityTableRows = useMemo(() => {
         const rows = flattenPropertyStyleRows(
@@ -312,9 +311,9 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return expandPropertyStyleRowsByVendor(rows, electricityPayments, getServiceNo, {
             year: filters.year,
             month: filters.month,
-            vendorFilter: filters.vendor,
+            vendorFilter: '',
         });
-    }, [hiddenProjects, electricityPayments, filters.year, filters.month, filters.vendor]);
+    }, [hiddenProjects, electricityPayments, filters.year, filters.month]);
 
     const customSelectStyles = {
         control: (provided, state) => ({
@@ -515,132 +514,107 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         });
         return unpaidCount;
     };
-    const matchesPaymentFiltersFor = (property, filterState) => {
-        const selectedMonth = filterState.month;
-        const selectedStatus = filterState.paymentStatus;
 
-        if (!selectedMonth && !selectedStatus) {
-            return true;
+    const electricityTableRows = useMemo(() => {
+        let rows = flattenPropertyStyleRows(tableProjects, getServiceNo, comparePropertyShopNoAsc);
+
+        const selectedService = String(filters.service ?? '').trim();
+        if (selectedService) {
+            rows = rows.filter(({ property }) => String(property?.ebNo ?? '').trim() === selectedService);
         }
 
-        const evaluateMonth = (month) => {
-            const paymentData = getPaymentData(
-                property.ebNo,
-                month,
-                property.id,
-                filterState.year,
-                filterState.vendor || undefined
+        const selectedDoorNo = String(filters.doorNo ?? '').trim();
+        if (selectedDoorNo) {
+            rows = rows.filter(({ property }) => String(property?.doorNo ?? '').trim() === selectedDoorNo);
+        }
+
+        const selectedShop = String(filters.shop ?? '').trim();
+        if (selectedShop) {
+            rows = rows.filter(({ property }) => String(property?.shopNo ?? '').trim() === selectedShop);
+        }
+
+        const selectedProjectName = String(filters.projectName ?? '').trim();
+        if (selectedProjectName) {
+            rows = rows.filter(({ project }) => String(project?.projectName ?? '').trim() === selectedProjectName);
+        }
+
+        const selectedProjectType = String(filters.projectType ?? '').trim();
+        if (selectedProjectType) {
+            rows = rows.filter(({ property }) => String(property?.projectType ?? '').trim() === selectedProjectType);
+        }
+
+        if (selectedCategory) {
+            rows = rows.filter(({ project }) => String(project?.projectCategory ?? '').trim() === selectedCategory);
+        }
+
+        const selectedTenant = String(filters.tenant ?? '').trim();
+        if (selectedTenant) {
+            rows = rows.filter(({ property }) =>
+                getLinksForProperty(property.id).some(
+                    (link) => String(link?.tenantName ?? '').trim() === selectedTenant
+                )
             );
-            const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
-            const isUnpaid = paymentData.amount === '0';
-
-            if (selectedStatus === 'Paid') return isPaid;
-            if (selectedStatus === 'Unpaid') return isUnpaid;
-            return true;
-        };
-
-        if (selectedMonth) {
-            return evaluateMonth(selectedMonth);
         }
 
-        return monthLabels.some((month) => evaluateMonth(month));
-    };
+        const occupancyStatus = String(filters.occupancyStatus ?? '').trim();
+        if (occupancyStatus) {
+            rows = rows.filter(({ property }) => {
+                const links = getLinksForProperty(property.id);
+                const hasActive = links.some((link) => !link?.shopClosureDate);
+                const hasVacated = links.some((link) => !!link?.shopClosureDate);
+                if (occupancyStatus === 'occupied') return hasActive;
+                if (occupancyStatus === 'vacated') return !hasActive && hasVacated;
+                return true;
+            });
+        }
 
-    const matchesPaymentFilters = (property) => matchesPaymentFiltersFor(property, filters);
+        const paymentStatus = String(filters.paymentStatus ?? '').trim();
+        if (paymentStatus) {
+            const filterYear = filters.year || new Date().getFullYear().toString();
+            const filterMonth = String(filters.month ?? '').trim();
+
+            const rowMatchesPaymentStatus = (property) => {
+                const checkMonth = (month) => {
+                    const paymentData = getPaymentData(property.ebNo, month, property.id, filterYear);
+                    const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
+                    const isUnpaid = paymentData.amount === '0';
+                    if (paymentStatus === 'Paid') return isPaid;
+                    if (paymentStatus === 'Unpaid') return isUnpaid;
+                    return true;
+                };
+                if (filterMonth) return checkMonth(filterMonth);
+                return monthLabels.some((month) => checkMonth(month));
+            };
+
+            rows = rows.filter(({ property }) => rowMatchesPaymentStatus(property));
+        }
+
+        return rows.map((row, index) => ({
+            ...row,
+            rowKey: `${row.project?.id ?? 'p'}-${row.property?.id ?? index}`,
+        }));
+    }, [
+        tableProjects,
+        filters.service,
+        filters.doorNo,
+        filters.shop,
+        filters.projectName,
+        filters.projectType,
+        filters.tenant,
+        filters.occupancyStatus,
+        selectedCategory,
+        filters.paymentStatus,
+        filters.month,
+        filters.year,
+        electricityPayments,
+        frequencyHistory,
+        tenantLinksByPropertyId,
+    ]);
 
     const MONTH_NUMBER_MAP = {
         'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
         'May': '05', 'June': '06', 'July': '07', 'Aug': '08',
         'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-    };
-
-    const computeFilteredProjects = (filterState, excludeField = null) => {
-        const effective = { ...filterState };
-        if (excludeField) {
-            effective[excludeField] = '';
-        }
-        const toLower = (value) => (value ? value.toString().toLowerCase() : '');
-        const vendorFilter = toLower(effective.vendor);
-        const doorFilter = toLower(effective.doorNo);
-        const shopFilter = toLower(effective.shop);
-        const projectTypeFilter = toLower(effective.projectType);
-        const serviceFilter = toLower(effective.service);
-        const tenantFilter = toLower(effective.tenant);
-        const projectNameFilter = toLower(effective.projectName);
-        const occupancyFilter = toLower(effective.occupancyStatus);
-        const selectedYearForFilters = effective.year || new Date().getFullYear().toString();
-        const selectedMonthNumber = effective.month ? MONTH_NUMBER_MAP[effective.month] : null;
-        const selectedYearMonthForFilters = selectedMonthNumber ? `${selectedYearForFilters}-${selectedMonthNumber}` : null;
-        const propertyMatchesVendorFromPayments = (property) =>
-            propertyHasVendorForFilter(
-                property,
-                electricityPayments,
-                (p) => p?.ebNo,
-                effective.vendor,
-                selectedYearForFilters,
-                effective.month || null
-            );
-        const matchesTenantFromLinks = (propertyId) => {
-            if (!tenantFilter) return true;
-            const links = getLinksForProperty(propertyId);
-            if (!links.length) return false;
-            return links.some((l) => toLower(l.tenantName).includes(tenantFilter));
-        };
-        const matchesOccupancyFromLinks = (propertyId) => {
-            if (!occupancyFilter) return true;
-            const links = getLinksForProperty(propertyId);
-            const hasActive = links.some((l) => !l.shopClosureDate);
-            const hasVacated = links.some((l) => !!l.shopClosureDate);
-            if (occupancyFilter === 'occupied') return hasActive;
-            if (occupancyFilter === 'vacated') return !hasActive && hasVacated;
-            return true;
-        };
-
-        return projects.reduce((acc, project) => {
-            if (selectedCategory && project.projectCategory !== selectedCategory) {
-                return acc;
-            }
-            if (projectNameFilter && !toLower(project.projectName).includes(projectNameFilter)) {
-                return acc;
-            }
-
-            const filteredProperties = (project.propertyDetails || []).filter((property) => {
-                if (!property || !property.ebNo || !property.ebNo.trim()) {
-                    return false;
-                }
-                if (doorFilter && !toLower(property.doorNo).includes(doorFilter)) {
-                    return false;
-                }
-                if (shopFilter && !toLower(property.shopNo).includes(shopFilter)) {
-                    return false;
-                }
-                if (projectTypeFilter && !toLower(property.projectType).includes(projectTypeFilter)) {
-                    return false;
-                }
-                if (serviceFilter && !toLower(property.ebNo).includes(serviceFilter)) {
-                    return false;
-                }
-                if (!matchesTenantFromLinks(property.id)) return false;
-                if (!matchesOccupancyFromLinks(property.id)) return false;
-                if (vendorFilter && !propertyMatchesVendorFromPayments(property)) {
-                    return false;
-                }
-                if (!matchesPaymentFiltersFor(property, effective)) {
-                    return false;
-                }
-                return true;
-            });
-
-            if (filteredProperties.length === 0) {
-                return acc;
-            }
-
-            acc.push({
-                ...project,
-                propertyDetails: [...filteredProperties].sort(comparePropertyShopNoAsc),
-            });
-            return acc;
-        }, []);
     };
 
     const flattenProjectsToPropertyRows = (projectList) => {
@@ -653,83 +627,21 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
         return rows;
     };
 
-    const buildAutoFillFromRow = ({ project, property }, filterState, changedField) => {
-        const filled = {};
-        if (property.doorNo) filled.doorNo = String(property.doorNo);
-        if (property.shopNo) filled.shop = String(property.shopNo);
-        if (property.ebNo) filled.service = String(property.ebNo);
-        if (project.projectName) filled.projectName = String(project.projectName);
-        if (property.projectType) filled.projectType = String(property.projectType);
-
-        const links = getLinksForProperty(property.id);
-        const active = links.filter((l) => !l.shopClosureDate);
-        if (active.length > 0) {
-            filled.tenant = active[0].tenantName;
-            filled.occupancyStatus = 'occupied';
-        } else if (links.some((l) => l.shopClosureDate)) {
-            filled.occupancyStatus = 'vacated';
-            const vacated = links
-                .filter((l) => l.shopClosureDate)
-                .sort((a, b) => new Date(b.shopClosureDate).getTime() - new Date(a.shopClosureDate).getTime());
-            if (vacated[0]?.tenantName) filled.tenant = vacated[0].tenantName;
-        }
-
-        const monthForStatus = filterState.month || MONTH_LABELS[new Date().getMonth()];
-        if (property.ebNo && monthForStatus) {
-            const paymentData = getPaymentData(
-                property.ebNo,
-                monthForStatus,
-                property.id,
-                filterState.year,
-                filterState.vendor || undefined
-            );
-            if (paymentData.amount === '0') filled.paymentStatus = 'Unpaid';
-            else if (paymentData.amount !== '-') filled.paymentStatus = 'Paid';
-
-            const monthNumber = MONTH_NUMBER_MAP[monthForStatus];
-            const year = filterState.year || new Date().getFullYear().toString();
-            if (monthNumber) {
-                const yearMonth = `${year}-${monthNumber}`;
-                const payment = electricityPayments.find(
-                    (p) => p?.utilityTypeNumber === property.ebNo && p?.utilityForTheMonth === yearMonth
-                );
-                const vendorVal = payment?.vendorName ?? payment?.vendor ?? payment?.vendor_name ?? '';
-                if (vendorVal) filled.vendor = String(vendorVal);
-            }
-        }
-
-        if (changedField) {
-            delete filled[changedField];
-        }
-        return filled;
-    };
-
-    useEffect(() => {
-        setFilteredProjects(computeFilteredProjects(filters));
-    }, [filters, projects, selectedCategory, electricityPayments, frequencyHistory, tenantLinksByPropertyId]);
-
     const handleFilterChange = (filterType, selectedOption) => {
-        setFilters((prev) => {
-            const next = {
-                ...prev,
-                [filterType]: selectedOption ? selectedOption.value : ''
-            };
-            const rows = flattenProjectsToPropertyRows(computeFilteredProjects(next));
-            if (rows.length === 1) {
-                return { ...next, ...buildAutoFillFromRow(rows[0], next, filterType) };
-            }
-            return next;
-        });
+        setFilters((prev) => ({
+            ...prev,
+            [filterType]: selectedOption ? selectedOption.value : '',
+        }));
     };
 
     const clearFilters = () => {
         setFilters(getDefaultElectricityFilters());
+        setSelectedCategory('');
     };
 
-    const getFilterOptions = (fieldKey, excludeField) => {
-        const subset = computeFilteredProjects(filters, excludeField);
+    const getFilterOptions = (fieldKey) => {
         const values = new Set();
-        subset.forEach((project) => {
+        tableProjects.forEach((project) => {
             if (fieldKey === 'projectName' && project.projectName) {
                 values.add(String(project.projectName));
             } else {
@@ -748,8 +660,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     };
 
     const vendorFilterOptions = useMemo(() => {
-        const subset = computeFilteredProjects(filters, 'vendor');
-        const rows = flattenProjectsToPropertyRows(subset);
+        const rows = flattenProjectsToPropertyRows(tableProjects);
         const year = filters.year || new Date().getFullYear().toString();
         const monthNumber = filters.month ? MONTH_NUMBER_MAP[filters.month] : null;
         const yearMonth = monthNumber ? `${year}-${monthNumber}` : null;
@@ -767,11 +678,10 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             });
         });
         return Array.from(vendors).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
-    }, [filters, projects, selectedCategory, electricityPayments, tenantLinksByPropertyId]);
+    }, [tableProjects, filters.year, filters.month, electricityPayments]);
 
     const tenantFilterOptions = useMemo(() => {
-        const subset = computeFilteredProjects(filters, 'tenant');
-        const rows = flattenProjectsToPropertyRows(subset);
+        const rows = flattenProjectsToPropertyRows(tableProjects);
         const names = new Set();
         rows.forEach(({ property }) => {
             getLinksForProperty(property.id).forEach((l) => {
@@ -780,12 +690,12 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             });
         });
         return Array.from(names).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value }));
-    }, [filters, projects, selectedCategory, electricityPayments, tenantLinksByPropertyId]);
+    }, [tableProjects, tenantLinksByPropertyId]);
 
     const resolveExportYear = () => getUtilityHubExportYear(filters);
 
     const buildExportRows = (exportYear = resolveExportYear()) =>
-        electricityTableRows.map(({ project, property, rowVendor }, index) => {
+        electricityTableRows.map(({ project, property }, index) => {
             const rowNumber = index + 1;
             const serviceNo = property.ebNo || '-';
             const row = {
@@ -800,11 +710,11 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
             };
 
             monthLabels.forEach(month => {
-                const paymentData = getPaymentData(property.ebNo, month, property.id, exportYear, rowVendor);
+                const paymentData = getPaymentData(property.ebNo, month, property.id, exportYear);
                 row[month] = paymentData && paymentData.amount !== undefined ? paymentData.amount : '-';
             });
 
-            row.unpaid = getUnpaidCount(property.ebNo, property.id, rowVendor);
+            row.unpaid = getUnpaidCount(property.ebNo, property.id);
             return row;
         });
 
@@ -883,7 +793,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
     };
 
     const displayYear = resolveExportYear();
-    const hasExportableData = sortedFilteredProjects.some(project =>
+    const hasExportableData = tableProjects.some(project =>
         Array.isArray(project.propertyDetails) &&
         project.propertyDetails.some(property => property.ebNo && property.ebNo.trim() !== '')
     );
@@ -1119,7 +1029,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Service</label>
                             <Select
-                                options={getFilterOptions('serviceNo', 'service')}
+                                options={getFilterOptions('serviceNo')}
                                 value={filters.service ? { value: filters.service, label: filters.service } : null}
                                 onChange={(selectedOption) => handleFilterChange('service', selectedOption)}
                                 placeholder="Select Service No"
@@ -1137,7 +1047,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Door No</label>
                             <Select
-                                options={getFilterOptions('doorNo', 'doorNo')}
+                                options={getFilterOptions('doorNo')}
                                 value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
                                 onChange={(selectedOption) => handleFilterChange('doorNo', selectedOption)}
                                 placeholder="Select Door No"
@@ -1155,7 +1065,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Shop</label>
                             <Select
-                                options={getFilterOptions('shop', 'shop')}
+                                options={getFilterOptions('shop')}
                                 value={filters.shop ? { value: filters.shop, label: filters.shop } : null}
                                 onChange={(selectedOption) => handleFilterChange('shop', selectedOption)}
                                 placeholder="Select Shop"
@@ -1173,7 +1083,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Name</label>
                             <Select
-                                options={getFilterOptions('projectName', 'projectName')}
+                                options={getFilterOptions('projectName')}
                                 value={filters.projectName ? { value: filters.projectName, label: filters.projectName } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectName', selectedOption)}
                                 placeholder="Select Project"
@@ -1191,7 +1101,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                         <div>
                             <label className="block font-semibold mb-1">Project Type</label>
                             <Select
-                                options={getFilterOptions('projectType', 'projectType')}
+                                options={getFilterOptions('projectType')}
                                 value={filters.projectType ? { value: filters.projectType, label: filters.projectType } : null}
                                 onChange={(selectedOption) => handleFilterChange('projectType', selectedOption)}
                                 placeholder="Select Project Type"
@@ -1369,7 +1279,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                         </tr>
                                     ) : (
                                         electricityTableRows
-                                            .map(({ project, property, rowVendor, rowKey }, index) => {
+                                            .map(({ project, property, rowKey }, index) => {
                                                 return (
                                                         <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-2 py-2">{index + 1}</td>
@@ -1413,7 +1323,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                                 {property.ebNo}
                                                             </td>
                                                             {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => {
-                                                                const paymentData = getPaymentData(property.ebNo, month, property.id, undefined, rowVendor);
+                                                                const paymentData = getPaymentData(property.ebNo, month, property.id, undefined);
                                                                 const isPaid = paymentData.amount !== '-' && paymentData.amount !== '0';
                                                                 const isNotRequired = paymentData.isNotRequired;
                                                                 return (
@@ -1437,7 +1347,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                                             })}
                                                             <td className="px-2 py-2">
                                                                 <span className="text-sm font-medium text-gray-700">
-                                                                    {getUnpaidCount(property.ebNo, property.id, rowVendor)}
+                                                                    {getUnpaidCount(property.ebNo, property.id)}
                                                                 </span>
                                                             </td>
                                                             <td className="px-2 py-2">
@@ -1502,7 +1412,7 @@ const ElectricityTab = ({ username, userRoles = [] }) => {
                                     </thead>
                                     <tbody>
                                         {hiddenElectricityTableRows
-                                            .map(({ project, property, rowVendor, rowKey }, index) => {
+                                            .map(({ project, property, rowKey }, index) => {
                                                     return (
                                                         <tr key={rowKey || `${project.id}-${property.id}`} className="odd:bg-white even:bg-[#FAF6ED]">
                                                             <td className="px-4 py-2">{index + 1}</td>

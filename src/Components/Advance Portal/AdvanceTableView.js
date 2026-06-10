@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -30,11 +31,12 @@ import {
   EdbcExpandableBodyCell,
   EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
+  formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
-import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId } from '../../utils/advancePortalWeeklyPaymentBill';
+import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, resolveFilesUploadResponseUrl } from '../../utils/advancePortalWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 
-const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal }) => {
+const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const BLANK_VALUE = 'BLANK';
   const BLANK_LABEL = 'Blank';
   const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
@@ -99,6 +101,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const pendingAdvanceUpdateRef = useRef(null);
   const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
   const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editPaymentModalData, setEditPaymentModalData] = useState({
     chequeNo: '',
     chequeDate: '',
@@ -722,10 +725,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     fetchAdvanceData();
   }, [fetchAdvanceData]);
 
-  useEffect(() => {
-    if (refreshSignal === undefined) return;
-    fetchAdvanceData();
-  }, [refreshSignal, fetchAdvanceData]);
+  useTabRefreshSignal(refreshSignal, isActive, fetchAdvanceData);
   const formatDateOnly = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -1258,6 +1258,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     }),
   }), []);
   const handleUpdate = async () => {
+    if (isEditSubmitting) return;
+    setIsEditSubmitting(true);
     try {
       const currentEntry = advanceData.find(entry => entry.advancePortalId === editingId);
       if (currentEntry && !canUserEditEntry(currentEntry)) {
@@ -1298,7 +1300,15 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
             throw new Error('Upload failed');
           }
           const uploadResult = await uploadResponse.json();
-          fileUrl = uploadResult.url;
+          fileUrl = resolveFilesUploadResponseUrl(uploadResult);
+          if (!fileUrl) {
+            throw new Error('Upload succeeded but no file URL was returned');
+          }
+          setEditFormData((prev) => ({ ...prev, file_url: fileUrl }));
+          setSelectedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
         } catch (error) {
           console.error('Error during file upload:', error);
           alert('Error during file upload. Please try again.');
@@ -1366,27 +1376,35 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           throw new Error(errorText || 'Failed to update record');
         }
         const contentType = res.headers.get('content-type') || '';
-        let updatedRecord = null;
         if (contentType.includes('application/json')) {
-          updatedRecord = await res.json();
+          await res.json();
+        } else {
+          await res.text();
         }
         const sourceRecord = advanceData.find((e) => e.advancePortalId === id);
         const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
-        await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
-          editedBy: username,
-          branchId: activeBranchId,
-          modalPaymentData,
-          expensesEntryId,
-        });
-        if (expensesEntryId) {
-          await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+        try {
+          await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
             editedBy: username,
-            siteOptions,
-            selectedOption,
             branchId: activeBranchId,
+            modalPaymentData,
+            expensesEntryId,
           });
+        } catch (weeklyErr) {
+          console.error('Weekly payment bill sync failed after advance edit:', weeklyErr);
         }
-        return updatedRecord;
+        if (expensesEntryId) {
+          try {
+            await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+              editedBy: username,
+              siteOptions,
+              selectedOption,
+              branchId: activeBranchId,
+            });
+          } catch (expenseErr) {
+            console.error('Linked expense sync failed after advance edit:', expenseErr);
+          }
+        }
       };
       const setAllowToEdit = async (id, allow) => {
         try {
@@ -1408,7 +1426,11 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
             item.advancePortalId === editingId ? { ...item, ...payload } : item
           )
         );
-        await fetchAdvanceData();
+        try {
+          await fetchAdvanceData();
+        } catch (refreshErr) {
+          console.error('Failed to refresh advance data after edit:', refreshErr);
+        }
         setShowEditPaymentModal(false);
         pendingAdvanceUpdateRef.current = null;
         setIsEditModalOpen(false);
@@ -1416,6 +1438,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+        alert('Updated successfully!');
       };
       if (editFormData.type === 'Transfer') {
         const sameEntryRows = advanceData.filter(r => r.entry_no === editFormData.entry_no);
@@ -1501,15 +1524,22 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
         await finishEditSuccess(payload);
         return;
       }
-      await fetchAdvanceData();
+      try {
+        await fetchAdvanceData();
+      } catch (refreshErr) {
+        console.error('Failed to refresh advance data after edit:', refreshErr);
+      }
       setIsEditModalOpen(false);
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      alert('Updated successfully!');
     } catch (err) {
       console.error('Update error:', err);
-      alert('Failed to submit edit request. Please try again.');
+      alert(err?.message || 'Failed to submit edit request. Please try again.');
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
   const handleEditPaymentModalSubmit = async () => {
@@ -1538,19 +1568,27 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       }
       const sourceRecord = advanceData.find((e) => e.advancePortalId === editingId);
       const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
-      await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
-        editedBy: username,
-        branchId: activeBranchId,
-        modalPaymentData: editPaymentModalData,
-        expensesEntryId,
-      });
-      if (expensesEntryId) {
-        await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+      try {
+        await syncWeeklyPaymentBillsForAdvancePortal(editingId, payload, {
           editedBy: username,
-          siteOptions,
-          selectedOption,
           branchId: activeBranchId,
+          modalPaymentData: editPaymentModalData,
+          expensesEntryId,
         });
+      } catch (weeklyErr) {
+        console.error('Weekly payment bill sync failed after advance edit:', weeklyErr);
+      }
+      if (expensesEntryId) {
+        try {
+          await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+            editedBy: username,
+            siteOptions,
+            selectedOption,
+            branchId: activeBranchId,
+          });
+        } catch (expenseErr) {
+          console.error('Linked expense sync failed after advance edit:', expenseErr);
+        }
       }
       try {
         const allowRes = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${editingId}?allow=${false}`, {
@@ -1568,7 +1606,11 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           item.advancePortalId === editingId ? { ...item, ...payload } : item
         )
       );
-      await fetchAdvanceData();
+      try {
+        await fetchAdvanceData();
+      } catch (refreshErr) {
+        console.error('Failed to refresh advance data after edit:', refreshErr);
+      }
       setShowEditPaymentModal(false);
       pendingAdvanceUpdateRef.current = null;
       setIsEditModalOpen(false);
@@ -1576,9 +1618,10 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      alert('Updated successfully!');
     } catch (err) {
       console.error('Update error:', err);
-      alert('Failed to submit edit request. Please try again.');
+      alert(err?.message || 'Failed to submit edit request. Please try again.');
     } finally {
       setIsEditPaymentSubmitting(false);
     }
@@ -1742,21 +1785,21 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                   {startDate && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Start Date: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{startDate}</span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(startDate)}</span>
                       <button onClick={() => setStartDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                     </span>
                   )}
                   {endDate && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">End Date: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{endDate}</span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(endDate)}</span>
                       <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                     </span>
                   )}
                   {selectDate && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{selectDate}</span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
                       <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                     </span>
                   )}
@@ -2576,9 +2619,10 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                   <button
                     type="button"
                     onClick={handleUpdate}
-                    className="px-4 py-2 bg-[#BF9853] text-white rounded"
+                    disabled={isEditSubmitting}
+                    className={`px-4 py-2 rounded text-white ${isEditSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#BF9853]'}`}
                   >
-                    Save
+                    {isEditSubmitting ? 'Saving...' : 'Save'}
                   </button>
                 </div>
               </div>

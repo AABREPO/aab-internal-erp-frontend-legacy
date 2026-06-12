@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import Incoming from "./Incoming";
 import MobileInventory from "../../componentsMobile/Inventory/Inventory";
 import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
@@ -57,31 +58,31 @@ const InventoryHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === '' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === ''}
                     onClick={() => setActiveTab('')}
                 >
                     Outgoing
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'incoming' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'incoming'}
                     onClick={() => setActiveTab('incoming')}
                 >
                     Incoming
-                </h2>
-                <h2
-                    className={`link ${activeTab === '' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === ''}
                     onClick={() => setActiveTab('')}
                 >
                     Site Usage Report
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 }
 

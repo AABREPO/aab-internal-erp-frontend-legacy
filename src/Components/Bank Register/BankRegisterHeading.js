@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import BillPayment from './BillPayment';
 import BankRegister6View from './BankRegisterPayments';
 import BankRegisterHistory from './BankRegisterHistory';
@@ -37,27 +37,27 @@ const BankRegisterHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED] bank-register-heading-scope">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'bankregister6' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="bank-register-heading-scope">
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'bankregister6'}
                     onClick={() => handleTabChange('bankregister6')}
                 >
                     Bank Payments
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'bankregisterhistory' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'bankregisterhistory'}
                     onClick={() => handleTabChange('bankregisterhistory')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'bankregisterreconcile' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'bankregisterreconcile'}
                     onClick={() => handleTabChange('bankregisterreconcile')}
                 >
                     Reconcile
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('bankregister6') && (
                     <div className={activeTab === 'bankregister6' ? '' : 'hidden'}>
@@ -75,7 +75,7 @@ const BankRegisterHeading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

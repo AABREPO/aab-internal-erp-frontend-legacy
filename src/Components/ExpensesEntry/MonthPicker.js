@@ -1,21 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { calendarPanelStyle } from "./SingleDatePicker";
+import { calendarPanelStyle, CALENDAR_NAV_BUTTON_SIZE_PX } from "./SingleDatePicker";
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => format(new Date(2024, i, 1), "MMM"));
 
 function monthValueToDate(value) {
   if (!value) return null;
@@ -93,6 +80,11 @@ export default function MonthPicker({
   const selectedMonthIndex = selectedDate ? selectedDate.getMonth() : null;
   const selectedYear = selectedDate ? selectedDate.getFullYear() : null;
 
+  const navButtonStyle = {
+    width: CALENDAR_NAV_BUTTON_SIZE_PX,
+    height: CALENDAR_NAV_BUTTON_SIZE_PX,
+  };
+
   if (!isOpen) return null;
 
   const panel = (
@@ -101,18 +93,68 @@ export default function MonthPicker({
       className="bg-white rounded-lg shadow-xl border border-gray-200 box-border"
       style={calendarPanelStyle}
     >
-      <div className="flex justify-center mb-1.5 border-b">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        {viewMode === "month" ? (
+          <button
+            type="button"
+            onClick={() => setViewDate(new Date(viewYear - 1, viewDate.getMonth(), 1))}
+            className="flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 text-lg font-bold"
+            style={navButtonStyle}
+            aria-label="Previous year"
+          >
+            &lt;
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewDate(new Date(viewYear - 12, viewDate.getMonth(), 1))}
+            className="flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 text-lg font-bold"
+            style={navButtonStyle}
+            aria-label="Previous years"
+          >
+            &lt;
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setViewMode((mode) => (mode === "month" ? "year" : "month"))}
-          className="h-8 px-3 rounded bg-white text-sm font-medium text-gray-800 hover:bg-gray-100 inline-flex items-center"
+          className="h-8 px-3 rounded bg-white text-sm font-semibold text-black hover:bg-gray-100 inline-flex items-center"
+          style={{ height: CALENDAR_NAV_BUTTON_SIZE_PX }}
         >
           <span>{viewYear}</span>
         </button>
+        {viewMode === "month" ? (
+          <button
+            type="button"
+            onClick={() => setViewDate(new Date(viewYear + 1, viewDate.getMonth(), 1))}
+            className="flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 text-lg font-bold"
+            style={navButtonStyle}
+            aria-label="Next year"
+          >
+            &gt;
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewDate(new Date(viewYear + 12, viewDate.getMonth(), 1))}
+            className="flex items-center justify-center rounded hover:bg-gray-100 text-gray-700 text-lg font-bold"
+            style={navButtonStyle}
+            aria-label="Next years"
+          >
+            &gt;
+          </button>
+        )}
       </div>
 
       {viewMode === "month" ? (
         <div className="h-[163px] flex flex-col">
+          <div className="grid grid-cols-7 gap-0.5 mb-1 invisible shrink-0" aria-hidden="true">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="text-center text-[11px] font-bold py-0.5">
+                &nbsp;
+              </div>
+            ))}
+          </div>
           <div className="grid grid-cols-3 grid-rows-4 gap-0.5 flex-1 min-h-0">
           {MONTH_NAMES.map((name, monthIndex) => {
             const isSelected =
@@ -123,10 +165,10 @@ export default function MonthPicker({
                 type="button"
                 onClick={() => commit(new Date(viewYear, monthIndex, 1))}
                 className={[
-                  "flex items-center justify-center h-full min-h-0 text-xs font-bold rounded-full text-center px-0.5",
+                  "flex items-center justify-center h-full min-h-0 text-xs font-semibold rounded-full text-center px-0.5",
                   isSelected
                     ? "bg-[#BF9853] text-white"
-                    : "text-gray-700 hover:bg-[#FAF6ED]",
+                    : "text-black hover:bg-[#FAF6ED]",
                 ].join(" ")}
               >
                 {name}
@@ -137,6 +179,13 @@ export default function MonthPicker({
         </div>
       ) : (
         <div className="h-[163px] flex flex-col">
+          <div className="grid grid-cols-7 gap-0.5 mb-1 invisible shrink-0" aria-hidden="true">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="text-center text-[11px] font-bold py-0.5">
+                &nbsp;
+              </div>
+            ))}
+          </div>
           <div className="grid grid-cols-3 grid-rows-4 gap-0.5 flex-1 min-h-0">
           {yearGrid.map((year) => {
             const isSelected = year === viewYear;

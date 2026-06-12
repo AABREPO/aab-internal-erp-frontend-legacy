@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import PurchaseOrder from './PurchaseOrder';
 import PurchaseHistory from "./PurchaseHistory";
 import PurchaseInputData from "./PurchaseInputData";
@@ -59,31 +60,31 @@ const PurchaseHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'purchaseorder' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="w-full h-auto min-h-screen">
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'purchaseorder'}
                     onClick={() => setActiveTab('purchaseorder')}
                 >
                     Purchase Order
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'purchasehistory' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'purchasehistory'}
                     onClick={() => setActiveTab('purchasehistory')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'purchaseinputdata' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'purchaseinputdata'}
                     onClick={() => setActiveTab('purchaseinputdata')}
                 >
                     Input Data
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 }
 

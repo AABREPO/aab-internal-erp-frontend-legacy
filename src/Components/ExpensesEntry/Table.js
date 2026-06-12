@@ -13,6 +13,7 @@ import {
     EdbcDateBodyCell,
     EdbcProjectNameBodyCell,
     EdbcSelectFilter,
+    EdbcPaymentModeFilter,
     EdbcTextInputFilter,
     EdbcTotalAmountFilter,
     EdbcEmptyFilterCell,
@@ -167,6 +168,8 @@ export function buildEntryCheckTableContext({
     setSelectedContractor,
     selectedQuantity,
     setSelectedQuantity,
+    selectedAmount = '',
+    setSelectedAmount = noop,
     selectedDescription,
     setSelectedDescription,
     categoryOptions,
@@ -221,6 +224,8 @@ export function buildEntryCheckTableContext({
         setSelectedStaff: noop,
         selectedQuantity,
         setSelectedQuantity,
+        selectedAmount,
+        setSelectedAmount,
         selectedDescription,
         setSelectedDescription,
         categoryOptions,
@@ -272,6 +277,12 @@ export function buildTableViewExpenseTableContext({
     showFilters,
     filterRowRef,
     totalAmount,
+    selectedQuantity = '',
+    setSelectedQuantity = noop,
+    selectedAmount = '',
+    setSelectedAmount = noop,
+    selectedDescription = '',
+    setSelectedDescription = noop,
     sortField,
     sortDirection,
     handleSort,
@@ -354,10 +365,12 @@ export function buildTableViewExpenseTableContext({
         staffOptions: [],
         selectedStaff: '',
         setSelectedStaff: noop,
-        selectedQuantity: '',
-        setSelectedQuantity: noop,
-        selectedDescription: '',
-        setSelectedDescription: noop,
+        selectedQuantity,
+        setSelectedQuantity,
+        selectedAmount,
+        setSelectedAmount,
+        selectedDescription,
+        setSelectedDescription,
         categoryOptions,
         selectedCategory,
         setSelectedCategory,
@@ -448,6 +461,8 @@ export function Table({
         setSelectedStaff,
         selectedQuantity,
         setSelectedQuantity,
+        selectedAmount = '',
+        setSelectedAmount = noop,
         selectedDescription,
         setSelectedDescription,
         categoryOptions,
@@ -462,6 +477,8 @@ export function Table({
         paymentModeFilterOptions = [],
         selectedPaymentMode = '',
         setSelectedPaymentMode = noop,
+        selectedPaymentModes = [],
+        setSelectedPaymentModes = noop,
         sourceOptions,
         selectedSource,
         setSelectedSource,
@@ -727,7 +744,12 @@ export function Table({
                             value={selectedQuantity}
                             onChange={(e) => setSelectedQuantity(e.target.value)}
                         />
-                        <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totalAmount} />
+                        <EdbcTotalAmountFilter
+                            columnId={EDBC_IDS.EDBC8}
+                            totalAmount={totalAmount}
+                            value={selectedAmount}
+                            onChange={(e) => setSelectedAmount(e.target.value)}
+                        />
                         <EdbcTextInputFilter
                             columnId={EDBC_IDS.EDBC9}
                             placeholder={dstCol9Label}
@@ -760,7 +782,16 @@ export function Table({
                             onChange={setSelectedAccountType}
                             selectStyles={customStyles}
                         />
-                        {setSelectedPaymentMode !== noop ? (
+                        {setSelectedPaymentModes !== noop ? (
+                            <EdbcPaymentModeFilter
+                                columnId={EDBC_IDS.EDBC13}
+                                placeholder={dstCol13Label}
+                                options={paymentModeFilterOptions}
+                                value={selectedPaymentModes}
+                                onChange={setSelectedPaymentModes}
+                                selectStyles={customStyles}
+                            />
+                        ) : setSelectedPaymentMode !== noop ? (
                             <EdbcSelectFilter
                                 columnId={EDBC_IDS.EDBC13}
                                 placeholder={dstCol13Label}

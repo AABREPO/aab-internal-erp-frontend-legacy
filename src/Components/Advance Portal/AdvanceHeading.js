@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import AdvancePortal from './AdvancePortal';
 import AdvanceTableView from './AdvanceTableView';
 import AdvanceDatabase from './AdvanceDatabase';
@@ -91,41 +91,41 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
     }
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'advanceportal' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'advanceportal'}
                     onClick={() => handleTabChange('advanceportal')}
                 >
                     Advance
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'advacetablview' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'advacetablview'}
                     onClick={() => handleTabChange('advacetablview')}
                 >
                     Table View
-                </h2>
+                </ModuleHeadingTab>
                 {isAdminAdvance && (
-                    <h2
-                        className={`link whitespace-nowrap ${activeTab === 'advancedatabase' ? 'active' : ''}`}
+                    <ModuleHeadingTab
+                        active={activeTab === 'advancedatabase'}
                         onClick={() => handleTabChange('advancedatabase')}
                     >
                         Database
-                    </h2>
+                    </ModuleHeadingTab>
                 )}
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'advancereport' ? 'active' : ''}`}
+                <ModuleHeadingTab
+                    active={activeTab === 'advancereport'}
                     onClick={() => handleTabChange('advancereport')}
                 >
                     Report
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'advancesummary' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'advancesummary'}
                     onClick={() => handleTabChange('advancesummary')}
                 >
                     Summary
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('advanceportal') && (
                     <div className={activeTab === 'advanceportal' ? '' : 'hidden'}>
@@ -153,7 +153,7 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

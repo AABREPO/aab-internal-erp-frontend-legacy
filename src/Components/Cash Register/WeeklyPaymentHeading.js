@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import WeeklyPayment from './WeeklyPayment';
 import History from './WeeklyPaymentHistory';
 import HandoverPaymentsPage from './WeeklyPaymentHandover';
@@ -22,27 +22,27 @@ const WHeading = ({ username, userRoles = [] }) => {
     }, [activeTab]);
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2 className={`link whitespace-nowrap ${activeTab === 'weeklypayment' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypayment')}>
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab active={activeTab === 'weeklypayment'} onClick={() => setActiveTab('weeklypayment')}>
                     Weekly Payment
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'dailypayment' ? 'active' : ''}`} onClick={() => setActiveTab('dailypayment')}>
+                </ModuleHeadingTab>
+                <ModuleHeadingTab active={activeTab === 'dailypayment'} onClick={() => setActiveTab('dailypayment')}>
                     Daily Payment
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'weeklyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('weeklyhistory')}>
+                </ModuleHeadingTab>
+                <ModuleHeadingTab active={activeTab === 'weeklyhistory'} onClick={() => setActiveTab('weeklyhistory')}>
                    Weekly History
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'dailyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('dailyhistory')}>
+                </ModuleHeadingTab>
+                <ModuleHeadingTab active={activeTab === 'dailyhistory'} onClick={() => setActiveTab('dailyhistory')}>
                     Daily History
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'handoverpaymentspage' ? 'active' : ''}`} onClick={() => setActiveTab('handoverpaymentspage')} >
+                </ModuleHeadingTab>
+                <ModuleHeadingTab active={activeTab === 'handoverpaymentspage'} onClick={() => setActiveTab('handoverpaymentspage')}>
                     Handover
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypaymentaddinput')} >
+                </ModuleHeadingTab>
+                <ModuleHeadingTab active={activeTab === 'weeklypaymentaddinput'} onClick={() => setActiveTab('weeklypaymentaddinput')}>
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('weeklypayment') && (
                     <div className={activeTab === 'weeklypayment' ? '' : 'hidden'}>
@@ -75,7 +75,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

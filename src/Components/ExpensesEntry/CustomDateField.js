@@ -49,20 +49,31 @@ function normalizePartialMonth(month) {
   return String(n).padStart(2, "0");
 }
 
-/** While typing — keep single month digits unpadded; cap at 12; never pull year into month. */
+/** While typing — keep single month digits unpadded; max 12; e.g. 22 → 02. */
 function sanitizeMonthWhileTyping(month) {
   if (!month) return "";
   const digits = String(month).replace(/\D/g, "").slice(0, 2);
   if (digits.length <= 1) return digits;
   const n = Number(digits);
-  if (n > 12) return "12";
+  if (n > 12) return `0${digits[1]}`;
   if (n < 1) return "1";
   return digits;
 }
 
-function formatPartialDdMmYyyy({ day, month, year }) {
+/** While typing — keep single day digits unpadded; cap at 31. */
+function sanitizeDayWhileTyping(day) {
+  if (!day) return "";
+  const digits = String(day).replace(/\D/g, "").slice(0, 2);
+  if (digits.length <= 1) return digits;
+  const n = Number(digits);
+  if (n > 31) return "31";
+  if (n < 1) return "1";
+  return digits;
+}
+
+function formatPartialDdMmYyyy({ day, month, year }, trailAfterMonth = false) {
   const monthStr = sanitizeMonthWhileTyping(month);
-  const dayStr = String(day ?? "").slice(0, 2);
+  const dayStr = sanitizeDayWhileTyping(day);
   const yearStr = String(year ?? "").slice(0, 4);
 
   if (!dayStr && !month && !yearStr) return "";
@@ -75,16 +86,143 @@ function formatPartialDdMmYyyy({ day, month, year }) {
     return out;
   }
 
-  let out = `${dayStr}-`;
+  let out = dayStr.length === 2 ? `${dayStr}-` : dayStr;
   if (!monthStr) {
-    out += "-";
-  } else {
-    out += monthStr;
+    if (yearStr) out += `-${yearStr}`;
+    return out;
   }
-  if (monthStr.length > 0 || yearStr.length > 0) {
+  if (dayStr.length < 2) {
+    out += "-";
+  }
+  out += monthStr;
+  if (yearStr.length > 0) {
     out += `-${yearStr}`;
+  } else if (monthStr.length === 2 && trailAfterMonth) {
+    out += "-";
   }
   return out;
+}
+
+function getPartialFromText(text) {
+  const fromHyphens = tryParsePartialDdMmYyyy(text);
+  if (fromHyphens) {
+    return {
+      day: String(fromHyphens.day ?? "").replace(/\D/g, ""),
+      month: String(fromHyphens.month ?? "").replace(/\D/g, ""),
+      year: String(fromHyphens.year ?? "").replace(/\D/g, ""),
+    };
+  }
+  const d = String(text ?? "").replace(/\D/g, "");
+  return { day: d.slice(0, 2), month: d.slice(2, 4), year: d.slice(4, 8) };
+}
+
+function getSegmentFromCaret(text, caret) {
+  const s = String(text ?? "");
+  const firstHyp = s.indexOf("-");
+  if (firstHyp === -1) return "day";
+  const secondHyp = s.indexOf("-", firstHyp + 1);
+  if (secondHyp === -1) {
+    return caret <= firstHyp ? "day" : "month";
+  }
+  if (caret <= firstHyp) return "day";
+  if (caret <= secondHyp) return "month";
+  return "year";
+}
+
+function getInsertedDigits(prevText, nextVal) {
+  const prevD = String(prevText ?? "").replace(/\D/g, "");
+  const newD = String(nextVal ?? "").replace(/\D/g, "");
+  if (newD.length <= prevD.length) return "";
+  let i = 0;
+  while (i < prevD.length && prevD[i] === newD[i]) i += 1;
+  return newD.slice(i, i + (newD.length - prevD.length));
+}
+
+function applyDigitToActiveSegment(partial, segment, insertedDigits, caret, text) {
+  const digits = String(insertedDigits ?? "").replace(/\D/g, "");
+  if (!digits) return partial;
+
+  const p = {
+    day: String(partial?.day ?? "").replace(/\D/g, ""),
+    month: String(partial?.month ?? "").replace(/\D/g, ""),
+    year: String(partial?.year ?? "").replace(/\D/g, ""),
+  };
+
+  const firstHyp = text.indexOf("-");
+  const secondHyp = firstHyp >= 0 ? text.indexOf("-", firstHyp + 1) : -1;
+  const maxLen = segment === "year" ? 4 : 2;
+  let segStart = 0;
+  if (segment === "month") segStart = firstHyp + 1;
+  else if (segment === "year") segStart = secondHyp + 1;
+
+  let posInSeg = Math.max(0, Math.min(caret - segStart, maxLen));
+
+  for (const ch of digits) {
+    let cur = p[segment];
+    if (cur.length >= maxLen && posInSeg < maxLen) {
+      cur = cur.slice(0, posInSeg) + ch + cur.slice(posInSeg + 1);
+      posInSeg += 1;
+    } else if (cur.length < maxLen) {
+      if (posInSeg < cur.length) {
+        cur = cur.slice(0, posInSeg) + ch + cur.slice(posInSeg);
+      } else {
+        cur += ch;
+      }
+      posInSeg += 1;
+    } else {
+      cur = cur.slice(1) + ch;
+      posInSeg = maxLen;
+    }
+
+    if (segment === "day") p.day = sanitizeDayWhileTyping(cur.slice(0, 2));
+    else if (segment === "month") p.month = sanitizeMonthWhileTyping(cur.slice(0, 2));
+    else p.year = cur.slice(0, 4);
+  }
+
+  return p;
+}
+
+function computeCaretInSegment(nextText, partial, segment) {
+  const firstHyp = nextText.indexOf("-");
+  const secondHyp = firstHyp >= 0 ? nextText.indexOf("-", firstHyp + 1) : -1;
+  const dayLen = String(partial?.day || "").length;
+  const monthLen = String(partial?.month || "").length;
+  const yearLen = String(partial?.year || "").length;
+
+  if (segment === "day") {
+    return dayLen === 2 && firstHyp >= 0 ? firstHyp : dayLen;
+  }
+  if (segment === "month") {
+    const monthStart = firstHyp + 1;
+    if (monthLen === 2 && secondHyp >= 0) return secondHyp + 1;
+    return monthStart + monthLen;
+  }
+  return (secondHyp >= 0 ? secondHyp + 1 : 0) + yearLen;
+}
+
+function appendDigitsToPartial(partial, digitsToAdd) {
+  const p = {
+    day: String(partial?.day ?? "").replace(/\D/g, ""),
+    month: String(partial?.month ?? "").replace(/\D/g, ""),
+    year: String(partial?.year ?? "").replace(/\D/g, ""),
+  };
+  for (const ch of String(digitsToAdd ?? "").replace(/\D/g, "")) {
+    if (p.day.length < 2) p.day += ch;
+    else if (p.month.length < 2) p.month += ch;
+    else if (p.year.length < 4) p.year += ch;
+  }
+  p.day = sanitizeDayWhileTyping(p.day);
+  p.month = sanitizeMonthWhileTyping(p.month);
+  return p;
+}
+
+function computeCaretEndOfActiveSegment(nextText, partial) {
+  const dayLen = String(partial?.day || "").length;
+  const monthLen = String(partial?.month || "").length;
+  const yearLen = String(partial?.year || "").length;
+  if (dayLen < 2) return dayLen;
+  if (monthLen < 2) return 2 + 1 + monthLen;
+  return 6 + yearLen;
 }
 
 /** Keep day/year in place while month is cleared or re-typed (dd-[mm]-yyyy). */
@@ -114,17 +252,6 @@ function tryParsePartialDdMmYyyy(val) {
   if (m) return { day: m[1] ?? "", month: m[2] ?? "", year: "" };
 
   return null;
-}
-
-function computeCaretAfterPartialEdit(prevCaret, nextText, partial) {
-  if (partial && !partial.day) {
-    return 0;
-  }
-  if (prevCaret <= 2) {
-    const dayLen = String(partial?.day || "").length;
-    return dayLen > 0 ? Math.min(prevCaret, dayLen) : 0;
-  }
-  return Math.min(prevCaret, nextText.length);
 }
 
 /** When day/month typing makes the string longer than 10 chars, keep full year (do not truncate end). */
@@ -159,14 +286,14 @@ function resolveOverflowDdMmYyyy(val, prevText) {
     return truncated;
   }
 
-  let day = m[1] ?? "";
-  const month = m[2] ?? "";
+  let day = sanitizeDayWhileTyping(m[1] ?? "");
+  const month = sanitizeMonthWhileTyping(m[2] ?? "");
   let year = m[3] ?? "";
   const prevPartial = tryParsePartialDdMmYyyy(prevText);
   const prevYear = String(prevPartial?.year || "");
 
-  if (day.length > 2) {
-    day = day.slice(-2);
+  if (String(m[1] ?? "").length > 2) {
+    day = sanitizeDayWhileTyping(String(m[1] ?? "").slice(-2));
   }
   if (year.length < 4 && prevYear.length === 4) {
     year = prevYear;
@@ -228,24 +355,23 @@ function formatDigitsAsDdMmYyyy(digits, val, prevText) {
   if (d.length === 0) return "";
   if (d.length === 1) return d;
   if (d.length === 2) {
-    if (p.endsWith("-") && !v.includes("-")) return d;
-    return `${d}-`;
+    const dayPart = sanitizeDayWhileTyping(d);
+    if (p.endsWith("-") && !v.includes("-")) return dayPart;
+    return `${dayPart}-`;
   }
   if (d.length === 3) {
-    return `${d.slice(0, 2)}-${d.slice(2)}-`;
+    const dayPart = sanitizeDayWhileTyping(d.slice(0, 2));
+    return `${dayPart}-${d.slice(2)}`;
   }
   if (d.length === 4) {
-    const monthDigits = d.slice(2, 4);
-    let monthNum = Number(monthDigits);
-    if (monthNum > 12) monthNum = 12;
-    if (monthNum < 1 && monthDigits.length === 2) monthNum = Number(monthDigits.slice(0, 1)) || 1;
-    const monthPart = monthDigits.length === 1 ? monthDigits : String(monthNum);
-    return `${d.slice(0, 2)}-${monthPart}-`;
+    const dayPart = sanitizeDayWhileTyping(d.slice(0, 2));
+    const monthPart = sanitizeMonthWhileTyping(d.slice(2, 4));
+    return `${dayPart}-${monthPart}-`;
   }
   if (d.length >= 5 && d.length < 8) {
     const prevPartial = tryParsePartialDdMmYyyy(p);
-    const day = d.slice(0, 2);
-    const month = d.slice(2, 4);
+    const day = sanitizeDayWhileTyping(d.slice(0, 2));
+    const month = sanitizeMonthWhileTyping(d.slice(2, 4));
     let yearDigits = d.slice(4);
     const prevYear = String(prevPartial?.year || "");
     if (prevYear && yearDigits.length < 4) {
@@ -253,7 +379,9 @@ function formatDigitsAsDdMmYyyy(digits, val, prevText) {
     }
     return formatPartialDdMmYyyy({ day, month, year: yearDigits });
   }
-  return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}`;
+  const dayPart = sanitizeDayWhileTyping(d.slice(0, 2));
+  const monthPart = sanitizeMonthWhileTyping(d.slice(2, 4));
+  return `${dayPart}-${monthPart}-${d.slice(4)}`;
 }
 
 export default function CustomDateField({
@@ -333,6 +461,36 @@ export default function CustomDateField({
   const handleInputChange = (e) => {
     const val = e.target.value;
     const caret = e.target.selectionStart ?? 0;
+    const isDeleting = val.length < text.length;
+    const prevDigits = text.replace(/\D/g, "");
+    const newDigits = val.replace(/\D/g, "");
+    if (!isDeleting && newDigits.length > prevDigits.length) {
+      const inserted = getInsertedDigits(text, val);
+      if (String(text).includes("-")) {
+        const typeCaret = Math.max(0, caret - inserted.length);
+        const segment = getSegmentFromCaret(text, typeCaret);
+        let partial = applyDigitToActiveSegment(
+          getPartialFromText(text),
+          segment,
+          inserted,
+          typeCaret,
+          text
+        );
+        partial = preserveYearFromPrevIfEditingDayMonth(partial, text);
+        const nextText = formatPartialDdMmYyyy(partial, partial.month.length === 2);
+        applyText(nextText, computeCaretInSegment(nextText, partial, segment));
+        return;
+      }
+      const partial = appendDigitsToPartial(getPartialFromText(text), inserted);
+      const nextText = formatPartialDdMmYyyy(partial, partial.month.length === 2);
+      applyText(nextText, computeCaretEndOfActiveSegment(nextText, partial));
+      return;
+    }
+    if (isDeleting && !val.includes("-")) {
+      const dayDigits = val.replace(/\D/g, "").slice(0, 2);
+      applyText(dayDigits, Math.min(caret, dayDigits.length));
+      return;
+    }
     if (ISO_DATE_TYPING.test(val)) {
       const y = parseInt(val.slice(0, 4), 10);
       const plausibleYear = y >= 1900 && y <= 2100;
@@ -348,8 +506,18 @@ export default function CustomDateField({
     const partialSegments = tryParsePartialDdMmYyyy(val);
     if (partialSegments) {
       const preserved = preserveYearFromPrevIfEditingDayMonth(partialSegments, text);
-      const nextText = formatPartialDdMmYyyy(preserved);
-      applyText(nextText, computeCaretAfterPartialEdit(caret, nextText, preserved));
+      const normalized = {
+        day: String(preserved.day ?? "").replace(/\D/g, ""),
+        month: String(preserved.month ?? "").replace(/\D/g, ""),
+        year: String(preserved.year ?? "").replace(/\D/g, ""),
+      };
+      normalized.day = sanitizeDayWhileTyping(normalized.day);
+      normalized.month = sanitizeMonthWhileTyping(normalized.month);
+      const nextText = formatPartialDdMmYyyy(
+        normalized,
+        !isDeleting && normalized.month.length === 2
+      );
+      applyText(nextText, Math.min(caret, nextText.length));
       return;
     }
     if (String(val).replace(/\s/g, "").includes("-")) {
@@ -359,7 +527,8 @@ export default function CustomDateField({
     }
     const digits = val.replace(/\D/g, "").slice(0, 8);
     const nextText = formatDigitsAsDdMmYyyy(digits, val, text);
-    applyText(nextText, Math.min(caret, nextText.length));
+    const partial = getPartialFromText(nextText);
+    applyText(nextText, computeCaretEndOfActiveSegment(nextText, partial));
   };
 
   const pickerValue = calendarValue || resolvePickerValueFromText(text, value || "") || "";
@@ -395,7 +564,7 @@ export default function CustomDateField({
             "min-w-0 flex-1 border-0 bg-transparent pl-[12px] pt-[2px] pb-[2px] text-sm outline-none focus:ring-0",
             inputLooksEmpty
               ? String(placeholderButtonClassName || "").trim() || "text-[12px] text-black font-normal placeholder:text-[#A6A5A6]"
-              : "!text-black !font-bold",
+              : "!text-black !font-semibold",
             disabled ? "cursor-not-allowed" : "",
           ].join(" ")}
         />

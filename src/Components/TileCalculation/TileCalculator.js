@@ -176,6 +176,16 @@ const DesignTool = () => {
         }
         return skirtingArea;
     };
+    const resolveSkirtingArea = (tile, areaName) => {
+        if (tile.type !== "Floor Tile") return 0;
+        const isUserChanged =
+            tile.isUserChanged === true ||
+            tile.isUserChanged === "true";
+        if (isUserChanged) {
+            return Number(tile.skirtingArea ?? tile.directValue) || 0;
+        }
+        return Number(calculateSkirtingArea(tile, areaName)) || 0;
+    };
     const handleSkirtingAreaChange = (selectedOption) => {
         if (!selectedOption) return;
         const selectedValue = parseInt(selectedOption.value, 10);
@@ -231,6 +241,80 @@ const DesignTool = () => {
     const [selectedModule, setSelectedModule] = useState("");
     const [fullDatas, setFullDatas] = useState([]);
     const inputRef = useRef(null);
+    const initialTileStateRef = useRef(null);
+    const pendingSnapshotCaptureRef = useRef(false);
+    const initialSnapshotSetRef = useRef(false);
+    const normalizeSnapshotValue = (value) => {
+        if (value === null || value === undefined) return "";
+        if (typeof value === "number" && !Number.isNaN(value)) return value;
+        if (value !== "" && !Number.isNaN(Number(value))) return Number(value);
+        return String(value).trim();
+    };
+    const buildTileDataSnapshot = useCallback(() => {
+        const normalizeTile = (tile, areaName) => ({
+            type: normalizeSnapshotValue(tile.type),
+            length: normalizeSnapshotValue(tile.length),
+            breadth: normalizeSnapshotValue(tile.breadth),
+            height: normalizeSnapshotValue(tile.height),
+            lengthInput: normalizeSnapshotValue(tile.lengthInput),
+            breadthInput: normalizeSnapshotValue(tile.breadthInput),
+            heightInput: normalizeSnapshotValue(tile.heightInput),
+            deductionArea: Number(tile.deductionArea) || 0,
+            deductionInput: normalizeSnapshotValue(tile.deductionInput),
+            deduction1: normalizeSnapshotValue(tile.deduction1),
+            deduction2: normalizeSnapshotValue(tile.deduction2),
+            deduction3: normalizeSnapshotValue(tile.deduction3),
+            deduction4: normalizeSnapshotValue(tile.deduction4),
+            deduction5: normalizeSnapshotValue(tile.deduction5),
+            deduction6: normalizeSnapshotValue(tile.deduction6),
+            deduction7: normalizeSnapshotValue(tile.deduction7),
+            deduction8: normalizeSnapshotValue(tile.deduction8),
+            deduction9: normalizeSnapshotValue(tile.deduction9),
+            deduction10: normalizeSnapshotValue(tile.deduction10),
+            deduction11: normalizeSnapshotValue(tile.deduction11),
+            deduction12: normalizeSnapshotValue(tile.deduction12),
+            deduction13: normalizeSnapshotValue(tile.deduction13),
+            deduction14: normalizeSnapshotValue(tile.deduction14),
+            deduction15: normalizeSnapshotValue(tile.deduction15),
+            deduction16: normalizeSnapshotValue(tile.deduction16),
+            wastagePercentage: normalizeSnapshotValue(tile.wastagePercentage),
+            skirtingArea: Number(resolveSkirtingArea(tile, areaName).toFixed(2)),
+            tileName: normalizeSnapshotValue(tile.tileName),
+            tileSize: normalizeSnapshotValue(tile.tileSize),
+            size: normalizeSnapshotValue(tile.size),
+            rate: normalizeSnapshotValue(tile.rate),
+            vendor: normalizeSnapshotValue(tile.vendor),
+            quantityBox: normalizeSnapshotValue(tile.quantityBox),
+            areaTile: normalizeSnapshotValue(tile.areaTile),
+            correctQuantityBox: normalizeSnapshotValue(tile.correctQuantityBox),
+            isUserChanged: tile.isUserChanged === true || tile.isUserChanged === "true",
+        });
+        return JSON.stringify({
+            skirting: Number(selectSkirtingArea) || 0,
+            commonWastage: Number(wastagePercentages) || 0,
+            rate: normalizeSnapshotValue(commonRate),
+            commonVendors: normalizeSnapshotValue(commonVendor),
+            floors: floors.map((floor) => ({
+                floorName: normalizeSnapshotValue(floor.floorName),
+                areaName: normalizeSnapshotValue(floor.areaName),
+                tiles: (floor.tiles || []).map((tile) => normalizeTile(tile, floor.areaName)),
+            })),
+        });
+    }, [floors, selectSkirtingArea, wastagePercentages, commonRate, commonVendor]);
+    const resetTileStateSnapshot = () => {
+        initialTileStateRef.current = null;
+        pendingSnapshotCaptureRef.current = false;
+        initialSnapshotSetRef.current = false;
+    };
+    const scheduleTileStateSnapshotCapture = () => {
+        pendingSnapshotCaptureRef.current = true;
+    };
+    const hasTileDataChanged = () => {
+        if (!initialTileStateRef.current) {
+            return true;
+        }
+        return initialTileStateRef.current !== buildTileDataSnapshot();
+    };
     const closeImportPopup = () => setIsImportPopup(false);
     const openImportPopup = () => setIsImportPopup(true);
     const evaluateExpression = (expression) => {
@@ -293,163 +377,12 @@ const DesignTool = () => {
     const handleTileBillClick = () => {
         setIsTileBillOpen(true);
     }
-    const preprocessFloors = (calculationData) => {
-        let lastValidFloorName = '';
-        return calculationData.map((floor) => {
-            if (!floor.floorName || floor.floorName.trim() === '') {
-                return {
-                    ...floor,
-                    floorName: lastValidFloorName
-                };
-            } else {
-                lastValidFloorName = floor.floorName;
-                return floor;
-            }
-        });
-    };
-    const getMismatchedFloors = () => {
-        const processedFloors = preprocessFloors(calculationData.calculations);
-        const mismatches = [];
-        if (!selectedClientData || !selectedClientData.calculations) {
-            console.error("selectedClientData or calculations are missing!");
-            mismatches.push({
-                type: 'Missing Calculations',
-                message: 'No calculations found for selectedClientData'
-            });
-            return mismatches;
-        }
-        const calculations = selectedClientData.calculations;
-        if (calculations.length !== processedFloors.length) {
-            mismatches.push({
-                type: 'Length Mismatch',
-                calculationsLength: calculations.length,
-                floorsLength: processedFloors.length
-            });
-        }
-        for (let i = 0; i < processedFloors.length; i++) {
-            const calc = calculations[i];
-            const floor = processedFloors[i];
-            const diff = {};
-            const calcFloorName = calc.floorName?.trim() || '';
-            const floorFloorName = floor.floorName?.trim() || '';
-            const calcAreaName = calc.areaName?.trim() || '';
-            const floorAreaName = floor.areaName?.trim() || '';
-            if (calcFloorName !== floorFloorName) {
-                diff.floorName = {
-                    expected: calcFloorName,
-                    actual: floorFloorName
-                };
-            }
-            if (calcAreaName !== floorAreaName) {
-                diff.areaName = {
-                    expected: calcAreaName,
-                    actual: floorAreaName
-                };
-            }
-            const sanitizeTiles = (tiles) => {
-                if (!tiles) return [];
-                return tiles.map(tile => {
-                    const {
-                        id,
-                        actualQuantity,
-                        deductionThickness,
-                        deductionThicknessInputs,
-                        isUserChanged,
-                        vendor,
-                        vendors,
-                        ...rest
-                    } = tile;
-                    const normalizedIsUserChanged =
-                        rest.isUserChanged === "" ||
-                            rest.isUserChanged === null ||
-                            rest.isUserChanged === false ||
-                            rest.isUserChanged === undefined
-                            ? "false"
-                            : String(rest.isUserChanged);
-                    const normalizeValue = (value) => {
-                        if (value === null || value === undefined) return "";
-                        if (!isNaN(value) && value !== "") return Number(value);
-                        return String(value).trim();
-                    };
-                    return {
-                        ...rest,
-                        isUserChanged: normalizedIsUserChanged,
-                        areaInSqft: normalizeValue(rest.areaInSqft),
-                        breadth: normalizeValue(rest.breadth),
-                        correctQuantityBox: normalizeValue(rest.correctQuantityBox),
-                        deductionArea: normalizeValue(rest.deductionArea),
-                        height: normalizeValue(rest.height),
-                        length: normalizeValue(rest.length),
-                        noOfBoxes: normalizeValue(rest.noOfBoxes),
-                        qtyPerBox: normalizeValue(rest.qtyPerBox),
-                        rate: normalizeValue(rest.rate),
-                        skirtingArea: normalizeValue(rest.skirtingArea),
-                        totalOrderedTile: normalizeValue(rest.totalOrderedTile),
-                        wastagePercentage: normalizeValue(rest.wastagePercentage),
-                    };
-                });
-            };
-            const sanitizedCalcTiles = sanitizeTiles(calc.tiles);
-            const sanitizedFloorTiles = sanitizeTiles(floor.tiles);
-            const tileDifferences = [];
-            sanitizedCalcTiles.forEach((calcTile, tileIndex) => {
-                const floorTile = sanitizedFloorTiles[tileIndex];
-                if (!floorTile) {
-                    tileDifferences.push({
-                        tileIndex,
-                        issue: 'Missing tile in floor data',
-                        expected: calcTile
-                    });
-                    return;
-                }
-                const tileDiff = {};
-                Object.keys(calcTile).forEach(key => {
-                    if (calcTile[key] !== floorTile[key]) {
-                        tileDiff[key] = {
-                            expected: calcTile[key],
-                            actual: floorTile[key]
-                        };
-                    }
-                });
-                if (Object.keys(tileDiff).length > 0) {
-                    tileDifferences.push({
-                        tileIndex,
-                        differences: tileDiff
-                    });
-                }
-            });
-            if (sanitizedFloorTiles.length > sanitizedCalcTiles.length) {
-                for (let j = sanitizedCalcTiles.length; j < sanitizedFloorTiles.length; j++) {
-                    tileDifferences.push({
-                        tileIndex: j,
-                        issue: 'Extra tile in floor data',
-                        actual: sanitizedFloorTiles[j]
-                    });
-                }
-            }
-            if (tileDifferences.length > 0) {
-                diff.tiles = tileDifferences;
-            }
-            if (Object.keys(diff).length > 0) {
-                mismatches.push({
-                    index: i,
-                    differences: diff
-                });
-            }
-        }
-        return mismatches;
-    };
     const handleConfirmTileBill = () => {
-        const mismatches = getMismatchedFloors();
         if (floorRateSelect === 'With Rate' || floorRateSelect === 'Without Rate') {
             extractTileBillData();
         }
-        if (mismatches.length > 0) {
-            console.log(mismatches);
-            console.log("Not Match!!!!!!!!!");
+        if (hasTileDataChanged()) {
             handleSubmitWithTileBile();
-        } else {
-            console.log('No mismatches found. Proceeding...');
         }
         setFloorRateSelect([]);
         setIsTileBillOpen(false);
@@ -740,6 +673,9 @@ const DesignTool = () => {
             if (savedSelectedFile) setSelectedFile(JSON.parse(savedSelectedFile));
             if (savedSelectedSkirtingArea) setSelectSkiritingArea(JSON.parse(savedSelectedSkirtingArea));
             if (savedWastagePercentage) setWastagePercentage(JSON.parse(savedWastagePercentage));
+            if (savedSelectedFile) {
+                scheduleTileStateSnapshotCapture();
+            }
         } catch (error) {
             console.error("Error parsing sessionStorage data:", error);
         }
@@ -766,6 +702,23 @@ const DesignTool = () => {
         if (selectSkirtingArea) sessionStorage.setItem('selectedSkirtingArea', JSON.stringify(selectSkirtingArea));
         if (wastagePercentages) sessionStorage.setItem('wastagePercentages', JSON.stringify(wastagePercentages));
     }, [clientName, clientSNo, floors, filteredFileOptions, selectedFile, selectSkirtingArea, wastagePercentages]);
+    useEffect(() => {
+        if (!pendingSnapshotCaptureRef.current && !initialSnapshotSetRef.current && !selectedFile && floors.length > 0) {
+            initialTileStateRef.current = buildTileDataSnapshot();
+            initialSnapshotSetRef.current = true;
+            return;
+        }
+        if (!pendingSnapshotCaptureRef.current || floors.length === 0) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            if (!pendingSnapshotCaptureRef.current) return;
+            initialTileStateRef.current = buildTileDataSnapshot();
+            pendingSnapshotCaptureRef.current = false;
+            initialSnapshotSetRef.current = true;
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [floors, selectSkirtingArea, wastagePercentages, commonRate, commonVendor, selectedFile, buildTileDataSnapshot]);
     useEffect(() => {
         const fetchSites = async () => {
             try {
@@ -923,6 +876,7 @@ const DesignTool = () => {
             setFilteredFileOptions([]);
             setSelectedFile(null);
             setSelectedClientData({ calculations: [] });
+            resetTileStateSnapshot();
             setFloors([{
                 floorName: "Ground Floor",
                 areaName: "",
@@ -1591,6 +1545,7 @@ const DesignTool = () => {
             if (!response.ok) {
                 throw new Error("Failed to send data to the backend");
             }
+            initialTileStateRef.current = buildTileDataSnapshot();
             setEno(eno + 1);
             setIsSubmitting(false);
             setClientName(null);
@@ -1975,7 +1930,7 @@ const DesignTool = () => {
                 const wastagePercentageNum = Number(wastagePercentage);
                 const deductionAreaNum = Number(deductionArea || 0);
                 let tileArea;
-                let skirtingArea = tile.type === "Floor Tile" ? Number(tile.skirtingArea) : 0;
+                let skirtingArea = resolveSkirtingArea(tile, floor.areaName);
                 if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x B') {
                     tileArea = lengthNum * breadthNum;
                 } else if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x H') {
@@ -2740,6 +2695,7 @@ const DesignTool = () => {
         if (!selected) {
             setSelectedFile(null);
             setSelectedClientData({ calculations: [] });
+            resetTileStateSnapshot();
             setFloors([]);
             return;
         }
@@ -2834,9 +2790,11 @@ const DesignTool = () => {
                     }),
                 };
             });
+            scheduleTileStateSnapshotCapture();
             setFloors(newFloorsData);
         } else {
             setSelectedClientData({ calculations: [] });
+            resetTileStateSnapshot();
             setFloors([]);
         }
     };
@@ -2856,6 +2814,7 @@ const DesignTool = () => {
     const handleFileChanges = (selected) => {
         if (!selected) {
             setSelectedFiles(null);
+            resetTileStateSnapshot();
             setFloors([]);
             return;
         }
@@ -2967,12 +2926,14 @@ const DesignTool = () => {
                     }),
                 };
             });
+                scheduleTileStateSnapshotCapture();
                 setFloors(newFloorsData);
                 if (Object.keys(deductionData).length > 0) {
                     setDeductionPopupData(deductionData);
                 }
                 // Recalculate skirting areas after setting floors
                 setTimeout(() => {
+                    scheduleTileStateSnapshotCapture();
                     setFloors((prevFloors) =>
                         prevFloors.map((floor) => {
                             const updatedTiles = floor.tiles.map((tile) => {
@@ -3088,6 +3049,7 @@ const DesignTool = () => {
                         }),
                     };
                 });
+                scheduleTileStateSnapshotCapture();
                 setFloors(newFloorsData);
                 if (Object.keys(deductionData).length > 0) {
                     setDeductionPopupData(deductionData);
@@ -3095,6 +3057,7 @@ const DesignTool = () => {
                 // Recalculate skirting areas after setting floors for Paint Calculation files
                 const finalSkirtingValue = paintSkirtingValue;
                 setTimeout(() => {
+                    scheduleTileStateSnapshotCapture();
                     setFloors((prevFloors) =>
                         prevFloors.map((floor) => {
                             const updatedTiles = floor.tiles.map((tile) => {
@@ -4586,7 +4549,7 @@ const DesignTool = () => {
                 const wastagePercentageNum = Number(wastagePercentage);
                 const deductionAreaNum = Number(deductionArea || 0);
                 let tileArea;
-                let skirtingArea = tile.type === "Floor Tile" ? Number(tile.skirtingArea) : 0;
+                let skirtingArea = resolveSkirtingArea(tile, floor.areaName);
                 if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x B') {
                     tileArea = lengthNum * breadthNum;
                 } else if (tileFloorTypes.find(floorType => floorType.floorType === tile.type)?.formula === 'L x H') {
@@ -4753,7 +4716,7 @@ const DesignTool = () => {
                 const skirtingAreaMeasurement = tile.type === "Floor Tile"
                     ? `((${tile.length}x2)+(${tile.breadth}x2))x${skirtingAreaInch}`
                     : 0;
-                const skirtingArea = tile.type === "Floor Tile" ? Number(tile.skirtingArea) : 0;
+                const skirtingArea = resolveSkirtingArea(tile, floor.areaName);
                 if (!typeTotals[tile.type]) {
                     typeTotals[tile.type] = 0;
                 }

@@ -172,13 +172,51 @@ const PurchaseOrder = ({ user, onLogout }) => {
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow;
     const originalHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyLeft = document.body.style.left;
+    const originalBodyRight = document.body.style.right;
+
+    const lockPageScroll = () => {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      window.scrollTo(0, 0);
+    };
+
+    lockPageScroll();
+
     return () => {
       document.body.style.overflow = originalBodyOverflow;
       document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.top = originalBodyTop;
+      document.body.style.left = originalBodyLeft;
+      document.body.style.right = originalBodyRight;
     };
   }, []);
+
+  const isSelectVendorModalOpen =
+    (showVendorModal && !isEditFromHistory) ||
+    showProjectModal ||
+    showInchargeModal ||
+    showRfqModal;
+
+  // SelectVendorModal unlocks body scroll on close; re-lock so sticky/toolbar layout cannot drift.
+  useEffect(() => {
+    if (!isSelectVendorModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      window.scrollTo(0, 0);
+    }
+  }, [isSelectVendorModalOpen]);
   const fetchRfqsForSelectedVendor = async () => {
     if (!selectedVendor?.id) return;
     const vendorId = String(selectedVendor.id);
@@ -2958,9 +2996,9 @@ const PurchaseOrder = ({ user, onLogout }) => {
         {activeTab === 'summary' && <Summary />}
         {/* Create PO Tab Content */}
         {activeTab === 'create' && (
-          <div className="flex flex-col h-full bg-white">
+          <div className="flex flex-col h-full min-h-0 overflow-hidden bg-white">
             {/* PO Number and Date Row - Only show date when not in empty state */}
-            <div className="sticky top-0 bg-white z-10 flex-shrink-0">
+            <div className="flex-shrink-0 bg-white">
               <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[8px]">
                 <div className="flex items-center gap-[8px]">
                   {poData.poNumber && (
@@ -2995,7 +3033,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       <button type="button" onClick={downloadPDF} className="text-[12px] font-semibold text-black leading-normal" >
                         Download
                       </button>
-
                     </>
                   ) : !isViewOnlyFromHistory && areFieldsFilled ? (
                     <button
@@ -3009,7 +3046,6 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       {(isGenerating || isGeneratePrecheckRunning) ? (isEditFromHistory ? 'Updating...' : 'Generating...') : (isEditFromHistory ? 'Update PO' : 'Generate PO')}
                     </button>
                   ) : null}
-
                   {!isViewOnlyFromHistory && (
                     <button
                       type="button"
@@ -3113,11 +3149,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                       {poData.projectName || 'Select Name'}
                     </div>
                     {poData.projectName ? (
-                      <button type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPoData({ ...poData, projectName: '' });
-                        }}
+                      <button type="button" onClick={(e) => {e.stopPropagation(); setPoData({ ...poData, projectName: '' });}}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
@@ -3139,19 +3171,12 @@ const PurchaseOrder = ({ user, onLogout }) => {
                   <div className="relative">
                     <div onClick={() => setShowInchargeModal(true)}
                       className="w-[360px] h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
-                      style={{
-                        boxSizing: 'border-box',
-                        color: poData.projectIncharge ? '#000' : '#9E9E9E'
-                      }}
+                      style={{ boxSizing: 'border-box', color: poData.projectIncharge ? '#000' : '#9E9E9E' }}
                     >
                       {poData.projectIncharge || 'Select Name'}
                     </div>
                     {poData.projectIncharge ? (
-                      <button type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPoData({ ...poData, projectIncharge: '' });
-                        }}
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setPoData({ ...poData, projectIncharge: '' }); }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
@@ -3229,7 +3254,7 @@ const PurchaseOrder = ({ user, onLogout }) => {
                     </div>
                     {/* Items List - Scrollable */}
                     {items.length > 0 && (
-                      <div className="flex-1 overflow-y-auto no-scrollbar pb-[40px]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      <div className="flex-1 overflow-y-auto no-scrollbar pb-[40px]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overscrollBehaviorY: 'contain' }}>
                         <div className="space-y-2">
                           {items.map((item) => {
                             // Use item.id as-is (can be string or number) for consistent swipe state lookup

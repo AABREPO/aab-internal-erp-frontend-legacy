@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import TestToolsTrackerEntry from './TestToolsTrackerEntry';
 import TestToolsTrackerAddInput from './TestToolsTrackerAddInput';
 import TestToolsTrackerPurchaseOrder from './TestToolsTrackerPurchaseOrder';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 
 const TestToolsTrackerHeading = ({ username, userRoles }) => {
 
@@ -29,34 +29,32 @@ const TestToolsTrackerHeading = ({ username, userRoles }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED] w-full h-screen">
-      {/* Top Navigation Tabs */}
-      <div className="topbar-title">
-        <h2
-          className={`link ${activeTab === 'testtoolstrackerentry' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="w-full h-screen">
+      <ModuleHeadingBar>
+        <ModuleHeadingTab
+          active={activeTab === 'testtoolstrackerentry'}
           onClick={() => setActiveTab('testtoolstrackerentry')}
         >
           Entry
-        </h2>
-        <h2
-          className={`link ${activeTab === 'testtoolstrackeraddinput' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'testtoolstrackeraddinput'}
           onClick={() => setActiveTab('testtoolstrackeraddinput')}
         >
           Add Input
-        </h2>
-        <h2
-          className={`link ${activeTab === 'testtoolstrackerpurchaseorder' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'testtoolstrackerpurchaseorder'}
           onClick={() => setActiveTab('testtoolstrackerpurchaseorder')}
         >
           Purchase Order
-        </h2>
-      </div>
+        </ModuleHeadingTab>
+      </ModuleHeadingBar>
 
-      {/* Dynamic Content Area */}
       <div className="content px-4">
         {renderContent()}
       </div>
-    </div>
+    </ModuleHeadingWrapper>
     )
 }
 

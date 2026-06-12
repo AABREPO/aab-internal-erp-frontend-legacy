@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import TileCalculation from './TileCalculator';
 import DTableview from './DTableView';
 import TileHistory from './TileHistory';
-import './DHeading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 
 const DHeading = () => {
     const [activeTab, setActiveTab] = useState(() => {
@@ -31,31 +31,31 @@ const DHeading = () => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'tileCalculate' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'tileCalculate'}
                     onClick={() => setActiveTab('tileCalculate')}
                 >
                     Tile Calculation
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'tileHistory' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'tileHistory'}
                     onClick={() => setActiveTab('tileHistory')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'tileTableView' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'tileTableView'}
                     onClick={() => setActiveTab('tileTableView')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

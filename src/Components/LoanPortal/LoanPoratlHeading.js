@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import LoanTableview from './LoanTableview';
 import LoanDatabase from './LoanDatabase';
 import LoanAddInput from './LoanAddInput';
@@ -92,47 +92,47 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
     }
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'loanportal' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'loanportal'}
                     onClick={() => handleTabChange('loanportal')}
                 >
                     Loan
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'loantableview' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'loantableview'}
                     onClick={() => handleTabChange('loantableview')}
                 >
                     Table View
-                </h2>
+                </ModuleHeadingTab>
                 {isAdminLoan && (
-                    <h2
-                        className={`link whitespace-nowrap ${activeTab === 'loandatabase' ? 'active' : ''}`}
+                    <ModuleHeadingTab
+                        active={activeTab === 'loandatabase'}
                         onClick={() => handleTabChange('loandatabase')}
                     >
                         Database
-                    </h2>
+                    </ModuleHeadingTab>
                 )}
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'loanaddinput' ? 'active' : ''}`}
+                <ModuleHeadingTab
+                    active={activeTab === 'loanaddinput'}
                     onClick={() => handleTabChange('loanaddinput')}
                 >
                     Add Input
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'loanreport' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'loanreport'}
                     onClick={() => handleTabChange('loanreport')}
                 >
                     Report
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'loansummary' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'loansummary'}
                     onClick={() => handleTabChange('loansummary')}
                 >
                     Summary
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('loanportal') && (
                     <div className={activeTab === 'loanportal' ? '' : 'hidden'}>
@@ -165,7 +165,7 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

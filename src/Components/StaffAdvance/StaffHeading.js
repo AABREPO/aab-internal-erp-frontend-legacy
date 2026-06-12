@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import StaffAdvance from './StaffAdvance';
 import StaffTableview from './StaffTableview';
 import StaffDatabase from './StaffDatabase';
@@ -105,51 +105,47 @@ const StaffHeading = ({ username, userRoles = [] }) => {
     }
 
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen overflow-auto">
-            <div className="w-full xl:px-0 px-5">
-                <div className="w-full overflow-x-auto no-scrollbar xl:px-0">
-                    <div className="topbar-title flex flex-nowrap xl:flex-wrap min-w-max xl:min-w-0">
-                        <h2
-                            className={`link ${activeTab === 'staffAdvance' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('staffAdvance')}
-                        >
-                            Advance
-                        </h2>
-                        <h2
-                            className={`link ${activeTab === 'staffTablview' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('staffTablview')}
-                        >
-                            Table View
-                        </h2>
-                        {isAdminStaff && (
-                            <h2
-                                className={`link ${activeTab === 'staffDatabase' ? 'active' : ''}`}
-                                onClick={() => handleTabChange('staffDatabase')}
-                            >
-                                Database
-                            </h2>
-                        )}
-                        <h2
-                            className={`link ${activeTab === 'staffInput' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('staffInput')}
-                        >
-                            Add Input
-                        </h2>
-                        <h2
-                            className={`link ${activeTab === 'staffReport' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('staffReport')}
-                        >
-                            Report
-                        </h2>
-                        <h2
-                            className={`link ${activeTab === 'staffSummary' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('staffSummary')}
-                        >
-                            Summary
-                        </h2>
-                    </div>
-                </div>
-            </div>
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'staffAdvance'}
+                    onClick={() => handleTabChange('staffAdvance')}
+                >
+                    Advance
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'staffTablview'}
+                    onClick={() => handleTabChange('staffTablview')}
+                >
+                    Table View
+                </ModuleHeadingTab>
+                {isAdminStaff && (
+                    <ModuleHeadingTab
+                        active={activeTab === 'staffDatabase'}
+                        onClick={() => handleTabChange('staffDatabase')}
+                    >
+                        Database
+                    </ModuleHeadingTab>
+                )}
+                <ModuleHeadingTab
+                    active={activeTab === 'staffInput'}
+                    onClick={() => handleTabChange('staffInput')}
+                >
+                    Add Input
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'staffReport'}
+                    onClick={() => handleTabChange('staffReport')}
+                >
+                    Report
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'staffSummary'}
+                    onClick={() => handleTabChange('staffSummary')}
+                >
+                    Summary
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('staffAdvance') && (
                     <div className={activeTab === 'staffAdvance' ? '' : 'hidden'}>
@@ -182,7 +178,7 @@ const StaffHeading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

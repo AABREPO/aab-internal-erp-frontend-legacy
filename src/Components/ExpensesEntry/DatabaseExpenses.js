@@ -11,10 +11,8 @@ import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
 import Select, { components as selectComponents } from 'react-select';
-import Filter from '../Images/TableFilter.svg'
-import Search from '../Images/Searchnew.svg'
+import UploadFile from '../Images/Upload file.svg'
 import CalendarIcon from "../Images/Calendoricon.png";
-import Reload from '../Images/Clear.svg'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -34,15 +32,25 @@ import {
     formatWeeklyBillDeleteMessage,
     formatAdvancePortalClearOnExpenseDeleteMessage,
 } from '../../utils/advancePortalWeeklyPaymentBill';
-import XL from '../Images/sheets.png'
-import Pdf from '../Images/pdf.png'
 import ExpenseEntryPaymentModal from './ExpenseEntryPaymentModal';
 import { Table, TableProvider } from './Table';
 import {
     DATABASE_TABLE_FILTER_SELECT_STYLES,
     isAdvancePortalSourceExpense,
+    EdbcPaymentModeFilterChip,
+    buildEdbcSelectFilterOptions,
+    hasEdbcPaymentModeFilter,
+    loadEdbcPaymentModeFilterFromStorage,
+    matchesEdbcAmountFilter,
+    matchesEdbcPaymentModeFilter,
+    matchesEdbcSelectFilter,
+    normalizeEdbcFilterText,
+    saveEdbcPaymentModeFilterToStorage,
+    EdbcFilterToggleButton,
+    EdbcTableToolbarRightActions,
 } from './databaseExpensesSharedColumns';
 import { useExpensesListLoader } from './expensesListStore';
+import { uploadExpensesEntryBillCopy } from './expensesBillCopyUpload';
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const BLANK_VALUE = 'BLANK';
@@ -51,14 +59,79 @@ const blankOption = { value: BLANK_VALUE, label: BLANK_LABEL };
 const EDIT_POPUP_SELECT_INDICATOR_COMPONENTS = {
     DropdownIndicator: (props) => {
         if (props.selectProps.value) return null;
-        return <selectComponents.DropdownIndicator {...props} />;
+        return (
+            <selectComponents.DropdownIndicator
+                {...props}
+                innerProps={{
+                    ...props.innerProps,
+                    style: { ...props.innerProps?.style, color: '#000000' },
+                }}
+            />
+        );
     },
     ClearIndicator: (props) => {
         if (!props.selectProps.value) return null;
-        return <selectComponents.ClearIndicator {...props} />;
+        return (
+            <selectComponents.ClearIndicator
+                {...props}
+                innerProps={{
+                    ...props.innerProps,
+                    style: { ...props.innerProps?.style, color: '#000000' },
+                }}
+            />
+        );
     },
 };
 const EDIT_POPUP_SELECT_CLASSNAME = 'font-semibold text-[14px]';
+const EDIT_POPUP_MACHINE_SELECT_STYLES = {
+    control: (base, state) => ({
+        ...base,
+        fontWeight: 600,
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+        borderWidth: '2px',
+        borderRadius: '0.5rem',
+        height: '40px',
+        minHeight: '40px',
+        alignItems: 'center',
+        textAlign: 'left',
+        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.4)' : 'none',
+        '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
+    }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    placeholder: (base) => ({ ...base, fontWeight: 'normal', color: '#6B7280', textAlign: 'left' }),
+    singleValue: (base) => ({ ...base, color: '#111827', fontWeight: 600 }),
+    option: (provided, state) => ({
+        ...provided,
+        textAlign: 'left',
+        fontWeight: 600,
+        fontSize: '15px',
+        backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+        color: 'black',
+    }),
+    menuPortal: (base) => ({ ...base, zIndex: 10001 }),
+    menu: (base) => ({ ...base, zIndex: 999 }),
+};
+const isAdvanceAdjustmentPaymentMode = (mode) =>
+    String(mode ?? '').trim().toLowerCase() === 'advance adjustment';
+
+const normalizeAccountTypeName = (name) => String(name ?? '').trim();
+
+const getPropertyProfessionTaxNo = (property) =>
+    String(property?.professionalTaxNo ?? property?.professionTaxNo ?? '').trim();
+
+const EDIT_POPUP_UTILITY_TYPE_OPTIONS = [
+    { value: 'Electricity', label: 'Electricity' },
+    { value: 'Property', label: 'Property' },
+    { value: 'Water', label: 'Water' },
+    { value: 'Profession', label: 'Profession' },
+    { value: 'Telecom', label: 'Telecom' },
+    { value: 'Subscription', label: 'Subscription' },
+];
+const getEditPopupHeading = (source, defaultTitle) => {
+    const s = String(source ?? '').trim();
+    return s ? `Edit ${s}` : defaultTitle;
+};
+
 const getUtilityTypeNumberLabel = (utilityTypeValue) => {
     switch (utilityTypeValue) {
         case 'Electricity':
@@ -262,6 +335,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [machineToolsOptions, setMachineToolsOptions] = useState([]);
     const [machineToolsCatalog, setMachineToolsCatalog] = useState([]);
+    const [toolsItemNameOptions, setToolsItemNameOptions] = useState([]);
+    const [editPopupSelectedToolsItemName, setEditPopupSelectedToolsItemName] = useState(null);
+    const [editPopupSelectedMachine, setEditPopupSelectedMachine] = useState(null);
     const [accountTypeOption, setAccountTypeOption] = useState([]);
     const [editAccountTypeOptions, setEditAccountTypeOptions] = useState([]);
     const [siteOption, setSiteOption] = useState([]);
@@ -290,7 +366,8 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [selectedCategory, setSelectedCategory] = useState(() => {
         return localStorage.getItem('expenseFilter_category') || '';
     });
-    const [selectedFile, setSelectedFile] = useState(null);
+    const [pendingBillCopyFile, setPendingBillCopyFile] = useState(null);
+    const billCopyFileInputRef = useRef(null);
     const [selectedEno, setSelectedEno] = useState(() => {
         return localStorage.getItem('expenseFilter_eno') || '';
     });
@@ -317,9 +394,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [selectedSource, setSelectedSource] = useState(() => {
         return localStorage.getItem('expenseFilter_source') || '';
     });
-    const [selectedPaymentMode, setSelectedPaymentMode] = useState(() => {
-        return localStorage.getItem('expenseFilter_paymentMode') || '';
-    });
+    const [selectedPaymentModes, setSelectedPaymentModes] = useState(() => loadEdbcPaymentModeFilterFromStorage());
     const [selectedBranch, setSelectedBranch] = useState(() => {
         return localStorage.getItem('expenseFilter_branch') || '';
     });
@@ -329,6 +404,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [staffOptions, setStaffOptions] = useState([]);
     const [selectedStaff, setSelectedStaff] = useState('');
     const [selectedQuantity, setSelectedQuantity] = useState('');
+    const [selectedAmount, setSelectedAmount] = useState('');
     const [selectedDescription, setSelectedDescription] = useState('');
     const [selectedBillArrival, setSelectedBillArrival] = useState('');
     const [showBillArrivalCalendar, setShowBillArrivalCalendar] = useState(false);
@@ -518,8 +594,8 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         localStorage.setItem('expenseFilter_source', selectedSource);
     }, [selectedSource]);
     useEffect(() => {
-        localStorage.setItem('expenseFilter_paymentMode', selectedPaymentMode);
-    }, [selectedPaymentMode]);
+        saveEdbcPaymentModeFilterToStorage(selectedPaymentModes);
+    }, [selectedPaymentModes]);
     useEffect(() => {
         localStorage.setItem('expenseFilter_branch', selectedBranch);
     }, [selectedBranch]);
@@ -562,6 +638,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         otherContractorName: '',
         machineTools: '',
         billCopy: '',
+        billCopyUrl: '',
         paymentMode: '',
         utilityType: '',
         utilityTypeNumber: '',
@@ -642,6 +719,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     break;
                 case 'Water':
                     optionValue = property.waterTaxNo || '';
+                    break;
+                case 'Profession':
+                    optionValue = getPropertyProfessionTaxNo(property);
                     break;
                 default:
                     return;
@@ -866,6 +946,92 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         };
         fetchToolsItemIds();
     }, []);
+    useEffect(() => {
+        const fetchToolsItemNames = async () => {
+            try {
+                const response = await fetch(`${TOOLS_API_BASE}/api/tools_item_name/getAll`, {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : [];
+                const formattedData = list
+                    .map((item) => ({
+                        value: String(item.id),
+                        label: item.item_name || "-",
+                        id: item.id,
+                    }))
+                    .sort((a, b) =>
+                        a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+                    );
+                setToolsItemNameOptions(formattedData);
+            } catch (error) {
+                console.error("Fetch error (tools_item_name): ", error);
+            }
+        };
+        fetchToolsItemNames();
+    }, []);
+    const editPopupCategoryOptions = useMemo(() => {
+        const all = Array.isArray(categoryOption) ? categoryOption : [];
+        if (formData.accountType === 'Sundry Payment') return all;
+        return all.filter(
+            (opt) => String(opt?.label ?? opt?.value ?? '').trim() !== 'Machine Repair'
+        );
+    }, [categoryOption, formData.accountType]);
+    const editPopupSelectablePaymentModeOptions = useMemo(() => {
+        const allModes = Array.isArray(finalPaymentModeOptions) ? finalPaymentModeOptions : [];
+        let modes = allModes.filter(
+            (mode) => !isAdvanceAdjustmentPaymentMode(mode?.modeOfPayment)
+        );
+        const hideCash =
+            formData.accountType === 'Claim Payment' || formData.accountType === 'Sundry Payment';
+        if (hideCash) {
+            modes = modes.filter((mode) => String(mode?.modeOfPayment ?? '').trim() !== 'Cash');
+        }
+        return modes;
+    }, [finalPaymentModeOptions, formData.accountType]);
+    const editPopupSiteOptions = useMemo(
+        () => [...siteOption].sort((a, b) => a.label.localeCompare(b.label)),
+        [siteOption]
+    );
+    useEffect(() => {
+        if (!modalIsOpen) return;
+        if (isAdvanceAdjustmentPaymentMode(formData.paymentMode)) {
+            setFormData((prev) => ({ ...prev, paymentMode: '' }));
+            return;
+        }
+        if (
+            (formData.accountType === 'Claim Payment' || formData.accountType === 'Sundry Payment') &&
+            formData.paymentMode === 'Cash'
+        ) {
+            setFormData((prev) => ({ ...prev, paymentMode: '' }));
+        }
+    }, [modalIsOpen, formData.accountType, formData.paymentMode]);
+    const editPopupFilteredMachineOptions = useMemo(() => {
+        if (editPopupSelectedToolsItemName?.id == null) {
+            return [];
+        }
+        const nameId = String(editPopupSelectedToolsItemName.id);
+        return machineToolsCatalog.filter(
+            (opt) => String(opt.item_name_id ?? "").trim() === nameId
+        );
+    }, [machineToolsCatalog, editPopupSelectedToolsItemName]);
+    useEffect(() => {
+        setEditPopupSelectedMachine((current) => {
+            if (current == null) return null;
+            if (editPopupSelectedToolsItemName?.id == null) return null;
+            if (String(current.item_name_id ?? '').trim() === String(editPopupSelectedToolsItemName.id)) {
+                return current;
+            }
+            return null;
+        });
+    }, [editPopupSelectedToolsItemName]);
     const machineToolsIdToLabel = useMemo(() => {
         const map = {};
         machineToolsCatalog.forEach((opt) => {
@@ -901,12 +1067,19 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     throw new Error("Network response was not ok: " + response.statusText);
                 }
                 const data = await response.json();
-                const formattedData = data.map(item => ({
-                    value: item.accountType,
-                    label: item.accountType,
-                    id: item.id,
-                }));
-                setAccountTypeOption(formattedData);
+                const formattedData = data
+                    .map((item) => {
+                        const typeName = normalizeAccountTypeName(
+                            item.accountType ?? item.account_type
+                        );
+                        return {
+                            value: typeName,
+                            label: typeName,
+                            id: item.id ?? item.Id ?? item.account_type_id ?? item.accountTypeId,
+                        };
+                    })
+                    .filter((item) => item.value);
+                setAccountTypeOption(formattedData.filter((item) => item.value !== 'Daily Wage'));
                 setEditAccountTypeOptions(formattedData);
             } catch (error) {
                 console.error("Fetch error: ", error);
@@ -1093,69 +1266,25 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 if (!searchable.includes(q)) return false;
             }
             return (
-                (selectedSiteName
-                    ? (selectedSiteName === BLANK_VALUE
-                        ? isBlankish(expense.siteName)
-                        : expense.siteName === selectedSiteName)
-                    : true) &&
-                (selectedVendor
-                    ? (selectedVendor === BLANK_VALUE
-                        ? isBlankish(expense.vendor)
-                        : expense.vendor === selectedVendor)
-                    : true) &&
-                (selectedContractor
-                    ? (selectedContractor === BLANK_VALUE
-                        ? isBlankish(expense.contractor)
-                        : expense.contractor === selectedContractor)
-                    : true) &&
-                (selectedCategory
-                    ? (selectedCategory === BLANK_VALUE
-                        ? isBlankish(expense.category)
-                        : expense.category === selectedCategory)
-                    : true) &&
-                (selectedMachineTools
-                    ? (selectedMachineTools === BLANK_VALUE
-                        ? isBlankish(expense.machineTools)
-                        : String(expense.machineTools ?? '') === String(selectedMachineTools))
-                    : true) &&
-                (selectedSource
-                    ? (selectedSource === BLANK_VALUE
-                        ? isBlankish(expense.source)
-                        : expense.source === selectedSource)
-                    : true) &&
-                (selectedPaymentMode
-                    ? (selectedPaymentMode === BLANK_VALUE
-                        ? isBlankish(expense.paymentMode)
-                        : expense.paymentMode === selectedPaymentMode)
-                    : true) &&
-                (selectedBranch
-                    ? (selectedBranch === BLANK_VALUE
-                        ? isBlankish(expense.branch_id ?? expense.branchId)
-                        : String(expense.branch_id ?? expense.branchId ?? '') === String(selectedBranch))
-                    : true) &&
-                (selectedEnteredBy
-                    ? (selectedEnteredBy === BLANK_VALUE
-                        ? isBlankish(expense.enteredBy)
-                        : (expense.enteredBy || ' ') === selectedEnteredBy)
-                    : true) &&
-                (selectedAccountType ?
-                    (selectedAccountType === BLANK_VALUE
-                        ? isBlankish(expense.accountType)
-                        : expense.accountType === selectedAccountType)
-                    : true) &&
-                (selectedEno
-                    ? (selectedEno === BLANK_VALUE
-                        ? isBlankish(expense.eno)
-                        : String(expense.eno) === String(selectedEno))
-                    : true) &&
-                (selectedStaff
-                    ? (selectedStaff === BLANK_VALUE
-                        ? isBlankish(getDisplayStaffName(expense))
-                        : getDisplayStaffName(expense) === selectedStaff)
-                    : true) &&
+                matchesEdbcSelectFilter(expense.siteName, selectedSiteName, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.vendor, selectedVendor, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.contractor, selectedContractor, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.category, selectedCategory, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.machineTools, selectedMachineTools, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.source, selectedSource, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcPaymentModeFilter(expense.paymentMode, selectedPaymentModes, {
+                    blankValue: BLANK_VALUE,
+                    isBlankish,
+                }) &&
+                matchesEdbcSelectFilter(expense.branch_id ?? expense.branchId, selectedBranch, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.enteredBy || ' ', selectedEnteredBy, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.accountType, selectedAccountType, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(expense.eno, selectedEno, { blankValue: BLANK_VALUE, isBlankish }) &&
+                matchesEdbcSelectFilter(getDisplayStaffName(expense), selectedStaff, { blankValue: BLANK_VALUE, isBlankish }) &&
                 (selectedQuantity.trim()
                     ? String(expense.quantity ?? '').toLowerCase().includes(selectedQuantity.toLowerCase().trim())
                     : true) &&
+                matchesEdbcAmountFilter(expense.amount, selectedAmount) &&
                 (selectedDescription.trim()
                     ? String(expense.comments ?? '').toLowerCase().includes(selectedDescription.toLowerCase().trim())
                     : true) &&
@@ -1167,26 +1296,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setFilteredExpenses(filtered);
         setCurrentPage(1); // Reset to first page when filters change
         // Dynamically update dropdown options from filtered data
-        const getOptions = (data, key, includeBlank = true) => {
-            const unique = [];
-            const seen = new Set();
-            let hasBlank = false;
-            data.forEach((item) => {
-                const value = item[key];
-                if (isBlankish(value)) {
-                    hasBlank = true;
-                    return;
-                }
-                const normalized = String(value);
-                if (!seen.has(normalized)) {
-                    seen.add(normalized);
-                    unique.push(value);
-                }
+        const getOptions = (data, key, includeBlank = true) =>
+            buildEdbcSelectFilterOptions(data, key, {
+                blankOption: includeBlank ? blankOption : null,
+                isBlankish,
             });
-            const options = unique.map(val => ({ value: val, label: val }));
-            if (includeBlank) options.unshift(blankOption);
-            return options;
-        };
         setSiteOptions(getOptions(filtered, "siteName"));
         setVendorOptions(getOptions(filtered, "vendor"));
         setContractorOptions(getOptions(filtered, "contractor"));
@@ -1202,8 +1316,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 hasBlankStaff = true;
                 return;
             }
-            if (!seenStaff.has(staff)) {
-                seenStaff.add(staff);
+            const staffKey = normalizeEdbcFilterText(staff);
+            if (!seenStaff.has(staffKey)) {
+                seenStaff.add(staffKey);
                 uniqueStaff.push(staff);
             }
         });
@@ -1241,7 +1356,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 hasBlankEnteredBy = true;
                 return;
             }
-            const key = String(enteredBy);
+            const key = normalizeEdbcFilterText(enteredBy);
             if (!seenEnteredBy.has(key)) {
                 seenEnteredBy.add(key);
                 uniqueEnteredBy.push(String(enteredBy));
@@ -1287,7 +1402,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 hasBlankEno = true;
                 return;
             }
-            const key = String(eno);
+            const key = normalizeEdbcFilterText(eno);
             if (!seenEno.has(key)) {
                 seenEno.add(key);
                 uniqueEno.push(eno);
@@ -1296,7 +1411,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         uniqueEno.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEno);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
     useEffect(() => {
         if (filterScrollResetSkipRef.current) {
             filterScrollResetSkipRef.current = false;
@@ -1311,9 +1426,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         });
     }, [
         selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools,
-        selectedSource, selectedPaymentMode, selectedBranch, selectedEnteredBy, selectedAccountType,
+        selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType,
         startDate, endDate, timestampStartDate, timestampEndDate, selectedEno,
-        selectedStaff, selectedBillArrival, selectedQuantity, selectedDescription,
+        selectedStaff, selectedBillArrival, selectedQuantity, selectedAmount, selectedDescription,
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
@@ -1336,8 +1451,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             [name]: type === "file" ? files[0] : value
         });
     };
-    const handleFileChange = (e) => {
-        setSelectedFile(e.target.files[0]);
+    const handleBillCopyFileSelected = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setPendingBillCopyFile(file);
     };
     const formatChipDateDMY = (dateString) => {
         if (!dateString) return '';
@@ -1358,61 +1475,36 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     };
     const handleSave = async (event) => {
         event.preventDefault();
-        let updatedBillCopy = formData.billCopy;
         setIsSubmitting(true);
-        if (selectedFile) {
+        let resolvedBillCopyUrl = String(formData.billCopyUrl || formData.billCopy || '').trim();
+        if (pendingBillCopyFile) {
             try {
-                const uploadFormData = new FormData();
-
-                const now = new Date();
-                const timestamp = now.toLocaleString("en-GB", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: true
-                })
-                    .replace(",", "")
-                    .replace(/\s/g, "-");
-
-                const finalName = `${timestamp}-${formData.siteName}-${formData.vendor || formData.contractor}`;
-
-                // ✅ CHANGE 1: key must be "files"
-                uploadFormData.append("files", selectedFile);
-
-                // ✅ CHANGE 2: required folder
-                uploadFormData.append("folder", "FileUpload / Expenses_Entry_Files");
-
-                // ✅ CHANGE 3: optional filename
-                uploadFormData.append("fileName", finalName);
-
-                const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
-                    method: "POST",
-                    body: uploadFormData,
+                resolvedBillCopyUrl = await uploadExpensesEntryBillCopy(pendingBillCopyFile, {
+                    siteName: formData.siteName,
+                    vendor: formData.vendor,
+                    contractor: formData.contractor,
                 });
-
-                if (!uploadResponse.ok) {
-                    throw new Error("File upload failed");
+                setPendingBillCopyFile(null);
+                if (billCopyFileInputRef.current) {
+                    billCopyFileInputRef.current.value = '';
                 }
-
-                const result = await uploadResponse.json();
-
-                // ✅ CHANGE 4: new response structure
-                updatedBillCopy = result.urls[0];
-
+                setFormData((prev) => ({ ...prev, billCopyUrl: resolvedBillCopyUrl, billCopy: resolvedBillCopyUrl }));
             } catch (error) {
-                console.error("Error during file upload:", error);
-                alert("Error during file upload. Please try again.");
+                console.error('Error during file upload:', error);
+                alert('Error during file upload. Please try again.');
                 setIsSubmitting(false);
                 return;
             }
         }
         const updatedFormData = {
             ...formData,
-            billCopy: updatedBillCopy,
+            billCopy: resolvedBillCopyUrl,
+            billCopyUrl: resolvedBillCopyUrl,
             editedBy: username,
+            machineTools:
+                formData.accountType === 'Sundry Payment' && formData.category === 'Machine Repair'
+                    ? (editPopupSelectedMachine?.id != null ? editPopupSelectedMachine.id : null)
+                    : formData.machineTools,
         };
         // Always ask payment details for online payment modes so user can confirm/change account number.
         if (
@@ -1443,6 +1535,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             await performUpdateAndWeeklyBills(updatedFormData);
             await refetchExpenses();
             setModalIsOpen(false);
+            setPendingBillCopyFile(null);
+            if (billCopyFileInputRef.current) {
+                billCopyFileInputRef.current.value = '';
+            }
             setIsSubmitting(false);
             alert('Updated successfully!');
         } catch (error) {
@@ -1564,6 +1660,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             await refetchExpenses();
             setShowPaymentModal(false);
             setModalIsOpen(false);
+            setPendingBillCopyFile(null);
+            if (billCopyFileInputRef.current) {
+                billCopyFileInputRef.current.value = '';
+            }
             setIsSubmitting(false);
             alert('Updated successfully!');
         } catch (error) {
@@ -1890,6 +1990,25 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             return String(raw);
         }
     };
+    const applyEditPopupMachineSelection = (machineToolsId, catalog = machineToolsCatalog, nameOptions = toolsItemNameOptions) => {
+        if (machineToolsId == null || machineToolsId === '') {
+            setEditPopupSelectedMachine(null);
+            setEditPopupSelectedToolsItemName(null);
+            return;
+        }
+        const machineOpt = catalog.find(
+            (o) => o.id == machineToolsId || String(o.id) === String(machineToolsId)
+        ) || null;
+        setEditPopupSelectedMachine(machineOpt);
+        if (!machineOpt) {
+            setEditPopupSelectedToolsItemName(null);
+            return;
+        }
+        const nameOpt = nameOptions.find(
+            (o) => String(o.id) === String(machineOpt.item_name_id ?? '')
+        ) || null;
+        setEditPopupSelectedToolsItemName(nameOpt);
+    };
     const handleEditClick = (expense) => {
         if (isAdvancePortalSourceExpense(expense)) {
             return;
@@ -1907,8 +2026,15 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
             projectId: expense.projectId || '',
             vendorId: expense.vendorId || '',
             contractorId: expense.contractorId || '',
-            billArrivalDate: expenseBillArrivalToInput(expense)
+            billArrivalDate: expenseBillArrivalToInput(expense),
+            billCopyUrl: expense.billCopyUrl || expense.billCopy || '',
+            billCopy: expense.billCopy || expense.billCopyUrl || '',
         });
+        applyEditPopupMachineSelection(expense.machineTools);
+        setPendingBillCopyFile(null);
+        if (billCopyFileInputRef.current) {
+            billCopyFileInputRef.current.value = '';
+        }
         setModalIsOpen(true);
     };
     const deleteRelatedWeeklyPaymentBills = async (expensesEntryId) => {
@@ -1981,7 +2107,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     };
     const handleCancel = () => {
         setModalIsOpen(false);
-        setSelectedFile(null);
+        setEditPopupSelectedMachine(null);
+        setEditPopupSelectedToolsItemName(null);
+        setPendingBillCopyFile(null);
+        if (billCopyFileInputRef.current) {
+            billCopyFileInputRef.current.value = '';
+        }
     };
     const fetchAuditDetails = async (expenseId) => {
         try {
@@ -2001,7 +2132,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setSelectedMachineTools('');
         setSelectedAccountType('');
         setSelectedSource('');
-        setSelectedPaymentMode('');
+        setSelectedPaymentModes([]);
         setSelectedBranch('');
         setSelectedEnteredBy('');
         setStartDate('');
@@ -2011,6 +2142,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setSelectedEno('');
         setSelectedStaff('');
         setSelectedQuantity('');
+        setSelectedAmount('');
         setSelectedDescription('');
         setSelectedBillArrival('');
         setOverallSearch('');
@@ -2160,13 +2292,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     ) : null}
                     <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div
-                            className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
+                            className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
                                 ? 'flex-col sm:flex-row sm:justify-between'
                                 : 'flex-row justify-between items-center'
                                 } mb-[12px] gap-[6px]`}>
                             <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-                                <button
-                                    className=''
+                                <EdbcFilterToggleButton
                                     onClick={() => {
                                         const willOpen = !showFilters;
                                         const scroller = scrollRef.current;
@@ -2196,14 +2327,8 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             });
                                         });
                                     }}
-                                >
-                                    <img
-                                        src={Filter}
-                                        alt="Toggle Filter"
-                                        className=" border rounded-md"
-                                    />
-                                </button>
-                                {(selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || selectedPaymentMode || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
+                                />
+                                {(selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
                                     <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                                         {timestampStartDate && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
@@ -2273,6 +2398,13 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 <button onClick={() => setSelectedQuantity('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
+                                        {selectedAmount.trim() && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Amount: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedAmount}</span>
+                                                <button onClick={() => setSelectedAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
                                         {selectedDescription.trim() && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                                                 <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Description: </span>
@@ -2294,13 +2426,15 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
-                                        {selectedPaymentMode && (
-                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
-                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Mode: </span>
-                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedPaymentMode === BLANK_VALUE ? BLANK_LABEL : selectedPaymentMode}</span>
-                                                <button onClick={() => setSelectedPaymentMode('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
+                                        <EdbcPaymentModeFilterChip
+                                            fieldLabel="Mode"
+                                            selectedModes={selectedPaymentModes}
+                                            blankValue={BLANK_VALUE}
+                                            blankLabel={BLANK_LABEL}
+                                            onClear={() => setSelectedPaymentModes([])}
+                                            className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden"
+                                            labelClassName="font-medium text-[#BF9853] shrink-0 whitespace-nowrap"
+                                        />
                                         {selectedMachineTools && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                                                 <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Tools: </span>
@@ -2346,28 +2480,14 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                     </div>
                                 )}
                             </div>
-                            <div className='flex items-end gap-[6px]'>
-                                <button onClick={clearFilters} className='flex h-[30px] w-[30px] shrink-0 items-center justify-center'>
-                                    <img className='w-full h-full' src={Reload} alt="Reload" />
-                                </button>
-                                <div className="w-[286px] min-w-[286px]  translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-                                    <input
-                                        type="text"
-                                        value={overallSearch}
-                                        onChange={(e) => setOverallSearch(e.target.value)}
-                                        placeholder="Search Transactions..."
-                                        className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-                                    />
-                                    <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-                                </div>
-
-                                <div className=' text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar'>
-                                    <div className='flex items-end text-center '>
-                                        <span className='text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={generateFilteredPDF}>PDF<img src={Pdf} alt="Pdf" className='w-4 h-4' /></span>
-                                        <span className='text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer' onClick={exportToCSV}>XL<img src={XL} alt="XL" className='w-4 h-4' /></span>
-                                    </div>
-                                </div>
-                            </div>
+                            <EdbcTableToolbarRightActions
+                                onClearFilters={clearFilters}
+                                overallSearch={overallSearch}
+                                onOverallSearchChange={setOverallSearch}
+                                showExportIcons
+                                onExportPdf={generateFilteredPDF}
+                                onExportCsv={exportToCSV}
+                            />
                         </div>
                         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                             <div
@@ -2393,9 +2513,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                     setSelectedDate: () => {},
                                     siteOptions, selectedSiteName, setSelectedSiteName, vendorOptions, selectedVendor, setSelectedVendor,
                                     contractorOptions, selectedContractor, setSelectedContractor, staffOptions, selectedStaff, setSelectedStaff,
-                                    selectedQuantity, setSelectedQuantity, selectedDescription, setSelectedDescription,
+                                    selectedQuantity, setSelectedQuantity, selectedAmount, setSelectedAmount, selectedDescription, setSelectedDescription,
                                     categoryOptions, selectedCategory, setSelectedCategory, accountTypeOptions, selectedAccountType, setSelectedAccountType,
-                                    machineToolsOptions, selectedMachineTools, setSelectedMachineTools, paymentModeFilterOptions, selectedPaymentMode, setSelectedPaymentMode,
+                                    machineToolsOptions, selectedMachineTools, setSelectedMachineTools, paymentModeFilterOptions, selectedPaymentModes, setSelectedPaymentModes,
                                     sourceOptions, selectedSource, setSelectedSource,
                                     branchFilterOptions, selectedBranch, setSelectedBranch, enteredByOptions, selectedEnteredBy, setSelectedEnteredBy,
                                     enoOptions, selectedEno, setSelectedEno, selectedBillArrival, setSelectedBillArrival,
@@ -2476,11 +2596,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 </div>
                             </div>
                             <Modal isOpen={modalIsOpen} onRequestClose={handleCancel}
-                                contentLabel="Edit Expense" className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
+                                contentLabel={getEditPopupHeading(formData.source, 'Edit Expense Entry')} className="fixed inset-0 flex items-center justify-center p-4 bg-gray-800 bg-opacity-50 z-[9999]"
                                 overlayClassName="fixed inset-0 z-[9999]">
                                 <div className="bg-white text-left p-6 rounded-lg shadow-lg w-full max-w-2xl">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-xl font-normal">Edit Expense</h2>
+                                    <div className="flex justify-between items-center mb-[12px]">
+                                        <h2 className="text-xl font-bold">{getEditPopupHeading(formData.source, 'Edit Expense Entry')}</h2>
                                         <span className="text-[16px] font-semibold text-[#E4572E]">{formData.eno}</span>
                                     </div>
                                     <form className="flex flex-col gap-[12px]">
@@ -2493,6 +2613,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 value={editAccountTypeOptions.find(option => option.value === formData.accountType) || null}
                                                 onChange={(selectedOption) => {
                                                     const nextAccountType = selectedOption?.value || '';
+                                                    if (nextAccountType !== 'Sundry Payment') {
+                                                        setEditPopupSelectedToolsItemName(null);
+                                                        setEditPopupSelectedMachine(null);
+                                                    }
                                                     setFormData((prev) => {
                                                         const parsed = parseFloat(String(prev.amount ?? '').replace(/,/g, ''));
                                                         const hasAmount = prev.amount !== '' && prev.amount != null && !Number.isNaN(parsed);
@@ -2587,20 +2711,8 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                     <div className="w-[616px]">
                                                     <Select
                                                         name="utilityType"
-                                                        options={[
-                                                            { value: 'Electricity', label: 'Electricity' },
-                                                            { value: 'Property', label: 'Property' },
-                                                            { value: 'Water', label: 'Water' },
-                                                            { value: 'Telecom', label: 'Telecom' },
-                                                            { value: 'Subscription', label: 'Subscription' },
-                                                        ]}
-                                                        value={[
-                                                            { value: 'Electricity', label: 'Electricity' },
-                                                            { value: 'Property', label: 'Property' },
-                                                            { value: 'Water', label: 'Water' },
-                                                            { value: 'Telecom', label: 'Telecom' },
-                                                            { value: 'Subscription', label: 'Subscription' },
-                                                        ].find((o) => o.value === formData.utilityType) || null}
+                                                        options={EDIT_POPUP_UTILITY_TYPE_OPTIONS}
+                                                        value={EDIT_POPUP_UTILITY_TYPE_OPTIONS.find((o) => o.value === formData.utilityType) || null}
                                                         onChange={(selectedOption) => {
                                                             setSelectedEbNumber(null);
                                                             setEbNumberOptions([]);
@@ -2706,7 +2818,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             <div className="w-[300px]">
                                             <Select
                                                 name="siteName"
-                                                value={siteOption.find(option => option.value === formData.siteName)}
+                                                value={editPopupSiteOptions.find(option => option.value === formData.siteName)}
                                                 onChange={(selectedOption) =>
                                                     setFormData({
                                                         ...formData,
@@ -2714,7 +2826,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         projectId: selectedOption?.id || ''
                                                     })
                                                 }
-                                                options={siteOption}
+                                                options={editPopupSiteOptions}
                                                 placeholder="Select Site"
                                                 isClearable
                                                 components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
@@ -2789,7 +2901,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             <div className="flex justify-between mb-[8px]">
                                                 <label className="block text-black font-semibold text-left">Associate Name<span className="text-[#E4572E]">*</span></label>
                                                 {editPopupVendorContractorType && (
-                                                    <span className="text-[14px] text-[#E4572E] font-normal">{editPopupVendorContractorType}</span>
+                                                    <span className="text-[14px] text-[#E4572E] font-semibold">{editPopupVendorContractorType}</span>
                                                 )}
                                             </div>
                                             <div className="w-[300px]">
@@ -2825,6 +2937,8 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         alignItems: 'center',
                                                         paddingTop: 0,
                                                         paddingBottom: 0,
+                                                        flexWrap: 'nowrap',
+                                                        overflow: 'hidden',
                                                     }),
                                                     indicatorsContainer: (base) => ({
                                                         ...base,
@@ -2838,6 +2952,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         fontWeight: 'normal',
                                                         color: '#6B7280',
                                                         textAlign: 'left',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
                                                     }),
                                                     option: (provided, state) => ({
                                                         ...provided,
@@ -2863,7 +2980,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                         '&::-webkit-scrollbar': { display: 'none' },
                                                     }),
                                                 }}
-                                                placeholder="Vendor/Contractor Name"
+                                                placeholder="Vendor/Contractor/Employee/Labour"
                                             />
                                             </div>
                                         </div>
@@ -2891,8 +3008,19 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             <label className="block text-black font-semibold mb-[8px] text-left">Category<span className="text-[#E4572E]">*</span></label>
                                             <div className="w-[300px]">
                                             <Select name="category" value={categoryOption.find(option => option.value === formData.category)}
-                                                onChange={(selectedOption) => setFormData({ ...formData, category: selectedOption?.value || '' })}
-                                                options={categoryOption}
+                                                onChange={(selectedOption) => {
+                                                    const newCategory = selectedOption?.value || '';
+                                                    if (newCategory !== 'Machine Repair') {
+                                                        setEditPopupSelectedToolsItemName(null);
+                                                        setEditPopupSelectedMachine(null);
+                                                    }
+                                                    setFormData({
+                                                        ...formData,
+                                                        category: newCategory,
+                                                        machineTools: newCategory === 'Machine Repair' ? formData.machineTools : null,
+                                                    });
+                                                }}
+                                                options={editPopupCategoryOptions}
                                                 placeholder="Select Category"
                                                 isClearable
                                                 components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
@@ -2963,7 +3091,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             />
                                             </div>
                                         </div>
-                                        {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund') && (
+                                        {(formData.accountType === 'Bill Payments' || formData.accountType === 'Bill Refund' || formData.accountType === 'Bill Payments + Claim') && (
                                             <div className="text-left w-[300px]">
                                                 <label className="block text-black font-semibold mb-[8px] text-left">Bill Arrival Date</label>
                                                 <div className="w-[300px]">
@@ -2984,12 +3112,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 <div className="w-[300px]">
                                                 <Select
                                                     name="paymentMode"
-                                                    options={finalPaymentModeOptions.map((mode) => ({
+                                                    options={editPopupSelectablePaymentModeOptions.map((mode) => ({
                                                         value: mode.modeOfPayment,
                                                         label: mode.modeOfPayment,
                                                     }))}
                                                     value={
-                                                        finalPaymentModeOptions
+                                                        editPopupSelectablePaymentModeOptions
                                                             .map((mode) => ({
                                                                 value: mode.modeOfPayment,
                                                                 label: mode.modeOfPayment,
@@ -3080,6 +3208,54 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             </div>
                                         )}
                                         </div>
+                                        {formData.accountType === 'Sundry Payment' && formData.category === 'Machine Repair' && (
+                                            <div className="flex gap-[16px]">
+                                                <div className="text-left w-[300px]">
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">Machine Name<span className="text-[#E4572E]">*</span></label>
+                                                    <div className="w-[300px]">
+                                                        <Select
+                                                            options={toolsItemNameOptions}
+                                                            value={editPopupSelectedToolsItemName}
+                                                            onChange={setEditPopupSelectedToolsItemName}
+                                                            placeholder="Machine Name"
+                                                            isClearable
+                                                            isSearchable
+                                                            components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                            className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                            styles={EDIT_POPUP_MACHINE_SELECT_STYLES}
+                                                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                            menuPlacement="bottom"
+                                                            menuPosition="fixed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="text-left w-[300px]">
+                                                    <label className="block text-black font-semibold mb-[8px] text-left">Machine ID<span className="text-[#E4572E]">*</span></label>
+                                                    <div className="w-[300px]">
+                                                        <Select
+                                                            options={editPopupFilteredMachineOptions}
+                                                            value={editPopupSelectedMachine}
+                                                            onChange={setEditPopupSelectedMachine}
+                                                            placeholder={
+                                                                !editPopupSelectedToolsItemName
+                                                                    ? 'Machine ID'
+                                                                    : editPopupFilteredMachineOptions.length === 0
+                                                                        ? 'No IDs for this machine'
+                                                                        : 'Machine ID'
+                                                            }
+                                                            isClearable
+                                                            isSearchable
+                                                            components={EDIT_POPUP_SELECT_INDICATOR_COMPONENTS}
+                                                            className={EDIT_POPUP_SELECT_CLASSNAME}
+                                                            styles={EDIT_POPUP_MACHINE_SELECT_STYLES}
+                                                            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                                            menuPlacement="bottom"
+                                                            menuPosition="fixed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                         {formData.accountType === 'Utility Bills' && (
                                             <>
                                                 <div className="flex gap-[16px]">
@@ -3286,21 +3462,49 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                             </>
                                         )}
                                         <div className="text-left">
+                                            <label className="block text-black font-semibold mb-[8px] text-left">Bill Copy URL</label>
+                                            <div className="flex w-[616px] items-center gap-[8px]">
+                                                <input
+                                                    type="text"
+                                                    name="billCopyUrl"
+                                                    value={formData.billCopyUrl ?? formData.billCopy ?? ''}
+                                                    onChange={handleChange}
+                                                    placeholder="Bill copy URL"
+                                                    className="min-w-0 flex-1 h-[40px] text-[14px] py-0 px-2 box-border border-2 border-[#BF9853] rounded-lg border-opacity-[0.20] focus:outline-none focus:ring-0 focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)] hover:border-opacity-[0.40] font-semibold placeholder:font-normal"
+                                                />
+                                                <input
+                                                    ref={billCopyFileInputRef}
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,image/*,application/pdf"
+                                                    onChange={handleBillCopyFileSelected}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => billCopyFileInputRef.current?.click()}
+                                                    disabled={isSubmitting}
+                                                    className="shrink-0 h-[40px] text-[#BF9853]"
+                                                >
+                                                    <img src={UploadFile} alt="Upload" className="w-[40px] h-[40px]" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="text-left">
                                             <label className="block text-black font-semibold mb-[8px] text-left">Description</label>
                                             <textarea
                                                 name="comments"
                                                 value={formData.comments}
                                                 onChange={handleChange}
                                                 placeholder="Description"
-                                                className="border-2 border-[#BF9853] rounded-md px-[8px] w-[616px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none font-semibold placeholder:font-normal placeholder:text-gray-500"
+                                                className="border-2 border-[#BF9853] text-[14px] rounded-md px-[8px] w-[616px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none font-semibold placeholder:font-normal placeholder:text-gray-500"
                                             />
                                         </div>
-                                        <div className="flex justify-end space-x-4 mt-4 ">
-                                            <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded mt-3">
+                                        <div className="flex justify-end space-x-4 ">
+                                            <button type="button" onClick={handleCancel} className="px-4 py-2 border-2 border-opacity-[] border-[#BF9853] text-[#BF9853] rounded ">
                                                 Cancel
                                             </button>
                                             <button type="submit" disabled={isSubmitting} onClick={handleSave}
-                                                className={`px-4 py-2 bg-[#BF9853] text-white rounded mt-3 transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                className={`px-4 py-2 bg-[#BF9853] text-white rounded transition duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
                                                 {isSubmitting ? 'Submitting...' : 'Submit'}
                                             </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import PendingBill from './PendingBill';
 import BillDatabase from './BillDatabase';
 import BillStatement from './BillStatement';
@@ -54,20 +54,20 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2 className={`link whitespace-nowrap ${activeTab === 'pendingbill' ? 'active' : ''}`} onClick={() => handleTabChange('pendingbill')}>
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab active={activeTab === 'pendingbill'} onClick={() => handleTabChange('pendingbill')}>
                     Pending Bill
-                </h2>
+                </ModuleHeadingTab>
                 {canAccessDatabase && (
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'billdatabase' ? 'active' : ''}`} onClick={() => handleTabChange('billdatabase')} >
+                    <ModuleHeadingTab active={activeTab === 'billdatabase'} onClick={() => handleTabChange('billdatabase')}>
                         Database
-                    </h2>
+                    </ModuleHeadingTab>
                 )}
-                <h2 className={`link whitespace-nowrap ${activeTab === 'billstatement' ? 'active' : ''}`} onClick={() => handleTabChange('billstatement')} >
+                <ModuleHeadingTab active={activeTab === 'billstatement'} onClick={() => handleTabChange('billstatement')}>
                     Statement
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('pendingbill') && (
                     <div className={activeTab === 'pendingbill' ? '' : 'hidden'}>
@@ -100,7 +100,7 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

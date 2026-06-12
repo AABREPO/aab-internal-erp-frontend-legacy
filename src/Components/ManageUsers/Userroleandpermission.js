@@ -1,7 +1,12 @@
 import { all } from "axios";
 import { id } from "date-fns/locale";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Select from 'react-select';
+import {
+  EDBC_TABLE_BODY_ROW_CLASS,
+  EDBC_TABLE_EDGE_TABLE_CLASS,
+  EDBC_TABLE_HEADER_ROW_CLASS,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 const Userroleandpermission = () => {
   const [showRoleCreationModal, setShowRoleCreationModal] = useState(false);
   const [allRoles, setAllRoles] = useState([]);
@@ -428,120 +433,226 @@ const Userroleandpermission = () => {
   useEffect(() => {
     fetchRoleNames();
   }, []);
+  const scrollRef = useRef(null);
+  const isDragging = useRef(false);
+  const start = useRef({ x: 0, y: 0 });
+  const scroll = useRef({ left: 0, top: 0 });
+  const velocity = useRef({ x: 0, y: 0 });
+  const animationFrame = useRef(null);
+  const lastMove = useRef({ time: 0, x: 0, y: 0 });
+  const cancelMomentum = () => {
+    if (animationFrame.current) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+  };
+  const applyMomentum = () => {
+    const friction = 0.95;
+    const minVelocity = 0.1;
+    const step = () => {
+      const { x, y } = velocity.current;
+      if (!scrollRef.current) return;
+      if (Math.abs(x) > minVelocity || Math.abs(y) > minVelocity) {
+        scrollRef.current.scrollLeft -= x * 20;
+        scrollRef.current.scrollTop -= y * 20;
+        velocity.current.x *= friction;
+        velocity.current.y *= friction;
+        animationFrame.current = requestAnimationFrame(step);
+      } else {
+        cancelMomentum();
+      }
+    };
+    animationFrame.current = requestAnimationFrame(step);
+  };
+  const handleTableMouseDown = (e) => {
+    if (e.target.closest('input, button, a, select, textarea, label, [role="button"], .react-select')) return;
+    if (!scrollRef.current) return;
+    isDragging.current = true;
+    start.current = { x: e.clientX, y: e.clientY };
+    scroll.current = {
+      left: scrollRef.current.scrollLeft,
+      top: scrollRef.current.scrollTop,
+    };
+    lastMove.current = {
+      time: Date.now(),
+      x: e.clientX,
+      y: e.clientY,
+    };
+    scrollRef.current.style.cursor = 'grabbing';
+    scrollRef.current.style.userSelect = 'none';
+    cancelMomentum();
+  };
+  const handleTableMouseMove = (e) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    const dx = e.clientX - start.current.x;
+    const dy = e.clientY - start.current.y;
+    const now = Date.now();
+    const dt = now - lastMove.current.time || 16;
+    velocity.current = {
+      x: (e.clientX - lastMove.current.x) / dt,
+      y: (e.clientY - lastMove.current.y) / dt,
+    };
+    scrollRef.current.scrollLeft = scroll.current.left - dx;
+    scrollRef.current.scrollTop = scroll.current.top - dy;
+    lastMove.current = {
+      time: now,
+      x: e.clientX,
+      y: e.clientY,
+    };
+  };
+  const handleTableMouseUp = () => {
+    if (!isDragging.current || !scrollRef.current) return;
+    isDragging.current = false;
+    scrollRef.current.style.cursor = '';
+    scrollRef.current.style.userSelect = '';
+    applyMomentum();
+  };
+  useEffect(() => () => cancelMomentum(), []);
   return (
-    <div className="p-4 sm:p-6 w-full max-w-[1750px] bg-white ml-0 md:ml-8 box-border">
-      <div className="p-4 sm:p-6 min-h-screen">
-        <div className="flex flex-wrap gap-4 mb-4 overflow-hidden">
-          <div className="flex flex-wrap gap-4 text-left flex-1">
-            <div className="w-full sm:w-auto min-w-[200px]">
-              <label className="block mb-3 font-semibold">Branch Name</label>
-              <select className="w-full sm:w-[252px] h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg focus:outline-none">
-                <option>Select Branch</option>
-                <option>Option 1</option>
-              </select>
-            </div>
-            <div className="w-full sm:w-auto min-w-[200px]">
-              <label className="block mb-3 font-semibold">Role</label>
-              <select
-                className="w-full sm:w-[257px] h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg focus:outline-none"
-                value={selectedRole}
-                onChange={(e) => handleRoleChange(e.target.value)}
-              >
-                <option value="">Select Role</option>
-                {allRoles.map((role) => (
-                  <option key={role.roleName} value={role.roleName}>
-                    {role.roleName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="w-full sm:w-auto min-w-[140px]">
-              <label className="block mb-3 font-semibold">Level</label>
-              <select className="w-full sm:w-[147px] h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg focus:outline-none">
-                <option>Select Level</option>
-                <option>Option 1</option>
-              </select>
+    <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
+      <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+        <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-wrap gap-4 mb-[12px] text-left shrink-0">
+            <div className="flex flex-wrap gap-4 flex-1 min-w-0">
+              <div className="w-full sm:w-auto min-w-[200px]">
+                <label className="block mb-[8px] font-semibold text-[16px]">Branch Name</label>
+                <select className="w-full sm:w-[252px] h-[40px] border-2 border-[#BF9853] border-opacity-20 rounded-lg focus:outline-none text-[14px] font-semibold px-2">
+                  <option>Select Branch</option>
+                  <option>Option 1</option>
+                </select>
+              </div>
+              <div className="w-full sm:w-auto min-w-[200px]">
+                <label className="block mb-[8px] font-semibold text-[16px]">Role</label>
+                <select
+                  className="w-full sm:w-[257px] h-[40px] border-2 border-[#BF9853] border-opacity-20 rounded-lg focus:outline-none text-[14px] font-semibold px-2"
+                  value={selectedRole}
+                  onChange={(e) => handleRoleChange(e.target.value)}
+                >
+                  <option value="">Select Role</option>
+                  {allRoles.map((role) => (
+                    <option key={role.roleName} value={role.roleName}>
+                      {role.roleName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-full sm:w-auto min-w-[140px]">
+                <label className="block mb-[8px] font-semibold text-[16px]">Level</label>
+                <select className="w-full sm:w-[147px] h-[40px] border-2 border-[#BF9853] border-opacity-20 rounded-lg focus:outline-none text-[14px] font-semibold px-2">
+                  <option>Select Level</option>
+                  <option>Option 1</option>
+                </select>
+              </div>
+              <div className="w-full sm:w-auto">
+                <button
+                  type="button"
+                  className="w-full sm:w-36 mt-0 sm:mt-[2rem] h-[40px] border bg-[#BF9853] text-white font-semibold rounded-lg text-[14px]"
+                  onClick={() => setIsModuleSelectedOpen(true)}
+                >
+                  + Add Modules
+                </button>
+              </div>
             </div>
             <div className="w-full sm:w-auto">
               <button
-                className="w-full sm:w-36 mt-0 sm:mt-[2.38rem] p-2 border bg-[#BF9853] text-white font-semibold rounded"
-                onClick={() => setIsModuleSelectedOpen(true)}>
-                + Add Modules
+                type="button"
+                className="w-full sm:w-[132px] h-[40px] bg-[#BF9853] text-white font-semibold rounded-lg text-[14px] sm:ml-auto"
+                onClick={() => setShowRoleCreationModal(true)}
+              >
+                + New Role
               </button>
             </div>
           </div>
-          <div className="w-full sm:w-auto">
-            <button
-              className="w-full sm:w-[132px] h-[38px] bg-[#BF9853] text-white font-semibold rounded sm:ml-auto"
-              onClick={() => setShowRoleCreationModal(true)}
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div
+              ref={scrollRef}
+              className="w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar"
+              onMouseDown={handleTableMouseDown}
+              onMouseMove={handleTableMouseMove}
+              onMouseUp={handleTableMouseUp}
+              onMouseLeave={handleTableMouseUp}
             >
-              + New Role
-            </button>
+              <table className={`table-fixed w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} min-w-[1420px]`}>
+                <colgroup>
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 300 }} />
+                  <col style={{ width: 140 }} />
+                  <col style={{ width: 900 }} />
+                </colgroup>
+                <thead className="sticky top-0 z-10 bg-white">
+                  <tr className={EDBC_TABLE_HEADER_ROW_CLASS}>
+                    <th className="w-[80px] text-left font-bold text-[16px]">S.No</th>
+                    <th className="w-[300px] text-left font-bold text-[16px]">Module</th>
+                    <th className="w-[140px] text-left font-bold text-[16px]">Levels</th>
+                    <th className="w-[900px] text-left font-bold text-[16px]">Permissions</th>
+                  </tr>
+                </thead>
+                {selectedRole ? (
+                  <tbody>
+                    {activeModules.map((module, index) => (
+                      <tr key={module.name} className={`${EDBC_TABLE_BODY_ROW_CLASS} !h-auto min-h-[40px] align-top`}>
+                        <td className="w-[80px] text-[#2E2E2E] text-left align-top py-3">{index + 1}</td>
+                        <td className="w-[300px] text-left align-top py-3">
+                          <div className="flex items-center font-semibold text-[14px] gap-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={isModuleSelected(module.name)}
+                              onChange={() => handleModuleCheckboxChange(module.name)}
+                              className="custom-checkbox appearance-none w-4 h-4 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] shrink-0"
+                            />
+                            <span className="break-words">{module.name}</span>
+                          </div>
+                          <div className="items-center">
+                            <label className="text-[14px] text-[#6B7280] items-center font-medium inline-flex gap-1">
+                              <input
+                                type="checkbox"
+                                checked={isAllSelected(module.name)}
+                                disabled={!isModuleSelected(module.name)}
+                                onChange={() => handleSelectAll(module.name)}
+                                className="custom-checkbox appearance-none w-4 h-4 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] disabled:opacity-50 shrink-0"
+                              />
+                              <span>Select All</span>
+                            </label>
+                          </div>
+                        </td>
+                        <td className="w-[140px] text-[14px] font-semibold text-left align-top py-3">{module.level}</td>
+                        <td className="w-[900px] text-left align-top py-3">
+                          <div
+                            className="inline-grid gap-x-12 gap-y-10"
+                            style={{ gridTemplateColumns: 'repeat(5, max-content)' }}
+                          >
+                            {permissions.map((perm) => (
+                              <label
+                                key={perm}
+                                className="inline-flex items-center gap-1 text-[14px] font-medium whitespace-nowrap"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="custom-checkbox appearance-none w-4 h-4 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] shrink-0"
+                                  checked={isChecked(module.name, perm)}
+                                  disabled={!isModuleSelected(module.name)}
+                                  onChange={() => handlePermissionChange(module.name, perm)}
+                                />
+                                {perm}
+                              </label>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ) : (
+                  <tbody>
+                    <tr className={EDBC_TABLE_BODY_ROW_CLASS}>
+                      <td colSpan={4} className="py-6 text-center text-[16px] font-medium text-[#666666]">
+                        Select a role to view and edit permissions
+                      </td>
+                    </tr>
+                  </tbody>
+                )}
+              </table>
+            </div>
           </div>
-        </div>
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <table className="w-full min-w-[700px] table-auto sm:table-fixed border-collapse bg-white rounded-xl shadow-md">
-          <thead>
-            <tr className="bg-[#F5F5F5] text-left text-sm sm:text-[16px] font-semibold ">
-              <th className="px-2 sm:px-4 py-3 min-w-[60px] sm:w-[120px]">S.No</th>
-              <th className="px-2 sm:px-4 py-3 min-w-[150px] sm:w-[300px]">Module</th>
-              <th className="px-2 sm:px-4 py-3 min-w-[80px] sm:w-[320px]">Levels</th>
-              <th className="px-2 sm:px-4 py-3">Permissions</th>
-            </tr>
-          </thead>
-          {selectedRole && (
-            <tbody>
-              {activeModules.map((module, index) => (
-                <tr key={module.name} className="border-t text-sm sm:text-[14px] align-top">
-                  <td className="px-2 sm:px-4 py-4 text-[#2E2E2E] text-left">{index + 1}</td>
-                  <td className="px-2 sm:px-4 py-4">
-                    <div className="flex items-center font-semibold text-base gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={isModuleSelected(module.name)}
-                        onChange={() => handleModuleCheckboxChange(module.name)}
-                        className="custom-checkbox appearance-none w-4 h-4 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
-                      />
-                      {module.name}
-                    </div>
-                    <div className="mr-0 sm:mr-36 items-center">
-                      <label className="text-[14px] text-[#6B7280] items-center font-medium">
-                        <input
-                          type="checkbox"
-                          checked={isAllSelected(module.name)}
-                          disabled={!isModuleSelected(module.name)}
-                          onChange={() => handleSelectAll(module.name)}
-                          className="custom-checkbox appearance-none w-4 h-4 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638] disabled:opacity-50"
-                        />
-                        <span>Select All</span>
-                      </label>
-                    </div>
-                  </td>
-                  <td className="px-2 sm:px-4 py-4 text-base font-semibold text-left">{module.level}</td>
-                  <td className="px-2 sm:px-4 py-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-4 sm:gap-y-8 gap-x-2 max-w-[900px]">
-                      {permissions.map((perm) => (
-                        <label
-                          key={perm}
-                          className="flex items-center gap-1 text-base font-medium whitespace-nowrap"
-                        >
-                          <input
-                            type="checkbox"
-                            className="custom-checkbox appearance-none w-4 h-4 rounded bg-slate-200 checked:bg-[#E2F9E1] checked:border-[#034638]"
-                            checked={isChecked(module.name, perm)}
-                            disabled={!isModuleSelected(module.name)}
-                            onChange={() => handlePermissionChange(module.name, perm)}
-                          />
-                          {perm}
-                        </label>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          )}
-        </table>
         </div>
       </div>
       {showRoleCreationModal && (

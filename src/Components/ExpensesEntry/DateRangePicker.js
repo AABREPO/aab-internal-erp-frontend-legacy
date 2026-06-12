@@ -352,7 +352,7 @@ const DateRangePicker = ({
                                         onClick={() => handlePickMonth(idx)}
                                         className={[
                                             'flex items-center justify-center h-full min-h-0 text-xs font-bold rounded-full text-center',
-                                            isActive ? 'bg-[rgba(191,152,83,0.2)] text-gray-900' : 'text-gray-800 hover:bg-gray-50',
+                                            isActive ? 'bg-[#BF9853] text-white' : 'text-gray-800 hover:bg-[#FAF6ED]',
                                         ].join(' ')}
                                     >
                                         {label}
@@ -378,7 +378,7 @@ const DateRangePicker = ({
                                         onClick={() => handlePickYear(y)}
                                         className={[
                                             'flex items-center justify-center h-full min-h-0 text-xs font-bold rounded-full text-center',
-                                            isActive ? 'bg-[rgba(191,152,83,0.2)] text-gray-900' : 'text-gray-800 hover:bg-gray-50',
+                                            isActive ? 'bg-[#BF9853] text-white' : 'text-gray-800 hover:bg-[#FAF6ED]',
                                         ].join(' ')}
                                     >
                                         {y}
@@ -413,10 +413,10 @@ const DateRangePicker = ({
                                             onClick={() => handleDateClick(d)}
                                             onDoubleClick={() => handleDateDoubleClick(d)}
                                             className={[
-                                                'flex items-center justify-center text-xs font-bold rounded',
+                                                'flex items-center justify-center text-xs rounded',
                                                 inMonth ? 'text-gray-900' : 'text-gray-300',
-                                                inRange && !selected ? 'bg-gray-200' : '',
-                                                selected ? 'bg-[#BF9853] text-white' : '',
+                                                inRange && !selected ? 'bg-gray-200 font-bold' : '',
+                                                selected ? 'bg-[#BF9853] text-white font-semibold' : 'font-bold',
                                                 !selected && inMonth ? 'hover:bg-gray-100' : '',
                                                 !selected && isToday ? 'ring-2 ring-[#BF9853] ring-inset' : '',
                                             ].filter(Boolean).join(' ')}

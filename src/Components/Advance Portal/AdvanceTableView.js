@@ -21,7 +21,7 @@ import {
   EdbcTableFilterRow,
   EdbcTableBodyRow,
   EdbcColumnHeader,
-  EdbcDateFilter,
+  EdbcTimestampFilter,
   EdbcProjectNameFilter,
   EdbcSelectFilter,
   EdbcTextInputFilter,
@@ -71,7 +71,9 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const [selectedOption, setSelectedOption] = useState(null);
   const [siteOptions, setSiteOptions] = useState([]);
   const [advanceData, setAdvanceData] = useState([]);
-  const [selectDate, setSelectDate] = useState('');
+  const [selectDateStart, setSelectDateStart] = useState('');
+  const [selectDateEnd, setSelectDateEnd] = useState('');
+  const [showTableDateRangePicker, setShowTableDateRangePicker] = useState(false);
   const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
   const [selectProjectName, setSelectProjectName] = useState('');
   const [selectTransfer, setSelectTransfer] = useState('');
@@ -191,7 +193,12 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       if (savedFilters) {
         try {
           const filters = JSON.parse(savedFilters);
-          if (filters.selectDate) setSelectDate(filters.selectDate);
+          if (filters.selectDateStart) setSelectDateStart(filters.selectDateStart);
+          if (filters.selectDateEnd) setSelectDateEnd(filters.selectDateEnd);
+          else if (filters.selectDate) {
+            setSelectDateStart(filters.selectDate);
+            setSelectDateEnd(filters.selectDate);
+          }
           if (filters.selectContractororVendorName) setSelectContractororVendorName(filters.selectContractororVendorName);
           if (filters.selectProjectName) setSelectProjectName(filters.selectProjectName);
           if (filters.selectTransfer) setSelectTransfer(filters.selectTransfer);
@@ -232,7 +239,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
 
   useEffect(() => {
     const filters = {
-      selectDate,
+      selectDateStart,
+      selectDateEnd,
       selectContractororVendorName,
       selectProjectName,
       selectTransfer,
@@ -249,7 +257,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       showFilters
     };
     sessionStorage.setItem('advanceTableViewFilters', JSON.stringify(filters));
-  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectMode, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, startDate, endDate, overallSearch, showFilters]);
+  }, [selectDateStart, selectDateEnd, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectMode, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, startDate, endDate, overallSearch, showFilters]);
   useEffect(() => {
     const syncBranch = () => {
       const nextBranchId = resolveActiveBranchId();
@@ -774,12 +782,22 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       const entryDate = new Date(entry.date);
       if (entryDate > e) return false;
     }
-    if (selectDate) {
-      const [year, month, day] = selectDate.split("-");
-      const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-      const entryDateObj = new Date(entry.date);
-      const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-      if (formattedEntryDate !== formattedSelectDate) return false;
+    if (selectDateStart && selectDateEnd) {
+      const s = new Date(selectDateStart);
+      const e = new Date(selectDateEnd);
+      e.setHours(23, 59, 59, 999);
+      const entryDate = new Date(entry.date);
+      if (entryDate < s || entryDate > e) return false;
+    } else if (selectDateStart) {
+      const s = new Date(selectDateStart);
+      s.setHours(0, 0, 0, 0);
+      const entryDate = new Date(entry.date);
+      if (entryDate < s) return false;
+    } else if (selectDateEnd) {
+      const e = new Date(selectDateEnd);
+      e.setHours(23, 59, 59, 999);
+      const entryDate = new Date(entry.date);
+      if (entryDate > e) return false;
     }
     if (selectContractororVendorName) {
       const name =
@@ -1057,7 +1075,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const currentData = sortedData.slice(startIndex, endIndex);
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectDate, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectMode, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, startDate, endDate, overallSearch]);
+  }, [selectDateStart, selectDateEnd, selectContractororVendorName, selectProjectName, selectTransfer, selectType, selectDescription, selectMode, selectEntryNo, selectSourceFrom, selectBranch, selectEnteredBy, startDate, endDate, overallSearch]);
   useEffect(() => {
     if (filterScrollResetSkipRef.current) {
       filterScrollResetSkipRef.current = false;
@@ -1071,7 +1089,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
       scroller.scrollTop = 0;
     });
   }, [
-    selectDate,
+    selectDateStart,
+    selectDateEnd,
     selectContractororVendorName,
     selectProjectName,
     selectTransfer,
@@ -1086,7 +1105,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
     endDate,
   ]);
   const clearFilters = () => {
-    setSelectDate('');
+    setSelectDateStart('');
+    setSelectDateEnd('');
     setSelectContractororVendorName('');
     setSelectProjectName('');
     setSelectTransfer('');
@@ -1710,34 +1730,12 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                 readOnly
               />
             </div>
-            <div className=''>
-              <label className='block mb-[8px] font-semibold'>Start Date</label>
-              <CustomDateField
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="Select date"
-                alwaysOpenBelow
-                controlHeightPx={40}
-                className="w-full max-w-[150px]"
-              />
-            </div>
-            <div className=''>
-              <label className='block mb-[8px] font-semibold'>End Date</label>
-              <CustomDateField
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="Select date"
-                alwaysOpenBelow
-                controlHeightPx={40}
-                className="w-full max-w-[150px]"
-              />
-            </div>
           </div>
         </div>
       </div>
       <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
           <div
-            className={`text-left flex ${selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectDescription.trim() || selectMode || selectEntryNo || selectSourceFrom || selectBranch || selectEnteredBy || startDate || endDate
+            className={`text-left flex ${selectDateStart || selectDateEnd || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectDescription.trim() || selectMode || selectEntryNo || selectSourceFrom || selectBranch || selectEnteredBy || startDate || endDate
               ? 'flex-col sm:flex-row sm:justify-between'
               : 'flex-row justify-between items-center'
               } mb-[12px] gap-[6px]`}>
@@ -1780,7 +1778,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                   className=" border rounded-md h-[34px]"
                 />
               </button>
-              {(selectDate || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectDescription.trim() || selectMode || selectEntryNo || selectSourceFrom || selectBranch || selectEnteredBy || startDate || endDate) && (
+              {(selectDateStart || selectDateEnd || selectContractororVendorName || selectProjectName || selectTransfer || selectType || selectDescription.trim() || selectMode || selectEntryNo || selectSourceFrom || selectBranch || selectEnteredBy || startDate || endDate) && (
                 <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                   {startDate && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
@@ -1796,13 +1794,25 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                       <button onClick={() => setEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                     </span>
                   )}
-                  {selectDate && (
+                  {selectDateStart && selectDateEnd ? (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDate)}</span>
-                      <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{selectDateStart === selectDateEnd ? formatEdbcFilterDateDMY(selectDateStart) : `${formatEdbcFilterDateDMY(selectDateStart)} – ${formatEdbcFilterDateDMY(selectDateEnd)}`}</span>
+                      <button onClick={() => { setSelectDateStart(''); setSelectDateEnd(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                     </span>
-                  )}
+                  ) : selectDateStart ? (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDateStart)} onwards</span>
+                      <button onClick={() => setSelectDateStart('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    </span>
+                  ) : selectDateEnd ? (
+                    <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                      <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date until: </span>
+                      <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDateEnd)}</span>
+                      <button onClick={() => setSelectDateEnd('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    </span>
+                  ) : null}
                   {selectContractororVendorName && (
                     <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                       <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Contractor/Vendor Name: </span>
@@ -2001,10 +2011,19 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                   </EdbcTableHeaderRow>
                   {showFilters && (
                     <EdbcTableFilterRow ref={filterRowRef}>
-                      <EdbcDateFilter
+                      <EdbcTimestampFilter
+                        columnId={EDBC_IDS.EDBC2}
                         placeholder="Date"
-                        value={selectDate}
-                        onChange={setSelectDate}
+                        timestampStartDate={selectDateStart}
+                        timestampEndDate={selectDateEnd}
+                        isOpen={showTableDateRangePicker}
+                        onOpen={() => setShowTableDateRangePicker(true)}
+                        onClose={() => setShowTableDateRangePicker(false)}
+                        onApply={(from, to) => {
+                          setSelectDateStart(from || '');
+                          setSelectDateEnd(to || '');
+                          setShowTableDateRangePicker(false);
+                        }}
                       />
                       <EdbcSelectFilter
                         columnId={EDBC_IDS.EDBC4}

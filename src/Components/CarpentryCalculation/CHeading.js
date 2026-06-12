@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import CarpentryCalculator from './CarpentryCalculator';
 import History from './History';
 import AddInput from './AddInput';
@@ -28,31 +29,31 @@ const CHeading = () => {
     };
 
   return (
-    <div className="bg-[#FAF6ED]">
-      <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'carpentrycalculator' ? 'active' : ''}`}
+    <ModuleHeadingWrapper>
+      <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'carpentrycalculator'}
                     onClick={() => setActiveTab('carpentrycalculator')}
                 >
                     Carpentry Calculator
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'history' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'history'}
                     onClick={() => setActiveTab('history')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'addinput' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'addinput'}
                     onClick={() => setActiveTab('addinput')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-    </div>
+    </ModuleHeadingWrapper>
   )
 }
 

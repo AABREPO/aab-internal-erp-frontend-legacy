@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import ToolTrackerEntry from './ToolsTrackerEntry';
 import ToolTrackerTableview from './ToolsTrackerTableView';
 import ToolTrackerPendingItems from './ToolsTrackerPendingItems';
@@ -66,39 +67,37 @@ const ToolsTrackerHeading = ({ username, userRoles = [] }) => {
     }
   };
   return (
-    <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-      {/* Top Navigation Tabs */}
-      <div className="topbar-title">
-        <h2 className={`link ${activeTab === 'toolstrackerentry' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerentry')}>
+    <ModuleHeadingWrapper className="w-full h-auto min-h-screen">
+      <ModuleHeadingBar>
+        <ModuleHeadingTab active={activeTab === 'toolstrackerentry'} onClick={() => setActiveTab('toolstrackerentry')}>
           Entry
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackertableview' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackertableview')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackertableview'} onClick={() => setActiveTab('toolstrackertableview')}>
           Table View
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackerpendingitems' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerpendingitems')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackerpendingitems'} onClick={() => setActiveTab('toolstrackerpendingitems')}>
           Pending Items
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackerdatabase' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerdatabase')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackerdatabase'} onClick={() => setActiveTab('toolstrackerdatabase')}>
           Database
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackeraddinput' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackeraddinput')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackeraddinput'} onClick={() => setActiveTab('toolstrackeraddinput')}>
           Add Input
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackernetstock' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackernetstock')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackernetstock'} onClick={() => setActiveTab('toolstrackernetstock')}>
           Net Stock
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackertoolhistory' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackertoolhistory')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackertoolhistory'} onClick={() => setActiveTab('toolstrackertoolhistory')}>
           Tool History
-        </h2>
-        <h2 className={`link ${activeTab === 'toolstrackerservicehistory' ? 'active' : ''}`} onClick={() => setActiveTab('toolstrackerservicehistory')}>
+        </ModuleHeadingTab>
+        <ModuleHeadingTab active={activeTab === 'toolstrackerservicehistory'} onClick={() => setActiveTab('toolstrackerservicehistory')}>
           Service History
-        </h2>
-      </div>
-      {/* Dynamic Content Area */}
+        </ModuleHeadingTab>
+      </ModuleHeadingBar>
       <div className="content px-4">
         {renderContent()}
       </div>
-    </div>
+    </ModuleHeadingWrapper>
   )
 }
 export default ToolsTrackerHeading

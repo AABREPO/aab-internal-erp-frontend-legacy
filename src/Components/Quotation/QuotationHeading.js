@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import CreateQuotation from './CreateQuotation';
 import QuotationDatabase from './QuotationDatabase';
 import QuotationHistory from './QuotationHistory';
@@ -31,40 +32,38 @@ const QuotationHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-            {/* Top Navigation Tabs */}
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'createquotation' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="w-full h-auto min-h-screen">
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'createquotation'}
                     onClick={() => setActiveTab('createquotation')}
                 >
                     Create Quotation
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'quotationhistory' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'quotationhistory'}
                     onClick={() => setActiveTab('quotationhistory')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'quotationdatabase' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'quotationdatabase'}
                     onClick={() => setActiveTab('quotationdatabase')}
                 >
                     Database
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'quotationaddinput' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'quotationaddinput'}
                     onClick={() => setActiveTab('quotationaddinput')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
 
-            {/* Dynamic Content Area */}
             <div className="content px-4">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

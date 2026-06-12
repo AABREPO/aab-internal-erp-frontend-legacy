@@ -40,6 +40,22 @@ const IconDot = () => (
   </svg>
 );
 
+const formatLiveDateTime = (date) => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = date.toLocaleString("en-GB", { month: "short" });
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours %= 12;
+  hours = hours || 12;
+  return {
+    dateLine: `${day} ${month} ${year}`,
+    timeLine: `${hours}:${minutes}:${seconds} ${ampm}`,
+  };
+};
+
 const ORBIT_TOPBAR_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
 .orbit-erp-heading-root{
@@ -59,21 +75,14 @@ const ORBIT_TOPBAR_CSS = `
 @media(max-width:480px){
   .orbit-erp-heading-root .brand-text{font-size:13.5px;letter-spacing:0.13em;}
 }
-.orbit-erp-heading-root .topbar{background:#fff;border-bottom:1px solid var(--line);padding:5px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:300;min-height:56px;}
-@media(min-width:1024px){
-  .orbit-erp-heading-root .topbar{
-    margin-left:-56px;
-    width:calc(100% + 56px);
-    padding-left:12px;
-  }
-}
-@media(max-width:1023px){
-  .orbit-erp-heading-root .topbar{
-    margin-left:-56px;
-    width:calc(100% + 56px);
-    padding-left:12px;
-  }
-}
+.orbit-erp-heading-root .topbar{background:#fff;border-bottom:1px solid var(--line);padding:5px 16px;display:flex;align-items:center;gap:10px;position:fixed;top:0;left:0;right:0;width:100%;box-sizing:border-box;z-index:300;min-height:56px;}
+.orbit-erp-heading-root::after{content:'';display:block;height:56px;}
+.orbit-erp-heading-root .topbar-end{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;min-width:0;}
+.orbit-erp-heading-root .live-clock{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15;padding:3px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;flex-shrink:0;white-space:nowrap;}
+.orbit-erp-heading-root .live-clock .live-date{font-size:11px;font-weight:600;color:var(--ink-2);}
+.orbit-erp-heading-root .live-clock .live-time{font-size:10px;font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums;}
+.orbit-erp-heading-root .user-pill{flex-shrink:0;}
+.orbit-erp-heading-root .user-pill .icon-btn{flex-shrink:0;}
 .orbit-erp-heading-root .branch-select{background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 28px 5px 10px;font-size:12.5px;font-weight:600;color:var(--ink-2);appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' stroke='%238a8275' stroke-width='1.5' fill='none'/></svg>");background-repeat:no-repeat;background-position:right 9px center;cursor:pointer;min-width:128px;}
 .orbit-erp-heading-root .branch-select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(214,171,96,0.15);}
 .orbit-erp-heading-root .icon-btn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink-2);cursor:pointer;transition:all .15s;position:relative;}
@@ -121,6 +130,7 @@ const ORBIT_TOPBAR_CSS = `
 @media(max-width:768px){
   .orbit-erp-heading-root .topbar{padding:10px 12px;gap:8px;}
   .orbit-erp-heading-root .topbar .desktop-only{display:none;}
+  .orbit-erp-heading-root .live-clock .live-date{display:none;}
 }
 `;
 
@@ -266,6 +276,7 @@ export default function OrbitERPHeading({
   const [notifOpen, setNotifOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [syncState, setSyncState] = useState({ lastSyncedAt: null, isSyncing: false });
+  const [liveDateTime, setLiveDateTime] = useState(() => formatLiveDateTime(new Date()));
   const [notificationsInternal] = useState([]);
   const notifications = notificationsProp !== undefined ? notificationsProp : notificationsInternal;
   const canDownloadExpenses = canDownloadExpensesReport(displayName);
@@ -274,6 +285,12 @@ export default function OrbitERPHeading({
 
   useEffect(() => {
     return subscribeOrbitSyncStatus(setSyncState);
+  }, []);
+
+  useEffect(() => {
+    const tick = () => setLiveDateTime(formatLiveDateTime(new Date()));
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -330,7 +347,7 @@ export default function OrbitERPHeading({
   return (
     <div className="orbit-erp-heading-root">
       <style>{ORBIT_TOPBAR_CSS}</style>
-      <div className="topbar flex items-center justify-start">
+      <div className="topbar flex w-full items-center justify-start">
         <div className="brand-button w-[147px] h-[32px]">
           <img
             src={navLogoSrc}
@@ -340,7 +357,11 @@ export default function OrbitERPHeading({
           />
         </div>
         {!hideEndToolbar && (
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="topbar-end">
+          <div className="live-clock" aria-live="polite">
+            <span className="live-date">{liveDateTime.dateLine}</span>
+            <span className="live-time">{liveDateTime.timeLine}</span>
+          </div>
           <button
             type="button"
             className="sync-btn desktop-only"

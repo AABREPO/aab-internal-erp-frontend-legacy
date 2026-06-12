@@ -18,7 +18,7 @@ export default function CustomMonthField({
   const displayValue = useMemo(() => {
     if (!value) return "";
     try {
-      return format(parseISO(`${value}-01`), "MMM yyyy");
+      return format(parseISO(`${value}-01`), "MMMM yyyy");
     } catch {
       return value;
     }

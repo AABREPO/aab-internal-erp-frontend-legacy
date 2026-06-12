@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import Form from './Form';
 import Table from './Table';
 import Dashboard from './Dashboard';
@@ -69,71 +69,71 @@ const RHeading = ({ username, userRoles = [] }) => {
   };
 
   return (
-    <div className="bg-[#FAF6ED]">
-      <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'form' ? 'active' : ''}`}
+    <ModuleHeadingWrapper>
+      <ModuleHeadingBar>
+        <ModuleHeadingTab
+          active={activeTab === 'form'}
           onClick={() => handleTabChange('form')}
         >
           Form
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'table' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'table'}
           onClick={() => handleTabChange('table')}
         >
           Table View
-        </h2>
+        </ModuleHeadingTab>
         {isAdminRent && (
-          <h2
-            className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
+          <ModuleHeadingTab
+            active={activeTab === 'database'}
             onClick={() => handleTabChange('database')}
           >
             Database
-          </h2>
+          </ModuleHeadingTab>
         )}
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'dashboard' ? 'active' : ''}`}
+        <ModuleHeadingTab
+          active={activeTab === 'dashboard'}
           onClick={() => handleTabChange('dashboard')}
         >
           Dashboard
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'inputdata' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'inputdata'}
           onClick={() => handleTabChange('inputdata')}
         >
           Input Data
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'summary' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'summary'}
           onClick={() => handleTabChange('summary')}
         >
           Summary
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'rentalagreement' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'rentalagreement'}
           onClick={() => handleTabChange('rentalagreement')}
         >
           Rental Agreement
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'tenant' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'tenant'}
           onClick={() => handleTabChange('tenant')}
         >
           Tenant
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'monthlyReport' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'monthlyReport'}
           onClick={() => handleTabChange('monthlyReport')}
         >
           Monthly Report
-        </h2>
-        <h2
-          className={`link whitespace-nowrap ${activeTab === 'ebno' ? 'active' : ''}`}
+        </ModuleHeadingTab>
+        <ModuleHeadingTab
+          active={activeTab === 'ebno'}
           onClick={() => handleTabChange('ebno')}
         >
           EB No
-        </h2>
-      </div>
+        </ModuleHeadingTab>
+      </ModuleHeadingBar>
       <div className="content">
         {visitedTabs.has('form') && (
           <div className={activeTab === 'form' ? '' : 'hidden'}>
@@ -191,7 +191,7 @@ const RHeading = ({ username, userRoles = [] }) => {
           </div>
         )}
       </div>
-    </div>
+    </ModuleHeadingWrapper>
   );
 };
 

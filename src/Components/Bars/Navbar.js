@@ -6,6 +6,23 @@ import logo from '../Images/AALogo.svg';
 import { canDownloadExpensesReport, downloadExpensesReport } from '../../utils/downloadExpensesReport';
 import Sidebar from './Sidebar';
 import { isOrbitAppChromeRoute } from '../OrbitERP/orbitAppChromePaths';
+
+const formatLiveDateTime = (date) => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = date.toLocaleString('en-GB', { month: 'short' });
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours %= 12;
+  hours = hours || 12;
+  return {
+    dateLine: `${day} ${month} ${year}`,
+    timeLine: `${hours}:${minutes}:${seconds} ${ampm}`,
+  };
+};
+
 const Navbar = ({ username, userImage, position, email, onLogout, userRoles = [], branchId, brachId }) => {
   const location = useLocation();
   const hideMainNavForOrbitChrome = isOrbitAppChromeRoute(location.pathname);
@@ -31,6 +48,12 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
   const profileRef = useRef(null);
   const notificationScrollRef = useRef(null);
   const [roleModels, setRoleModels] = useState([]);
+  const [liveDateTime, setLiveDateTime] = useState(() => formatLiveDateTime(new Date()));
+  useEffect(() => {
+    const tick = () => setLiveDateTime(formatLiveDateTime(new Date()));
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
   useEffect(() => {
     const fetchUserRoles = async () => {
       try {
@@ -511,9 +534,16 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
           position:fixed !important;
           top:0 !important;
           left:0 !important;
+          right:0 !important;
           width:100% !important;
+          box-sizing:border-box !important;
           background:#fff !important;
         }
+        .navbar-orbit-end .live-clock{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15;padding:3px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;flex-shrink:0;white-space:nowrap;}
+        .navbar-orbit-end .live-clock .live-date{font-size:11px;font-weight:600;color:var(--ink-2);}
+        .navbar-orbit-end .live-clock .live-time{font-size:10px;font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums;}
+        .navbar-orbit-end .user-pill{flex-shrink:0;}
+        .navbar-orbit-end .user-pill .icon-btn{flex-shrink:0;}
         .navbar.navbar-unified::after{
           content:"";
           position:absolute;
@@ -543,6 +573,7 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
         @media(max-width:768px){
           .navbar-brand-text{display:none;}
           .navbar-orbit-end .desktop-only{display:none;}
+          .navbar-orbit-end .live-clock .live-date{display:none;}
         }
       `}</style>
       {!hideMainNavForOrbitChrome && (
@@ -555,7 +586,11 @@ const Navbar = ({ username, userImage, position, email, onLogout, userRoles = []
               className=" object-cover"
             />
           </div>
-          <div className="navbar-orbit-end relative ml-auto flex shrink-0 flex-wrap items-center gap-2" ref={profileRef}>
+          <div className="navbar-orbit-end relative ml-auto flex shrink-0 flex-nowrap items-center gap-2" ref={profileRef}>
+            <div className="live-clock" aria-live="polite">
+              <span className="live-date">{liveDateTime.dateLine}</span>
+              <span className="live-time">{liveDateTime.timeLine}</span>
+            </div>
             {canSelectBranch ? (
               <div className="flex items-center">
                 <select

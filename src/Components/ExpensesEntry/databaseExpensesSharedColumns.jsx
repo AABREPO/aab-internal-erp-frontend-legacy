@@ -6,6 +6,11 @@ import CalendarIcon from '../Images/Calendoricon.png';
 import edit from '../Images/Edit.svg';
 import history from '../Images/History.svg';
 import remove from '../Images/Delete.svg';
+import FilterIcon from '../Images/TableFilter.svg';
+import ReloadIcon from '../Images/Clear.svg';
+import SearchIcon from '../Images/Searchnew.svg';
+import PdfIcon from '../Images/pdf.png';
+import XlIcon from '../Images/sheets.png';
 
 /** Expenses created from Advance Portal Bill Settlement — edit in Advance Portal only. */
 export const isAdvancePortalSourceExpense = (expense) =>
@@ -56,7 +61,7 @@ const EDBC9_FILTER_W = 'w-[198px]';
 const EDBC10_COLUMN_W = 'w-[158px]';
 const EDBC11_COLUMN_W = 'w-[158px]';
 const EDBC12_COLUMN_W = 'w-[158px]';
-const EDBC13_COLUMN_W = 'w-[120px]';
+const EDBC13_COLUMN_W = 'w-[130px]';
 const EDBC14_COLUMN_W = 'w-[158px]';
 const EDBC15_COLUMN_W = 'w-[158px]';
 const EDBC16_COLUMN_W = 'w-[158px]';
@@ -189,6 +194,7 @@ const EDBC_CONFIG = {
         filterThClass: 'pr-[9px]',
         tdClass: `pl-[1px] pr-[9px] ${EDBC8_BODY_W} text-right`,
         bodyCellKey: 'amount',
+        inputClassName: `${EDBC8_HEADER_W} ${EDBC_TEXT_INPUT_CLASS} px-2 text-right`,
     },
     [EDBC_IDS.EDBC9]: {
         sortField: 'comments',
@@ -704,7 +710,7 @@ export const EdbcTimestampFilter = ({
             >
                 <span
                     title={hasDateFilter ? filterLabel : undefined}
-                    className={`text-[14px] flex-1 min-w-0 text-left truncate overflow-hidden text-ellipsis whitespace-nowrap ${hasDateFilter ? 'text-black font-bold' : 'text-[#A6A5A6] font-normal'}`}
+                    className={`text-[14px] flex-1 min-w-0 text-left truncate overflow-hidden text-ellipsis whitespace-nowrap ${hasDateFilter ? 'text-black font-semibold' : 'text-[#A6A5A6] font-normal'}`}
                 >
                     {hasDateFilter ? filterLabel : placeholder}
                 </span>
@@ -901,6 +907,194 @@ export const buildRightAlignedTableFilterSelectStyles = (selectStyles) => ({
 /** @deprecated Use buildRightAlignedTableFilterSelectStyles */
 export const buildRightAlignedSelectStyles = buildRightAlignedTableFilterSelectStyles;
 
+export const normalizeEdbcFilterText = (value) => String(value ?? '').trim().toLowerCase();
+
+export const equalsEdbcFilterValue = (fieldValue, selectedValue) =>
+    normalizeEdbcFilterText(fieldValue) === normalizeEdbcFilterText(selectedValue);
+
+export const matchesEdbcSelectFilter = (fieldValue, selectedValue, { blankValue, isBlankish }) => {
+    if (!selectedValue) return true;
+    if (selectedValue === blankValue) return isBlankish(fieldValue);
+    return equalsEdbcFilterValue(fieldValue, selectedValue);
+};
+
+export const buildEdbcSelectFilterOptions = (data, key, { blankOption = null, isBlankish } = {}) => {
+    const unique = [];
+    const seen = new Set();
+    data.forEach((item) => {
+        const val = item[key];
+        if (isBlankish?.(val)) return;
+        const normalized = normalizeEdbcFilterText(val);
+        if (seen.has(normalized)) return;
+        seen.add(normalized);
+        unique.push(val);
+    });
+    const options = unique.map((val) => ({ value: val, label: val }));
+    if (blankOption) options.unshift(blankOption);
+    return options;
+};
+
+export const normalizeEdbcPaymentModeFilterValues = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter((v) => v !== '' && v != null);
+    if (typeof value === 'string') {
+        if (!value.trim()) return [];
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return parsed.filter((v) => v !== '' && v != null);
+        } catch (_) {
+            /* legacy single value */
+        }
+        return [value];
+    }
+    return [];
+};
+
+export const hasEdbcPaymentModeFilter = (value) =>
+    normalizeEdbcPaymentModeFilterValues(value).length > 0;
+
+export const formatEdbcPaymentModeFilterChipLabel = (
+    value,
+    { blankValue = 'Blank', blankLabel = 'Blank' } = {},
+) =>
+    normalizeEdbcPaymentModeFilterValues(value)
+        .map((mode) => (mode === blankValue ? blankLabel : mode))
+        .join(', ');
+
+export const matchesEdbcPaymentModeFilter = (
+    expensePaymentMode,
+    selectedValues,
+    { blankValue = 'Blank', isBlankish },
+) => {
+    const modes = normalizeEdbcPaymentModeFilterValues(selectedValues);
+    if (modes.length === 0) return true;
+    return modes.some((mode) => {
+        if (mode === blankValue) return isBlankish(expensePaymentMode);
+        return equalsEdbcFilterValue(expensePaymentMode, mode);
+    });
+};
+
+export const loadEdbcPaymentModeFilterFromStorage = (key = 'expenseFilter_paymentMode') => {
+    if (typeof localStorage === 'undefined') return [];
+    return normalizeEdbcPaymentModeFilterValues(localStorage.getItem(key));
+};
+
+export const saveEdbcPaymentModeFilterToStorage = (values, key = 'expenseFilter_paymentMode') => {
+    if (typeof localStorage === 'undefined') return;
+    const modes = normalizeEdbcPaymentModeFilterValues(values);
+    if (modes.length === 0) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(modes));
+};
+
+const buildPaymentModeMultiSelectStyles = (selectStyles) => ({
+    ...selectStyles,
+    multiValue: () => ({ display: 'none' }),
+    multiValueLabel: () => ({ display: 'none' }),
+    multiValueRemove: () => ({ display: 'none' }),
+});
+
+const PaymentModeCheckboxOption = ({ innerProps, label, isSelected, isFocused }) => (
+    <div
+        {...innerProps}
+        className="flex items-center gap-2 cursor-pointer select-none"
+        style={{
+            backgroundColor: isFocused ? '#FAF6ED' : 'white',
+            minHeight: `${TABLE_FILTER_OPTION_HEIGHT_PX}px`,
+            padding: '0 12px',
+        }}
+    >
+        <span
+            className="pointer-events-none shrink-0 inline-flex items-center justify-center box-border rounded-[2px]"
+            style={{
+                width: 14,
+                height: 14,
+                border: isSelected ? '2px solid #BF9853' : '2px solid #D1D5DB',
+                backgroundColor: isSelected ? '#BF9853' : '#FFFFFF',
+            }}
+            aria-hidden
+        >
+            {isSelected ? (
+                <svg width="9" height="7" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            ) : null}
+        </span>
+        <span className="text-[14px] font-normal text-black truncate">{label}</span>
+    </div>
+);
+
+/** EDBC-13 payment mode filter with checkbox multi-select. */
+export const EdbcPaymentModeFilter = ({
+    columnId = EDBC_IDS.EDBC13,
+    placeholder,
+    options,
+    value = [],
+    onChange,
+    selectStyles = DATABASE_TABLE_FILTER_SELECT_STYLES,
+}) => {
+    const config = EDBC_CONFIG[columnId];
+    const allOptionsRef = useRef([]);
+    const selectedValues = normalizeEdbcPaymentModeFilterValues(value);
+    const displayOptions = useMemo(() => {
+        const map = new Map();
+        allOptionsRef.current.forEach((option) => map.set(String(option.value), option));
+        options.forEach((option) => map.set(String(option.value), option));
+        selectedValues.forEach((selectedValue) => {
+            const key = String(selectedValue);
+            if (!map.has(key)) map.set(key, { value: selectedValue, label: selectedValue });
+        });
+        const merged = Array.from(map.values());
+        allOptionsRef.current = merged;
+        return merged;
+    }, [options, selectedValues]);
+    if (!config) return null;
+    const selectedOptions = displayOptions.filter((opt) =>
+        selectedValues.some((selectedValue) => equalsEdbcFilterValue(opt.value, selectedValue)),
+    );
+    return (
+        <th id={columnId} className={config.filterThClass}>
+            <Select
+                isMulti
+                isClearable={false}
+                closeMenuOnSelect={false}
+                hideSelectedOptions={false}
+                controlShouldRenderValue={false}
+                filterOption={() => true}
+                className={config.filterWidthClass}
+                options={displayOptions}
+                value={selectedOptions}
+                onChange={(selected) => onChange((selected || []).map((option) => option.value))}
+                placeholder={placeholder}
+                menuPlacement="bottom"
+                noOptionsMessage={() => null}
+                components={{ Option: PaymentModeCheckboxOption }}
+                styles={buildPaymentModeMultiSelectStyles(selectStyles)}
+            />
+        </th>
+    );
+};
+
+export const EdbcPaymentModeFilterChip = ({
+    fieldLabel = 'Mode',
+    selectedModes = [],
+    blankValue = 'Blank',
+    blankLabel = 'Blank',
+    onClear,
+    className = 'inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden',
+    labelClassName = 'font-semibold shrink-0 whitespace-nowrap',
+}) => {
+    if (!hasEdbcPaymentModeFilter(selectedModes)) return null;
+    return (
+        <span className={className}>
+            <span className={labelClassName}>{fieldLabel}: </span>
+            <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">
+                {formatEdbcPaymentModeFilterChipLabel(selectedModes, { blankValue, blankLabel })}
+            </span>
+            <button type="button" onClick={onClear} className="text-[#E4572E] text-2xl ml-1">×</button>
+        </span>
+    );
+};
+
 /** Generic EDBC select filter (EDBC-4+). */
 export const EdbcSelectFilter = ({
     columnId,
@@ -984,13 +1178,33 @@ export const EdbcTextInputFilter = ({
     );
 };
 
-/** EDBC-8 amount total filter cell. */
-export const EdbcTotalAmountFilter = ({ columnId, totalAmount }) => {
+export const formatEdbcTotalAmountPlaceholder = (totalAmount) =>
+    `₹${Number(totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export const normalizeEdbcAmountFilterText = (value) =>
+    String(value ?? '').replace(/[₹,\s]/g, '').trim();
+
+export const matchesEdbcAmountFilter = (amount, filterText) => {
+    const q = normalizeEdbcAmountFilterText(filterText);
+    if (!q) return true;
+    const amountStr = normalizeEdbcAmountFilterText(amount);
+    return amountStr.includes(q);
+};
+
+/** EDBC-8 amount filter — total shown as placeholder when empty. */
+export const EdbcTotalAmountFilter = ({ columnId, totalAmount, value, onChange, placeholder }) => {
     const config = EDBC_CONFIG[columnId];
     if (!config) return null;
     return (
-        <th id={columnId} className={`text-[14px] ${config.filterWidthClass} text-right font-bold ${config.filterThClass}`.trim()}>
-            ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <th id={columnId} className={config.filterThClass}>
+            <input
+                type="text"
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder ?? formatEdbcTotalAmountPlaceholder(totalAmount)}
+                style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                className={config.inputClassName}
+            />
         </th>
     );
 };
@@ -1026,7 +1240,8 @@ export const EdbcBillArrivalFilter = ({
                     placeholder={placeholder}
                     alwaysOpenBelow
                     anchor="right"
-                    className={`${EDBC_BILL_ARRIVAL_FILTER_FIELD_CLASS} ${value ? '[&>button]:!text-black [&>button]:!font-normal' : '[&>button]:!text-[#d3d5db] [&>button]:!font-normal'}`}
+                    placeholderButtonClassName="text-[14px] font-normal placeholder:text-[#A6A5A6]"
+                    className={EDBC_BILL_ARRIVAL_FILTER_FIELD_CLASS}
                 />
             </div>
         </th>
@@ -1121,4 +1336,61 @@ export const EdbcFileBodyCell = ({ columnId, expense }) => {
             )}
         </td>
     );
+};
+
+/** Shared filter toggle button for EDBC table toolbars. */
+export const EdbcFilterToggleButton = ({
+    onClick,
+    buttonClassName = '',
+    imageClassName = ' border rounded-md',
+    type,
+}) => (
+    <button type={type} className={buttonClassName} onClick={onClick}>
+        <img src={FilterIcon} alt="Toggle Filter" className={imageClassName} />
+    </button>
+);
+
+/** Shared clear / search / export actions for EDBC table toolbars. */
+export const EdbcTableToolbarRightActions = ({
+    onClearFilters,
+    overallSearch,
+    onOverallSearchChange,
+    searchPlaceholder = 'Search Transactions...',
+    showExportIcons = false,
+    onExportPdf,
+    onExportCsv,
+    clearButtonClassName = 'flex shrink-0 items-center justify-center',
+    clearButtonType,
+    searchWrapperClassName = 'w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1',
+    wrapperClassName = 'flex items-end gap-[6px]',
+}) => {
+    const content = (
+        <>
+            <button type={clearButtonType} onClick={onClearFilters} className={clearButtonClassName}>
+                <img className="h-[34px] w-[34px]" src={ReloadIcon} alt="Reload" />
+            </button>
+            <div className={searchWrapperClassName}>
+                <input
+                    type="text"
+                    value={overallSearch}
+                    onChange={(e) => onOverallSearchChange(e.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
+                />
+                <img src={SearchIcon} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
+            </div>
+            {showExportIcons && (
+                <div className=" text-left md:text-right md:items-end items-end cursor-default flex justify-end max-w-screen-2xl table-auto overflow-auto w-full scrollbar-none no-scrollbar">
+                    <div className="flex items-end text-center ">
+                        <span className="text-[#E4572E] mr-2 flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={onExportPdf}>PDF<img src={PdfIcon} alt="Pdf" className="w-4 h-4" /></span>
+                        <span className="text-[#007233] flex items-center gap-1 font-semibold hover:underline cursor-pointer" onClick={onExportCsv}>XL<img src={XlIcon} alt="XL" className="w-4 h-4" /></span>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+    if (wrapperClassName == null) {
+        return content;
+    }
+    return <div className={wrapperClassName}>{content}</div>;
 };

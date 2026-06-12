@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import DirectoryTelecom from './DirectoryTelecom';
 import DirectorySubscription from './DirectorySubscription';
 import DirectoryAmc from './DirectoryAmc';
@@ -31,40 +32,38 @@ const DirectoryHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-            {/* Top Navigation Tabs */}
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'directorytelecom' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="w-full h-auto min-h-screen">
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'directorytelecom'}
                     onClick={() => setActiveTab('directorytelecom')}
                 >
                     Telecom
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'directorysubscription' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'directorysubscription'}
                     onClick={() => setActiveTab('directorysubscription')}
                 >
                     Subscription
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'directoryamc' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'directoryamc'}
                     onClick={() => setActiveTab('directoryamc')}
                 >
                     AMC
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'directoryprofession' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'directoryprofession'}
                     onClick={() => setActiveTab('directoryprofession')}
                 >
                     Profession
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
 
-            {/* Dynamic Content Area */}
             <div className="content px-4">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

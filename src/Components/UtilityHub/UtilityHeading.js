@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import PropertyTab from './PropertyTab';
 import WaterTab from './WaterTab';
 import ProfessionTab from './ProfessionTab';
@@ -55,71 +56,68 @@ const UtilityHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED] w-full h-auto min-h-screen">
-            {/* Top Navigation Tabs */}
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'utilitydashboard' ? 'active' : ''}`}
+        <ModuleHeadingWrapper className="w-full h-auto min-h-screen">
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'utilitydashboard'}
                     onClick={() => setActiveTab('utilitydashboard')}
                 >
                     Dashboard
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'electricity' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'electricity'}
                     onClick={() => setActiveTab('electricity')}
                 >
                     Electricity
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'property' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'property'}
                     onClick={() => setActiveTab('property')}
                 >
                     Property
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'water' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'water'}
                     onClick={() => setActiveTab('water')}
                 >
                     Water
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'profession' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'profession'}
                     onClick={() => setActiveTab('profession')}
                 >
                     Profession
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'telecom' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'telecom'}
                     onClick={() => setActiveTab('telecom')}
                 >
                     Telecom
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'subscription' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'subscription'}
                     onClick={() => setActiveTab('subscription')}
                 >
                     Subscription
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'amc' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'amc'}
                     onClick={() => setActiveTab('amc')}
                 >
                     AMC
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'database' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'database'}
                     onClick={() => setActiveTab('database')}
                 >
                     Database
-                </h2>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
 
-            </div>
-
-            {/* Dynamic Content Area */}
             <div className="content px-4">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

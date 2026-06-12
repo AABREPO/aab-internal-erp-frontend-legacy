@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import ClaimPaymentSummary from './ClaimPaymentSummary';
 import ClaimPaymentTableView from './ClaimPaymentTableView';
 import ClaimPaymentDatabase from './ClaimPaymentDatabase';
@@ -57,41 +57,41 @@ const ClaimPaymentHeading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'claimpaymentsummary' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'claimpaymentsummary'}
                     onClick={() => handleTabChange('claimpaymentsummary')}
                 >
                     Summary
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'claimpaymenttableview' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'claimpaymenttableview'}
                     onClick={() => handleTabChange('claimpaymenttableview')}
                 >
                     Table View
-                </h2>
+                </ModuleHeadingTab>
                 {isAdminClaim && (
-                    <h2
-                        className={`link whitespace-nowrap ${activeTab === 'claimpaymentdatabase' ? 'active' : ''}`}
+                    <ModuleHeadingTab
+                        active={activeTab === 'claimpaymentdatabase'}
                         onClick={() => handleTabChange('claimpaymentdatabase')}
                     >
                         Database
-                    </h2>
+                    </ModuleHeadingTab>
                 )}
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'claimpaymentcashregister' ? 'active' : ''}`}
+                <ModuleHeadingTab
+                    active={activeTab === 'claimpaymentcashregister'}
                     onClick={() => handleTabChange('claimpaymentcashregister')}
                 >
                     Cash Register
-                </h2>
-                <h2
-                    className={`link whitespace-nowrap ${activeTab === 'claimpaymentclaimhistory' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'claimpaymentclaimhistory'}
                     onClick={() => handleTabChange('claimpaymentclaimhistory')}
                 >
                     Claim History
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('claimpaymentsummary') && (
                     <div className={activeTab === 'claimpaymentsummary' ? '' : 'hidden'}>
@@ -119,7 +119,7 @@ const ClaimPaymentHeading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     )
 }
 

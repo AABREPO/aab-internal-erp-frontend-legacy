@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './Heading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from './MainHeadingpage/MainHeadingpage';
 import Form from './ExpensesEntry/Form';
 import Tableview from './ExpensesEntry/TableViewExpense';
 import Database from './ExpensesEntry/DatabaseExpenses';
@@ -63,45 +63,61 @@ const Heading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full overflow-x-auto no-scrollbar">
-                <h2 className={`link whitespace-nowrap ${activeTab === 'expense-entry' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('expense-entry')}>
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'expense-entry'}
+                    onClick={() => handleTabChange('expense-entry')}
+                >
                     Form
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'tableview' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('tableview')}>
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'tableview'}
+                    onClick={() => handleTabChange('tableview')}
+                >
                     Table View
-                </h2>
+                </ModuleHeadingTab>
                 {isAdminExpense && (
                     <>
-                        <h2 className={`link whitespace-nowrap ${activeTab === 'database' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('database')}>
+                        <ModuleHeadingTab
+                            active={activeTab === 'database'}
+                            onClick={() => handleTabChange('database')}
+                        >
                             Database
-                        </h2>
-                        <h2 className={`link whitespace-nowrap ${activeTab === 'log' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('log')}>
+                        </ModuleHeadingTab>
+                        <ModuleHeadingTab
+                            active={activeTab === 'log'}
+                            onClick={() => handleTabChange('log')}
+                        >
                             Log
-                        </h2>
-                        <h2 className={`link whitespace-nowrap ${activeTab === 'addInput' ? 'active' : ''}`}
-                            onClick={() => handleTabChange('addInput')}>
+                        </ModuleHeadingTab>
+                        <ModuleHeadingTab
+                            active={activeTab === 'addInput'}
+                            onClick={() => handleTabChange('addInput')}
+                        >
                             Input Data
-                        </h2>                        
+                        </ModuleHeadingTab>
                     </>
                 )}
-                <h2 className={`link whitespace-nowrap ${activeTab === 'entryCheck' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('entryCheck')}>
+                <ModuleHeadingTab
+                    active={activeTab === 'entryCheck'}
+                    onClick={() => handleTabChange('entryCheck')}
+                >
                     Entry Check
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'weeklyUploadHistory' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('weeklyUploadHistory')}>
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'weeklyUploadHistory'}
+                    onClick={() => handleTabChange('weeklyUploadHistory')}
+                >
                     Weekly Uploads
-                </h2>
-                <h2 className={`link whitespace-nowrap ${activeTab === 'dailyUpload' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('dailyUpload')}>
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'dailyUpload'}
+                    onClick={() => handleTabChange('dailyUpload')}
+                >
                     Daily Upload
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('expense-entry') && (
                     <div className={activeTab === 'expense-entry' ? '' : 'hidden'}>
@@ -148,7 +164,7 @@ const Heading = ({ username, userRoles = [] }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 export default Heading;

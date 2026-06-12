@@ -24,7 +24,6 @@ import {
   EdbcTableBodyRow,
   EdbcColumnHeader,
   EdbcTimestampFilter,
-  EdbcDateFilter,
   EdbcProjectNameFilter,
   EdbcSelectFilter,
   EdbcTextInputFilter,
@@ -79,7 +78,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const [advanceData, setAdvanceData] = useState([]);
   const [timestampStartDate, setTimestampStartDate] = useState('');
   const [timestampEndDate, setTimestampEndDate] = useState('');
-  const [selectDatabaseDate, setSelectDatabaseDate] = useState('');
+  const [selectDatabaseDateStart, setSelectDatabaseDateStart] = useState('');
+  const [selectDatabaseDateEnd, setSelectDatabaseDateEnd] = useState('');
+  const [showTableDateRangePicker, setShowTableDateRangePicker] = useState(false);
   const [selectDatabaseContractororVendorName, setSelectDatabaseContractororVendorName] = useState('');
   const [selectDatabaseProjectName, setSelectDatabaseProjectName] = useState('');
   const [selectDatabaseTransfer, setSelectDatabaseTransfer] = useState('');
@@ -212,7 +213,12 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             setTimestampStartDate(filters.selectTimeStampDate);
             setTimestampEndDate(filters.selectTimeStampDate);
           }
-          if (filters.selectDatabaseDate) setSelectDatabaseDate(filters.selectDatabaseDate);
+          if (filters.selectDatabaseDateStart) setSelectDatabaseDateStart(filters.selectDatabaseDateStart);
+          if (filters.selectDatabaseDateEnd) setSelectDatabaseDateEnd(filters.selectDatabaseDateEnd);
+          else if (filters.selectDatabaseDate) {
+            setSelectDatabaseDateStart(filters.selectDatabaseDate);
+            setSelectDatabaseDateEnd(filters.selectDatabaseDate);
+          }
           if (filters.selectDatabaseContractororVendorName) setSelectDatabaseContractororVendorName(filters.selectDatabaseContractororVendorName);
           if (filters.selectDatabaseProjectName) setSelectDatabaseProjectName(filters.selectDatabaseProjectName);
           if (filters.selectDatabaseTransfer) setSelectDatabaseTransfer(filters.selectDatabaseTransfer);
@@ -256,7 +262,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
     const filters = {
       timestampStartDate,
       timestampEndDate,
-      selectDatabaseDate,
+      selectDatabaseDateStart,
+      selectDatabaseDateEnd,
       selectDatabaseContractororVendorName,
       selectDatabaseProjectName,
       selectDatabaseTransfer,
@@ -273,7 +280,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       showFilters
     };
     sessionStorage.setItem('advanceDatabaseFilters', JSON.stringify(filters));
-  }, [timestampStartDate, timestampEndDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch, showFilters]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch, showFilters]);
   const scrollRef = useRef(null);
   const filterRowRef = useRef(null);
   const filterNudgeUsedRef = useRef(false);
@@ -865,12 +872,22 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       const entryTimestamp = entry.timestamp ? new Date(entry.timestamp) : null;
       if (!entryTimestamp || entryTimestamp > te) return false;
     }
-    if (selectDatabaseDate) {
-      const [year, month, day] = selectDatabaseDate.split("-");
-      const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
-      const entryDateObj = new Date(entry.date);
-      const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
-      if (formattedEntryDate !== formattedSelectDate) return false;
+    if (selectDatabaseDateStart && selectDatabaseDateEnd) {
+      const s = new Date(selectDatabaseDateStart);
+      const e = new Date(selectDatabaseDateEnd);
+      e.setHours(23, 59, 59, 999);
+      const entryDate = new Date(entry.date);
+      if (entryDate < s || entryDate > e) return false;
+    } else if (selectDatabaseDateStart) {
+      const s = new Date(selectDatabaseDateStart);
+      s.setHours(0, 0, 0, 0);
+      const entryDate = new Date(entry.date);
+      if (entryDate < s) return false;
+    } else if (selectDatabaseDateEnd) {
+      const e = new Date(selectDatabaseDateEnd);
+      e.setHours(23, 59, 59, 999);
+      const entryDate = new Date(entry.date);
+      if (entryDate > e) return false;
     }
     if (selectDatabaseContractororVendorName) {
       const name = entry.vendor_id
@@ -1242,7 +1259,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const advCol17Label = 'Activity';
   useEffect(() => {
     setCurrentPage(1);
-  }, [timestampStartDate, timestampEndDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch]);
+  }, [timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName, selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode, selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy, startDate, endDate, overallSearch]);
   useEffect(() => {
     if (filterScrollResetSkipRef.current) {
       filterScrollResetSkipRef.current = false;
@@ -1256,7 +1273,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       scroller.scrollTop = 0;
     });
   }, [
-    timestampStartDate, timestampEndDate, selectDatabaseDate, selectDatabaseContractororVendorName, selectDatabaseProjectName,
+    timestampStartDate, timestampEndDate, selectDatabaseDateStart, selectDatabaseDateEnd, selectDatabaseContractororVendorName, selectDatabaseProjectName,
     selectDatabaseTransfer, selectDatabaseType, selectDatabaseDescription, selectDatabaseMode,
     selectDatabaseEntryNo, selectDatabaseSourceFrom, selectDatabaseBranch, selectDatabaseEnteredBy,
     startDate, endDate,
@@ -1264,7 +1281,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   const clearFilters = useCallback(() => {
     setTimestampStartDate('');
     setTimestampEndDate('');
-    setSelectDatabaseDate('');
+    setSelectDatabaseDateStart('');
+    setSelectDatabaseDateEnd('');
     setSelectDatabaseContractororVendorName('');
     setSelectDatabaseProjectName('');
     setSelectDatabaseTransfer('');
@@ -1974,28 +1992,6 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                 readOnly
               />
             </div>
-            <div className=''>
-              <label className='block mb-[8px] font-semibold'>Start Date</label>
-              <CustomDateField
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="Select date"
-                alwaysOpenBelow
-                controlHeightPx={40}
-                className="w-full max-w-[150px]"
-              />
-            </div>
-            <div className=''>
-              <label className='block mb-[8px] font-semibold'>End Date</label>
-              <CustomDateField
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="Select date"
-                alwaysOpenBelow
-                controlHeightPx={40}
-                className="w-full max-w-[150px]"
-              />
-            </div>
           </div>
         </div>
         <div className='mr-0 xl:px-0 px-4 xl:mb-0 mb-4'>
@@ -2004,7 +2000,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       </div>
       <div className="w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
-          className={`text-left flex ${timestampStartDate || timestampEndDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
+          className={`text-left flex ${timestampStartDate || timestampEndDate || selectDatabaseDateStart || selectDatabaseDateEnd || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate
             ? 'flex-col sm:flex-row sm:justify-between'
             : 'flex-row justify-between items-center'
             } mb-[12px] gap-[6px]`}>
@@ -2047,7 +2043,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                 className=" border rounded-md h-[34px]"
               />
             </button>
-            {(timestampStartDate || timestampEndDate || selectDatabaseDate || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
+            {(timestampStartDate || timestampEndDate || selectDatabaseDateStart || selectDatabaseDateEnd || selectDatabaseContractororVendorName || selectDatabaseProjectName || selectDatabaseTransfer || selectDatabaseType || selectDatabaseDescription.trim() || selectDatabaseMode || selectDatabaseEntryNo || selectDatabaseSourceFrom || selectDatabaseBranch || selectDatabaseEnteredBy || startDate || endDate) && (
               <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                 {startDate && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
@@ -2083,13 +2079,25 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                     <button onClick={() => setTimestampEndDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
                 )}
-                {selectDatabaseDate && (
+                {selectDatabaseDateStart && selectDatabaseDateEnd ? (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
-                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDatabaseDate)}</span>
-                    <button onClick={() => setSelectDatabaseDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{selectDatabaseDateStart === selectDatabaseDateEnd ? formatEdbcFilterDateDMY(selectDatabaseDateStart) : `${formatEdbcFilterDateDMY(selectDatabaseDateStart)} – ${formatEdbcFilterDateDMY(selectDatabaseDateEnd)}`}</span>
+                    <button onClick={() => { setSelectDatabaseDateStart(''); setSelectDatabaseDateEnd(''); }} className="text-[#E4572E] ml-1 text-2xl">×</button>
                   </span>
-                )}
+                ) : selectDatabaseDateStart ? (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDatabaseDateStart)} onwards</span>
+                    <button onClick={() => setSelectDatabaseDateStart('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                ) : selectDatabaseDateEnd ? (
+                  <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                    <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Date until: </span>
+                    <span className="font-semibold text-[14px] truncate min-w-0">{formatEdbcFilterDateDMY(selectDatabaseDateEnd)}</span>
+                    <button onClick={() => setSelectDatabaseDateEnd('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                  </span>
+                ) : null}
                 {selectDatabaseContractororVendorName && (
                   <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
                     <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Contractor/Vendor Name: </span>
@@ -2318,10 +2326,19 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
                         setShowTimestampDatePicker(false);
                       }}
                     />
-                    <EdbcDateFilter
+                    <EdbcTimestampFilter
+                      columnId={EDBC_IDS.EDBC2}
                       placeholder={advCol2Label}
-                      value={selectDatabaseDate}
-                      onChange={setSelectDatabaseDate}
+                      timestampStartDate={selectDatabaseDateStart}
+                      timestampEndDate={selectDatabaseDateEnd}
+                      isOpen={showTableDateRangePicker}
+                      onOpen={() => setShowTableDateRangePicker(true)}
+                      onClose={() => setShowTableDateRangePicker(false)}
+                      onApply={(from, to) => {
+                        setSelectDatabaseDateStart(from || '');
+                        setSelectDatabaseDateEnd(to || '');
+                        setShowTableDateRangePicker(false);
+                      }}
                     />
                     <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC4}

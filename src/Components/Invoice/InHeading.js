@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import './InHeading.css';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import Invoice from '../Invoice/Invoice';
 import EditInvoice from '../Invoice/EditInvoice';
 import History from './History';
@@ -47,45 +47,45 @@ const Heading = ({ username, userRoles = [] }) => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title ml-40">
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/invoice' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/invoice'}
                     onClick={() => handleTabClick('/invoice-bill/invoice')}
                 >
                     Create Invoice
-                </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/editinvoice' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/editinvoice'}
                     onClick={() => handleTabClick('/invoice-bill/editinvoice')}
                 >
                     Edit Invoice
-                </h2>
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/history' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/history'}
                     onClick={() => handleTabClick('/invoice-bill/history')}
                 >
                     History
-                </h2>
+                </ModuleHeadingTab>
                 {(username === 'Mahalingam M' || username === 'Admin') && (
-                    <h2
-                        className={`link ${activeTab === '/invoice-bill/database' ? 'active' : ''}`}
+                    <ModuleHeadingTab
+                        active={activeTab === '/invoice-bill/database'}
                         onClick={() => handleTabClick('/invoice-bill/database')}
                     >
                         Database
-                    </h2>
+                    </ModuleHeadingTab>
                 )}
-                <h2
-                    className={`link ${activeTab === '/invoice-bill/addinput' ? 'active' : ''}`}
+                <ModuleHeadingTab
+                    active={activeTab === '/invoice-bill/addinput'}
                     onClick={() => handleTabClick('/invoice-bill/addinput')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

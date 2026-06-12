@@ -2,15 +2,10 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import edit from '../Images/Edit.svg';
-import Filter from '../Images/TableFilter.svg';
-import Search from '../Images/Searchnew.svg';
-import Reload from '../Images/Clear.svg';
-import Pdf from '../Images/pdf.png';
-import XL from '../Images/sheets.png';
-import Select from 'react-select';
 import {
   EDBC_IDS,
   getEdbcColumnConfig,
+  getEdbcColumnHeaderSortProps,
   useEdbcExpandedCells,
   EdbcTableHeaderRow,
   EdbcTableBodyRow,
@@ -18,23 +13,19 @@ import {
   EdbcDateBodyCell,
   EdbcExpandableBodyCell,
   EdbcTableFilterRow,
-  EdbcTotalAmountFilter,
-  EdbcProjectNameFilter,
-  EdbcSelectFilter,
+  matchesEdbcAmountFilter,
   EdbcEmptyFilterCell,
   EdbcFileBodyCell,
   EdbcTimestampFilter,
+  EdbcTotalAmountFilter,
+  EdbcSelectFilter,
   formatEdbcFilterDateDMY,
   DATABASE_TABLE_FILTER_SELECT_STYLES,
   EDBC_TABLE_EDGE_TABLE_CLASS,
   EDBC2_FIRST_COLUMN_WIDTH_CLASS,
+  EdbcFilterToggleButton,
+  EdbcTableToolbarRightActions,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
-
-const SIDE_TABLE_DATE_FILTER_CALENDAR_CLASS =
-  '[&_thead]:!overflow-visible [&_thead]:!z-30 [&_tbody]:!relative [&_tbody]:!z-0 [&_thead_tr:nth-child(2)>th:first-child]:!overflow-visible [&_thead_tr:nth-child(2)>th:first-child]:!relative [&_thead_tr:nth-child(2)>th:first-child]:!z-40 [&_thead_tr:nth-child(2)>th:first-child>div]:!overflow-visible';
-
-const SIDE_TABLE_DATE_COLUMN_CLASS =
-  '[&_thead_tr>th#EDBC-2:first-child]:!w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!max-w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!min-w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!box-border [&_thead_tr:nth-child(2)>th#EDBC-2]:!w-[130px] [&_thead_tr:nth-child(2)>th#EDBC-2]:!max-w-[130px] [&_thead_tr:nth-child(2)>th#EDBC-2]:!min-w-[130px] [&_thead_tr:nth-child(2)>th#EDBC-2]:!box-border [&_thead_tr:nth-child(2)>th#EDBC-2>div]:!w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-2>div]:!max-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-2>div]:!min-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-2>div]:!box-border';
 
 const SIDE_TABLE_FIELDS = {
   date: 'Date',
@@ -53,7 +44,7 @@ const SIDE_TABLE_FORM_PATH_CSS = `
 .expense-form-side-table-host .side-table-form-path .form-side-table-toolbar-row {
   width: 100% !important;
   min-width: 0 !important;
-  max-width: 978px !important;
+  max-width: 988px !important;
   flex-wrap: wrap !important;
   align-items: flex-start !important;
   align-content: flex-start !important;
@@ -77,10 +68,13 @@ const SIDE_TABLE_FORM_PATH_CSS = `
   align-items: flex-end !important;
 }
 .expense-form-side-table-host .side-table-form-path .form-side-table-advance-amount {
-  width: 322px !important;
+  width: auto !important;
+  min-width: 0 !important;
   max-width: 100% !important;
   text-align: right !important;
   flex: none !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
 }
 .expense-form-side-table-host .side-table-form-path .form-side-table-search-row {
   flex: 0 0 auto !important;
@@ -101,71 +95,6 @@ const SIDE_TABLE_SORT_KEYS = {
 const sideTableSortIndicator = (activeSortField, sortDirection, columnSortField) => {
   if (activeSortField !== columnSortField) return null;
   return sortDirection === 'asc' ? ' ↑' : ' ↓';
-};
-
-const resolveSideTableSelectFilterValue = (value, blankOption, blankValue) => {
-  if (!value) return null;
-  if (blankValue && value === blankValue) return blankOption;
-  return { value, label: value };
-};
-
-const buildSideTableRightAlignedSelectStyles = (selectStyles) => ({
-  ...selectStyles,
-  control: (provided, state) => ({
-    ...(typeof selectStyles.control === 'function' ? selectStyles.control(provided, state) : provided),
-    textAlign: 'right',
-  }),
-  valueContainer: (provided, state) => ({
-    ...(typeof selectStyles.valueContainer === 'function' ? selectStyles.valueContainer(provided, state) : provided),
-    justifyContent: state.hasValue ? 'flex-end' : 'flex-start',
-    paddingLeft: state.hasValue ? '2px' : '12px',
-    paddingRight: '0px',
-  }),
-  singleValue: (provided) => ({
-    ...(typeof selectStyles.singleValue === 'function' ? selectStyles.singleValue(provided) : provided),
-    textAlign: 'right',
-  }),
-  input: (provided) => ({
-    ...(typeof selectStyles.input === 'function' ? selectStyles.input(provided) : provided),
-    textAlign: 'right',
-  }),
-  placeholder: (provided) => ({
-    ...(typeof selectStyles.placeholder === 'function' ? selectStyles.placeholder(provided) : provided),
-    textAlign: 'left',
-    paddingRight: '0px',
-    marginRight: 0,
-  }),
-  option: (provided, state) => ({
-    ...(typeof selectStyles.option === 'function' ? selectStyles.option(provided, state) : provided),
-    textAlign: 'right',
-    justifyContent: 'flex-end',
-    paddingRight: '12px',
-  }),
-});
-
-const buildSideTableEntryNoSelectStyles = (selectStyles) => {
-  const baseStyles = buildSideTableRightAlignedSelectStyles(selectStyles);
-  return {
-    ...baseStyles,
-    container: (provided) => ({
-      ...(typeof baseStyles.container === 'function' ? baseStyles.container(provided) : provided),
-      width: 120,
-      minWidth: 120,
-      maxWidth: 120,
-    }),
-    control: (provided, state) => {
-      const controlBase = typeof baseStyles.control === 'function'
-        ? baseStyles.control(provided, state)
-        : provided;
-      return {
-        ...controlBase,
-        width: 120,
-        minWidth: 120,
-        maxWidth: 120,
-        boxSizing: 'border-box',
-      };
-    },
-  };
 };
 
 function getFirstVisibleSideTableBodyRow(scroller) {
@@ -196,40 +125,6 @@ function alignSideTableRowBelowHeader(scroller, row) {
     scroller.scrollTop += delta;
   }
 }
-
-const SideTableSelectFilter = ({
-  columnId,
-  placeholder,
-  options,
-  value,
-  onChange,
-  blankOption = null,
-  blankValue = null,
-  selectStyles,
-}) => {
-  const config = getEdbcColumnConfig(columnId);
-  if (!config) return null;
-  const resolvedValue = resolveSideTableSelectFilterValue(value, blankOption, blankValue);
-  const resolvedStyles = columnId === EDBC_IDS.EDBC17
-    ? buildSideTableEntryNoSelectStyles(selectStyles)
-    : selectStyles;
-  return (
-    <th id={columnId} className={config.filterThClass}>
-      <Select
-        className={config.filterWidthClass}
-        options={options}
-        value={resolvedValue}
-        onChange={(selectedOption) => onChange(selectedOption ? selectedOption.value : '')}
-        placeholder={placeholder}
-        menuPlacement="bottom"
-        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-        menuPosition="fixed"
-        noOptionsMessage={() => null}
-        styles={resolvedStyles}
-      />
-    </th>
-  );
-};
 
 const SideTableColumnHeader = ({
   columnId,
@@ -453,6 +348,9 @@ const SideTable = ({
   const [filterTransferRefund, setFilterTransferRefund] = useState('');
   const [filterMode, setFilterMode] = useState('');
   const [filterEntryNo, setFilterEntryNo] = useState('');
+  const [filterAdvanceAmount, setFilterAdvanceAmount] = useState('');
+  const [filterBillAmount, setFilterBillAmount] = useState('');
+  const [filterDiscountAmount, setFilterDiscountAmount] = useState('');
   const filterRowRef = useRef(null);
   const scrollRef = useRef(null);
   const filterChipsScrollRef = useRef(null);
@@ -574,7 +472,7 @@ const SideTable = ({
     requestAnimationFrame(() => {
       scroller.scrollTop = 0;
     });
-  }, [filterDateStart, filterDateEnd, filterTransferRefund, filterMode, filterEntryNo]);
+  }, [filterDateStart, filterDateEnd, filterTransferRefund, filterMode, filterEntryNo, filterAdvanceAmount, filterBillAmount, filterDiscountAmount]);
   useLayoutEffect(() => {
     if (!hideDiscountAndActivity) return undefined;
     const el = document.createElement('style');
@@ -675,6 +573,22 @@ const SideTable = ({
         (entry) => (entry.payment_mode || '').toLowerCase() === filterMode.toLowerCase()
       );
     }
+    if (filterAdvanceAmount.trim()) {
+      entries = entries.filter((entry) => {
+        const amountVal = entry.type === 'Refund' ? entry.refund_amount : entry.amount;
+        return matchesEdbcAmountFilter(amountVal, filterAdvanceAmount);
+      });
+    }
+    if (filterBillAmount.trim()) {
+      entries = entries.filter((entry) =>
+        matchesEdbcAmountFilter(entry.bill_amount, filterBillAmount)
+      );
+    }
+    if (filterDiscountAmount.trim()) {
+      entries = entries.filter((entry) =>
+        matchesEdbcAmountFilter(entry.discount_amount, filterDiscountAmount)
+      );
+    }
     if (!overallSearch.trim()) return entries;
     const q = normalizeOverallSearchText(overallSearch.trim());
     return entries.filter((entry) => {
@@ -699,7 +613,7 @@ const SideTable = ({
       );
       return searchable.includes(q);
     });
-  }, [baseEntries, filterDateStart, filterDateEnd, filterTransferRefund, filterMode, overallSearch, siteOptions]);
+  }, [baseEntries, filterDateStart, filterDateEnd, filterTransferRefund, filterMode, filterAdvanceAmount, filterBillAmount, filterDiscountAmount, overallSearch, siteOptions]);
   const entryNoFilterOptions = useMemo(() => {
     if (!hideDiscountAndActivity) return [];
     const seen = new Set();
@@ -726,6 +640,9 @@ const SideTable = ({
     filterDateEnd ||
     filterTransferRefund ||
     filterMode ||
+    filterAdvanceAmount.trim() ||
+    filterBillAmount.trim() ||
+    filterDiscountAmount.trim() ||
     (hideDiscountAndActivity && filterEntryNo);
   const tableEntries = useMemo(() => {
     let entries = entriesForFilterOptions;
@@ -773,45 +690,38 @@ const SideTable = ({
   const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
   const edbc13Config = getEdbcColumnConfig(EDBC_IDS.EDBC13);
   const edbc17Config = getEdbcColumnConfig(EDBC_IDS.EDBC17);
-  const edbc20Config = getEdbcColumnConfig(EDBC_IDS.EDBC20);
   const edbc19Config = getEdbcColumnConfig(EDBC_IDS.EDBC19);
+  const edbc20Config = getEdbcColumnConfig(EDBC_IDS.EDBC20);
   const edbc19TdClass = edbc19Config?.tdClass || '';
   const tableColSpan = hideDiscountAndActivity ? 7 : 8;
-  const tableWidthClass = hideDiscountAndActivity ? 'w-[978px] max-w-[978px]' : 'w-[1038px] max-w-[1038px]';
-  const formSideTableHostWidthClass = hideDiscountAndActivity ? 'w-[978px]' : 'w-fit';
-  const formSideTableFilterSelectStyles = useMemo(
-    () => ({
-      ...DATABASE_TABLE_FILTER_SELECT_STYLES,
-      container: (provided) => ({
-        ...provided,
-        width: '100%',
-        maxWidth: '100%',
-      }),
-      control: (provided, state) => ({
-        ...DATABASE_TABLE_FILTER_SELECT_STYLES.control(provided, state),
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-      }),
-      menuPortal: (provided) => ({
-        ...provided,
-        zIndex: 99999,
-      }),
-    }),
-    [],
+  const sideTableWidthClass = hideDiscountAndActivity ? 'w-[988px] max-w-[988px]' : 'w-[1058px] max-w-[1058px]';
+  const sideTableColumnWidthClasses = useMemo(() => {
+    const edbc8W = edbc8Config?.columnWidthClass;
+    const cols = [EDBC2_FIRST_COLUMN_WIDTH_CLASS, edbc8W, edbc8W];
+    if (!hideDiscountAndActivity) cols.push(edbc8W);
+    cols.push(edbc3Config?.columnWidthClass);
+    if (hideDiscountAndActivity) cols.push(edbc17Config?.columnWidthClass);
+    cols.push(edbc13Config?.columnWidthClass);
+    if (hideDiscountAndActivity) cols.push(edbc20Config?.columnWidthClass);
+    else {
+      cols.push(edbc19Config?.columnWidthClass);
+      cols.push(edbc20Config?.columnWidthClass);
+    }
+    return cols.filter(Boolean);
+  }, [
+    hideDiscountAndActivity,
+    edbc8Config,
+    edbc3Config,
+    edbc13Config,
+    edbc17Config,
+    edbc19Config,
+    edbc20Config,
+  ]);
+  const edbc2ColumnWidthClass = EDBC2_FIRST_COLUMN_WIDTH_CLASS;
+  const edbcSortProps = useMemo(
+    () => getEdbcColumnHeaderSortProps(sortField, sortDirection, handleSort),
+    [sortField, sortDirection, handleSort],
   );
-  const formSideTableClass = hideDiscountAndActivity
-    ? [
-        '[&_thead_tr:nth-child(2)>th#EDBC-3]:!overflow-visible [&_thead_tr:nth-child(2)>th#EDBC-17]:!overflow-visible [&_thead_tr:nth-child(2)>th#EDBC-13]:!overflow-visible',
-        '[&_thead_tr:nth-child(2)>th#EDBC-3]:!box-border [&_thead_tr:nth-child(2)>th#EDBC-17]:!box-border [&_thead_tr:nth-child(2)>th#EDBC-13]:!box-border',
-        '[&_thead_tr:nth-child(2)>th#EDBC-3>div]:!w-full [&_thead_tr:nth-child(2)>th#EDBC-3>div]:!max-w-full [&_thead_tr:nth-child(2)>th#EDBC-3>div]:!min-w-0',
-        '[&_thead_tr:nth-child(2)>th#EDBC-3]:!p-0 [&_thead_tr:nth-child(2)>th#EDBC-17]:!pl-0 [&_thead_tr:nth-child(2)>th#EDBC-17]:!py-0 [&_thead_tr:nth-child(2)>th#EDBC-13]:!p-0',
-        '[&_thead_tr:nth-child(2)>th#EDBC-17>div]:!w-full [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!max-w-full [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!min-w-0',
-        '[&_thead_tr:nth-child(2)>th#EDBC-13>div]:!w-full [&_thead_tr:nth-child(2)>th#EDBC-13>div]:!max-w-full [&_thead_tr:nth-child(2)>th#EDBC-13>div]:!min-w-0',
-        '[&_thead_tr:nth-child(2)>th#EDBC-20]:!pl-[6px]',
-        '[&]:!overflow-x-hidden',
-      ].join(' ')
-    : '';
   const formSideTableSpacerRow = hideDiscountAndActivity ? (
     <tr aria-hidden="true" className="h-0 overflow-hidden pointer-events-none">
       <td colSpan={tableColSpan} className="h-0 p-0 border-0 leading-[0] text-[0px] overflow-hidden">
@@ -986,6 +896,9 @@ const SideTable = ({
     setFilterTransferRefund('');
     setFilterMode('');
     setFilterEntryNo('');
+    setFilterAdvanceAmount('');
+    setFilterBillAmount('');
+    setFilterDiscountAmount('');
     setOverallSearch('');
     clearSort();
   };
@@ -1012,34 +925,32 @@ const SideTable = ({
   };
 
   const formSideTableSearchActions = (
-    <>
-      <button type="button" onClick={clearFilters} className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
-        <img className="w-full h-full" src={Reload} alt="Reload" />
-      </button>
-      <div className="w-[286px] min-w-[286px] max-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2">
-        <input
-          type="text"
-          value={overallSearch}
-          onChange={(e) => setOverallSearch(e.target.value)}
-          placeholder={SIDE_TABLE_FIELDS.searchTransactions}
-          className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-        />
-        <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-      </div>
-    </>
+    <EdbcTableToolbarRightActions
+      onClearFilters={clearFilters}
+      overallSearch={overallSearch}
+      onOverallSearchChange={setOverallSearch}
+      searchPlaceholder={SIDE_TABLE_FIELDS.searchTransactions}
+      showExportIcons={false}
+      clearButtonType="button"
+      wrapperClassName={null}
+      searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0"
+    />
   );
 
   const formSideTableFilterToolbarLeft = (
     <div
       className={
         hideDiscountAndActivity
-          ? `flex min-w-0 w-full items-center overflow-hidden${hasActiveColumnFilters ? ' gap-[8px]' : ' gap-[6px]'}`
+          ? `flex min-w-0 items-center overflow-hidden${hasActiveColumnFilters ? ' w-full gap-[8px]' : ' shrink-0 gap-[6px]'}`
           : 'flex shrink-0 flex-col sm:flex-row sm:items-center sm:space-x-3'
       }
     >
-      <button type="button" onClick={toggleFilters} className="shrink-0">
-        <img src={Filter} alt="Toggle Filter" className="h-[34px] w-auto shrink-0 border rounded-md" />
-      </button>
+      <EdbcFilterToggleButton
+        type="button"
+        buttonClassName="shrink-0"
+        imageClassName="h-[34px] w-auto shrink-0 border rounded-md"
+        onClick={toggleFilters}
+      />
       {hasActiveColumnFilters && (
         <div
           ref={hideDiscountAndActivity ? filterChipsScrollRef : null}
@@ -1077,6 +988,27 @@ const SideTable = ({
               </button>
             </span>
           )}
+          {filterAdvanceAmount.trim() && (
+            <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+              <span className="font-medium text-[#BF9853]">{SIDE_TABLE_FIELDS.advance}: </span>
+              <span className="font-semibold text-[14px]">{filterAdvanceAmount}</span>
+              <button type="button" onClick={() => setFilterAdvanceAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+            </span>
+          )}
+          {filterBillAmount.trim() && (
+            <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+              <span className="font-medium text-[#BF9853]">{SIDE_TABLE_FIELDS.bill}: </span>
+              <span className="font-semibold text-[14px]">{filterBillAmount}</span>
+              <button type="button" onClick={() => setFilterBillAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+            </span>
+          )}
+          {filterDiscountAmount.trim() && (
+            <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+              <span className="font-medium text-[#BF9853]">{SIDE_TABLE_FIELDS.discount}: </span>
+              <span className="font-semibold text-[14px]">{filterDiscountAmount}</span>
+              <button type="button" onClick={() => setFilterDiscountAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+            </span>
+          )}
           {filterTransferRefund && (
             <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
               <span className="font-medium text-[#BF9853]">{SIDE_TABLE_FIELDS.transferRefund}: </span>
@@ -1108,46 +1040,34 @@ const SideTable = ({
   );
 
   const formSideTableTableSection = (
-    <div className={`border-l-8 border-l-[#BF9853] rounded-lg ${showFilters ? 'overflow-visible' : 'overflow-hidden'} box-border shrink-0 ${formSideTableHostWidthClass} ${hideDiscountAndActivity ? 'min-w-[978px]' : 'max-w-full'}`}>
+    <div className={`border-l-8 border-l-[#BF9853] rounded-lg overflow-hidden box-border flex-1 min-h-0 flex flex-col ${sideTableWidthClass}`}>
         <div
           ref={scrollRef}
-          className={`overflow-x-hidden max-h-[400px] overflow-y-scroll no-scrollbar scrollbar-none select-none ${hideDiscountAndActivity ? 'w-[978px] min-w-[978px] shrink-0' : 'w-full'}`}
+          className="w-full flex-1 min-h-0 overflow-auto no-scrollbar scrollbar-none select-none"
           onWheel={() => { filterNudgeUsedRef.current = false; }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <table className={`table-fixed ${tableWidthClass} border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} ${SIDE_TABLE_DATE_FILTER_CALENDAR_CLASS} ${SIDE_TABLE_DATE_COLUMN_CLASS} ${formSideTableClass}`}>
+          <table className={`table-fixed ${sideTableWidthClass} border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS}`.trim()}>
             <colgroup>
-              <col className={EDBC2_FIRST_COLUMN_WIDTH_CLASS} />
-              <col className={edbc8Config?.columnWidthClass} />
-              <col className={edbc8Config?.columnWidthClass} />
-              {!hideDiscountAndActivity && <col className={edbc8Config?.columnWidthClass} />}
-              <col className={edbc3Config?.columnWidthClass} />
-              {hideDiscountAndActivity && <col className={edbc17Config?.columnWidthClass} />}
-              <col className={edbc13Config?.columnWidthClass} />
-              {hideDiscountAndActivity && <col className={edbc20Config?.columnWidthClass} />}
-              {!hideDiscountAndActivity && <col className={edbc19Config?.columnWidthClass} />}
-              {!hideDiscountAndActivity && <col className={edbc20Config?.columnWidthClass} />}
+              {sideTableColumnWidthClasses.map((colClass, index) => (
+                <col key={index} className={colClass} />
+              ))}
             </colgroup>
-            <thead className={`sticky top-0 bg-white ${showFilters ? 'z-30' : 'z-10'}`}>
+            <thead className="sticky top-0 z-10 bg-white">
               <EdbcTableHeaderRow>
                 <EdbcColumnHeader
                   columnId={EDBC_IDS.EDBC2}
                   label={SIDE_TABLE_FIELDS.date}
-                  columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
+                  columnWidthClass={edbc2ColumnWidthClass}
+                  {...edbcSortProps}
                 />
-                <SideTableColumnHeader
+                <EdbcColumnHeader
                   columnId={EDBC_IDS.EDBC8}
                   label={SIDE_TABLE_FIELDS.advance}
-                  sortKey={SIDE_TABLE_SORT_KEYS[SIDE_TABLE_FIELDS.advance]}
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
+                  {...edbcSortProps}
                 />
                 <SideTableColumnHeader
                   columnId={EDBC_IDS.EDBC8}
@@ -1167,31 +1087,22 @@ const SideTable = ({
                     onSort={handleSort}
                   />
                 )}
-                <SideTableColumnHeader
+                <EdbcColumnHeader
                   columnId={EDBC_IDS.EDBC3}
                   label={SIDE_TABLE_FIELDS.transferRefund}
-                  sortKey={SIDE_TABLE_SORT_KEYS[SIDE_TABLE_FIELDS.transferRefund]}
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
+                  {...edbcSortProps}
                 />
                 {hideDiscountAndActivity && (
-                  <SideTableColumnHeader
+                  <EdbcColumnHeader
                     columnId={EDBC_IDS.EDBC17}
                     label={SIDE_TABLE_FIELDS.entryNo}
-                    sortKey={SIDE_TABLE_SORT_KEYS[SIDE_TABLE_FIELDS.entryNo]}
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
+                    {...edbcSortProps}
                   />
                 )}
-                <SideTableColumnHeader
+                <EdbcColumnHeader
                   columnId={EDBC_IDS.EDBC13}
                   label={SIDE_TABLE_FIELDS.mode}
-                  sortKey={SIDE_TABLE_SORT_KEYS[SIDE_TABLE_FIELDS.mode]}
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
+                  {...edbcSortProps}
                 />
                 {hideDiscountAndActivity && (
                   <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={SIDE_TABLE_FIELDS.file} />
@@ -1218,35 +1129,38 @@ const SideTable = ({
                       setFilterDateEnd(to || '');
                     }}
                   />
-                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.advance} />
-                  <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.bill} />
+                  <EdbcTotalAmountFilter
+                    columnId={EDBC_IDS.EDBC8}
+                    totalAmount={totals.advance}
+                    value={filterAdvanceAmount}
+                    onChange={(e) => setFilterAdvanceAmount(e.target.value)}
+                  />
+                  <EdbcTotalAmountFilter
+                    columnId={EDBC_IDS.EDBC8}
+                    totalAmount={totals.bill}
+                    value={filterBillAmount}
+                    onChange={(e) => setFilterBillAmount(e.target.value)}
+                  />
                   {!hideDiscountAndActivity && (
-                    <EdbcTotalAmountFilter columnId={EDBC_IDS.EDBC8} totalAmount={totals.discount} />
-                  )}
-                  {hideDiscountAndActivity ? (
-                    <SideTableSelectFilter
-                      columnId={EDBC_IDS.EDBC3}
-                      placeholder={SIDE_TABLE_FIELDS.transferRefund}
-                      options={transferRefundFilterOptions}
-                      value={filterTransferRefund}
-                      onChange={setFilterTransferRefund}
-                      blankOption={blankOption}
-                      blankValue={BLANK_VALUE}
-                      selectStyles={formSideTableFilterSelectStyles}
-                    />
-                  ) : (
-                    <EdbcProjectNameFilter
-                      placeholder={SIDE_TABLE_FIELDS.transferRefund}
-                      options={transferRefundFilterOptions}
-                      value={filterTransferRefund}
-                      onChange={setFilterTransferRefund}
-                      blankOption={blankOption}
-                      blankValue={BLANK_VALUE}
-                      selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                    <EdbcTotalAmountFilter
+                      columnId={EDBC_IDS.EDBC8}
+                      totalAmount={totals.discount}
+                      value={filterDiscountAmount}
+                      onChange={(e) => setFilterDiscountAmount(e.target.value)}
                     />
                   )}
+                  <EdbcSelectFilter
+                    columnId={EDBC_IDS.EDBC3}
+                    placeholder={SIDE_TABLE_FIELDS.transferRefund}
+                    options={transferRefundFilterOptions}
+                    value={filterTransferRefund}
+                    onChange={setFilterTransferRefund}
+                    blankOption={blankOption}
+                    blankValue={BLANK_VALUE}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
                   {hideDiscountAndActivity && (
-                    <SideTableSelectFilter
+                    <EdbcSelectFilter
                       columnId={EDBC_IDS.EDBC17}
                       placeholder={SIDE_TABLE_FIELDS.entryNo}
                       options={entryNoFilterOptions}
@@ -1254,28 +1168,17 @@ const SideTable = ({
                       onChange={setFilterEntryNo}
                       blankOption={blankOption}
                       blankValue={BLANK_VALUE}
-                      selectStyles={formSideTableFilterSelectStyles}
-                    />
-                  )}
-                  {hideDiscountAndActivity ? (
-                    <SideTableSelectFilter
-                      columnId={EDBC_IDS.EDBC13}
-                      placeholder={SIDE_TABLE_FIELDS.mode}
-                      options={modeFilterOptions}
-                      value={filterMode}
-                      onChange={setFilterMode}
-                      selectStyles={formSideTableFilterSelectStyles}
-                    />
-                  ) : (
-                    <EdbcSelectFilter
-                      columnId={EDBC_IDS.EDBC13}
-                      placeholder={SIDE_TABLE_FIELDS.mode}
-                      options={modeFilterOptions}
-                      value={filterMode}
-                      onChange={setFilterMode}
                       selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                     />
                   )}
+                  <EdbcSelectFilter
+                    columnId={EDBC_IDS.EDBC13}
+                    placeholder={SIDE_TABLE_FIELDS.mode}
+                    options={modeFilterOptions}
+                    value={filterMode}
+                    onChange={setFilterMode}
+                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                  />
                   {hideDiscountAndActivity && (
                     <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                   )}
@@ -1316,7 +1219,7 @@ const SideTable = ({
                         expandedCells={expandedCells}
                         onToggleExpanded={toggleExpandedCell}
                         formatValue={(date) => new Date(date).toLocaleDateString('en-GB')}
-                        columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                        columnWidthClass={edbc2ColumnWidthClass}
                       />
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC8}
@@ -1327,25 +1230,25 @@ const SideTable = ({
                         textAlignClass="text-right"
                         getDisplayValue={() => advanceAmount}
                       />
-                      <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
-                        <span
-                          onClick={() => toggleExpandedCell(`${rowKey}-bill_amount`)}
-                          className={`block w-full cursor-pointer text-right ${expandedCells[`${rowKey}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                          title={billAmount}
-                        >
-                          {billAmount}
-                        </span>
-                      </td>
+                      <EdbcExpandableBodyCell
+                        columnId={EDBC_IDS.EDBC8}
+                        expense={row}
+                        rowIndex={index}
+                        expandedCells={expandedCells}
+                        onToggleExpanded={toggleExpandedCell}
+                        textAlignClass="text-right"
+                        getDisplayValue={() => billAmount}
+                      />
                       {!hideDiscountAndActivity && (
-                        <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
-                          <span
-                            onClick={() => toggleExpandedCell(`${rowKey}-discount_amount`)}
-                            className={`block w-full cursor-pointer text-right ${expandedCells[`${rowKey}-discount_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
-                            title={discountDisplay}
-                          >
-                            {discountDisplay}
-                          </span>
-                        </td>
+                        <EdbcExpandableBodyCell
+                          columnId={EDBC_IDS.EDBC8}
+                          expense={row}
+                          rowIndex={index}
+                          expandedCells={expandedCells}
+                          onToggleExpanded={toggleExpandedCell}
+                          textAlignClass="text-right"
+                          getDisplayValue={() => discountDisplay}
+                        />
                       )}
                       <EdbcExpandableBodyCell
                         columnId={EDBC_IDS.EDBC3}
@@ -1413,9 +1316,9 @@ const SideTable = ({
   );
 
   const formSideTableScrollInner = (
-    <>
+    <div className="flex flex-col h-full min-h-0">
       <div
-        className={`text-left flex mb-[12px] ${
+        className={`text-left flex shrink-0 mb-[12px] ${
           hasActiveColumnFilters ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'
         } gap-[px] w-full`}
       >
@@ -1424,14 +1327,16 @@ const SideTable = ({
           {formSideTableSearchActions}
         </div>
       </div>
-      {formSideTableTableSection}
-    </>
+      <div className="flex-1 min-h-0 flex flex-col">
+        {formSideTableTableSection}
+      </div>
+    </div>
   );
 
   const formSideTableFormContent = (
-    <>
-      <div className="form-side-table-toolbar-row w-full max-w-[978px] min-w-0 shrink-0 text-left flex flex-wrap mb-[12px] justify-between items-start gap-y-2 gap-x-2">
-        <div className="form-side-table-filter-left flex min-w-0 flex-[1_1_200px] max-w-full flex-col gap-1">
+    <div className="flex flex-col h-full min-h-0">
+      <div className={`form-side-table-toolbar-row w-full ${hideDiscountAndActivity ? 'max-w-[988px]' : 'max-w-[1058px]'} min-w-0 shrink-0 text-left mb-[8px]`}>
+        <div className="flex w-full justify-between items-start gap-[8px] mt-[4px] mb-[12px]">
           {projectAdvance != null && (
             <h2
               ref={advanceHeaderRef}
@@ -1440,33 +1345,37 @@ const SideTable = ({
               Advance
             </h2>
           )}
-          {formSideTableFilterToolbarLeft}
-        </div>
-        <div className="form-side-table-search-column flex flex-col items-end gap-1 ml-auto shrink-0">
           {projectAdvance != null && (
             <span className="form-side-table-advance-amount text-base font-bold text-[#E4572E] leading-none">
-              ₹{projectAdvance || '0'}
+              ₹{(!selectedOption || !selectedSite || sortedTableEntries.length === 0)
+                ? '0.00'
+                : (projectAdvance || '0.00')}
             </span>
           )}
-          <div className="form-side-table-search-row flex shrink-0 items-center gap-[6px]">
+        </div>
+        <div className="flex min-w-0 w-full flex-nowrap items-center justify-between gap-[6px]">
+          <div className={`flex min-w-0 items-center overflow-hidden${hasActiveColumnFilters ? ' flex-1 min-w-0' : ' shrink-0'}`}>
+            {formSideTableFilterToolbarLeft}
+          </div>
+          <div className="flex min-w-0 items-center justify-end gap-[6px]">
             {formSideTableSearchActions}
           </div>
         </div>
       </div>
-      <div className="form-side-table-h-scroll min-w-0 w-full overflow-x-auto no-scrollbar scrollbar-none shrink-0">
-        <div className="w-[978px] min-w-[978px] shrink-0 flex flex-col">
+      <div className="form-side-table-h-scroll min-w-0 w-full flex-1 min-h-0 flex flex-col overflow-x-auto no-scrollbar scrollbar-none">
+        <div className="w-full min-w-0 flex-1 min-h-0 flex flex-col">
           {formSideTableTableSection}
         </div>
       </div>
-    </>
+    </div>
   );
 
   return (
-    <div className={`side-table-root ${hideDiscountAndActivity ? 'side-table-form-path w-full min-w-0 max-w-full' : 'w-full min-w-0 max-w-full'} flex flex-col`}>
+    <div className={`side-table-root ${hideDiscountAndActivity ? 'side-table-form-path w-full min-w-0 max-w-full' : 'w-full min-w-0 max-w-full'} flex flex-col h-full min-h-0`}>
       {hideDiscountAndActivity ? (
         formSideTableFormContent
       ) : (
-        <div className={`${formSideTableHostWidthClass} max-w-full shrink-0 flex flex-col`}>
+        <div className="w-full max-w-full flex-1 min-h-0 flex flex-col h-full">
           {formSideTableScrollInner}
         </div>
       )}

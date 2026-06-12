@@ -1813,7 +1813,6 @@ const Form = ({
             if (selectedFile) {
                 try {
                     const formData = new FormData();
-
                     const now = new Date();
                     const timestamp = now.toLocaleString("en-GB", {
                         day: "2-digit",
@@ -1826,29 +1825,21 @@ const Form = ({
                     })
                         .replace(",", "")
                         .replace(/\s/g, "-");
-
                     const finalName = `${timestamp}_${selectedSite.sNo}_${vendor || contractor}`;
-
                     // ✅ IMPORTANT: key must be "files" (plural)
                     formData.append("files", selectedFile);
-
                     // ✅ required
                     formData.append("folder", "FileUpload / Expenses_Entry_Files");
-
                     // ✅ optional (your backend uses this as prefix)
                     formData.append("fileName", finalName);
-
                     const uploadResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/files/upload", {
                         method: "POST",
                         body: formData,
                     });
-
                     if (!uploadResponse.ok) {
                         throw new Error("File upload failed");
                     }
-
                     const result = await uploadResponse.json();
-
                     // ✅ backend returns { urls: [] }
                     pdfUrl = result.urls[0];
 
@@ -1911,7 +1902,7 @@ const Form = ({
             console.log("expensesId", expensesId);
             if (!expensesId) {
                 throw new Error(
-                    'Expenses save response did not include id. Backend must return { id } from expenses_form/save.'
+                    'Expenses save response did not include id. Backend must return { id } from expenses_form.'
                 );
             }
             const trimmedSaveResponse = responseText.trim();
@@ -2249,7 +2240,7 @@ const Form = ({
             expensesId = resolveExpensesEntryIdAfterSave(responseText);
             if (!expensesId) {
                 throw new Error(
-                    'Expenses save response did not include id. Backend must return { id } from expenses_form/save.'
+                    'Expenses save response did not include id. Backend must return { id } from expenses_form.'
                 );
             }
             const trimmedSaveResponse = responseText.trim();
@@ -2493,149 +2484,6 @@ const Form = ({
                     padding-bottom: 0 !important;
                 }
             `}</style>
-            {!embedded && (
-                <style>{`
-                    .expense-form-side-table-host {
-                        overflow-x: visible !important;
-                        overflow-y: hidden !important;
-                    }
-                    .expense-form-side-table-host > div {
-                        height: auto !important;
-                        width: 100% !important;
-                        min-width: 0 !important;
-                        max-width: 100% !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        min-height: 0 !important;
-                    }
-                    .expense-form-side-table-host .form-side-table-h-scroll {
-                        flex: none !important;
-                        min-height: 0 !important;
-                        width: 100% !important;
-                        min-width: 0 !important;
-                        max-width: 100% !important;
-                        overflow-x: auto !important;
-                        display: block !important;
-                    }
-                    .expense-form-side-table-host .form-side-table-h-scroll > div {
-                        width: 978px !important;
-                        min-width: 978px !important;
-                        max-width: 978px !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                    }
-                    .expense-form-side-table-host .form-side-table-h-scroll > div > div:first-child {
-                        width: 978px !important;
-                        min-width: 978px !important;
-                        max-width: 978px !important;
-                        box-sizing: border-box !important;
-                    }
-                    .expense-form-side-table-host .border-l-8 {
-                        flex: none !important;
-                        min-height: 0 !important;
-                        width: 978px !important;
-                        min-width: 978px !important;
-                        max-width: 978px !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        overflow-x: hidden !important;
-                    }
-                    .expense-form-side-table-host table {
-                        width: 978px !important;
-                        max-width: 978px !important;
-                        min-width: 978px !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll {
-                        width: 978px !important;
-                        min-width: 978px !important;
-                        max-width: 978px !important;
-                        max-height: 400px !important;
-                        height: auto !important;
-                        flex: none !important;
-                        min-height: 0 !important;
-                        overflow-x: hidden !important;
-                        overflow-y: auto !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll:has(table tbody > tr:only-child) {
-                        display: flex !important;
-                        flex-direction: column !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        width: 100% !important;
-                        min-height: 280px !important;
-                    }
-                    .expense-form-side-table-host .border-l-8:has(table tbody > tr:only-child) {
-                        width: 100% !important;
-                        max-width: 100% !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        flex: 1 1 auto !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) {
-                        display: flex !important;
-                        flex-direction: column !important;
-                        flex: 1 1 auto !important;
-                        width: 100% !important;
-                        min-width: 100% !important;
-                        max-width: 100% !important;
-                        min-height: 100% !important;
-                        height: 100% !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > thead {
-                        flex: 0 0 auto !important;
-                        width: 100% !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > tbody {
-                        flex: 1 1 auto !important;
-                        display: flex !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        width: 100% !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > tbody > tr {
-                        display: flex !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        width: 100% !important;
-                        flex: 1 1 auto !important;
-                    }
-                    .expense-form-side-table-host .overflow-y-scroll > table:has(tbody > tr:only-child) > tbody > tr > td {
-                        display: flex !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        width: 100% !important;
-                        text-align: center !important;
-                        border: none !important;
-                    }
-                    @media (min-width: 1280px) {
-                        .expense-form-side-table-host .overflow-y-scroll:has(table tbody > tr:only-child) {
-                            min-height: 100% !important;
-                        }
-                        .expense-form-side-table-host > div {
-                            height: 100% !important;
-                        }
-                        .expense-form-side-table-host .form-side-table-h-scroll {
-                            height: 100% !important;
-                            flex: 1 1 0% !important;
-                            min-height: 0 !important;
-                            display: flex !important;
-                            flex-direction: column !important;
-                        }
-                        .expense-form-side-table-host .form-side-table-h-scroll > div {
-                            flex: 1 1 0% !important;
-                            min-height: 0 !important;
-                        }
-                        .expense-form-side-table-host .border-l-8 {
-                            flex: 1 1 0% !important;
-                        }
-                        .expense-form-side-table-host .overflow-y-scroll {
-                            max-height: none !important;
-                            height: 100% !important;
-                            flex: 1 1 0% !important;
-                        }
-                    }
-                `}</style>
-            )}
             <div className={`px-[18px] pt-[18px] pb-[18px] bg-white rounded w-full flex-1 min-h-0 overflow-auto no-scrollbar scrollbar-none`}>
                 <form onSubmit={handleFormSubmit}>
                     <div className="flex flex-col xl:grid xl:grid-cols-[max-content_minmax(0,1fr)] gap-x-[18px] gap-y-[12px] min-w-0 items-start">

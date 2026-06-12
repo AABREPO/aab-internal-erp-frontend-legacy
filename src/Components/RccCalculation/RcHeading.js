@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ModuleHeadingWrapper, ModuleHeadingBar, ModuleHeadingTab } from '../MainHeadingpage/MainHeadingpage';
 import { Link, Routes, Route } from 'react-router-dom';
 import RccCalculator from './RccCalculator';
 import RcHistory from './RcHistory';
@@ -30,31 +31,31 @@ const RcHeading = () => {
     };
 
     return (
-        <div className="bg-[#FAF6ED]">
-            <div className="topbar-title">
-                <h2
-                    className={`link ${activeTab === 'RCCCalculation' ? 'active' : ''}`}
+        <ModuleHeadingWrapper>
+            <ModuleHeadingBar>
+                <ModuleHeadingTab
+                    active={activeTab === 'RCCCalculation'}
                     onClick={() => setActiveTab('RCCCalculation')}
                 >
                     RCC Calculation
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'history' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'history'}
                     onClick={() => setActiveTab('history')}
                 >
                     History
-                </h2>
-                <h2
-                    className={`link ${activeTab === 'addinput' ? 'active' : ''}`}
+                </ModuleHeadingTab>
+                <ModuleHeadingTab
+                    active={activeTab === 'addinput'}
                     onClick={() => setActiveTab('addinput')}
                 >
                     Add Input
-                </h2>
-            </div>
+                </ModuleHeadingTab>
+            </ModuleHeadingBar>
             <div className="content">
                 {renderContent()}
             </div>
-        </div>
+        </ModuleHeadingWrapper>
     );
 };
 

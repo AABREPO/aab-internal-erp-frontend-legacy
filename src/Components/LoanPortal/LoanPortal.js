@@ -1302,7 +1302,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
       }
       const loanResult = await response.json();
       // If payment mode is GPay, PhonePe, Net Banking, or Cheque, also save to weekly-payment-bills
-      if (selectedLoanType === "Loan" && ["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
+      if (selectedLoanType === "Loan" || selectedLoanType === "Refund" && ["GPay", "Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentMode)) {
         const weeklyPaymentBillPayload = {
           date: dateValue,
           created_at: new Date().toISOString(),
@@ -1310,7 +1310,7 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
           vendor_id: selectedOption?.type === "Vendor" ? selectedOption.id : null,
           employee_id: selectedOption?.type === "Employee" ? selectedOption.id : null,
           project_id: 0,
-          type: "Loan",
+          type: selectedLoanType,
           bill_payment_mode: paymentMode,
           amount: parseFloat(amountGiven) || 0,
           status: true,
@@ -1325,7 +1325,9 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
           cheque_date: paymentMode === "Cheque" ? paymentPopupData.chequeDate : null,
           transaction_number: paymentPopupData.transactionNumber || null,
           account_number: paymentPopupData.accountNumber || null,
-          branch_id: activeBranchId
+          branch_id: activeBranchId,
+          source: "Loan Portal",
+          entered_by: username,
         };
 
         const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save");

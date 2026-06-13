@@ -1087,6 +1087,7 @@ const AdvancePortal = ({
             file_url: "",
             branch_id: activeBranchId,
             entered_by: enteredBy,
+            source: "Advance Portal",
           };
           // Save to LoanPortal
           const loanResponse = await fetch(withBranchUrl("https://backendaab.in/demoAabuildersDash/api/loans/save"), {
@@ -1629,7 +1630,8 @@ const AdvancePortal = ({
           transaction_number: paymentModalData.transactionNumber || null,
           account_number: paymentModalData.accountNumber || null,
           branch_id: activeBranchId,
-          entered_by: enteredBy
+          entered_by: enteredBy,
+          source: "Advance Portal",
         };
         // Save to weekly payment bills
         const weeklyBillSaveUrl = withBranchUrl('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save');

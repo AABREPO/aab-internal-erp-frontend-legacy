@@ -33,7 +33,7 @@ import {
   EDBC_TABLE_EDGE_TABLE_CLASS,
   formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
-import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, resolveFilesUploadResponseUrl } from '../../utils/advancePortalWeeklyPaymentBill';
+import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, resolveFilesUploadResponseUrl, syncVendorCarryForwardFromAdvancePortalEdit } from '../../utils/advancePortalWeeklyPaymentBill';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 
 const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
@@ -1425,6 +1425,13 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
             console.error('Linked expense sync failed after advance edit:', expenseErr);
           }
         }
+        if (sourceRecord) {
+          try {
+            await syncVendorCarryForwardFromAdvancePortalEdit(sourceRecord, payload);
+          } catch (carryForwardErr) {
+            console.error('Linked vendor carry forward sync failed after advance edit:', carryForwardErr);
+          }
+        }
       };
       const setAllowToEdit = async (id, allow) => {
         try {
@@ -1608,6 +1615,13 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           });
         } catch (expenseErr) {
           console.error('Linked expense sync failed after advance edit:', expenseErr);
+        }
+      }
+      if (sourceRecord) {
+        try {
+          await syncVendorCarryForwardFromAdvancePortalEdit(sourceRecord, payload);
+        } catch (carryForwardErr) {
+          console.error('Linked vendor carry forward sync failed after advance edit:', carryForwardErr);
         }
       }
       try {

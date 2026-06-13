@@ -2,10 +2,14 @@ import {
   postBankRegisterLogSave,
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
+  isChequePaymentMode,
 } from './bankRegisterLogBeforeWeeklyBill';
 import {
   updateWeeklyPaymentBillById,
   saveWeeklyPaymentBill,
+  resolveLoanAdvancePortalId,
+  syncAdvancePortalFromLoanEdit,
+  buildEditPaymentModalDataFromWeeklyBill,
 } from './advancePortalWeeklyPaymentBill';
 
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
@@ -49,6 +53,24 @@ const pickLoanWeeklyBillModalOrExisting = (modalPaymentData, bill, modalKey, sna
 export const isLoanOnlinePaymentModeForModal = (paymentMode) =>
   isPaymentModeRequiringBankRegisterLog(paymentMode);
 
+export const shouldPromptLoanEditPaymentModal = (payload) => {
+  if (payload?.type === 'Transfer') return false;
+  return isLoanOnlinePaymentModeForModal(payload?.loan_payment_mode);
+};
+
+export const fetchLoanEditPaymentModalData = async (loanPortalId, accountDetails = []) => {
+  let existingBill = null;
+  try {
+    const bills = await fetchWeeklyPaymentBillsByLoanPortalId(loanPortalId);
+    existingBill = Array.isArray(bills) && bills.length > 0 ? bills[0] : null;
+  } catch (e) {
+    console.warn('Could not fetch existing weekly bill to prefill payment details', e);
+  }
+  return buildEditPaymentModalDataFromWeeklyBill(existingBill, accountDetails);
+};
+
+export const isLoanChequePaymentMode = (paymentMode) => isChequePaymentMode(paymentMode);
+
 export const getLoanPortalDisplayAmount = (payload) => {
   if (payload?.type === 'Refund') return payload.loan_refund_amount ?? '';
   return payload.amount ?? '';
@@ -77,12 +99,22 @@ const resolveLoanWeeklyBillAmount = (loanPayload) => {
   return parseFloat(loanPayload.amount) || 0;
 };
 
+/** Weekly bills: sync for Loan/Refund with online mode; delete only for Transfer (or non-online). */
 const shouldSyncLoanToWeeklyBill = (loanPayload) => {
-  if (loanPayload?.type !== 'Loan') return false;
+  if (loanPayload?.type === 'Transfer') return false;
   const mode = String(loanPayload?.loan_payment_mode || '').trim();
   if (!mode) return false;
   return isLoanOnlinePaymentModeForModal(mode);
 };
+
+const shouldDeleteLoanWeeklyBillsOnEdit = (loanPayload) => loanPayload?.type === 'Transfer';
+
+const buildLoanWeeklyBillModalDataFromExistingBill = (bill) => ({
+  chequeNo: bill?.cheque_number ?? bill?.chequeNumber ?? '',
+  chequeDate: bill?.cheque_date ?? bill?.chequeDate ?? '',
+  transactionNumber: bill?.transaction_number ?? bill?.transactionNumber ?? '',
+  accountNumber: bill?.account_number ?? bill?.accountNumber ?? '',
+});
 
 export const buildLoanPortalWeeklyBillUpdatePayload = (
   loanPayload,
@@ -122,7 +154,7 @@ export const buildLoanPortalWeeklyBillUpdatePayload = (
       normalizeWeeklyBillNullableId(bill.employee_id ?? bill.employeeId),
     labour_id: normalizeWeeklyBillNullableId(bill.labour_id ?? bill.labourId),
     project_id: normalizeWeeklyBillNullableId(bill.project_id ?? bill.projectId),
-    type: 'Loan',
+    type: loanPayload.type || bill.type || 'Loan',
     amount: resolveLoanWeeklyBillAmount(loanPayload),
     status: bill.status !== false,
     weekly_number: bill.weekly_number ?? bill.weeklyNumber ?? null,
@@ -208,7 +240,7 @@ export const buildLoanPortalWeeklyBillSavePayload = (
     vendor_id: normalizeWeeklyBillNullableId(loanPayload.vendor_id),
     employee_id: normalizeWeeklyBillNullableId(loanPayload.employee_id),
     project_id: 0,
-    type: 'Loan',
+    type: loanPayload.type || 'Loan',
     bill_payment_mode: loanPayload.loan_payment_mode || null,
     amount: resolveLoanWeeklyBillAmount(loanPayload),
     status: true,
@@ -265,6 +297,13 @@ export const syncWeeklyPaymentBillsForLoanPortal = async (
   const matchingBills = await fetchWeeklyPaymentBillsByLoanPortalId(loanPortalId);
   const isOnlineMode = shouldSyncLoanToWeeklyBill(loanPayload);
 
+  if (shouldDeleteLoanWeeklyBillsOnEdit(loanPayload)) {
+    if (matchingBills.length > 0) {
+      await deleteRelatedWeeklyPaymentBillsForLoanPortal(loanPortalId);
+    }
+    return;
+  }
+
   if (!isOnlineMode) {
     if (matchingBills.length > 0) {
       await deleteRelatedWeeklyPaymentBillsForLoanPortal(loanPortalId);
@@ -272,7 +311,14 @@ export const syncWeeklyPaymentBillsForLoanPortal = async (
     return;
   }
 
-  if (!modalPaymentData?.accountNumber) {
+  const resolvedModalPaymentData =
+    modalPaymentData?.accountNumber
+      ? modalPaymentData
+      : matchingBills.length > 0
+        ? buildLoanWeeklyBillModalDataFromExistingBill(matchingBills[0])
+        : null;
+
+  if (!resolvedModalPaymentData?.accountNumber) {
     return;
   }
 
@@ -282,7 +328,7 @@ export const syncWeeklyPaymentBillsForLoanPortal = async (
       const payload = buildLoanPortalWeeklyBillUpdatePayload(loanPayload, bill, {
         editedBy,
         loanPortalId,
-        modalPaymentData,
+        modalPaymentData: resolvedModalPaymentData,
         purposeId,
       });
       await updateWeeklyPaymentBillById(bill.id, payload);
@@ -292,7 +338,7 @@ export const syncWeeklyPaymentBillsForLoanPortal = async (
 
   const resolvedBranchId = branchId ?? loanPayload.branch_id ?? loanPayload.branchId;
   const savePayload = buildLoanPortalWeeklyBillSavePayload(loanPayload, loanPortalId, {
-    modalPaymentData,
+    modalPaymentData: resolvedModalPaymentData,
     branchId: resolvedBranchId,
     enteredBy: editedBy,
     purposeId,
@@ -312,4 +358,191 @@ export const syncWeeklyPaymentBillsForLoanPortal = async (
   }
 
   await saveWeeklyPaymentBill(savePayload, { branchId: resolvedBranchId });
+};
+
+export const buildLoanEditPayloadFromForm = ({
+  editingId,
+  editSelectedType,
+  editFormData,
+  editTransferSelection,
+  editSelectedOption,
+  editPurpose,
+  editTransferAmount,
+  editPaymentMode,
+  editDescription,
+  currentEntry,
+}) => {
+  const isRefund = editSelectedType === 'Refund';
+  const isTransfer = editSelectedType === 'Transfer';
+  const transferType = editTransferSelection?.type;
+  const isTransferToSite =
+    isTransfer &&
+    transferType === 'Site' &&
+    (editSelectedOption?.type === 'Vendor' || editSelectedOption?.type === 'Contractor');
+  const transferAmount = parseFloat(editTransferAmount || editFormData.loan_amount || 0) || 0;
+
+  return {
+    loanPortalId: editingId,
+    type: editSelectedType,
+    date: editFormData.date,
+    amount: isRefund
+      ? 0
+      : isTransfer
+        ? isTransferToSite
+          ? -Math.abs(transferAmount)
+          : transferAmount
+        : parseFloat(editFormData.loan_amount || 0) || 0,
+    loan_refund_amount: isRefund ? parseFloat(editFormData.loan_refund_amount || 0) : 0,
+    loan_payment_mode: isTransfer ? '' : (editPaymentMode || ''),
+    from_purpose_id: editPurpose || 0,
+    to_purpose_id: isTransfer && transferType === 'Purpose' ? (editTransferSelection?.id || 0) : 0,
+    vendor_id:
+      editSelectedOption?.type === 'Vendor'
+        ? editSelectedOption.id
+        : (currentEntry?.vendor_id || 0),
+    contractor_id:
+      editSelectedOption?.type === 'Contractor'
+        ? editSelectedOption.id
+        : (currentEntry?.contractor_id || 0),
+    employee_id:
+      editSelectedOption?.type === 'Employee'
+        ? editSelectedOption.id
+        : (currentEntry?.employee_id || 0),
+    labour_id:
+      editSelectedOption?.type === 'Labour'
+        ? editSelectedOption.id
+        : (currentEntry?.labour_id || 0),
+    project_id: editFormData.project_id || currentEntry?.project_id || 0,
+    transfer_Project_id: isTransfer && transferType === 'Site' ? (editTransferSelection?.id || 0) : 0,
+    entry_no: editFormData.entry_no || currentEntry?.entry_no || 0,
+    description: editDescription || '',
+    file_url: currentEntry?.file_url ?? currentEntry?.fileUrl ?? '',
+    advance_portal_id: currentEntry?.advance_portal_id ?? currentEntry?.advancePortalId ?? null,
+    branch_id: currentEntry?.branch_id ?? currentEntry?.branchId ?? null,
+  };
+};
+
+export const buildLoanClearedPayload = (record, loanPortalId) => ({
+  loanPortalId: loanPortalId ?? record.loanPortalId ?? record.id,
+  type: '',
+  date: record.date,
+  amount: 0,
+  loan_refund_amount: 0,
+  loan_payment_mode: '',
+  from_purpose_id: 0,
+  to_purpose_id: 0,
+  vendor_id: 0,
+  contractor_id: 0,
+  project_id: 0,
+  transfer_Project_id: 0,
+  entry_no: record.entry_no ?? 0,
+  description: '',
+});
+
+export const clearLoanPortalRecordsOnDelete = async (idToDelete, record, allLoanData, editedBy) => {
+  if (!record) {
+    throw new Error('Loan record not found for delete');
+  }
+
+  const entryNo = record.entry_no;
+  const clearedRecords = [];
+
+  const clearRecord = async (loanRec) => {
+    const loanId = loanRec.loanPortalId ?? loanRec.id;
+    const clearedData = buildLoanClearedPayload(loanRec, loanId);
+    const res = await fetch(
+      `${TOOLS_API_BASE}/api/loans/${loanId}?editedBy=${encodeURIComponent(editedBy || '')}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(clearedData),
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(errText || `Failed to clear loan record ${loanId}`);
+    }
+    clearedRecords.push(loanRec);
+  };
+
+  if (record.type === 'Transfer') {
+    const transferRecords = (allLoanData || []).filter((row) => row.entry_no === entryNo);
+    if (transferRecords.length !== 2) {
+      console.warn(`Expected 2 Transfer records with entry_no ${entryNo}, but found ${transferRecords.length}`);
+    }
+    await Promise.all(transferRecords.map(clearRecord));
+  } else {
+    await clearRecord(record);
+  }
+
+  let deletedCount = 0;
+  let failedCount = 0;
+  const processedLoanIds = new Set();
+  for (const loanRec of clearedRecords) {
+    const loanId = loanRec.loanPortalId ?? loanRec.id;
+    if (!loanId || processedLoanIds.has(String(loanId))) continue;
+    processedLoanIds.add(String(loanId));
+    const result = await deleteRelatedWeeklyPaymentBillsForLoanPortal(loanId);
+    deletedCount += result.deletedCount;
+    failedCount += result.failedCount;
+  }
+
+  return {
+    clearedRecords,
+    weeklyBillDelete: { deletedCount, failedCount },
+  };
+};
+
+export const performLoanPortalEditWithSync = async ({
+  editingId,
+  payload,
+  editedBy,
+  currentEntry,
+  siteOptions = [],
+  selectedOption = null,
+  modalPaymentData = null,
+}) => {
+  const res = await fetch(
+    `${TOOLS_API_BASE}/api/loans/${editingId}?editedBy=${encodeURIComponent(editedBy || '')}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(errText || 'Failed to update loan record');
+  }
+
+  try {
+    await syncWeeklyPaymentBillsForLoanPortal(editingId, payload, {
+      editedBy,
+      branchId: payload.branch_id,
+      modalPaymentData,
+      purposeId: payload.from_purpose_id,
+    });
+  } catch (weeklyErr) {
+    console.error('Weekly payment bill sync failed after loan edit:', weeklyErr);
+  }
+
+  let advanceSyncFailed = false;
+  const advancePortalId = resolveLoanAdvancePortalId(currentEntry);
+  if (advancePortalId) {
+    try {
+      await syncAdvancePortalFromLoanEdit(advancePortalId, payload, {
+        editedBy,
+        siteOptions,
+        selectedOption,
+        branchId: payload.branch_id,
+      });
+    } catch (advanceErr) {
+      console.error('Failed to sync linked advance portal entry:', advanceErr);
+      advanceSyncFailed = true;
+    }
+  }
+
+  return { advanceSyncFailed };
 };

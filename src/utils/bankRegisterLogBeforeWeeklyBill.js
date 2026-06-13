@@ -11,15 +11,27 @@ function resolveEnteredByFromPayload(p) {
   }
 }
 
-/** GPay / Gpay, PhonePe, Net Banking, Cheque — case-insensitive */
-export function isPaymentModeRequiringBankRegisterLog(paymentMode) {
-  const m = String(paymentMode || '')
+const normalizePaymentModeToken = (paymentMode) =>
+  String(paymentMode || '')
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, ' ');
+    .replace(/[\s_-]+/g, '');
+
+/** GPay / G-Pay, PhonePe, Net Banking, Cheque — case-insensitive */
+export function isPaymentModeRequiringBankRegisterLog(paymentMode) {
+  const m = normalizePaymentModeToken(paymentMode);
   if (!m) return false;
-  return m === 'gpay' || m === 'phonepe' || m === 'net banking' || m === 'cheque';
+  return (
+    m === 'gpay' ||
+    m === 'googlepay' ||
+    m === 'phonepe' ||
+    m === 'netbanking' ||
+    m === 'cheque'
+  );
 }
+
+export const isChequePaymentMode = (paymentMode) =>
+  normalizePaymentModeToken(paymentMode) === 'cheque';
 
 /**
  * Bank log lives on aabuildersDash; copy query params (e.g. branchId) from the main request URL.

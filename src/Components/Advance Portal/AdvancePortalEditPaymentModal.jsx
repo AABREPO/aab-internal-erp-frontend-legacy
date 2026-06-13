@@ -2,8 +2,22 @@ import React, { useMemo } from 'react';
 import Select from 'react-select';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
 import { isAdvanceOnlinePaymentModeForModal } from '../../utils/advancePortalWeeklyPaymentBill';
+import { isChequePaymentMode } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const PAYMENT_MODAL_SELECT_Z_INDEX = 10001;
+
+const buildAccountOptions = (accountDetails) =>
+  (accountDetails || []).map((account) => ({
+    value: account.account_number,
+    label: account.account_number,
+  }));
+
+const resolveSelectedAccountOption = (accountOptions, rawAccountNumber) => {
+  const raw = rawAccountNumber;
+  if (raw == null || String(raw).trim() === '') return null;
+  const match = accountOptions.find((o) => String(o.value) === String(raw));
+  return match || { value: String(raw), label: String(raw) };
+};
 
 const AdvancePortalEditPaymentModal = ({
   isOpen,
@@ -33,12 +47,13 @@ const AdvancePortalEditPaymentModal = ({
     };
   }, [selectStyles]);
 
-  if (!isOpen) return null;
+  const accountOptions = useMemo(() => buildAccountOptions(accountDetails), [accountDetails]);
+  const selectedAccountOption = useMemo(
+    () => resolveSelectedAccountOption(accountOptions, paymentModalData?.accountNumber),
+    [accountOptions, paymentModalData?.accountNumber]
+  );
 
-  const accountOptions = (accountDetails || []).map((account) => ({
-    value: account.account_number,
-    label: account.account_number,
-  }));
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[10000]">
@@ -80,7 +95,7 @@ const AdvancePortalEditPaymentModal = ({
             {isAdvanceOnlinePaymentModeForModal(paymentMode) && (
               <div className="border-2 border-[#BF9853] border-opacity-25 w-full rounded-lg p-4">
                 <div className="space-y-4">
-                  {paymentMode === 'Cheque' && (
+                  {isChequePaymentMode(paymentMode) && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -123,11 +138,7 @@ const AdvancePortalEditPaymentModal = ({
                       </label>
                       <Select
                         options={accountOptions}
-                        value={
-                          paymentModalData.accountNumber
-                            ? { value: paymentModalData.accountNumber, label: paymentModalData.accountNumber }
-                            : null
-                        }
+                        value={selectedAccountOption}
                         onChange={(selected) =>
                           setPaymentModalData((prev) => ({
                             ...prev,

@@ -65,6 +65,8 @@
     line-height: 21px !important;
     color: #000000 !important;
     font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif !important;
+    cursor: pointer;
+    user-select: none;
 }
 
 .expense-entry-tabs .link.active::after {

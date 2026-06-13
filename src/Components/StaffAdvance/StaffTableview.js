@@ -2,6 +2,15 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from '
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import {
+  buildStaffEditPayloadFromForm,
+  shouldPromptStaffEditPaymentModal,
+  fetchStaffEditPaymentModalData,
+  syncWeeklyPaymentBillsForStaffAdvancePortal,
+  getStaffAdvanceDisplayAmount,
+  isStaffAdvanceChequePaymentMode,
+} from '../../utils/staffAdvanceWeeklyPaymentBill';
+import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -288,10 +297,10 @@ const EditModal = memo(({
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-4">
-          <button onClick={onClose} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded">
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-[#BF9853] w-[100px] h-[45px] rounded">
             Cancel
           </button>
-          <button onClick={onUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
+          <button type="button" onClick={onUpdate} className="px-4 py-2 bg-[#BF9853] w-[100px] h-[45px] text-white rounded">
             Save
           </button>
         </div>
@@ -303,6 +312,11 @@ const EditModal = memo(({
 EditModal.displayName = 'EditModal';
 
 const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
+  const normalizeStaffAdvanceRecords = (recData) =>
+    (Array.isArray(recData) ? recData : []).filter(
+      (entry) => String(entry?.type || '').trim() !== ''
+    );
+
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -313,7 +327,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const [filterType, setFilterType] = useState('');
   const [laboursList, setLaboursList] = useState([]);
   const [isRequestStaffModalOpen, setIsRequestStaffModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectDate, setSelectDate] = useState('');
   const [selectEmployeeName, setSelectEmployeeName] = useState('');
@@ -325,6 +339,16 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
+  const [accountDetails, setAccountDetails] = useState([]);
+  const pendingStaffUpdateRef = useRef(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -344,7 +368,6 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
   const fetchData = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
     try {
       const [recRes, empRes, purRes] = await Promise.allSettled([
@@ -363,7 +386,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       const purData = purRes.status === 'fulfilled' && purRes.value.ok
         ? await purRes.value.json()
         : [];
-      setRecords(recData);
+      setRecords(normalizeStaffAdvanceRecords(recData));
       setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
       setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
       const failedAPIs = [];
@@ -380,7 +403,19 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       setEmployees([]);
       setPurposes([]);
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+    }
+  }, []);
+
+  const refreshStaffRecords = useCallback(async () => {
+    try {
+      const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
+      if (recRes.ok) {
+        const recData = await recRes.json();
+        setRecords(normalizeStaffAdvanceRecords(recData));
+      }
+    } catch (error) {
+      console.warn('Error refreshing staff advance records:', error);
     }
   }, []);
 
@@ -388,9 +423,9 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
     fetchData();
   }, [fetchData]);
 
-  useOrbitPageSync('staffadvance', fetchData, [fetchData]);
+  useOrbitPageSync('staffadvance', refreshStaffRecords, [refreshStaffRecords]);
 
-  useTabRefreshSignal(refreshSignal, isActive, fetchData);
+  useTabRefreshSignal(refreshSignal, isActive, refreshStaffRecords);
   useEffect(() => {
     fetchLaboursList();
   }, []);
@@ -416,6 +451,22 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
     }
   };
   useEffect(() => { setStaffAdvanceCombinedOptions([...employees, ...laboursList]); }, [employees, laboursList]);
+
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          setAccountDetails(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching account details:', error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
+
   const handleMouseDown = (e) => {
     if (!scrollRef.current) return;
     isDragging.current = true;
@@ -691,48 +742,87 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
     setIsEditModalOpen(true);
   }, []);
 
-  const handleUpdate = useCallback(async () => {
-    try {
+  const performStaffAdvanceUpdate = useCallback(
+    async (payload, modalPaymentData = null) => {
+      const currentEntry = records.find(
+        (r) => String(r.staffAdvancePortalId || r.id) === String(editingId)
+      );
       const url = `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
-      const payload = {
-        type: editFormData.type || '',
-        date: editFormData.date || '',
-        employee_id: editFormData.employee_id || '',
-        labour_id: editFormData.labour_id || '',
-        from_purpose_id: editFormData.from_purpose_id || null,
-        to_purpose_id: editFormData.to_purpose_id || null,
-        staff_payment_mode: editFormData.staff_payment_mode || '',
-        amount: editFormData.type === "Refund" ? 0 : Number(editFormData.amount || 0),
-        staff_refund_amount: editFormData.type === "Refund" ? Number(editFormData.staff_refund_amount || 0) : 0,
-        entry_no: editFormData.entryNo ?? null,
-        description: editFormData.description || '',
-        file_url: editFormData.file_url || ''
-      };
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         throw new Error(`Update failed: ${response.statusText}`);
       }
-      const updatedRecords = await response.json();
+      await response.json();
+
+      try {
+        await syncWeeklyPaymentBillsForStaffAdvancePortal(editingId, payload, {
+          editedBy: username,
+          branchId: currentEntry?.branch_id ?? currentEntry?.branchId ?? null,
+          modalPaymentData,
+        });
+      } catch (weeklyErr) {
+        console.error('Weekly payment bill sync failed after staff advance edit:', weeklyErr);
+      }
+
       setIsEditModalOpen(false);
-      setRecords(prevRecords => {
-        const updatedEntryNos = new Set(updatedRecords.map(r => r.entryNo));
-        const filteredRecords = prevRecords.filter(record =>
-          !updatedEntryNos.has(record.entryNo) ||
-          updatedRecords.some(u => u.staffAdvancePortalId === record.staffAdvancePortalId)
-        );
-        return [...filteredRecords, ...updatedRecords];
-      });
+      setShowEditPaymentModal(false);
+      pendingStaffUpdateRef.current = null;
+      await refreshStaffRecords();
       notifyOrbitModuleDataChanged('staffadvance');
+    },
+    [editingId, records, refreshStaffRecords, username]
+  );
+
+  const handleUpdate = useCallback(async () => {
+    try {
+      const payload = buildStaffEditPayloadFromForm({ editFormData });
+      if (shouldPromptStaffEditPaymentModal(payload)) {
+        pendingStaffUpdateRef.current = { payload };
+        const modalData = await fetchStaffEditPaymentModalData(editingId, accountDetails);
+        setEditPaymentModalData(modalData);
+        setShowEditPaymentModal(true);
+        return;
+      }
+      await performStaffAdvanceUpdate(payload);
     } catch (error) {
       console.error('Update error:', error);
       alert(error.message || 'Failed to update record. Please try again.');
     }
-  }, [editFormData, editingId, username]);
+  }, [accountDetails, editFormData, editingId, performStaffAdvanceUpdate]);
+
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    const pendingPaymentMode =
+      pendingStaffUpdateRef.current?.payload?.staff_payment_mode ??
+      editFormData.staff_payment_mode;
+    if (
+      isStaffAdvanceChequePaymentMode(pendingPaymentMode) &&
+      (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)
+    ) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingStaffUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+
+    setIsEditPaymentSubmitting(true);
+    try {
+      await performStaffAdvanceUpdate(pending.payload, editPaymentModalData);
+    } catch (error) {
+      console.error('Update error:', error);
+      alert(error.message || 'Failed to update record. Please try again.');
+    } finally {
+      setIsEditPaymentSubmitting(false);
+    }
+  };
   const [debouncedFilters, setDebouncedFilters] = useState({
     selectDate: '',
     selectEmployeeName: '',
@@ -1013,7 +1103,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       }
     };
   },[]);
-  if(isLoading){
+  if (isInitialLoading) {
     return (
       <div className="p-6 bg-[#faf6ed] min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -1529,6 +1619,31 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
             </div>
           </div>
         )}
+        <AdvancePortalEditPaymentModal
+          isOpen={showEditPaymentModal}
+          onClose={() => {
+            setShowEditPaymentModal(false);
+            pendingStaffUpdateRef.current = null;
+          }}
+          onSubmit={handleEditPaymentModalSubmit}
+          isSubmitting={isEditPaymentSubmitting}
+          paymentMode={
+            pendingStaffUpdateRef.current?.payload?.staff_payment_mode ??
+            editFormData.staff_payment_mode
+          }
+          date={pendingStaffUpdateRef.current?.payload?.date ?? editFormData.date}
+          amount={getStaffAdvanceDisplayAmount(
+            pendingStaffUpdateRef.current?.payload || {
+              type: editFormData.type,
+              amount: editFormData.amount,
+              staff_refund_amount: editFormData.staff_refund_amount,
+              staff_payment_mode: editFormData.staff_payment_mode,
+            }
+          )}
+          paymentModalData={editPaymentModalData}
+          setPaymentModalData={setEditPaymentModalData}
+          accountDetails={accountDetails}
+        />
       </div>
     </div>
   );

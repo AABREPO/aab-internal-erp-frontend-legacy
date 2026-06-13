@@ -62,6 +62,52 @@ const resolveAdvanceWeeklyBillAmount = (advancePayload) => {
 export const isAdvanceOnlinePaymentModeForModal = (paymentMode) =>
   isPaymentModeRequiringBankRegisterLog(paymentMode);
 
+export const resolveWeeklyBillAccountNumberForModal = (rawAccountNumber, accountDetails = []) => {
+  const normalizedRaw = String(rawAccountNumber ?? '').trim();
+  if (!normalizedRaw) return '';
+
+  const accounts = Array.isArray(accountDetails) ? accountDetails : [];
+  const match = accounts.find((acc) => {
+    const acct = String(acc?.account_number ?? acc?.accountNumber ?? '').trim();
+    if (!acct) return false;
+    const acctPrimary = acct.split(/\s+/)[0];
+    const rawPrimary = normalizedRaw.split(/\s+/)[0];
+    return (
+      acct === normalizedRaw ||
+      acctPrimary === rawPrimary ||
+      acct.startsWith(rawPrimary) ||
+      normalizedRaw.startsWith(acctPrimary)
+    );
+  });
+
+  if (match) {
+    return String(match.account_number ?? match.accountNumber ?? '').trim();
+  }
+  return normalizedRaw;
+};
+
+export const buildEditPaymentModalDataFromWeeklyBill = (existingBill, accountDetails = []) => ({
+  chequeNo: existingBill?.cheque_number ?? existingBill?.chequeNumber ?? '',
+  chequeDate: existingBill?.cheque_date ?? existingBill?.chequeDate ?? '',
+  transactionNumber:
+    existingBill?.transaction_number ?? existingBill?.transactionNumber ?? '',
+  accountNumber: resolveWeeklyBillAccountNumberForModal(
+    existingBill?.account_number ?? existingBill?.accountNumber ?? '',
+    accountDetails
+  ),
+});
+
+export const fetchAdvanceEditPaymentModalData = async (advancePortalId, accountDetails = []) => {
+  let existingBill = null;
+  try {
+    const bills = await fetchWeeklyPaymentBillsByAdvancePortalId(advancePortalId);
+    existingBill = Array.isArray(bills) && bills.length > 0 ? bills[0] : null;
+  } catch (e) {
+    console.warn('Could not fetch existing weekly bill to prefill payment details', e);
+  }
+  return buildEditPaymentModalDataFromWeeklyBill(existingBill, accountDetails);
+};
+
 /** Weekly-payment-bills are only for online modes (not Cash/Direct/Transfer). */
 const shouldSyncAdvanceToWeeklyBill = (advancePayload) => {
   if (advancePayload?.type === 'Transfer') return false;
@@ -458,6 +504,85 @@ export const resolveAdvancePortalExpensesEntryId = (record) => {
   return id;
 };
 
+export const resolveAdvancePortalVendorCarryForwardId = (record) => {
+  const id = record?.vendor_carry_forward_id ?? record?.vendorCarryForwardId;
+  if (id == null || id === '' || id === 0) return null;
+  return id;
+};
+
+export const buildVendorCarryForwardUpdateFromAdvanceEdit = (advancePayload, sourceRecord = {}) => {
+  const existing = sourceRecord || {};
+  const amountRaw = parseFloat(advancePayload?.amount);
+  const fallbackAmount = Math.abs(parseFloat(existing.amount) || 0);
+  const amount = Number.isFinite(amountRaw) ? Math.abs(amountRaw) : fallbackAmount;
+  const vendorId =
+    advancePayload?.vendor_id ??
+    existing.vendor_id ??
+    existing.vendorId ??
+    null;
+  const date = normalizeWeeklyBillApiDate(advancePayload?.date ?? existing.date);
+  const paymentMode =
+    advancePayload?.payment_mode ??
+    existing.payment_mode ??
+    existing.paymentMode ??
+    '';
+
+  return {
+    type: 'Transfer',
+    date: date || normalizeWeeklyBillApiDate(existing.date),
+    vendor_id: vendorId,
+    payment_mode: paymentMode || '',
+    amount,
+    bill_amount: 0,
+    refund_amount: 0,
+  };
+};
+
+export const syncVendorCarryForwardFromAdvancePortalEdit = async (sourceRecord, advancePayload) => {
+  const carryForwardId = resolveAdvancePortalVendorCarryForwardId(sourceRecord);
+  if (!carryForwardId) return;
+
+  const updatePayload = buildVendorCarryForwardUpdateFromAdvanceEdit(advancePayload, sourceRecord);
+  if (!updatePayload.date) {
+    console.warn(`Invalid date for vendor carry forward ${carryForwardId}; skipping sync`);
+    return;
+  }
+  if (!updatePayload.vendor_id) {
+    console.warn(`Missing vendor_id for vendor carry forward ${carryForwardId}; skipping sync`);
+    return;
+  }
+
+  const response = await fetch(`${TOOLS_API_BASE}/api/vendor_carry_forward/edit/${carryForwardId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(updatePayload),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to update linked vendor carry forward entry: ${errText}`);
+  }
+};
+
+export const deleteVendorCarryForwardById = async (carryForwardId) => {
+  if (!carryForwardId) return { ok: false, deleted: false };
+  const response = await fetch(`${TOOLS_API_BASE}/api/vendor_carry_forward/delete/${carryForwardId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(errText || `Failed to delete vendor carry forward ${carryForwardId}`);
+  }
+  return { ok: true, deleted: true };
+};
+
+export const deleteLinkedVendorCarryForwardOnAdvancePortalDelete = async (record) => {
+  const carryForwardId = resolveAdvancePortalVendorCarryForwardId(record);
+  if (!carryForwardId) return { ok: true, deleted: false };
+  return deleteVendorCarryForwardById(carryForwardId);
+};
+
 const pickPositiveNumericId = (value) => {
   if (value == null || value === '') return null;
   const n = Number(value);
@@ -738,6 +863,26 @@ export const clearAdvancePortalRecordsOnDelete = async (
   const clearedData = buildAdvancePortalClearedPayload(record);
   const entryNo = getAdvancePortalEntryNo(record);
   const advancePortalIdsToClear = [];
+  const recordsToClear =
+    record.type === 'Transfer'
+      ? (allAdvanceData || []).filter((r) => getAdvancePortalEntryNo(r) === entryNo)
+      : [record];
+
+  let vendorCarryForwardDeleted = 0;
+  let vendorCarryForwardFailed = 0;
+  const processedCarryForwardIds = new Set();
+  for (const rec of recordsToClear) {
+    const carryForwardId = resolveAdvancePortalVendorCarryForwardId(rec);
+    if (!carryForwardId || processedCarryForwardIds.has(String(carryForwardId))) continue;
+    processedCarryForwardIds.add(String(carryForwardId));
+    try {
+      const { deleted } = await deleteLinkedVendorCarryForwardOnAdvancePortalDelete(rec);
+      if (deleted) vendorCarryForwardDeleted += 1;
+    } catch (carryForwardErr) {
+      console.error('Failed to delete linked vendor carry forward:', carryForwardErr);
+      vendorCarryForwardFailed += 1;
+    }
+  }
 
   const putClear = async (advancePortalId) => {
     const res = await fetch(
@@ -756,16 +901,13 @@ export const clearAdvancePortalRecordsOnDelete = async (
   };
 
   if (record.type === 'Transfer') {
-    const transferRecords = (allAdvanceData || []).filter(
-      (r) => getAdvancePortalEntryNo(r) === entryNo
-    );
-    if (transferRecords.length !== 2) {
+    if (recordsToClear.length !== 2) {
       console.warn(
-        `Expected 2 Transfer records with entry_no ${entryNo}, but found ${transferRecords.length}`
+        `Expected 2 Transfer records with entry_no ${entryNo}, but found ${recordsToClear.length}`
       );
     }
     await Promise.all(
-      transferRecords.map(async (rec) => putClear(getAdvancePortalRecordId(rec)))
+      recordsToClear.map(async (rec) => putClear(getAdvancePortalRecordId(rec)))
     );
   } else {
     await putClear(idToDelete);
@@ -779,7 +921,14 @@ export const clearAdvancePortalRecordsOnDelete = async (
     failedCount += result.failedCount;
   }
 
-  return { advancePortalIdsToClear, weeklyBillDelete: { deletedCount, failedCount } };
+  return {
+    advancePortalIdsToClear,
+    weeklyBillDelete: { deletedCount, failedCount },
+    vendorCarryForwardDelete: {
+      deletedCount: vendorCarryForwardDeleted,
+      failedCount: vendorCarryForwardFailed,
+    },
+  };
 };
 
 /** When an expense is deleted, clear linked advance portal rows (by expenses_entry_id). */
@@ -849,6 +998,19 @@ export const formatWeeklyBillDeleteMessage = (deletedCount, failedCount) => {
   return '';
 };
 
+export const formatVendorCarryForwardDeleteMessage = (deletedCount, failedCount) => {
+  if (deletedCount > 0 && failedCount === 0) {
+    return ' Linked vendor carry forward record was also deleted.';
+  }
+  if (deletedCount > 0 && failedCount > 0) {
+    return ' Linked vendor carry forward record could not be fully deleted.';
+  }
+  if (failedCount > 0) {
+    return ' Failed to delete linked vendor carry forward record.';
+  }
+  return '';
+};
+
 export const formatAdvancePortalClearOnExpenseDeleteMessage = (clearedAdvanceIds) => {
   if (!clearedAdvanceIds?.length) return '';
   return ' Related advance portal record(s) were also cleared.';
@@ -858,6 +1020,55 @@ export const resolveLoanAdvancePortalId = (record) => {
   const id = record?.advance_portal_id ?? record?.advancePortalId;
   if (id == null || id === '' || id === 0) return null;
   return id;
+};
+
+/** Clear advance portal row(s) linked from loan delete — mirrors Advance Database delete side effects. */
+export const clearLinkedAdvancePortalForLoanDelete = async (loanRecords, editedBy) => {
+  const records = Array.isArray(loanRecords) ? loanRecords : [];
+  const advanceIdsToClear = [
+    ...new Set(
+      records.map((record) => resolveLoanAdvancePortalId(record)).filter((id) => id != null)
+    ),
+  ];
+  if (!advanceIdsToClear.length) {
+    return { clearedAdvanceIds: [] };
+  }
+
+  const allAdvanceData = await fetchAllAdvancePortalRecords();
+  const processedEntryNos = new Set();
+  const clearedAdvanceIds = [];
+
+  for (const advId of advanceIdsToClear) {
+    const advRecord = (allAdvanceData || []).find((record) => {
+      const recordId = getAdvancePortalRecordId(record) ?? record?.id;
+      return recordId != null && String(recordId) === String(advId);
+    });
+    if (!advRecord) continue;
+
+    const advEntryNo = getAdvancePortalEntryNo(advRecord) ?? advId;
+    const entryKey = String(advEntryNo);
+    if (processedEntryNos.has(entryKey)) continue;
+    processedEntryNos.add(entryKey);
+
+    try {
+      await clearAdvancePortalRecordsOnDelete(advId, advRecord, allAdvanceData, editedBy);
+      clearedAdvanceIds.push(advId);
+    } catch (clearErr) {
+      console.error(`Failed to clear linked advance portal ${advId}:`, clearErr);
+      continue;
+    }
+
+    const expensesEntryId = resolveAdvancePortalExpensesEntryId(advRecord);
+    if (expensesEntryId) {
+      try {
+        await deleteLinkedExpenseEntryOnAdvancePortalDelete(expensesEntryId, editedBy);
+      } catch (expenseErr) {
+        console.error(`Failed to delete linked expense for advance portal ${advId}:`, expenseErr);
+      }
+    }
+  }
+
+  return { clearedAdvanceIds };
 };
 
 export const fetchAdvancePortalRecordById = async (advancePortalId) => {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   addDays,
   addMonths,
@@ -47,6 +48,8 @@ export default function SingleDatePicker({
   anchor = "left", // "left" | "right"
   alwaysOpenBelow = false,
   alwaysOpenAbove = false,
+  portalStyle = null,
+  anchorRef = null,
 }) {
   const selectedDate = useMemo(() => (value ? parseISO(value) : null), [value]);
   const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
@@ -81,12 +84,13 @@ export default function SingleDatePicker({
   useEffect(() => {
     if (!isOpen || variant !== "dropdown") return;
     const onMouseDown = (e) => {
-      if (!containerRef.current) return;
-      if (!containerRef.current.contains(e.target)) onClose();
+      if (containerRef.current?.contains(e.target)) return;
+      if (anchorRef?.current?.contains(e.target)) return;
+      onClose();
     };
     window.addEventListener("mousedown", onMouseDown);
     return () => window.removeEventListener("mousedown", onMouseDown);
-  }, [isOpen, variant, onClose]);
+  }, [isOpen, variant, onClose, anchorRef]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -368,6 +372,14 @@ export default function SingleDatePicker({
   );
 
   if (variant === "dropdown") {
+    if (portalStyle) {
+      return createPortal(
+        <div ref={containerRef} style={{ position: "fixed", zIndex: 99999, ...portalStyle }}>
+          {panel}
+        </div>,
+        document.body
+      );
+    }
     return (
       <div
         ref={containerRef}

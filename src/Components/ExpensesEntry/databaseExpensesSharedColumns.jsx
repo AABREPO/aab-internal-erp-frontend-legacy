@@ -1361,8 +1361,8 @@ export const EdbcTableToolbarRightActions = ({
     onExportCsv,
     clearButtonClassName = 'flex shrink-0 items-center justify-center',
     clearButtonType,
-    searchWrapperClassName = 'w-[286px] min-w-[286px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1',
-    wrapperClassName = 'flex items-end gap-[6px]',
+    searchWrapperClassName = 'h-[34px] min-w-0 flex-1 max-w-[286px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 sm:w-[286px] sm:min-w-[286px] sm:flex-none sm:shrink-0',
+    wrapperClassName = 'flex items-end gap-[6px] min-w-0 shrink',
 }) => {
     const content = (
         <>

@@ -2,6 +2,17 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import {
+  buildStaffEditPayloadFromForm,
+  shouldPromptStaffEditPaymentModal,
+  fetchStaffEditPaymentModalData,
+  syncWeeklyPaymentBillsForStaffAdvancePortal,
+  clearStaffAdvanceRecordsOnDelete,
+  getStaffAdvanceDisplayAmount,
+  isStaffAdvanceChequePaymentMode,
+} from '../../utils/staffAdvanceWeeklyPaymentBill';
+import { formatWeeklyBillDeleteMessage } from '../../utils/advancePortalWeeklyPaymentBill';
+import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Select from 'react-select';
@@ -16,7 +27,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [employees, setEmployees] = useState([]);
   const [purposes, setPurposes] = useState([]);
   const [filterType, setFilterType] = useState(''); // "" means all types
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [laboursList, setLaboursList] = useState([]);
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
@@ -31,6 +42,16 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
+  const [accountDetails, setAccountDetails] = useState([]);
+  const pendingStaffUpdateRef = useRef(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [staffAdvanceAudits, setStaffAdvanceAudits] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -45,9 +66,23 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   const animationFrame = useRef(null);
   const lastMove = useRef({ time: 0, x: 0, y: 0 });
 
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          setAccountDetails(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching account details:', error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
+
   // Fetch all data on mount
   const fetchData = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
     try {
       let recData = [];
@@ -88,7 +123,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
         console.warn('Error fetching purposes data:', error);
       }
 
-      setRecords(recData);
+      setRecords(Array.isArray(recData) ? recData : []);
       setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
       setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
     } catch (error) {
@@ -98,7 +133,19 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
       setEmployees([]);
       setPurposes([]);
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+    }
+  }, []);
+
+  const refreshStaffRecords = useCallback(async () => {
+    try {
+      const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
+      if (recRes.ok) {
+        const recData = await recRes.json();
+        setRecords(Array.isArray(recData) ? recData : []);
+      }
+    } catch (error) {
+      console.warn('Error refreshing staff advance records:', error);
     }
   }, []);
 
@@ -106,9 +153,9 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     fetchData();
   }, [fetchData]);
 
-  useOrbitPageSync('staffadvance', fetchData, [fetchData]);
+  useOrbitPageSync('staffadvance', refreshStaffRecords, [refreshStaffRecords]);
 
-  useTabRefreshSignal(refreshSignal, isActive, fetchData);
+  useTabRefreshSignal(refreshSignal, isActive, refreshStaffRecords);
 
   useEffect(() => {
     fetchLaboursList();
@@ -732,50 +779,88 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     }
   };
 
-  const handleUpdate = useCallback(async () => {
-    try {
+  const performStaffAdvanceUpdate = useCallback(
+    async (payload, modalPaymentData = null) => {
+      const currentEntry = records.find(
+        (r) => String(r.staffAdvancePortalId || r.id) === String(editingId)
+      );
       const url = `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${username}`;
-      const payload = {
-        type: editFormData.type || '',
-        date: editFormData.date || '',
-        employee_id: editFormData.employee_id || '',
-        labour_id: editFormData.labour_id || '',
-        from_purpose_id: editFormData.from_purpose_id || null,
-        to_purpose_id: editFormData.to_purpose_id || null,
-        staff_payment_mode: editFormData.staff_payment_mode || '',
-        amount: editFormData.type === "Refund" ? 0 : Number(editFormData.amount || 0),
-        staff_refund_amount: editFormData.type === "Refund" ? Number(editFormData.staff_refund_amount || 0) : 0,
-        entry_no: editFormData.entryNo ?? null,
-        description: editFormData.description || '',
-        file_url: editFormData.file_url || ''
-      };
-
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         throw new Error(`Update failed: ${response.statusText}`);
       }
-      const updatedRecords = await response.json();
+      await response.json();
+
+      try {
+        await syncWeeklyPaymentBillsForStaffAdvancePortal(editingId, payload, {
+          editedBy: username,
+          branchId: currentEntry?.branch_id ?? currentEntry?.branchId ?? null,
+          modalPaymentData,
+        });
+      } catch (weeklyErr) {
+        console.error('Weekly payment bill sync failed after staff advance edit:', weeklyErr);
+      }
+
       setIsEditModalOpen(false);
-      setRecords(prevRecords => {
-        const updatedEntryNos = new Set(updatedRecords.map(r => r.entry_no));
-        const filteredRecords = prevRecords.filter(record =>
-          !updatedEntryNos.has(record.entry_no) ||
-          updatedRecords.some(u => u.staffAdvancePortalId === record.staffAdvancePortalId)
-        );
-        return [...filteredRecords, ...updatedRecords];
-      });
+      setShowEditPaymentModal(false);
+      pendingStaffUpdateRef.current = null;
+      await refreshStaffRecords();
       notifyOrbitModuleDataChanged('staffadvance');
+    },
+    [editingId, records, refreshStaffRecords, username]
+  );
+
+  const handleUpdate = useCallback(async () => {
+    try {
+      const payload = buildStaffEditPayloadFromForm({ editFormData });
+      if (shouldPromptStaffEditPaymentModal(payload)) {
+        pendingStaffUpdateRef.current = { payload };
+        const modalData = await fetchStaffEditPaymentModalData(editingId, accountDetails);
+        setEditPaymentModalData(modalData);
+        setShowEditPaymentModal(true);
+        return;
+      }
+      await performStaffAdvanceUpdate(payload);
     } catch (error) {
       console.error('Update error:', error);
       alert(error.message || 'Failed to update record. Please try again.');
     }
-  }, [editFormData, editingId, username]);
+  }, [accountDetails, editFormData, editingId, performStaffAdvanceUpdate]);
+
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    const pendingPaymentMode =
+      pendingStaffUpdateRef.current?.payload?.staff_payment_mode ??
+      editFormData.staff_payment_mode;
+    if (
+      isStaffAdvanceChequePaymentMode(pendingPaymentMode) &&
+      (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)
+    ) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingStaffUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+
+    setIsEditPaymentSubmitting(true);
+    try {
+      await performStaffAdvanceUpdate(pending.payload, editPaymentModalData);
+    } catch (error) {
+      console.error('Update error:', error);
+      alert(error.message || 'Failed to update record. Please try again.');
+    } finally {
+      setIsEditPaymentSubmitting(false);
+    }
+  };
 
   const handleDelete = async (idToDelete) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this record?");
@@ -788,43 +873,23 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
         return;
       }
 
-      const entryNo = record.entry_no;
-
-      const clearedData = {
-        entry_no: entryNo, // Preserve entry_no
-        date: record.date,
-        amount: '',
-        employee_id: '',
-        labour_id: '',
-        from_purpose_id: '',
-        to_purpose_id: '',
-        staff_payment_mode: '',
-        type: '',
-        description: '',
-        staff_refund_amount: ''
-      };
-
-      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/staff-advance/${idToDelete}?editedBy=${username}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(clearedData)
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to clear record');
-      }
-
-      console.log(`Cleared record with ID ${idToDelete}`);
-      setRecords((prev) =>
-        prev.filter(
-          (record) =>
-            record.staffAdvancePortalId !== idToDelete && record.id !== idToDelete
-        )
+      const { weeklyBillDelete } = await clearStaffAdvanceRecordsOnDelete(
+        idToDelete,
+        record,
+        records,
+        username
       );
+
+      await refreshStaffRecords();
       notifyOrbitModuleDataChanged('staffadvance');
+      const billDeleteMessage = formatWeeklyBillDeleteMessage(
+        weeklyBillDelete.deletedCount,
+        weeklyBillDelete.failedCount
+      );
+      alert(`Record deleted successfully.${billDeleteMessage}`);
     } catch (error) {
       console.error('Delete error:', error);
+      alert(error.message || 'Failed to delete record. Please try again.');
     }
   };
 
@@ -858,7 +923,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
     return () => cancelMomentum();
   }, []);
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="p-6 bg-[#faf6ed] min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -870,7 +935,7 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
   }
 
   return (
-    <body>
+    <div>
       <div className='w-full max-w-[1850px] h-auto bg-white text-left flex  sm:flex-row gap-3 p-3 sm:p-5 mx-2 ml-10 mr-10'>
         <div className=''>
           <label className='block mb-2 font-semibold text-sm sm:text-base'>Advance Amount</label>
@@ -1678,12 +1743,14 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
               </div>
               <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
                 <button
+                  type="button"
                   onClick={() => setIsEditModalOpen(false)}
                   className="px-4 py-2 border border-[#BF9853] w-full sm:w-[100px] h-[40px] sm:h-[45px] rounded text-sm sm:text-base"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleUpdate}
                   className="px-4 py-2 bg-[#BF9853] w-full sm:w-[100px] h-[40px] sm:h-[45px] text-white rounded text-sm sm:text-base"
                 >
@@ -1701,8 +1768,33 @@ const StaffDatabase = ({ username, userRoles = [], paymentModeOptions = [], refr
           laboursList={laboursList}
           purposes={purposes} 
         />
+        <AdvancePortalEditPaymentModal
+          isOpen={showEditPaymentModal}
+          onClose={() => {
+            setShowEditPaymentModal(false);
+            pendingStaffUpdateRef.current = null;
+          }}
+          onSubmit={handleEditPaymentModalSubmit}
+          isSubmitting={isEditPaymentSubmitting}
+          paymentMode={
+            pendingStaffUpdateRef.current?.payload?.staff_payment_mode ??
+            editFormData.staff_payment_mode
+          }
+          date={pendingStaffUpdateRef.current?.payload?.date ?? editFormData.date}
+          amount={getStaffAdvanceDisplayAmount(
+            pendingStaffUpdateRef.current?.payload || {
+              type: editFormData.type,
+              amount: editFormData.amount,
+              staff_refund_amount: editFormData.staff_refund_amount,
+              staff_payment_mode: editFormData.staff_payment_mode,
+            }
+          )}
+          paymentModalData={editPaymentModalData}
+          setPaymentModalData={setEditPaymentModalData}
+          accountDetails={accountDetails}
+        />
       </div>
-    </body>
+    </div>
   );
 }
 

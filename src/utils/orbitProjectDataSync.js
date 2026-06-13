@@ -3,7 +3,7 @@ import { prefetchInventoryNetStockData } from '../componentsMobile/Inventory/inv
 import { prefetchToolsNetStockData } from '../componentsMobile/ToolsTracker/netStockPrefetch';
 import { populateExpensesFormCache } from './expensesFormPrefetch';
 
-export const ORBIT_MODULE_SYNC_INTERVAL_MS = 60_000;
+export const ORBIT_MODULE_SYNC_INTERVAL_MS = 20_000;
 const SYNC_INTERVAL_MS = ORBIT_MODULE_SYNC_INTERVAL_MS;
 const SYNC_STATUS_EVENT = 'orbitSyncStatusChanged';
 const SYNC_DATA_EVENT = 'orbitProjectDataSync';

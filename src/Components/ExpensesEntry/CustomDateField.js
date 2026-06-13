@@ -1,6 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import SingleDatePicker from "./SingleDatePicker";
+import SingleDatePicker, { CALENDAR_PANEL_WIDTH_PX } from "./SingleDatePicker";
 import CalendarIcon from "../Images/Calendoricon.png";
 
 
@@ -396,11 +396,14 @@ export default function CustomDateField({
   controlHeightPx,
   /** When empty, replaces default trigger typography (placeholder look only; calendar unchanged). */
   placeholderButtonClassName = "",
+  calendarPortal = false,
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(() => formatIsoToDisplay(value));
   const [calendarValue, setCalendarValue] = useState(() => value || "");
+  const [portalStyle, setPortalStyle] = useState(null);
   const inputRef = useRef(null);
+  const triggerRef = useRef(null);
   const caretRef = useRef(null);
   const controlBoxStyle = controlHeightPx
     ? {
@@ -432,6 +435,40 @@ export default function CustomDateField({
       el.setSelectionRange(pos, pos);
     }
   }, [text]);
+
+  const updatePortalPosition = useCallback(() => {
+    const triggerEl = triggerRef.current;
+    if (!triggerEl) return;
+    const rect = triggerEl.getBoundingClientRect();
+    const gap = 8;
+    const left = anchor === "right" ? rect.right - CALENDAR_PANEL_WIDTH_PX : rect.left;
+    if (alwaysOpenAbove) {
+      setPortalStyle({
+        left,
+        top: rect.top - gap,
+        transform: "translateY(-100%)",
+      });
+      return;
+    }
+    setPortalStyle({
+      left,
+      top: rect.bottom + gap,
+    });
+  }, [anchor, alwaysOpenAbove]);
+
+  useLayoutEffect(() => {
+    if (!open || !calendarPortal) {
+      setPortalStyle(null);
+      return;
+    }
+    updatePortalPosition();
+    window.addEventListener("scroll", updatePortalPosition, true);
+    window.addEventListener("resize", updatePortalPosition);
+    return () => {
+      window.removeEventListener("scroll", updatePortalPosition, true);
+      window.removeEventListener("resize", updatePortalPosition);
+    };
+  }, [open, calendarPortal, updatePortalPosition]);
 
   const applyText = (nextText, nextCaret) => {
     caretRef.current = nextCaret;
@@ -538,6 +575,7 @@ export default function CustomDateField({
   return (
     <div className={`relative ${className}`}>
       <div
+        ref={triggerRef}
         className={`relative flex items-center ${controlHeightPx ? 'w-[300px]' : 'w-[120px] h-[36px]'} rounded-lg border-2 border-[#BF9853] border-opacity-25 bg-[#FFFFFF] shadow-sm overflow-hidden ${
           disabled ? "opacity-70 cursor-not-allowed bg-gray-100" : "hover:border-[rgba(191,152,83,0.4)]"
         }`}
@@ -583,7 +621,7 @@ export default function CustomDateField({
 
       <SingleDatePicker
         key={open ? `cal-${pickerValue || "empty"}` : "cal-closed"}
-        isOpen={open}
+        isOpen={open && (!calendarPortal || !!portalStyle)}
         onClose={() => setOpen(false)}
         value={pickerValue}
         onChange={(v) => {
@@ -596,6 +634,8 @@ export default function CustomDateField({
         anchor={anchor}
         alwaysOpenBelow={alwaysOpenBelow}
         alwaysOpenAbove={alwaysOpenAbove}
+        portalStyle={calendarPortal && open ? portalStyle : null}
+        anchorRef={calendarPortal ? triggerRef : null}
       />
     </div>
   );

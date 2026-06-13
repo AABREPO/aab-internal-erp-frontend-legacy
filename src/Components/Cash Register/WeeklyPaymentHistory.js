@@ -3,14 +3,14 @@ import axios from 'axios';
 import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
-import Filter from '../Images/filter (3).png';
 import Change from '../Images/dropdownchange.png';
 import Select from 'react-select';
-import download from '../Images/file_download.png'
 import NotesStart from '../Images/notes _start.png';
-import NotesEnd from '../Images/notes_end.png';
-import fileUpload from '../Images/file_upload.png';
-import file from '../Images/file.png';
+import NotesEnd from '../Images/TextView.svg';
+import fileUpload from '../Images/FileUpload.svg';
+import file from '../Images/FileView.svg';
+import AddExtra from '../Images/AddExtra.svg';
+import FileRemover from '../Images/FileRemover.svg';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -26,18 +26,21 @@ import {
 } from '../../utils/weeklyPaymentStaffAdvancePdf';
 import { i } from 'mathjs';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
 import restore from '../Images/data-recovery.png';
-import TableFilter from '../Images/TableFilter.svg';
-import Reload from '../Images/Clear.svg';
 import {
     DATABASE_TABLE_FILTER_SELECT_STYLES,
+    EDBC_FILTER_CONTROL_BOX_STYLE,
+    EDBC_FILTER_CONTROL_HEIGHT_PX,
     EDBC_IDS,
+    EDBC2_FIRST_COLUMN_WIDTH_CLASS,
     EDBC_TABLE_EDGE_TABLE_CLASS,
     EdbcColumnHeader,
     EdbcDateBodyCell,
     EdbcDateFilter,
     EdbcEmptyFilterCell,
+    EdbcFilterToggleButton,
     EdbcExpandableBodyCell,
     EdbcProjectNameBodyCell,
     EdbcProjectNameFilter,
@@ -45,10 +48,23 @@ import {
     EdbcTableBodyRow,
     EdbcTableFilterRow,
     EdbcTableHeaderRow,
+    EdbcTableToolbarRightActions,
     EdbcTotalAmountFilter,
     getEdbcColumnConfig,
+    matchesEdbcAmountFilter,
     useEdbcExpandedCells,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
+
+const ENTRY_ROW_SELECT_CLASS_NAMES = {
+    menuList: () => 'no-scrollbar',
+};
+const entryRowSelectMenuListStyle = (provided) => ({
+    ...provided,
+    maxHeight: '300px',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+});
+
 const WEEKLY_SUMMARY_FILE_API = 'https://backendaab.in/demoAabuildersDash/api/weekly_summary';
 
 function cleanUrl(url) {
@@ -66,7 +82,7 @@ function cleanUrl(url) {
     }
     return cleanedUrl;
 }
-const History = ({ username, userRoles = [], viewMode = 'default' }) => {
+const History = ({ username, userRoles = [], viewMode = 'default', onExportActionsReady }) => {
     const resolveEnteredBy = () => {
         const propUsername = typeof username === 'string' ? username.trim() : '';
         if (propUsername) return propUsername;
@@ -313,6 +329,8 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
     });
     const scrollRef = useRef(null);
     const paymentsScrollRef = useRef(null);
+    const expensesFilterChipsRef = useRef(null);
+    const paymentsFilterChipsRef = useRef(null);
     const isDragging = useRef(false);
     const activeScrollRef = useRef(null); // Track which scroll container is currently active
     const start = useRef({ x: 0, y: 0 });
@@ -416,6 +434,12 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         animationFrame.current = requestAnimationFrame(step);
     };
     const [showFilters, setShowFilters] = useState(false);
+    const [showPaymentsFilters, setShowPaymentsFilters] = useState(false);
+    const [overallSearch, setOverallSearch] = useState('');
+    const [paymentsOverallSearch, setPaymentsOverallSearch] = useState('');
+    const [selectPaymentDate, setSelectPaymentDate] = useState('');
+    const [selectPaymentAmount, setSelectPaymentAmount] = useState('');
+    const [selectPaymentType, setSelectPaymentType] = useState('');
     const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
@@ -1593,6 +1617,13 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
         setSelectContractororVendorName('');
         setSelectProjectName('');
         setSelectType('');
+        setOverallSearch('');
+    };
+    const clearPaymentsFilters = () => {
+        setPaymentsOverallSearch('');
+        setSelectPaymentDate('');
+        setSelectPaymentAmount('');
+        setSelectPaymentType('');
     };
     const getVendorName = (id) =>
         vendorOptions.find(v => v.id === id)?.value || "";
@@ -3546,2348 +3577,70 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
             console.log("Deletion cancelled.");
         }
     };
+    useEffect(() => {
+        if (!onExportActionsReady || isExpensesEntryUploadOnly) return;
+        onExportActionsReady({ generatePDF });
+        return () => onExportActionsReady(null);
+    }, [onExportActionsReady, isExpensesEntryUploadOnly, generatePDF]);
     return (
-        <body className={isExpensesEntryUploadOnly ? 'bg-[#FAF6ED]' : undefined}>
-            <div className={isExpensesEntryUploadOnly ? 'flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]' : 'contents'}>
-            <div className={isExpensesEntryUploadOnly ? 'flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]' : 'contents'}>
-            <div className={isExpensesEntryUploadOnly
-                ? 'w-full pt-[18px] px-[18px] pb-[18px] rounded-[6px] bg-white mb-[18px] shrink-0 lg:flex justify-between gap-8'
-                : 'mx-auto w-auto lg:flex justify-between gap-8 p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md'}>
-                {(() => {
-                    const entryCheckLikeSelectStyles = {
-                        control: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: 'transparent',
-                            fontSize: '14px',
-                            border: '2px solid rgba(191, 152, 83, 0.2)',
-                            borderRadius: '8px',
-                            minHeight: '40px',
-                            fontWeight: 'medium',
-                            height: '40px',
-                            flexWrap: 'nowrap',
-                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                            '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
-                        }),
-                        valueContainer: (provided) => ({
-                            ...provided,
-                            flexWrap: 'nowrap',
-                            overflow: 'hidden',
-                            paddingLeft: '12px',
-                            paddingRight: '2px',
-                            height: '36px',
-                            alignItems: 'center',
-                        }),
-                        placeholder: (provided) => ({
-                            ...provided,
-                            color: '#999',
-                            textAlign: 'left',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: '100%',
-                            position: 'absolute',
-                        }),
-                        menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: 288 }),
-                        menuList: (provided) => ({
-                            ...provided,
-                            maxHeight: 288,
-                            paddingTop: 0,
-                            paddingBottom: 0,
-                            overflowY: 'auto',
-                            scrollbarWidth: 'none',
-                            msOverflowStyle: 'none',
-                            '&::-webkit-scrollbar': { display: 'none' },
-                        }),
-                        option: (provided, state) => ({
-                            ...provided,
-                            minHeight: 36,
-                            height: 36,
-                            paddingTop: 0,
-                            paddingBottom: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            textAlign: 'left',
-                            fontWeight: 'normal',
-                            fontSize: '15px',
-                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                            color: 'black',
-                        }),
-                        singleValue: (provided) => ({
-                            ...provided,
-                            textAlign: 'left',
-                            color: 'black',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: '100%',
-                        }),
-                        input: (provided) => ({
-                            ...provided,
-                            margin: 0,
-                            padding: 0,
-                            whiteSpace: 'nowrap',
-                        }),
-                        dropdownIndicator: (provided, state) => ({
-                            ...provided,
-                            display: state.hasValue ? 'none' : 'flex',
-                            color: '#000000',
-                            flexShrink: 0,
-                        }),
-                        clearIndicator: (provided) => ({
-                            ...provided,
-                            cursor: 'pointer',
-                            color: '#000000',
-                            flexShrink: 0,
-                        }),
-                        indicatorSeparator: () => ({ display: 'none' }),
-                    };
-                    const entryCheckLikeSelectClassNames = {
-                        menuList: () => 'no-scrollbar scrollbar-none',
-                        valueContainer: () => '!flex-nowrap !overflow-hidden',
-                        placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
-                        singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
-                    };
-                    const formatWeekOptionDate = (date) =>
-                        date.toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "long"
-                        });
-                    const weekSelectOptions = weeks.map((week) => ({
-                        value: String(week.number),
-                        label: `Week ${week.number}, ${formatWeekOptionDate(new Date(week.start))} to ${formatWeekOptionDate(new Date(week.end))}`,
-                    }));
-                    const yearSelectOptions = years.map((y) => ({ value: String(y), label: String(y) }));
-                    return (
-                <div className='lg:flex gap-[12px] text-left'>
-                    <div className="min-w-0">
-                        <h1 className='font-semibold mb-[8px]'>Select Week</h1>
-                        <Select
-                            className="min-w-0 w-[260px]"
-                            classNames={entryCheckLikeSelectClassNames}
-                            options={weekSelectOptions}
-                            value={weekSelectOptions.find((opt) => opt.value === String(selectedWeek)) || null}
-                            onChange={(opt) => setSelectedWeek(opt ? opt.value : "")}
-                            placeholder="Select Week"
-                            isSearchable
-                            isClearable
-                            styles={entryCheckLikeSelectStyles}
-                        />
-                    </div>
-                    <div className="min-w-0">
-                        <label className="block font-semibold mb-[8px]">Year</label>
-                        <Select
-                            className="min-w-0 w-[120px]"
-                            classNames={entryCheckLikeSelectClassNames}
-                            options={yearSelectOptions}
-                            value={yearSelectOptions.find((opt) => opt.value === String(year)) || null}
-                            onChange={(opt) => setYear(opt ? opt.value : getCurrentWeekYear().toString())}
-                            placeholder="Year"
-                            isSearchable
-                            isClearable
-                            styles={entryCheckLikeSelectStyles}
-                        />
-                    </div>
-                </div>
-                    );
-                })()}
-                {!isExpensesEntryUploadOnly && (
-                    <div className="flex justify-end mb-20 mr-6 items-center gap-6 flex-wrap">
-                        <div className="flex flex-col items-end gap-1 min-w-0 ">
-                            <div className="flex items-center gap-2 flex-wrap justify-end">
-                                {!selectedWeek && (
-                                    <span className="text-xs text-gray-500">Select a week</span>
-                                )}
-                                {selectedWeek && weeklySummaryLoading && (
-                                    <span className="text-xs text-gray-500">Loading…</span>
-                                )}
-                                {selectedWeek && !weeklySummaryLoading && weeklySummaryFile && (
-                                    <>
-                                        <a
-                                            href={cleanUrl(weeklySummaryFile.summary_bill_copy_url)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm text-blue-600 underline font-medium"
-                                        >
-                                            View file
-                                        </a>
-                                        {canEditDelete && (
-                                            <button
-                                                type="button"
-                                                disabled={weeklySummaryDeleteLoading}
-                                                onClick={handleWeeklySummaryMarkDeleted}
-                                                className="text-sm font-semibold text-red-600 hover:underline disabled:opacity-50"
-                                            >
-                                                {weeklySummaryDeleteLoading ? "…" : "Remove"}
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-                                {selectedWeek && !weeklySummaryLoading && !weeklySummaryFile && (
-                                    <>
-                                        {canEditDelete &&
-                                            lastDeletedWeeklySummary &&
-                                            String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
-                                            String(lastDeletedWeeklySummary.year) === String(year) && (
-                                                <button
-                                                    type="button"
-                                                    disabled={weeklySummaryDeleteLoading}
-                                                    onClick={handleWeeklySummaryUndoDelete}
-                                                    className="text-sm font-semibold text-[#BF9853] flex items-center gap-1 disabled:opacity-50"
-                                                    title="Restore removed summary"
-                                                >
-                                                    <img src={restore} alt="" className="w-4 h-4" />
-                                                    Restore
-                                                </button>
-                                            )}
-                                        <input
-                                            ref={weeklySummaryFileInputRef}
-                                            type="file"
-                                            className="hidden"
-                                            accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
-                                            onChange={handleWeeklySummaryFileChange}
-                                        />
-                                        <button
-                                            type="button"
-                                            disabled={weeklySummaryUploading}
-                                            onClick={() => weeklySummaryFileInputRef.current?.click()}
-                                            className="text-sm font-semibold flex items-center gap-2 text-gray-800 disabled:opacity-50"
-                                            title="Upload Signature Copy for this week"
-                                        >
-                                            <img src={fileUpload} alt="" className="w-5 h-5" />
-                                            {weeklySummaryUploading ? "Uploading…" : "Upload Signature Copy"}
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                        <button className="font-semibold text-lg cursor-pointer flex items-center gap-2 shrink-0" onClick={generatePDF}>
-                            Report
-                            <img className='w-6 h-5' src={download} alt="Download" />
-                        </button>
-                    </div>
-                )}
-            </div>
-            {!isExpensesEntryUploadOnly && (
-                <div className="flex justify-end mr-6 mt-2">
-                    <h1 className="font-bold text-xl">
-                        Balance: <span style={{ color: "#E4572E" }} className="inline-block text-right min-w-[120px]">
-                            {(
-                                payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
-                                filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
-                            ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                        </span>
-                    </h1>
-                </div>
-            )}
-            <div className={isExpensesEntryUploadOnly
-                ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden'
-                : 'mx-auto w-auto p-6 bg-white ml-[30px] mr-6 rounded-md border border-transparent'}>
-                <div className={`text-left ${
-                    isExpensesEntryUploadOnly
-                        ? 'grid shrink-0 mb-3 gap-y-3'
-                        : 'flex justify-between mb-4'
-                }`} style={isExpensesEntryUploadOnly ? { gridTemplateColumns: 'max-content 835px max-content' } : undefined}>
-                    {isExpensesEntryUploadOnly ? (
-                        <>
-                            <div className="col-span-2 flex flex-col sm:flex-row sm:items-center sm:space-x-3 min-w-0">
-                                <button onClick={() => setShowFilters(!showFilters)}>
-                                    <img
-                                        src={TableFilter}
-                                        alt="Toggle Filter"
-                                        className="border rounded-md"
-                                    />
-                                </button>
-                                {(selectDate || selectContractororVendorName || selectProjectName || selectType) && (
-                                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-2 sm:mt-0">
-                                        {selectDate && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Date: </span>
-                                                <span className="font-semibold text-[14px]">{formatDateOnly(selectDate)}</span>
-                                                <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                            </span>
-                                        )}
-                                        {selectContractororVendorName && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Associate: </span>
-                                                <span className="font-semibold text-[14px]">{selectContractororVendorName}</span>
-                                                <button onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
-                                        {selectProjectName && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Project Name: </span>
-                                                <span className="font-semibold text-[14px]">{selectProjectName}</span>
-                                                <button onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
-                                        {selectType && (
-                                            <span className="inline-flex items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Type: </span>
-                                                <span className="font-semibold text-[14px]">{selectType}</span>
-                                                <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-center justify-end">
-                                <button onClick={clearFilters} className="flex h-[30px] w-[30px] shrink-0 items-center justify-center">
-                                    <img className="w-full h-full" src={Reload} alt="Reload" />
-                                </button>
-                            </div>
-                            <div>
-                                <h1 className="font-bold text-base">PS: {selectedWeek ?? "-"}</h1>
-                            </div>
-                            <div />
-                            <div className="flex justify-end">
-                                <h1 className="font-bold text-base">
-                                    Expenses: <span style={{ color: "#E4572E" }}>
-                                        {filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                                    </span>
-                                </h1>
-                            </div>
-                        </>
-                    ) : (
-                        <button onClick={() => setShowFilters(!showFilters)}>
-                            <img
-                                src={Filter}
-                                alt="Toggle Filter"
-                                className="w-7 h-7 border border-[#BF9853] rounded-md"
-                            />
-                        </button>
-                    )}
-                    {!isExpensesEntryUploadOnly && nextWeekDiscountInfo && (
-                        <div className="flex justify-end -mr-6 -mt-7">
-                            <h2 className="font-semibold text-base">
-                                Discount :{" "}
-                                <span className="inline-block text-right min-w-[120px] text-xl">
-                                    {nextWeekDiscountInfo.amount.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    })}
-                                </span>
-                            </h2>
-                        </div>
-                    )}
-                </div>
-                <div className={`flex flex-col xl:flex-row gap-6 ${isExpensesEntryUploadOnly ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
-                    <div className={`min-w-0 ${isExpensesEntryUploadOnly ? 'w-full flex flex-col flex-1 min-h-0 overflow-hidden' : 'flex-[3]'}`}>
-                        {!isExpensesEntryUploadOnly && (
-                        <div className="flex justify-between">
-                            <h1 className="font-bold text-base">PS: {selectedWeek ?? "-"}</h1>
-                            <h1 className="font-bold text-base">
-                                Expenses: <span style={{ color: "#E4572E" }}>
-                                    {filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                                </span>
-                            </h1>
-                        </div>
-                        )}
-                        <div className={isExpensesEntryUploadOnly ? 'flex flex-col flex-1 min-h-0' : 'w-full h-[600px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden'}>
-                            <div
-                                ref={scrollRef}
-                                className={isExpensesEntryUploadOnly
-                                    ? 'w-fit max-w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar'
-                                    : 'overflow-auto max-h-[600px] thin-scrollbar'}
-                                onMouseDown={(e) => handleMouseDown(e, scrollRef)}
-                                onMouseMove={(e) => handleMouseMove(e, scrollRef)}
-                                onMouseUp={() => handleMouseUp(scrollRef)}
-                                onMouseLeave={() => handleMouseUp(scrollRef)}
-                            >
-                                {isExpensesEntryUploadOnly ? (
-                                <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS}`}>
-                                    <thead className="sticky top-0 z-10 bg-white">
-                                        <EdbcTableHeaderRow>
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
-                                            <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
-                                        </EdbcTableHeaderRow>
-                                        {showFilters && (
-                                            <EdbcTableFilterRow>
-                                                <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
-                                                <EdbcDateFilter
-                                                    placeholder="Date"
-                                                    value={selectDate}
-                                                    onChange={setSelectDate}
-                                                />
-                                                <EdbcSelectFilter
-                                                    columnId={EDBC_IDS.EDBC4}
-                                                    placeholder="Associate"
-                                                    options={contractorVendorFilterOptions}
-                                                    value={selectContractororVendorName}
-                                                    onChange={setSelectContractororVendorName}
-                                                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                />
-                                                <EdbcProjectNameFilter
-                                                    placeholder="Project Name"
-                                                    options={projectFilterOptions}
-                                                    value={selectProjectName}
-                                                    onChange={setSelectProjectName}
-                                                    isClearable
-                                                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                />
-                                                <EdbcSelectFilter
-                                                    columnId={EDBC_IDS.EDBC12}
-                                                    placeholder="Type"
-                                                    options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
-                                                    value={selectType}
-                                                    onChange={setSelectType}
-                                                    selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                />
-                                                <EdbcTotalAmountFilter
-                                                    columnId={EDBC_IDS.EDBC8}
-                                                    totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
-                                                />
-                                                <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                            </EdbcTableFilterRow>
-                                        )}
-                                    </thead>
-                                    <tbody>
-                                        {[...filteredExpenses].reverse().map((row, index) => (
-                                            <EdbcTableBodyRow key={row.id}>
-                                                <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
-                                                    {filteredExpenses.length - index}
-                                                </td>
-                                                <EdbcDateBodyCell
-                                                    expense={row}
-                                                    rowIndex={index}
-                                                    expandedCells={expandedCells}
-                                                    onToggleExpanded={toggleExpandedCell}
-                                                    formatValue={formatDateOnly}
-                                                />
-                                                <EdbcExpandableBodyCell
-                                                    columnId={EDBC_IDS.EDBC4}
-                                                    expense={row}
-                                                    rowIndex={index}
-                                                    expandedCells={expandedCells}
-                                                    onToggleExpanded={toggleExpandedCell}
-                                                    getDisplayValue={getPartyDisplayName}
-                                                />
-                                                <EdbcProjectNameBodyCell
-                                                    expense={row}
-                                                    rowIndex={index}
-                                                    expandedCells={expandedCells}
-                                                    onToggleExpanded={toggleExpandedCell}
-                                                    getDisplayValue={(entry) => siteOptions.find(opt => opt.id === Number(entry.project_id))?.label || ''}
-                                                />
-                                                <EdbcExpandableBodyCell
-                                                    columnId={EDBC_IDS.EDBC12}
-                                                    expense={row}
-                                                    rowIndex={index}
-                                                    expandedCells={expandedCells}
-                                                    onToggleExpanded={toggleExpandedCell}
-                                                    getDisplayValue={(entry) => entry.type}
-                                                />
-                                                <EdbcExpandableBodyCell
-                                                    columnId={EDBC_IDS.EDBC8}
-                                                    expense={row}
-                                                    rowIndex={index}
-                                                    expandedCells={expandedCells}
-                                                    onToggleExpanded={toggleExpandedCell}
-                                                    textAlignClass="text-right"
-                                                    getDisplayValue={(entry) => Number(entry.amount).toLocaleString('en-IN')}
-                                                />
-                                                <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                    {row.bill_copy_url ? (
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <a
-                                                                href={cleanUrl(row.bill_copy_url)}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="cursor-pointer"
-                                                                title="View File"
-                                                            >
-                                                                <img src={file} className="w-4 h-4" alt="Open File" />
-                                                            </a>
-                                                            {canEditDelete && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                    className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee]"
-                                                                    title="Remove File"
-                                                                >
-                                                                    ×
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <button
-                                                                onClick={() => handleFileUploadClick(row)}
-                                                                className="cursor-pointer"
-                                                                title="Upload File"
-                                                            >
-                                                                <img
-                                                                    src={fileUpload}
-                                                                    className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                    alt="Upload File"
-                                                                />
-                                                            </button>
-                                                            {canEditDelete && removedBillCopyRows[row.id] && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                    className="rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
-                                                                    title="Restore Removed File"
-                                                                >
-                                                                    Restore
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </EdbcTableBodyRow>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                ) : (
-                                <table className="border-collapse text-left w-[1320px]">
-                                    <thead className="sticky top-0 z-10 bg-white">
-                                        <tr className="bg-[#FAF6ED]">
-                                            <th className="pt-2 pl-2 w-[60px] font-bold text-left">S.No</th>
-                                            <th className="pt-2 w-[135px] font-bold text-left">Date</th>
-                                            <th className="px-1 w-[200px] font-bold text-left">
-                                                {isExpensesEntryUploadOnly ? "Associate" : (isClientToggleActive ? "Client Name" : "Contractor/Vendor/Employee")}
-                                            </th>
-                                            <th className="px-1 w-[240px] font-bold text-left">Project Name</th>
-                                            <th className="px-1 w-[100px] font-bold text-left">Type</th>
-                                            <th className="px-1 w-[110px] font-bold text-left">Amount</th>
-                                            <th className="px-1 w-[120px] font-bold text-left">
-                                                {isExpensesEntryUploadOnly ? 'File' : 'Activity'}
-                                            </th>
-                                        </tr>
-                                        {showFilters && (
-                                            <tr className="bg-[#FAF6ED] border-b border-gray-200">
-                                                <th className="pt-2 pb-2 w-[60px]"></th>
-                                                <th className="pt-2 pb-2 w-[140px]">
-                                                    <input
-                                                        type="date"
-                                                        value={selectDate}
-                                                        onChange={(e) => setSelectDate(e.target.value)}
-                                                        className="p-1 rounded-md bg-transparent w-[140px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                                                        placeholder="Search Date..."
-                                                    />
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[200px]">
-                                                    <Select
-                                                        options={contractorVendorFilterOptions}
-                                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
-                                                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
-                                                        className="text-xs focus:outline-none"
-                                                        placeholder={isClientToggleActive ? "Client Name..." : "Contractor/Ven..."}
-                                                        isSearchable
-                                                        isClearable
-                                                        menuPortalTarget={document.body}
-                                                        menuPosition="fixed"
-                                                        styles={{
-                                                            control: (provided, state) => ({
-                                                                ...provided,
-                                                                backgroundColor: 'transparent',
-                                                                borderWidth: '3px',
-                                                                borderColor: state.isFocused
-                                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                                borderRadius: '6px',
-                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                '&:hover': {
-                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                },
-                                                            }),
-                                                            placeholder: (provided) => ({
-                                                                ...provided,
-                                                                color: '#999',
-                                                                textAlign: 'left',
-                                                            }),
-                                                            menu: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10050,
-                                                                maxHeight: '300px',
-                                                                overflow: 'auto',
-                                                            }),
-                                                            menuList: (provided) => ({
-                                                                ...provided,
-                                                                maxHeight: '300px',
-                                                                overflowY: 'auto',
-                                                                padding: '4px',
-                                                            }),
-                                                            menuPortal: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10050,
-                                                            }),
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                fontSize: '15px',
-                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                color: 'black',
-                                                            }),
-                                                            singleValue: (provided) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                color: 'black',
-                                                            }),
-                                                            indicatorSeparator: () => ({
-                                                                display: 'none'
-                                                            }),
-                                                            indicatorsContainer: (provided) => ({
-                                                                ...provided,
-                                                                height: '40px',
-                                                                gap: '0px'
-                                                            }),
-                                                            clearIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            }),
-                                                            dropdownIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            })
-                                                        }}
-                                                    />
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[240px]">
-                                                    <Select
-                                                        options={projectFilterOptions}
-                                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
-                                                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
-                                                        className="focus:outline-none text-xs"
-                                                        placeholder="Project Name..."
-                                                        isSearchable
-                                                        isClearable
-                                                        menuPortalTarget={document.body}
-                                                        menuPosition="fixed"
-                                                        styles={{
-                                                            control: (provided, state) => ({
-                                                                ...provided,
-                                                                backgroundColor: 'transparent',
-                                                                borderWidth: '3px',
-                                                                borderColor: state.isFocused
-                                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                                borderRadius: '6px',
-                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                '&:hover': {
-                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                },
-                                                            }),
-                                                            placeholder: (provided) => ({
-                                                                ...provided,
-                                                                color: '#999',
-                                                                textAlign: 'left',
-                                                            }),
-                                                            menu: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10050,
-                                                                maxHeight: '300px',
-                                                                overflow: 'auto',
-                                                            }),
-                                                            menuList: (provided) => ({
-                                                                ...provided,
-                                                                maxHeight: '300px',
-                                                                overflowY: 'auto',
-                                                                padding: '4px',
-                                                            }),
-                                                            menuPortal: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10050,
-                                                            }),
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                fontSize: '15px',
-                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                color: 'black',
-                                                            }),
-                                                            singleValue: (provided) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                color: 'black',
-                                                            }),
-                                                            indicatorSeparator: () => ({
-                                                                display: 'none'
-                                                            }),
-                                                            indicatorsContainer: (provided) => ({
-                                                                ...provided,
-                                                                height: '40px',
-                                                                gap: '0px'
-                                                            }),
-                                                            clearIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            }),
-                                                            dropdownIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            })
-                                                        }}
-                                                    />
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[100px]">
-                                                    <select
-                                                        value={selectType}
-                                                        onChange={(e) => setSelectType(e.target.value)}
-                                                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none text-xs"
-                                                        placeholder="Type..."
-                                                    >
-                                                        <option value=''>Select Type...</option>
-                                                        {weeklyTypes.map((type, index) => (
-                                                            <option key={index} value={type.type}>
-                                                                {type.type}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[110px]"></th>
-                                                <th className="pt-2 pb-2 w-[120px]">
-                                                    <button
-                                                        onClick={clearFilters}
-                                                        className="px-3 py-1.5 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68B4A] transition-colors text-sm font-semibold"
-                                                        title="Clear all filters"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                </th>
-                                            </tr>
-                                        )}
-                                        {!isExpensesEntryUploadOnly && canEditSelectedWeek ? (
-                                            <tr className="bg-white border-b border-gray-200">
-                                                <td className="pt-2 pb-2 w-[60px] font-bold">{filteredExpenses.length + 1}.</td>
-                                                <td className="pt-2 pb-2 w-[135px]">
-                                                    <input
-                                                        type="date"
-                                                        name="date"
-                                                        className="p-1 rounded-md bg-transparent w-[135px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                                                        value={newExpense.date}
-                                                        onChange={handleExpenseChange}
-                                                        onKeyDown={handleKeyDown}
-                                                    />
-                                                </td>
-                                                <td className="pt-2 pb-2 w-[200px]">
-                                                    <div className="flex items-center gap-2 w-full">
-                                                        <Select
-                                                            name="contractor"
-                                                            className="text-xs focus:outline-none"
-                                                            value={
-                                                                isClientToggleActive
-                                                                    ? selectedClient
-                                                                    : selectedContractor ||
-                                                                    combinedOptions.find(
-                                                                        opt =>
-                                                                            (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
-                                                                            (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
-                                                                            (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
-                                                                    ) || null
-                                                            }
-                                                            onChange={(selectedOption) => {
-                                                                if (newExpense.type === "Staff Advance") {
-                                                                    if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
-                                                                        alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
-                                                                        return;
-                                                                    }
-                                                                    if (isClientToggleActive && selectedOption) {
-                                                                        alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
-                                                                        return;
-                                                                    }
-                                                                }
-                                                                if (newExpense.type === "Project Advance") {
-                                                                    if (selectedOption && selectedOption.type === "Employee") {
-                                                                        alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
-                                                                        return;
-                                                                    }
-                                                                    if (isClientToggleActive && selectedOption) {
-                                                                        alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
-                                                                        return;
-                                                                    }
-                                                                }
-                                                                if (isClientToggleActive) {
-                                                                    const allowedTypesForClient = ["Loan", "Bank", "Claim"];
-                                                                    if (!allowedTypesForClient.includes(newExpense.type)) {
-                                                                        alert("Client name selection is only allowed for Loan, Bank, or Claim types.");
-                                                                        return;
-                                                                    }
-                                                                    setSelectedClient(selectedOption || null);
-                                                                    setNewExpense(prev => ({
-                                                                        ...prev,
-                                                                        client_name: selectedOption ? selectedOption.label : "",
-                                                                        client_id: selectedOption ? (selectedOption.clientId || selectedOption.id) : "",
-                                                                    }));
-                                                                    setVendorId('');
-                                                                    setContractorId('');
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedEmployee(null);
-                                                                    const clientKey = selectedOption?.compositeKey || (selectedOption ? buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile) : "");
-                                                                    const projectsForClient = selectedOption
-                                                                        ? selectedOption.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : [])
-                                                                        : [];
-                                                                    setClientProjectOptions(projectsForClient);
-                                                                    if (projectsForClient.length === 1) {
-                                                                        const onlyProject = projectsForClient[0];
-                                                                        setSelectedProjectName(onlyProject);
-                                                                        setSelectedProjectOption(onlyProject);
-                                                                        setProjectId(onlyProject.id);
-                                                                        setNewExpense(prev => ({ ...prev, project_id: onlyProject.id }));
-                                                                    }
-                                                                    if (!selectedOption) {
-                                                                        setSelectedProjectName(null);
-                                                                        setSelectedProjectOption(null);
-                                                                        setProjectId('');
-                                                                        setNewExpense(prev => ({ ...prev, project_id: "" }));
-                                                                    }
-                                                                    return;
-                                                                }
-                                                                setSelectedClient(null);
-                                                                setSelectedClient(null);
-                                                                setClientProjectOptions([]);
-                                                                setSelectedProjectName(null);
-                                                                setSelectedProjectOption(null);
-                                                                setProjectId('');
-                                                                if (newExpense.type === "Staff Advance") {
-                                                                    if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
-                                                                        alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
-                                                                        return;
-                                                                    }
-                                                                }
-                                                                if (newExpense.type === "Project Advance") {
-                                                                    if (selectedOption && selectedOption.type === "Employee") {
-                                                                        alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
-                                                                        return;
-                                                                    }
-                                                                }
-                                                                if (!selectedOption) {
-                                                                    setNewExpense(prev => ({
-                                                                        ...prev,
-                                                                        contractor_id: "",
-                                                                        vendor_id: "",
-                                                                        employee_id: "",
-                                                                        client_name: "",
-                                                                        client_id: ""
-                                                                    }));
-                                                                    setContractorId("");
-                                                                    setVendorId("");
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedEmployee(null);
-                                                                    setSelectedClient(null);
-                                                                } else if (selectedOption.type === "Employee") {
-                                                                    setNewExpense(prev => ({
-                                                                        ...prev,
-                                                                        employee_id: selectedOption.id,
-                                                                        contractor_id: "",
-                                                                        vendor_id: ""
-                                                                    }));
-                                                                    setSelectedEmployee(selectedOption);
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedVendor(null);
-                                                                } else if (selectedOption.type === "Contractor") {
-                                                                    setNewExpense(prev => ({
-                                                                        ...prev,
-                                                                        contractor_id: selectedOption.id,
-                                                                        vendor_id: ""
-                                                                    }));
-                                                                    setContractorId(selectedOption.id);
-                                                                    setVendorId("");
-                                                                    setSelectedContractor(selectedOption);
-                                                                    setSelectedVendor(null);
-                                                                    setSelectedEmployee(null);
-                                                                } else if (selectedOption.type === "Vendor") {
-                                                                    setNewExpense(prev => ({
-                                                                        ...prev,
-                                                                        vendor_id: selectedOption.id,
-                                                                        contractor_id: ""
-                                                                    }));
-                                                                    setVendorId(selectedOption.id);
-                                                                    setContractorId("");
-                                                                    setSelectedVendor(selectedOption);
-                                                                    setSelectedContractor(null);
-                                                                    setSelectedEmployee(null);
-                                                                }
-                                                            }}
-                                                            options={isClientToggleActive ? clientOptions : combinedOptions}
-                                                            placeholder={isClientToggleActive ? "Client Name" : "Contractor/Vendor"}
-                                                            isSearchable
-                                                            isClearable
-                                                            menuPortalTarget={document.body}
-                                                            menuPosition="fixed"
-                                                            styles={{
-                                                                ...customStyles,
-                                                                menu: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 10050,
-                                                                    maxHeight: '300px',
-                                                                    overflow: 'auto',
-                                                                }),
-                                                                menuList: (provided) => ({
-                                                                    ...provided,
-                                                                    maxHeight: '300px',
-                                                                    overflowY: 'auto',
-                                                                    overflowX: 'hidden',
-                                                                    padding: '4px',
-                                                                    WebkitOverflowScrolling: 'touch',
-                                                                }),
-                                                                menuPortal: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 10050,
-                                                                }),
-                                                            }}
-                                                        />
-                                                        <button type="button" onClick={handlePartySourceToggle} >
-                                                            <img
-                                                                src={Change}
-                                                                className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
-                                                                alt="Toggle party type"
-                                                            />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="pt-2 pb-2 w-[240px]">
-                                                    <Select
-                                                        name="project"
-                                                        isClearable
-                                                        value={selectedProjectName || siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
-                                                        onChange={(selectedOption) => {
-                                                            if (isClientToggleActive) {
-                                                                setSelectedProjectName(selectedOption);
-                                                                setSelectedProjectOption(selectedOption);
-                                                            } else {
-                                                                setSelectedProjectName(selectedOption);
-                                                                setSelectedProjectOption(null);
-                                                            }
-                                                            setNewExpense(prev => ({
-                                                                ...prev,
-                                                                project_id: selectedOption ? selectedOption.id : ""
-                                                            }));
-                                                            setProjectId(selectedOption ? selectedOption.id : "");
-                                                        }}
-                                                        options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptionsForNewEntry}
-                                                        placeholder={isClientToggleActive ? "Client Project..." : "Project Name..."}
-                                                        isSearchable
-                                                        menuPortalTarget={document.body}
-                                                        menuPosition="fixed"
-                                                        styles={{
-                                                            ...customStyles,
-                                                            menu: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10050,
-                                                            }),
-                                                            menuPortal: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10050,
-                                                            }),
-                                                        }}
-                                                    />
-                                                </td>
-                                                <td className="pt-2 pb-2 w-[100px]">
-                                                    <select
-                                                        name="type"
-                                                        className="p-1 rounded-md bg-transparent w-[120px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                                                        value={newExpense.type}
-                                                        onChange={handleInputChange}
-                                                        onKeyDown={handleKeyDown}
-                                                    >
-                                                        <option value="">Select Type...</option>
-                                                        {weeklyTypes.map((type, index) => (
-                                                            <option key={index} value={type.type}>
-                                                                {type.type}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td className="pt-2 pb-2 w-[110px]">
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner"
-                                                        value={newExpense.amount}
-                                                        onChange={handleExpenseChange}
-                                                        onKeyDown={handleKeyDown}
-                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                    />
-                                                </td>
-                                                <td className="pt-2 pb-2 w-[120px]"></td>
-                                            </tr>
-                                        ) : null}
-                                    </thead>
-                                    <tbody>
-                                        {[...filteredExpenses].reverse().map((row, index) => (
-                                            <tr key={row.id} className="odd:bg-white even:bg-[#FAF6ED]">
-                                                <td className="text-sm text-left p-2 w-[60px] font-semibold">{filteredExpenses.length - index}</td>
-                                                <td className="text-sm text-left p-2 w-[140px] font-semibold">
-                                                    {editingRowId === row.id ? (
-                                                        <input
-                                                            type="date"
-                                                            name="date"
-                                                            className="p-1 rounded-md bg-transparent w-[120px] border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                                                            value={row.date}
-                                                            onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
-                                                            disabled={editingRowId !== row.id}
-                                                        />
-                                                    ) : (
-                                                        formatDateOnly(row.date) || ""
-                                                    )}
-                                                </td>
-                                                <td className="text-sm text-left w-[200px] font-semibold">
-                                                    {editingRowId === row.id ? (
-                                                        <Select
-                                                            name="party"
-                                                            className="w-[180px]"
-                                                            value={
-                                                                ((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type))
-                                                                    ? getClientOption(row.client_id, row.client_name)
-                                                                    : combinedOptions.find(
-                                                                        opt =>
-                                                                            (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
-                                                                            (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
-                                                                            (opt.type === "Employee" && opt.id === Number(row.employee_id))
-                                                                    ) || null
-                                                            }
-                                                            onChange={(selectedOption) => {
-                                                                const useClientMode = isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id));
-                                                                if (useClientMode) {
-                                                                    // Only allow client selection if type is Loan, Bank, or Claim
-                                                                    const allowedTypesForClient = ["Loan", "Bank", "Claim"];
-                                                                    if (selectedOption && !allowedTypesForClient.includes(row.type)) {
-                                                                        alert("Client name selection is only allowed for Loan, Bank, or Claim types.");
-                                                                        return;
-                                                                    }
-                                                                    if (!selectedOption) {
-                                                                        handleEditExpense(row.id, "client_name", "");
-                                                                        handleEditExpense(row.id, "client_id", "");
-                                                                    } else {
-                                                                        handleEditExpense(row.id, "client_name", selectedOption.label);
-                                                                        handleEditExpense(row.id, "client_id", selectedOption.clientId || selectedOption.id);
-                                                                    }
-                                                                    handleEditExpense(row.id, "contractor_id", "");
-                                                                    handleEditExpense(row.id, "vendor_id", "");
-                                                                    return;
-                                                                }
-                                                                if (!selectedOption) {
-                                                                    handleEditExpense(row.id, "contractor_id", "");
-                                                                    handleEditExpense(row.id, "vendor_id", "");
-                                                                    handleEditExpense(row.id, "employee_id", "");
-                                                                    handleEditExpense(row.id, "client_id", "");
-                                                                    handleEditExpense(row.id, "client_name", "");
-                                                                } else if (selectedOption.type === "Contractor") {
-                                                                    handleEditExpense(row.id, "contractor_id", selectedOption.id);
-                                                                    handleEditExpense(row.id, "vendor_id", "");
-                                                                } else if (selectedOption.type === "Vendor") {
-                                                                    handleEditExpense(row.id, "vendor_id", selectedOption.id);
-                                                                    handleEditExpense(row.id, "contractor_id", "");
-                                                                } else if (selectedOption.type === "Employee") {
-                                                                    handleEditExpense(row.id, "employee_id", selectedOption.id);
-                                                                    handleEditExpense(row.id, "contractor_id", "");
-                                                                    handleEditExpense(row.id, "vendor_id", "");
-                                                                }
-                                                            }}
-                                                            options={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? clientOptions : combinedOptions}
-                                                            placeholder={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? "Client Name" : "Select Contractor/Vendor"}
-                                                            isSearchable
-                                                            isClearable
-                                                            menuPortalTarget={document.body}
-                                                            menuPosition="fixed"
-                                                            styles={{
-                                                                ...customStyles,
-                                                                menu: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 10050,
-                                                                    maxHeight: '300px',
-                                                                    overflow: 'auto',
-                                                                }),
-                                                                menuList: (provided) => ({
-                                                                    ...provided,
-                                                                    maxHeight: '300px',
-                                                                    overflowY: 'auto',
-                                                                    overflowX: 'hidden',
-                                                                    padding: '4px',
-                                                                    WebkitOverflowScrolling: 'touch',
-                                                                }),
-                                                                menuPortal: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 10050,
-                                                                }),
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        getPartyDisplayName(row)
-                                                    )}
-                                                </td>
-                                                <td className="text-sm text-left w-[240px] font-semibold">
-                                                    {editingRowId === row.id ? (
-                                                        <Select
-                                                            name="project"
-                                                            value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
-                                                            onChange={(selectedOption) =>
-                                                                handleEditExpense(
-                                                                    row.id,
-                                                                    "project_id",
-                                                                    selectedOption ? selectedOption.id : ""
-                                                                )
-                                                            }
-                                                            options={siteOptions}
-                                                            placeholder="Select Project"
-                                                            isSearchable
-                                                            isClearable
-                                                            menuPortalTarget={document.body}
-                                                            menuPosition="fixed"
-                                                            styles={{
-                                                                ...customStyles,
-                                                                menu: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 10050,
-                                                                    maxHeight: '300px',
-                                                                    overflow: 'auto',
-                                                                }),
-                                                                menuList: (provided) => ({
-                                                                    ...provided,
-                                                                    maxHeight: '300px',
-                                                                    overflowY: 'auto',
-                                                                    overflowX: 'hidden',
-                                                                    padding: '4px',
-                                                                    WebkitOverflowScrolling: 'touch',
-                                                                }),
-                                                                menuPortal: (provided) => ({
-                                                                    ...provided,
-                                                                    zIndex: 10050,
-                                                                }),
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
-                                                    )}
-                                                </td>
-                                                <td className="text-sm text-left w-[100px] font-semibold">
-                                                    {editingRowId === row.id ? (
-                                                        <select
-                                                            name="type"
-                                                            className="p-1 rounded-md bg-transparent w-[90px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
-                                                            value={row.type}
-                                                            onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
-                                                        >
-                                                            <option value="">Select</option>
-                                                            {weeklyTypes.map((type, index) => (
-                                                                <option key={index} value={type.type}>
-                                                                    {type.type}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    ) : (
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span>{row.type}</span>
-                                                            </div>
-                                                            {(() => {
-                                                                const payments = getPaymentsByExpenseId(row.id);
-                                                                const paymentModes = [...new Set(payments.map(p => p.bill_payment_mode).filter(mode => mode !== null && mode !== undefined))];
-                                                                if (paymentModes.length === 0) return null;
-                                                                const hoverContent = payments.map(payment =>
-                                                                    `${payment.bill_payment_mode}: ₹${payment.amount.toLocaleString('en-IN')}`
-                                                                ).join('\n');
-                                                                return (
-                                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                                        {paymentModes.length === 1 ? (
-                                                                            <span
-                                                                                className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
-                                                                                title={hoverContent}
-                                                                            >
-                                                                                {paymentModes[0]}
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span
-                                                                                className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-green-200 transition-colors"
-                                                                                title={hoverContent}
-                                                                            >
-                                                                                Online
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="text-sm text-left pl-2 w-[110px] font-semibold">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="min-w-0 flex-1 text-right pr-1">
-                                                            {editingRowId === row.id ? (
-                                                                <input
-                                                                    type="number"
-                                                                    name="amount"
-                                                                    className="p-1 rounded-md bg-transparent w-[80px] h-[42px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner ml-auto block"
-                                                                    value={row.amount}
-                                                                    onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
-                                                                    disabled={editingRowId !== row.id}
-                                                                    onWheel={(e) => e.preventDefault()}
-                                                                    onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                                    onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                                />
-                                                            ) : (
-                                                                Number(row.amount).toLocaleString('en-IN')
-                                                            )}
-                                                        </div>
-                                                        {!isExpensesEntryUploadOnly && (
-                                                            <div className="flex shrink-0 items-center gap-1.5">
-                                                                <span className="inline-flex w-5 h-5 items-center justify-center">
-                                                                    {row.type !== "Daily" ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setCurrentProjectAdvanceRow(row);
-                                                                                setPaymentPopupData({
-                                                                                    date: new Date().toISOString().split('T')[0],
-                                                                                    amount: "",
-                                                                                    paymentMode: "",
-                                                                                    chequeNo: "",
-                                                                                    chequeDate: "",
-                                                                                    transactionNumber: "",
-                                                                                    accountNumber: ""
-                                                                                });
-                                                                                const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
-                                                                                setPreviousPayments(previousPaymentsForExpense);
-                                                                                setShowPaymentPopup(true);
-                                                                            }}
-                                                                            className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-green-600 transition-colors text-xs"
-                                                                            title="Add Payment"
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    ) : null}
-                                                                </span>
-                                                                <span className="inline-flex w-4 h-4 items-center justify-center">
-                                                                    {row.type === "Project Advance" ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={async () => {
-                                                                                let description = "";
-                                                                                if (row.advance_portal_id) {
-                                                                                    try {
-                                                                                        const res = await fetch(
-                                                                                            `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
-                                                                                        );
-                                                                                        if (!res.ok) throw new Error("Failed to fetch advance portal data");
-                                                                                        const data = await res.json();
-                                                                                        description = data.description || "";
-                                                                                    } catch (error) {
-                                                                                        console.error("Error fetching advance portal data:", error);
-                                                                                    }
-                                                                                }
-                                                                                setEditFormData((prev) => ({ ...prev, description }));
-                                                                                setCurrentRow(row);
-                                                                                setShowPopups(true);
-                                                                            }}
-                                                                        >
-                                                                            <img
-                                                                                src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
-                                                                                alt="Notes"
-                                                                                className="w-4 h-4"
-                                                                            />
-                                                                        </button>
-                                                                    ) : null}
-                                                                </span>
-                                                                <span className="inline-flex min-w-[44px] items-center justify-end gap-1">
-                                                                    {row.bill_copy_url ? (
-                                                                        <>
-                                                                            <a
-                                                                                href={cleanUrl(row.bill_copy_url)}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                                className="inline-flex h-4 w-4 items-center justify-center"
-                                                                                title="View File"
-                                                                            >
-                                                                                <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                            </a>
-                                                                            {canEditDelete ? (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                                    className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[#E4572E] text-base font-bold leading-none hover:bg-[#fff1ee]"
-                                                                                    title="Remove File"
-                                                                                >
-                                                                                    ×
-                                                                                </button>
-                                                                            ) : (
-                                                                                <span className="inline-block h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-                                                                            )}
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleFileUploadClick(row)}
-                                                                                className="inline-flex h-4 w-4 shrink-0 items-center justify-center"
-                                                                                title="Upload File"
-                                                                            >
-                                                                                <img
-                                                                                    src={fileUpload}
-                                                                                    className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                                    alt="Upload File"
-                                                                                />
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                tabIndex={-1}
-                                                                                aria-hidden="true"
-                                                                                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center pointer-events-none"
-                                                                            >
-                                                                                <span className="text-base font-bold leading-none opacity-0">×</span>
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                </span>
-                                                                {canEditDelete && !row.bill_copy_url && removedBillCopyRows[row.id] && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                        className="shrink-0 rounded border border-[#007233] px-1 text-[9px] font-semibold leading-tight text-[#007233] hover:bg-[#e9f8f0]"
-                                                                        title="Restore Removed File"
-                                                                    >
-                                                                        Restore
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="flex py-2 w-[120px]">
-                                                    {isExpensesEntryUploadOnly ? (
-                                                        row.bill_copy_url ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <a
-                                                                    href={cleanUrl(row.bill_copy_url)}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="cursor-pointer"
-                                                                    title="View File"
-                                                                >
-                                                                    <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                </a>
-                                                                {canEditDelete && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                        className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee]"
-                                                                        title="Remove File"
-                                                                    >
-                                                                        ×
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center gap-2">
-                                                                <button
-                                                                    onClick={() => handleFileUploadClick(row)}
-                                                                    className="cursor-pointer"
-                                                                    title="Upload File"
-                                                                >
-                                                                    <img
-                                                                        src={fileUpload}
-                                                                        className="w-4 h-4 opacity-70 hover:opacity-100"
-                                                                        alt="Upload File"
-                                                                    />
-                                                                </button>
-                                                                {canEditDelete && removedBillCopyRows[row.id] && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                        className="rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
-                                                                        title="Restore Removed File"
-                                                                    >
-                                                                        Restore
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    ) : (
-                                                        canEditSelectedWeek && (
-                                                            <>
-                                                                {editingRowId === row.id ? (
-                                                                    <button onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg mr-3">
-                                                                        ✓
-                                                                    </button>
-                                                                ) : (
-                                                                    row.type === "Daily" ? (
-                                                                        <img
-                                                                            className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                            src={Edit}
-                                                                            alt="Edit Disabled"
-                                                                        />
-                                                                    ) : (
-                                                                        <button className="rounded-full transition duration-200 ml-2 mr-3">
-                                                                            <img
-                                                                                src={Edit}
-                                                                                onClick={() => {
-                                                                                    setEditingRowId(row.id);
-                                                                                    setEditingOriginalRow({ ...row });
-                                                                                }}
-                                                                                alt="Edit"
-                                                                                className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                            />
-                                                                        </button>
-                                                                    )
-                                                                )}
-                                                                {row.type === "Daily" ? (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed ml-3"
-                                                                        src={Delete}
-                                                                        alt="Delete Disabled"
-                                                                    />
-                                                                ) : (
-                                                                    canEditDelete && (
-                                                                        <button className="rounded-full transition duration-200 mr-3">
-                                                                            <img
-                                                                                src={Delete}
-                                                                                className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                                onClick={() => handleWeeklyExpensesDelete(row.id)}
-                                                                                alt="Delete"
-                                                                            />
-                                                                        </button>
-                                                                    )
-                                                                )}
-                                                                {row.type === "Daily" ? (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed ml-3"
-                                                                        src={history}
-                                                                        alt="History Disabled"
-                                                                    />
-                                                                ) : (
-                                                                    <button className="rounded-full transition duration-200 mr-3">
-                                                                        <img
-                                                                            src={history}
-                                                                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                            onClick={() => fetchAuditDetailsForExpense(row.id)}
-                                                                            alt="History"
-                                                                        />
-                                                                    </button>
-                                                                )}
-                                                            </>
-                                                        )
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    {!isExpensesEntryUploadOnly && (
-                        <div className="flex-[1] min-w-0">
-                            <div className="block">
-                                <div className="flex flex-col sm:flex-row justify-between mb-4 gap-2">
-                                    <h1 className="font-bold text-base">Payments Received</h1>
-                                    <h1 className="font-bold text-base text-[#E4572E]">
-                                        Total: <span style={{ color: "#E4572E" }}>
-                                            {payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}
-                                        </span>
-                                    </h1>
-                                </div>
-                                <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-full overflow-y-auto max-h-[300px] thin-scrollbar"
-                                    style={{
-                                        willChange: 'scroll-position',
-                                        WebkitOverflowScrolling: 'touch',
-                                        transform: 'translateZ(0)', // Force hardware acceleration
-                                        backfaceVisibility: 'hidden' // Optimize rendering
-                                    }}
-                                    onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
-                                    onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
-                                    onMouseUp={() => handleMouseUp(paymentsScrollRef)}
-                                    onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
-                                    onWheel={(e) => e.stopPropagation()}
-                                >
-                                    <table className="w-full border-collapse">
-                                        <thead className="bg-[#FAF6ED] h-12">
-                                            <tr>
-                                                <th className="px-4 py-2 text-left">Date</th>
-                                                <th className="px-4 py-2">Amount</th>
-                                                <th className="px-4 py-2 text-left">Type</th>
-                                                <th>Activity</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {payments.map((row, index) => (
-                                                <tr key={index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                    <td className="px-4 py-2">
-                                                        {editingPaymentId === (row.id || null) ? (
-                                                            <input
-                                                                type="date"
-                                                                value={row.date || ""}
-                                                                onChange={(e) =>
-                                                                    handleEditPayment(index, "date", e.target.value)
-                                                                }
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg bg-transparent w-[120px] h-[40px] focus:outline-none"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-[120px] h-[40px] flex items-center">
-                                                                {formatDateOnly(row.date) || ""}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        {editingPaymentId === (row.id || null) ? (
-                                                            <input
-                                                                type="number"
-                                                                value={row.amount || ""}
-                                                                onChange={(e) =>
-                                                                    handleEditPayment(index, "amount", e.target.value)
-                                                                }
-                                                                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg bg-transparent w-[90px] h-[40px] focus:outline-none"
-                                                                onWheel={(e) => e.preventDefault()}
-                                                                onFocus={() =>
-                                                                    window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
-                                                                }
-                                                                onBlur={() =>
-                                                                    window.removeEventListener("wheel", (e) => e.preventDefault())
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <div className="w-[90px] h-[40px] flex items-center">
-                                                                {Number(row.amount).toLocaleString('en-IN')}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        {editingPaymentId === (row.id || null) ? (
-                                                            <>
-                                                                <select
-                                                                    value={row.type || ""}
-                                                                    onChange={(e) =>
-                                                                        handleEditPayment(index, "type", e.target.value)
-                                                                    }
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg bg-transparent focus:outline-none"
-                                                                    disabled={editingPaymentId !== row.id}
-                                                                >
-                                                                    <option value="">Select</option>
-                                                                    {weeklyReceivedTypes.map((type, idx) => (
-                                                                        <option key={idx} value={type.received_type}>
-                                                                            {type.received_type}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </>
-                                                        ) : (
-                                                            <div className="w-[90px] h-[40px] flex items-center">
-                                                                {row.type}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-2 py-2">
-                                                        {canEditSelectedWeek && (
-                                                            <div className="flex gap-1">
-                                                                {editingPaymentId === row.id ? (
-                                                                    <button
-                                                                        className="text-green-600 font-bold text-lg"
-                                                                        onClick={() => saveEditedPaymentReceived(row)}
-                                                                        disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
-                                                                    >
-                                                                        ✓
-                                                                    </button>
-                                                                ) : (
-                                                                    weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                        canEditSelectedWeek && (
-                                                                            <button onClick={() => {
-                                                                                setEditingPaymentId(row.id);
-                                                                                setEditingOriginalPayment({ ...row });
-                                                                            }}>
-                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                            </button>
-                                                                        )
-                                                                    ) : (
-                                                                        <img
-                                                                            className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                            src={Edit}
-                                                                            alt="Edit Disabled"
-                                                                        />
-                                                                    )
-                                                                )}
-                                                                {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                    canEditDelete && canEditSelectedWeek && (
-                                                                        <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
-                                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                                        </button>
-                                                                    )
-                                                                ) : (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={Delete}
-                                                                        alt="Delete Disabled"
-                                                                    />
-                                                                )}
-                                                                {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                    <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                        <img src={history} className="w-5 h-4" alt="History" />
-                                                                    </button>
-                                                                ) : (
-                                                                    <img
-                                                                        className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                        src={history}
-                                                                        alt="History Disabled"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {canEditSelectedWeek ? (
-                                                <tr>
-                                                    <td className="px-4 py-2">
-                                                        <input
-                                                            type="date"
-                                                            name="date"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 rounded-lg w-[120px] h-[40px] focus:outline-none"
-                                                            value={newPayment.date}
-                                                            onChange={handlePaymentChange}
-                                                            onKeyDown={handleKeyDown1}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <input
-                                                            type="number"
-                                                            name="amount"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none"
-                                                            value={newPayment.amount}
-                                                            onChange={handlePaymentChange}
-                                                            onKeyDown={handleKeyDown1}
-                                                            onWheel={(e) => e.preventDefault()}
-                                                            onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                            onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <select
-                                                            name="type"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 w-[90px] h-[40px] rounded-lg focus:outline-none"
-                                                            value={newPayment.type}
-                                                            onChange={handlePaymentChange}
-                                                            onKeyDown={handleKeyDown1}
-                                                        >
-                                                            <option value="">Select</option>
-                                                            {weeklyReceivedTypes.map((type, index) => (
-                                                                <option key={index} value={type.received_type}>
-                                                                    {type.received_type}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td></td>
-                                                </tr>
-                                            ) : null}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div className="mt-4 pt-2">
-                                <h2 className="font-bold text-lg mb-2">Summary</h2>
-                                <div className="overflow-hidden rounded-md border-l-8 border-[#BF9853] text-left">
-                                    <table className="w-full border-collapse">
-                                        <tbody>
-                                            {Object.entries(
-                                                filteredExpenses
-                                                    .filter(expense => Number(expense.amount) > 0)
-                                                    .reduce((acc, expense) => {
-                                                        const type = expense.type;
-                                                        const amount = Number(expense.amount);
-                                                        acc[type] = (acc[type] || 0) + amount;
-                                                        return acc;
-                                                    }, {})
-                                            ).map(([type, total], index, arr) => (
-                                                <tr key={type}
-                                                    className={`even:bg-[#FAF6ED] odd:bg-[#FFFFFF] ${index === 0 ? "rounded-t-md" : ""
-                                                        } ${index === arr.length - 1 ? "rounded-b-md" : ""}`}
-                                                >
-                                                    <td className="font-bold py-1.5 pl-2">{type}</td>
-                                                    <td className="font-bold py-1.5 px-4 text-right">
-                                                        {Number(total).toLocaleString("en-US", {
-                                                            minimumFractionDigits: 2,
-                                                            maximumFractionDigits: 2,
-                                                        })}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
-                    siteOptions={siteOptions} />
-                <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
-                    audits={weeklyPaymentReceivedAudits} />
-            </div>
-            {showPaymentPopup && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white text-left rounded-xl  p-6 w-[800px] h-[770px] overflow-y-auto">
-                        <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
-                        <div className="space-y-4 mb-4 justify-items-center">
-                            <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                        <div className="relative">
-                                            <input
-                                                type="date"
-                                                value={paymentPopupData.date}
-                                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
-                                                readOnly
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                        <input
-                                            type="number"
-                                            value={paymentPopupData.amount}
-                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
-                                            placeholder="Enter amount"
-                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
-                                        <select
-                                            value={paymentPopupData.paymentMode}
-                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
-                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                        >
-                                            <option value="">---Select---</option>
-                                            <option value="Gpay">Gpay</option>
-                                            <option value="PhonePe">PhonePe</option>
-                                            <option value="Net Banking">Net Banking</option>
-                                            <option value="Cheque">Cheque</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
-                                <div className="space-y-4">
-                                    {paymentPopupData.paymentMode === "Cheque" && (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
-                                                <input
-                                                    type="text"
-                                                    value={paymentPopupData.chequeNo}
-                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
-                                                    placeholder="Enter cheque number"
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={paymentPopupData.chequeDate}
-                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
-                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                            <input
-                                                type="text"
-                                                value={paymentPopupData.transactionNumber}
-                                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
-                                                placeholder="Enter transaction number"
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                                            <select
-                                                value={paymentPopupData.accountNumber}
-                                                onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                            >
-                                                <option value="">Select Account</option>
-                                                {accountDetails.map((account) => (
-                                                    <option key={account.id} value={account.account_number}>
-                                                        {account.account_number}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {previousPayments.length > 0 && (
-                            <div>
-                                <h4 className="text-md font-medium text-gray-700 mb-3 ml-20">Previous Payments: {previousPayments.length} </h4>
-                                <div className="mb-6 justify-items-center">
-                                    <div className="space-y-4 max-h-64 overflow-y-auto">
-                                        {previousPayments.map((payment, index) => (
-                                            <div key={index} className="">
-                                                <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
-                                                    <div className="grid grid-cols-3 gap-4">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                            <input
-                                                                type="text"
-                                                                value={new Date(payment.date).toLocaleDateString('en-GB')}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                                                            <input
-                                                                type="text"
-                                                                value={payment.amount.toLocaleString('en-IN')}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
-                                                            <input
-                                                                type="text"
-                                                                value={payment.bill_payment_mode}
-                                                                readOnly
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
-                                                    <div className="space-y-4">
-                                                        {payment.bill_payment_mode === "Cheque" && (
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.cheque_number || ""}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={payment.transaction_number || ""}
-                                                                    readOnly
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={payment.account_number || ""}
-                                                                    readOnly
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
-                            <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div className="text-center">
-                                    <span className="text-sm font-medium text-green-700">
-                                        This Claim Amount Was Already Sent to the Expense Entry
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                        <div className="flex justify-end items-center mt-6">
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowPaymentPopup(false);
-                                        setPaymentPopupData({
-                                            date: new Date().toISOString().split('T')[0],
-                                            amount: "",
-                                            paymentMode: "",
-                                            chequeNo: "",
-                                            chequeDate: "",
-                                            transactionNumber: "",
-                                            accountNumber: ""
-                                        });
-                                        setPreviousPayments([]);
-                                        setCurrentProjectAdvanceRow(null);
-                                    }}
-                                    className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
-                                                if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
-                                                    let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
-                                                    if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
-                                                        mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
-                                                    } else if (currentProjectAdvanceRow.type === "Staff Advance") {
-                                                        mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
-                                                    }
-                                                    await postBankRegisterLogSave(
-                                                        bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
-                                                        "Cash Register — Weekly Payment History",
-                                                        {
-                                                            bill_payment_mode: paymentPopupData.paymentMode,
-                                                            amount: paymentPopupData.amount,
-                                                            entered_by: enteredBy,
-                                                        }
-                                                    );
-                                                }
-                                                let advancePortalId = null;
-                                                let staffAdvancePortalId = null;
-                                                if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
-                                                    try {
-                                                        const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
-                                                        if (!res.ok) throw new Error("Failed to fetch entry numbers");
-                                                        const allData = await res.json();
-                                                        const maxEntryNo =
-                                                            allData.length > 0
-                                                                ? Math.max(...allData.map((item) => item.entry_no || 0))
-                                                                : 0;
-                                                        const nextEntryNo = maxEntryNo + 1;
-                                                        const getWeekNumber = () => {
-                                                            return getISOWeekNumber(new Date());
-                                                        };
-                                                        const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
-                                                        const advanceUpdateData = {
-                                                            type: "Advance",
-                                                            date: paymentPopupData.date,
-                                                            description: description,
-                                                            bill_amount: 0,
-                                                            amount: parseFloat(paymentPopupData.amount),
-                                                            project_id: currentProjectAdvanceRow.project_id,
-                                                            vendor_id: currentProjectAdvanceRow.vendor_id,
-                                                            contractor_id: currentProjectAdvanceRow.contractor_id,
-                                                            entry_no: nextEntryNo,
-                                                            week_no: getWeekNumber(),
-                                                            file_url: "",
-                                                            transfer_site_id: 0,
-                                                            refund_amount: 0,
-                                                            payment_mode: paymentPopupData.paymentMode,
-                                                            not_allow_to_edit: true,
-                                                            branch_id: activeBranchId ?? null,
-                                                            source: "Cash Register",
-                                                            entered_by: enteredBy,
-                                                        };
-                                                        const advanceResponse = await fetch(
-                                                            "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
-                                                            {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify(advanceUpdateData)
-                                                            }
-                                                        );
-                                                        if (!advanceResponse.ok) {
-                                                            console.error("Failed to update advance portal payment mode");
-                                                        } else {
-                                                            const advanceResponseData = await advanceResponse.json();
-                                                            advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
-                                                        }
-                                                    } catch (error) {
-                                                        console.error("Error updating advance portal payment mode:", error);
-                                                    }
-                                                }
-                                                if (currentProjectAdvanceRow.type === "Staff Advance") {
-                                                    try {
-                                                        const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
-                                                        if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
-                                                        const staffAdvanceData = await staffAdvanceRes.json();
-                                                        const maxEntryNo =
-                                                            staffAdvanceData.length > 0
-                                                                ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
-                                                                : 0;
-                                                        const nextEntryNo = maxEntryNo + 1;
-                                                        const getWeekNumber = () => {
-                                                            return getISOWeekNumber(new Date());
-                                                        };
-                                                        const staffAdvanceSaveData = {
-                                                            date: paymentPopupData.date,
-                                                            employee_id: currentProjectAdvanceRow.employee_id,
-                                                            project_id: currentProjectAdvanceRow.project_id,
-                                                            type: "Advance",
-                                                            from_purpose_id: 4,
-                                                            staff_payment_mode: paymentPopupData.paymentMode,
-                                                            entry_no: nextEntryNo,
-                                                            week_no: getWeekNumber(),
-                                                            amount: parseFloat(paymentPopupData.amount),
-                                                            staff_refund_amount: 0.0,
-                                                            description: "",
-                                                            file_url: null,
-                                                            labour_id: 0,
-                                                            not_allow_to_edit: true,
-                                                            branch_id: activeBranchId ?? null,
-                                                            entered_by: enteredBy,
-                                                            source: "Cash Register",
-                                                        };
-                                                        const staffAdvanceResponse = await fetch(
-                                                            "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
-                                                            {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify(staffAdvanceSaveData)
-                                                            }
-                                                        );
-                                                        if (!staffAdvanceResponse.ok) {
-                                                            console.error("Failed to save staff advance");
-                                                        } else {
-                                                            const staffAdvanceResponseData = await staffAdvanceResponse.json();
-                                                            staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
-                                                        }
-                                                    } catch (error) {
-                                                        console.error("Error saving staff advance:", error);
-                                                    }
-                                                }
-                                                const paymentData = {
-                                                    date: paymentPopupData.date,
-                                                    created_at: new Date().toISOString(),
-                                                    contractor_id: currentProjectAdvanceRow.contractor_id || null,
-                                                    vendor_id: currentProjectAdvanceRow.vendor_id || null,
-                                                    employee_id: currentProjectAdvanceRow.employee_id || null,
-                                                    project_id: currentProjectAdvanceRow.project_id || null,
-                                                    type: currentProjectAdvanceRow.type || null,
-                                                    bill_payment_mode: paymentPopupData.paymentMode,
-                                                    amount: parseFloat(paymentPopupData.amount),
-                                                    status: true,
-                                                    weekly_number: Number(selectedWeek),
-                                                    weekly_payment_expense_id: currentProjectAdvanceRow.id,
-                                                    advance_portal_id: advancePortalId,
-                                                    staff_advance_portal_id: staffAdvancePortalId,
-                                                    cheque_number: paymentPopupData.chequeNo || null,
-                                                    cheque_date: paymentPopupData.chequeDate || null,
-                                                    transaction_number: paymentPopupData.transactionNumber || null,
-                                                    account_number: paymentPopupData.accountNumber || null,
-                                                    branch_id: activeBranchId ?? null,
-                                                    entered_by: enteredBy,
-                                                    source: "Cash Register",
-                                                };
-                                                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify(paymentData)
-                                                });
-                                                if (!response.ok) {
-                                                    throw new Error("Failed to save payment");
-                                                }
-                                                const [expensesRes, paymentsRes] = await Promise.all([
-                                                    axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                                                    axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
-                                                ]);
-                                                setExpenses(expensesRes.data);
-                                                const filteredPayments = paymentsRes.data.filter(
-                                                    (payment) => payment.type !== "Handover"
-                                                );
-                                                setPayments(filteredPayments);
-                                                await fetchWeeklyPaymentBills();
-                                            }
-                                        } catch (error) {
-                                            console.error("Error saving payment:", error);
-                                        }
-
-                                        setShowPaymentPopup(false);
-                                        setPaymentPopupData({
-                                            date: new Date().toISOString().split('T')[0],
-                                            amount: "",
-                                            paymentMode: "",
-                                            chequeNo: "",
-                                            chequeDate: "",
-                                            transactionNumber: "",
-                                            accountNumber: ""
-                                        });
-                                        setPreviousPayments([]);
-                                        setCurrentProjectAdvanceRow(null);
-                                    }}
-                                    className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
-                                    disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
-                                >
-                                    Submit
-                                </button>
-                            </div>
-                        </div>
-                        {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && (
-                            <div className="mt- p-3 text-center -ml-[600px]">
-                                <span className="text-sm font-medium text-gray-700">Total Amount: </span>
-                                <span className="text-lg font-semibold text-gray-900">
-                                    ₹{(Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)).toLocaleString('en-IN')}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-            {showPopups && (currentRow?.type === "Project Advance" || currentRow?.type === "Bill Payment") && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                        <label className="block mb-3 text-left">
-                            <span className="font-semibold">Description</span>
-                            <input
-                                type="text"
-                                name="description"
-                                value={editFormData.description}
-                                className="w-full p-2 border border-gray-300 rounded-lg mt-1"
-                                onChange={handleEditChange}
-                                readOnly={Boolean(currentRow?.description)}
-                            />
-                        </label>
-                        <div className="flex justify-end gap-3 mt-4">
-                            <button onClick={() => setShowPopups(false)} className="px-4 py-2 bg-gray-200 rounded-lg">
-                                Close
-                            </button>
-                            {!portalDescriptions[currentRow?.advance_portal_id] && (
-                                <button
-                                    onClick={async () => {
-                                        await updateDescription(currentRow.advance_portal_id, editFormData.description);
-                                        setShowPopups(false);
-                                    }}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg"
-                                >
-                                    Save
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showBillExpenseEntryModal ? (
-                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
-                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                            <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (!canCloseExpenseEntryModal()) return;
-                                    setShowBillExpenseEntryModal(false);
-                                    localStorage.removeItem('expenseEntryPrefill');
-                                }}
-                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="p-3">
-                            <ExpenseEntryForm
-                                username={username}
-                                userRoles={userRoles}
-                                embedded
-                                lockAccountTypePrefill
-                                disableWeeklyExpensesSave
-                                onSuccess={() => {
-                                    setShowBillExpenseEntryModal(false);
-                                    localStorage.removeItem('expenseEntryPrefill');
-                                    setExpenseEntryRefreshNonce((n) => n + 1);
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-            {showBillSettlementAdvanceModal ? (
-                <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
-                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                            <p className="text-sm font-semibold text-[#202020]">Advance Portal</p>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowBillSettlementAdvanceModal(false);
-                                    try {
-                                        sessionStorage.removeItem("selectedType");
-                                        sessionStorage.removeItem("selectedOption");
-                                        sessionStorage.removeItem("selectedSite");
-                                        sessionStorage.removeItem("advanceAmount");
-                                        sessionStorage.removeItem("billAmount");
-                                        sessionStorage.removeItem("paymentMode");
-                                        sessionStorage.removeItem("description");
-                                        sessionStorage.removeItem("cashRegisterBillSettlementDate");
-                                    } catch {
-                                        /* ignore */
-                                    }
-                                }}
-                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="p-3">
-                            <AdvancePortalForm
-                                username={username}
-                                userRoles={userRoles}
-                                embedded
-                                lockTypePrefill
-                                onSuccess={() => {
-                                    setShowBillSettlementAdvanceModal(false);
-                                    try {
-                                        sessionStorage.removeItem("selectedType");
-                                        sessionStorage.removeItem("selectedOption");
-                                        sessionStorage.removeItem("selectedSite");
-                                        sessionStorage.removeItem("advanceAmount");
-                                        sessionStorage.removeItem("billAmount");
-                                        sessionStorage.removeItem("paymentMode");
-                                        sessionStorage.removeItem("description");
-                                        sessionStorage.removeItem("cashRegisterBillSettlementDate");
-                                    } catch {
-                                        /* ignore */
-                                    }
-                                    setExpenseEntryRefreshNonce((n) => n + 1);
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-            {fileUploadPopup && (
-                <div
-                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                            setFileUploadPopup(false);
-                            setCurrentFileRow(null);
-                            setSelectedFileForPopup(null);
-                        }
-                    }}
-                    tabIndex={0}
-                >
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
-                        <h3 className="text-lg font-semibold mb-4 text-center">
-                            {currentFileRow?.bill_copy_url ? 'Change File' : 'Upload File'}
-                        </h3>
-                        {currentFileRow?.bill_copy_url && (
-                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-2">Current file:</p>
-                                <a href={cleanUrl(currentFileRow.bill_copy_url)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline"
-                                >
-                                    View Current File
-                                </a>
-                            </div>
-                        )}
-                        <div className="mb-4">
-                            <label className="block mb-2 text-sm font-medium">
-                                Select PDF File
-                            </label>
-                            <input
-                                type="file"
-                                accept="application/pdf"
-                                onChange={handleFileSelectInPopup}
-                                className="w-full p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none"
-                            />
-                            {selectedFileForPopup && (
-                                <p className="text-sm text-green-600 mt-2">
-                                    ✓ {selectedFileForPopup.name} selected
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => {
-                                    setFileUploadPopup(false);
-                                    setCurrentFileRow(null);
-                                    setSelectedFileForPopup(null);
-                                }}
-                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button onClick={handleSaveFileFromPopup} disabled={!selectedFileForPopup}
-                                className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-green-600 hover:bg-green-700'
-                                    } text-white`}
-                            >
-                                {currentFileRow?.bill_copy_url ? 'Update File' : 'Upload File'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showCategoryPopup && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                        <h3 className="text-lg font-semibold mb-4 text-center">Select Category</h3>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Category
-                            </label>
-                            <Select
-                                value={selectedCategory}
-                                onChange={(selectedOption) => setSelectedCategory(selectedOption)}
-                                options={categoryOptions}
-                                placeholder="Select Category..."
-                                isSearchable
-                                isClearable
-                                menuPortalTarget={document.body}
-                                menuPosition="fixed"
-                                styles={{
+        <body className="bg-[#FAF6ED] overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+                    <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
+                        <div className="flex flex-wrap items-center justify-between text-left">
+                            {(() => {
+                                const entryCheckLikeSelectStyles = {
                                     control: (provided, state) => ({
                                         ...provided,
-                                        backgroundColor: 'white',
-                                        borderWidth: '2px',
-                                        borderColor: state.isFocused
-                                            ? '#BF9853'
-                                            : '#BF9853',
+                                        backgroundColor: 'transparent',
+                                        fontSize: '14px',
+                                        border: '2px solid rgba(191, 152, 83, 0.2)',
                                         borderRadius: '8px',
-                                        boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
-                                        '&:hover': {
-                                            borderColor: '#BF9853',
-                                        },
+                                        minHeight: '40px',
+                                        fontWeight: 'medium',
+                                        height: '40px',
+                                        flexWrap: 'nowrap',
+                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                        '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
+                                    }),
+                                    valueContainer: (provided) => ({
+                                        ...provided,
+                                        flexWrap: 'nowrap',
+                                        overflow: 'hidden',
+                                        paddingLeft: '12px',
+                                        paddingRight: '2px',
+                                        height: '36px',
+                                        alignItems: 'center',
                                     }),
                                     placeholder: (provided) => ({
                                         ...provided,
                                         color: '#999',
                                         textAlign: 'left',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '100%',
+                                        position: 'absolute',
                                     }),
-                                    menu: (provided) => ({
-                                        ...provided,
-                                        zIndex: 10050,
-                                        maxHeight: '300px',
-                                        overflow: 'auto',
-                                    }),
+                                    menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: 288 }),
                                     menuList: (provided) => ({
                                         ...provided,
-                                        maxHeight: '300px',
+                                        maxHeight: 288,
+                                        paddingTop: 0,
+                                        paddingBottom: 0,
                                         overflowY: 'auto',
-                                        padding: '4px',
-                                    }),
-                                    menuPortal: (provided) => ({
-                                        ...provided,
-                                        zIndex: 10050,
+                                        scrollbarWidth: 'none',
+                                        msOverflowStyle: 'none',
+                                        '&::-webkit-scrollbar': { display: 'none' },
                                     }),
                                     option: (provided, state) => ({
                                         ...provided,
+                                        minHeight: 36,
+                                        height: 36,
+                                        paddingTop: 0,
+                                        paddingBottom: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
                                         textAlign: 'left',
                                         fontWeight: 'normal',
                                         fontSize: '15px',
@@ -5897,120 +3650,1785 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                     singleValue: (provided) => ({
                                         ...provided,
                                         textAlign: 'left',
-                                        fontWeight: 'normal',
                                         color: 'black',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '100%',
                                     }),
-                                    indicatorSeparator: () => ({
-                                        display: 'none'
-                                    }),
-                                    indicatorsContainer: (provided) => ({
+                                    input: (provided) => ({
                                         ...provided,
-                                        height: '40px',
-                                        gap: '0px'
+                                        margin: 0,
+                                        padding: 0,
+                                        whiteSpace: 'nowrap',
+                                    }),
+                                    dropdownIndicator: (provided, state) => ({
+                                        ...provided,
+                                        display: state.hasValue ? 'none' : 'flex',
+                                        color: '#000000',
+                                        flexShrink: 0,
                                     }),
                                     clearIndicator: (provided) => ({
                                         ...provided,
-                                        padding: '2px'
+                                        cursor: 'pointer',
+                                        color: '#000000',
+                                        flexShrink: 0,
                                     }),
-                                    dropdownIndicator: (provided) => ({
-                                        ...provided,
-                                        padding: '2px'
-                                    })
-                                }}
-                            />
+                                    indicatorSeparator: () => ({ display: 'none' }),
+                                };
+                                const entryCheckLikeSelectClassNames = {
+                                    menuList: () => 'no-scrollbar scrollbar-none',
+                                    valueContainer: () => '!flex-nowrap !overflow-hidden',
+                                    placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                    singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                };
+                                const formatWeekOptionDate = (date) =>
+                                    date.toLocaleDateString("en-GB", {
+                                        day: "numeric",
+                                        month: "long"
+                                    });
+                                const weekSelectOptions = weeks.map((week) => ({
+                                    value: String(week.number),
+                                    label: `Week ${week.number}, ${formatWeekOptionDate(new Date(week.start))} to ${formatWeekOptionDate(new Date(week.end))}`,
+                                }));
+                                const yearSelectOptions = years.map((y) => ({ value: String(y), label: String(y) }));
+                                return (
+                                    <div className="flex flex-wrap items-center space-x-3 text-left p-[18px]">
+                                        <div className="min-w-0">
+                                            <h1 className='font-semibold mb-[8px]'>Select Week</h1>
+                                            <Select
+                                                className="min-w-0 w-[260px]"
+                                                classNames={entryCheckLikeSelectClassNames}
+                                                options={weekSelectOptions}
+                                                value={weekSelectOptions.find((opt) => opt.value === String(selectedWeek)) || null}
+                                                onChange={(opt) => setSelectedWeek(opt ? opt.value : "")}
+                                                placeholder="Select Week"
+                                                isSearchable
+                                                isClearable
+                                                styles={entryCheckLikeSelectStyles}
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="block font-semibold mb-[8px]">Year</label>
+                                            <Select
+                                                className="min-w-0 w-[120px]"
+                                                classNames={entryCheckLikeSelectClassNames}
+                                                options={yearSelectOptions}
+                                                value={yearSelectOptions.find((opt) => opt.value === String(year)) || null}
+                                                onChange={(opt) => setYear(opt ? opt.value : getCurrentWeekYear().toString())}
+                                                placeholder="Year"
+                                                isSearchable
+                                                isClearable
+                                                styles={entryCheckLikeSelectStyles}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            {!isExpensesEntryUploadOnly && (
+                                <div className="flex items-center space-x-3 flex-wrap justify-end pr-[18px]">
+                                    {!selectedWeek && (
+                                        <span className="text-xs text-gray-500">Select a week</span>
+                                    )}
+                                    <div
+                                        className="rounded-md px-4 py-[8px] text-sm shrink-0"
+                                        style={{
+                                            backgroundColor: '#FFFDF9',
+                                            backgroundImage: [
+                                                'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                                'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                                'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                                'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            ].join(', '),
+                                            backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                            backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                            backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                                        }}
+                                    >
+                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                            <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                                <span>Income</span>
+                                                <span className="ml-auto">:</span>
+                                            </span>
+                                            <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                                ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                            <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                                <span>Expenses</span>
+                                                <span className="ml-auto">:</span>
+                                            </span>
+                                            <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                                ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                            <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                                <span>Balance</span>
+                                                <span className="ml-auto">:</span>
+                                            </span>
+                                            <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                                ₹{(
+                                                    payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
+                                                    filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+                                                ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Comments
-                            </label>
-                            <textarea
-                                value={categoryComments}
-                                onChange={(e) => setCategoryComments(e.target.value)}
-                                placeholder="Enter comments..."
-                                className="w-full border-2 border-[#BF9853] border-opacity-25 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent resize-none"
-                                rows={3}
-                            />
+                    </div>
+                    <div className={isExpensesEntryUploadOnly
+                        ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden'
+                        : 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden'}>
+                        {!isExpensesEntryUploadOnly && nextWeekDiscountInfo && (
+                            <div className="flex justify-end mb-4 -mr-6 -mt-7">
+                                <h2 className="font-semibold text-base">
+                                    Discount :{" "}
+                                    <span className="inline-block text-right min-w-[120px] text-xl">
+                                        {nextWeekDiscountInfo.amount.toLocaleString('en-IN', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
+                                    </span>
+                                </h2>
+                            </div>
+                        )}
+                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden">
+                            <div className={`flex flex-col min-h-0 overflow-hidden ${isExpensesEntryUploadOnly ? 'w-full min-w-0 flex-1' : 'min-w-[1240] max-w-[1240] shrink-0'}`}>
+                                <div className="flex justify-between items-center">
+                                    <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
+                                    <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                        ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </h1>
+                                </div>
+                                <div className={`text-left flex ${(selectDate || selectContractororVendorName || selectProjectName || selectType) ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
+                                    <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                                        <EdbcFilterToggleButton onClick={() => setShowFilters(!showFilters)} />
+                                        {(selectDate || selectContractororVendorName || selectProjectName || selectType) && (
+                                            <div
+                                                ref={expensesFilterChipsRef}
+                                                className="flex flex-row flex-wrap items-center gap-2 min-w-0 overflow-x-auto no-scrollbar cursor-grab"
+                                                onMouseDown={(e) => handleMouseDown(e, expensesFilterChipsRef)}
+                                                onMouseMove={(e) => handleMouseMove(e, expensesFilterChipsRef)}
+                                                onMouseUp={() => handleMouseUp(expensesFilterChipsRef)}
+                                                onMouseLeave={() => handleMouseUp(expensesFilterChipsRef)}
+                                            >
+                                                {selectDate && (
+                                                    <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                        <span className="font-medium text-[#BF9853]">Date: </span>
+                                                        <span className="font-semibold text-[14px]">{formatDateOnly(selectDate)}</span>
+                                                        <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                    </span>
+                                                )}
+                                                {selectContractororVendorName && (
+                                                    <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                        <span className="font-medium text-[#BF9853]">Associate: </span>
+                                                        <span className="font-semibold text-[14px]">{selectContractororVendorName}</span>
+                                                        <button onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                    </span>
+                                                )}
+                                                {selectProjectName && (
+                                                    <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                        <span className="font-medium text-[#BF9853]">Project Name: </span>
+                                                        <span className="font-semibold text-[14px]">{selectProjectName}</span>
+                                                        <button onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                    </span>
+                                                )}
+                                                {selectType && (
+                                                    <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                        <span className="font-medium text-[#BF9853]">Type: </span>
+                                                        <span className="font-semibold text-[14px]">{selectType}</span>
+                                                        <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <EdbcTableToolbarRightActions
+                                        onClearFilters={clearFilters}
+                                        overallSearch={overallSearch}
+                                        onOverallSearchChange={setOverallSearch}
+                                    />
+                                </div>
+                                <div className="flex flex-col flex-1 min-h-0 w-fit max-w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                                    <div
+                                        ref={scrollRef}
+                                        className={isExpensesEntryUploadOnly
+                                            ? 'w-fit max-w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar'
+                                            : 'w-fit max-w-full flex-1 min-h-0 overflow-auto no-scrollbar'}
+                                        onMouseDown={(e) => handleMouseDown(e, scrollRef)}
+                                        onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                        onMouseUp={() => handleMouseUp(scrollRef)}
+                                        onMouseLeave={() => handleMouseUp(scrollRef)}
+                                    >
+                                        {isExpensesEntryUploadOnly ? (
+                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0`}>
+                                                <thead className="sticky top-0 z-10 bg-white">
+                                                    <EdbcTableHeaderRow>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                                        <th
+                                                            id={EDBC_IDS.EDBC20}
+                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim()}
+                                                            aria-hidden="true"
+                                                        />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="Activity" />
+                                                    </EdbcTableHeaderRow>
+                                                    {showFilters && (
+                                                        <EdbcTableFilterRow>
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
+                                                            <EdbcDateFilter
+                                                                placeholder="Date"
+                                                                value={selectDate}
+                                                                onChange={setSelectDate}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC4}
+                                                                placeholder="Associate"
+                                                                options={contractorVendorFilterOptions}
+                                                                value={selectContractororVendorName}
+                                                                onChange={setSelectContractororVendorName}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcProjectNameFilter
+                                                                placeholder="Project Name"
+                                                                options={projectFilterOptions}
+                                                                value={selectProjectName}
+                                                                onChange={setSelectProjectName}
+                                                                isClearable
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC12}
+                                                                placeholder="Type"
+                                                                options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
+                                                                value={selectType}
+                                                                onChange={setSelectType}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcTotalAmountFilter
+                                                                columnId={EDBC_IDS.EDBC8}
+                                                                totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                            />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                        </EdbcTableFilterRow>
+                                                    )}
+                                                </thead>
+                                                <tbody>
+                                                    {[...filteredExpenses].reverse().map((row, index) => (
+                                                        <EdbcTableBodyRow key={row.id}>
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
+                                                                {filteredExpenses.length - index}
+                                                            </td>
+                                                            <EdbcDateBodyCell
+                                                                expense={row}
+                                                                rowIndex={index}
+                                                                expandedCells={expandedCells}
+                                                                onToggleExpanded={toggleExpandedCell}
+                                                                formatValue={formatDateOnly}
+                                                            />
+                                                            <EdbcExpandableBodyCell
+                                                                columnId={EDBC_IDS.EDBC4}
+                                                                expense={row}
+                                                                rowIndex={index}
+                                                                expandedCells={expandedCells}
+                                                                onToggleExpanded={toggleExpandedCell}
+                                                                getDisplayValue={getPartyDisplayName}
+                                                            />
+                                                            <EdbcProjectNameBodyCell
+                                                                expense={row}
+                                                                rowIndex={index}
+                                                                expandedCells={expandedCells}
+                                                                onToggleExpanded={toggleExpandedCell}
+                                                                getDisplayValue={(entry) => siteOptions.find(opt => opt.id === Number(entry.project_id))?.label || ''}
+                                                            />
+                                                            <EdbcExpandableBodyCell
+                                                                columnId={EDBC_IDS.EDBC12}
+                                                                expense={row}
+                                                                rowIndex={index}
+                                                                expandedCells={expandedCells}
+                                                                onToggleExpanded={toggleExpandedCell}
+                                                                getDisplayValue={(entry) => entry.type}
+                                                            />
+                                                            <EdbcExpandableBodyCell
+                                                                columnId={EDBC_IDS.EDBC8}
+                                                                expense={row}
+                                                                rowIndex={index}
+                                                                expandedCells={expandedCells}
+                                                                onToggleExpanded={toggleExpandedCell}
+                                                                textAlignClass="text-right"
+                                                                getDisplayValue={(entry) => Number(entry.amount).toLocaleString('en-IN')}
+                                                            />
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex w-full items-center justify-center">
+                                                                    <span className="inline-flex items-center gap-1">
+                                                                        {row.bill_copy_url ? (
+                                                                            <>
+                                                                                <a
+                                                                                    href={cleanUrl(row.bill_copy_url)}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer"
+                                                                                    title="View File"
+                                                                                >
+                                                                                    <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                                </a>
+                                                                                {canEditDelete ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRemoveBillCopyUrl(row)}
+                                                                                        className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee] p-0 border-0 bg-transparent"
+                                                                                        title="Remove File"
+                                                                                    >
+                                                                                        ×
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0" aria-hidden="true" />
+                                                                                )}
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleFileUploadClick(row)}
+                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer p-0 border-0 bg-transparent"
+                                                                                    title="Upload File"
+                                                                                >
+                                                                                    <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
+                                                                                </button>
+                                                                                {canEditDelete && removedBillCopyRows[row.id] ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
+                                                                                        className="inline-flex shrink-0 rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
+                                                                                        title="Restore Removed File"
+                                                                                    >
+                                                                                        Restore
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center pointer-events-none" aria-hidden="true">
+                                                                                        <span className="text-[22px] font-bold leading-none opacity-0">×</span>
+                                                                                    </span>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                        </EdbcTableBodyRow>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        ) : (
+                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0`}>
+                                                <thead className="sticky top-0 z-10 bg-white">
+                                                    <EdbcTableHeaderRow>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                                        <EdbcColumnHeader
+                                                            columnId={EDBC_IDS.EDBC4}
+                                                            label={isClientToggleActive ? "Client Name" : "Associate"}
+                                                        />
+                                                        <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible" aria-hidden="true"></th>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                                        <th
+                                                            id={EDBC_IDS.EDBC20}
+                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim()}
+                                                            aria-hidden="true"
+                                                        />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="Activity" />
+                                                    </EdbcTableHeaderRow>
+                                                    {showFilters && (
+                                                        <EdbcTableFilterRow>
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
+                                                            <EdbcDateFilter
+                                                                placeholder="Date"
+                                                                value={selectDate}
+                                                                onChange={setSelectDate}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC4}
+                                                                placeholder={isClientToggleActive ? "Client Name" : "Associate"}
+                                                                options={contractorVendorFilterOptions}
+                                                                value={selectContractororVendorName}
+                                                                onChange={setSelectContractororVendorName}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></th>
+                                                            <EdbcProjectNameFilter
+                                                                placeholder="Project Name"
+                                                                options={projectFilterOptions}
+                                                                value={selectProjectName}
+                                                                onChange={setSelectProjectName}
+                                                                isClearable
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC12}
+                                                                placeholder="Type"
+                                                                options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
+                                                                value={selectType}
+                                                                onChange={setSelectType}
+                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                            />
+                                                            <EdbcTotalAmountFilter
+                                                                columnId={EDBC_IDS.EDBC8}
+                                                                totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                            />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                        </EdbcTableFilterRow>
+                                                    )}
+                                                    {!isExpensesEntryUploadOnly && canEditSelectedWeek ? (
+                                                        <tr className="bg-white border-b border-gray-200">
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
+                                                                {filteredExpenses.length + 1}.
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC2} className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.tdClass}>
+                                                                <div
+                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass}
+                                                                    onKeyDown={handleKeyDown}
+                                                                >
+                                                                    <CustomDateField
+                                                                        value={newExpense.date}
+                                                                        onChange={(dateStr) => handleExpenseChange({ target: { name: 'date', value: dateStr } })}
+                                                                        placeholder="Date"
+                                                                        alwaysOpenBelow
+                                                                        controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                        className={` [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newExpense.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}>
+                                                                    <Select
+                                                                        name="contractor"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={
+                                                                            isClientToggleActive
+                                                                                ? selectedClient
+                                                                                : selectedContractor ||
+                                                                                combinedOptions.find(
+                                                                                    opt =>
+                                                                                        (opt.type === "Contractor" && opt.id === Number(newExpense.contractor_id)) ||
+                                                                                        (opt.type === "Vendor" && opt.id === Number(newExpense.vendor_id)) ||
+                                                                                        (opt.type === "Employee" && opt.id === Number(newExpense.employee_id))
+                                                                                ) || null
+                                                                        }
+                                                                        onChange={(selectedOption) => {
+                                                                            if (newExpense.type === "Staff Advance") {
+                                                                                if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
+                                                                                    alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                                if (isClientToggleActive && selectedOption) {
+                                                                                    alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (newExpense.type === "Project Advance") {
+                                                                                if (selectedOption && selectedOption.type === "Employee") {
+                                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                                if (isClientToggleActive && selectedOption) {
+                                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (isClientToggleActive) {
+                                                                                const allowedTypesForClient = ["Loan", "Bank", "Claim"];
+                                                                                if (!allowedTypesForClient.includes(newExpense.type)) {
+                                                                                    alert("Client name selection is only allowed for Loan, Bank, or Claim types.");
+                                                                                    return;
+                                                                                }
+                                                                                setSelectedClient(selectedOption || null);
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    client_name: selectedOption ? selectedOption.label : "",
+                                                                                    client_id: selectedOption ? (selectedOption.clientId || selectedOption.id) : "",
+                                                                                }));
+                                                                                setVendorId('');
+                                                                                setContractorId('');
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedVendor(null);
+                                                                                setSelectedEmployee(null);
+                                                                                const clientKey = selectedOption?.compositeKey || (selectedOption ? buildClientKey(selectedOption.label, selectedOption.fatherName, selectedOption.mobile) : "");
+                                                                                const projectsForClient = selectedOption
+                                                                                    ? selectedOption.projects || (clientKey ? (clientProjectMap[clientKey]?.projects || []) : [])
+                                                                                    : [];
+                                                                                setClientProjectOptions(projectsForClient);
+                                                                                if (projectsForClient.length === 1) {
+                                                                                    const onlyProject = projectsForClient[0];
+                                                                                    setSelectedProjectName(onlyProject);
+                                                                                    setSelectedProjectOption(onlyProject);
+                                                                                    setProjectId(onlyProject.id);
+                                                                                    setNewExpense(prev => ({ ...prev, project_id: onlyProject.id }));
+                                                                                }
+                                                                                if (!selectedOption) {
+                                                                                    setSelectedProjectName(null);
+                                                                                    setSelectedProjectOption(null);
+                                                                                    setProjectId('');
+                                                                                    setNewExpense(prev => ({ ...prev, project_id: "" }));
+                                                                                }
+                                                                                return;
+                                                                            }
+                                                                            setSelectedClient(null);
+                                                                            setSelectedClient(null);
+                                                                            setClientProjectOptions([]);
+                                                                            setSelectedProjectName(null);
+                                                                            setSelectedProjectOption(null);
+                                                                            setProjectId('');
+                                                                            if (newExpense.type === "Staff Advance") {
+                                                                                if (selectedOption && (selectedOption.type === "Contractor" || selectedOption.type === "Vendor")) {
+                                                                                    alert("Staff Advance type only allows Employee. Please select an Employee or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (newExpense.type === "Project Advance") {
+                                                                                if (selectedOption && selectedOption.type === "Employee") {
+                                                                                    alert("Project Advance type only allows Contractor or Vendor. Please select a Contractor or Vendor or change the type.");
+                                                                                    return;
+                                                                                }
+                                                                            }
+                                                                            if (!selectedOption) {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    contractor_id: "",
+                                                                                    vendor_id: "",
+                                                                                    employee_id: "",
+                                                                                    client_name: "",
+                                                                                    client_id: ""
+                                                                                }));
+                                                                                setContractorId("");
+                                                                                setVendorId("");
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedVendor(null);
+                                                                                setSelectedEmployee(null);
+                                                                                setSelectedClient(null);
+                                                                            } else if (selectedOption.type === "Employee") {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    employee_id: selectedOption.id,
+                                                                                    contractor_id: "",
+                                                                                    vendor_id: ""
+                                                                                }));
+                                                                                setSelectedEmployee(selectedOption);
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedVendor(null);
+                                                                            } else if (selectedOption.type === "Contractor") {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    contractor_id: selectedOption.id,
+                                                                                    vendor_id: ""
+                                                                                }));
+                                                                                setContractorId(selectedOption.id);
+                                                                                setVendorId("");
+                                                                                setSelectedContractor(selectedOption);
+                                                                                setSelectedVendor(null);
+                                                                                setSelectedEmployee(null);
+                                                                            } else if (selectedOption.type === "Vendor") {
+                                                                                setNewExpense(prev => ({
+                                                                                    ...prev,
+                                                                                    vendor_id: selectedOption.id,
+                                                                                    contractor_id: ""
+                                                                                }));
+                                                                                setVendorId(selectedOption.id);
+                                                                                setContractorId("");
+                                                                                setSelectedVendor(selectedOption);
+                                                                                setSelectedContractor(null);
+                                                                                setSelectedEmployee(null);
+                                                                            }
+                                                                        }}
+                                                                        options={isClientToggleActive ? clientOptions : combinedOptions}
+                                                                        placeholder={isClientToggleActive ? "Client Name" : "Contractor/Vendor"}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...DATABASE_TABLE_FILTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: (provided) => ({
+                                                                                ...entryRowSelectMenuListStyle(provided),
+                                                                                paddingTop: 0,
+                                                                                paddingBottom: 0,
+                                                                                paddingLeft: 0,
+                                                                                paddingRight: 0,
+                                                                                WebkitOverflowScrolling: 'touch',
+                                                                            }),
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible">
+                                                                <button type="button" onClick={handlePartySourceToggle}>
+                                                                    <img
+                                                                        src={Change}
+                                                                        className={`w-4 h-4 ${isClientToggleActive ? 'opacity-100' : 'opacity-60'}`}
+                                                                        alt="Toggle party type"
+                                                                    />
+                                                                </button>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
+                                                                    <Select
+                                                                        name="project"
+                                                                        isClearable
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={selectedProjectName || siteOptions.find(opt => opt.id === Number(newExpense.project_id)) || null}
+                                                                        onChange={(selectedOption) => {
+                                                                            if (isClientToggleActive) {
+                                                                                setSelectedProjectName(selectedOption);
+                                                                                setSelectedProjectOption(selectedOption);
+                                                                            } else {
+                                                                                setSelectedProjectName(selectedOption);
+                                                                                setSelectedProjectOption(null);
+                                                                            }
+                                                                            setNewExpense(prev => ({
+                                                                                ...prev,
+                                                                                project_id: selectedOption ? selectedOption.id : ""
+                                                                            }));
+                                                                            setProjectId(selectedOption ? selectedOption.id : "");
+                                                                        }}
+                                                                        options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptionsForNewEntry}
+                                                                        placeholder={isClientToggleActive ? "Client Project..." : "Project Name..."}
+                                                                        isSearchable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...DATABASE_TABLE_FILTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: entryRowSelectMenuListStyle,
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                <div
+                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}
+                                                                    onKeyDown={handleKeyDown}
+                                                                >
+                                                                    <Select
+                                                                        name="type"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={newExpense.type ? { value: newExpense.type, label: newExpense.type } : null}
+                                                                        onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                        options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
+                                                                        placeholder="Select Type..."
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...DATABASE_TABLE_FILTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: entryRowSelectMenuListStyle,
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                        className="p-1 rounded-lg bg-transparent w-full box-border font-normal border-2 border-[#BF9853] border-opacity-25 focus:outline-none no-spinner text-right"
+                                                                        value={newExpense.amount}
+                                                                        onChange={handleExpenseChange}
+                                                                        onKeyDown={handleKeyDown}
+                                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                        </tr>
+                                                    ) : null}
+                                                </thead>
+                                                <tbody>
+                                                    {[...filteredExpenses].reverse().map((row, index) => (
+                                                        <EdbcTableBodyRow key={row.id}>
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
+                                                                {filteredExpenses.length - index}
+                                                            </td>
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC2} className={getEdbcColumnConfig(EDBC_IDS.EDBC2)?.tdClass}>
+                                                                    <input
+                                                                        type="date"
+                                                                        name="date"
+                                                                        className="p-1 rounded-md bg-transparent w-full box-border border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none"
+                                                                        value={row.date}
+                                                                        onChange={(e) => handleEditExpense(row.id, 'date', e.target.value)}
+                                                                        disabled={editingRowId !== row.id}
+                                                                    />
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcDateBodyCell
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    formatValue={formatDateOnly}
+                                                                />
+                                                            )}
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                                    <Select
+                                                                        name="party"
+                                                                        className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass || ''}
+                                                                        value={
+                                                                            ((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type))
+                                                                                ? getClientOption(row.client_id, row.client_name)
+                                                                                : combinedOptions.find(
+                                                                                    opt =>
+                                                                                        (opt.type === "Contractor" && opt.id === Number(row.contractor_id)) ||
+                                                                                        (opt.type === "Vendor" && opt.id === Number(row.vendor_id)) ||
+                                                                                        (opt.type === "Employee" && opt.id === Number(row.employee_id))
+                                                                                ) || null
+                                                                        }
+                                                                        onChange={(selectedOption) => {
+                                                                            const useClientMode = isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id));
+                                                                            if (useClientMode) {
+                                                                                // Only allow client selection if type is Loan, Bank, or Claim
+                                                                                const allowedTypesForClient = ["Loan", "Bank", "Claim"];
+                                                                                if (selectedOption && !allowedTypesForClient.includes(row.type)) {
+                                                                                    alert("Client name selection is only allowed for Loan, Bank, or Claim types.");
+                                                                                    return;
+                                                                                }
+                                                                                if (!selectedOption) {
+                                                                                    handleEditExpense(row.id, "client_name", "");
+                                                                                    handleEditExpense(row.id, "client_id", "");
+                                                                                } else {
+                                                                                    handleEditExpense(row.id, "client_name", selectedOption.label);
+                                                                                    handleEditExpense(row.id, "client_id", selectedOption.clientId || selectedOption.id);
+                                                                                }
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                                return;
+                                                                            }
+                                                                            if (!selectedOption) {
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                                handleEditExpense(row.id, "employee_id", "");
+                                                                                handleEditExpense(row.id, "client_id", "");
+                                                                                handleEditExpense(row.id, "client_name", "");
+                                                                            } else if (selectedOption.type === "Contractor") {
+                                                                                handleEditExpense(row.id, "contractor_id", selectedOption.id);
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                            } else if (selectedOption.type === "Vendor") {
+                                                                                handleEditExpense(row.id, "vendor_id", selectedOption.id);
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                            } else if (selectedOption.type === "Employee") {
+                                                                                handleEditExpense(row.id, "employee_id", selectedOption.id);
+                                                                                handleEditExpense(row.id, "contractor_id", "");
+                                                                                handleEditExpense(row.id, "vendor_id", "");
+                                                                            }
+                                                                        }}
+                                                                        options={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? clientOptions : combinedOptions}
+                                                                        placeholder={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? "Client Name" : "Select Contractor/Vendor"}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        styles={{
+                                                                            ...customStyles,
+                                                                            menu: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                                maxHeight: '300px',
+                                                                                overflow: 'auto',
+                                                                            }),
+                                                                            menuList: (provided) => ({
+                                                                                ...provided,
+                                                                                maxHeight: '300px',
+                                                                                overflowY: 'auto',
+                                                                                overflowX: 'hidden',
+                                                                                padding: '4px',
+                                                                                WebkitOverflowScrolling: 'touch',
+                                                                            }),
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC4}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    getDisplayValue={getPartyDisplayName}
+                                                                />
+                                                            )}
+                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
+                                                                    <Select
+                                                                        name="project"
+                                                                        className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass || ''}
+                                                                        value={siteOptions.find(opt => opt.id === Number(row.project_id)) || null}
+                                                                        onChange={(selectedOption) =>
+                                                                            handleEditExpense(
+                                                                                row.id,
+                                                                                "project_id",
+                                                                                selectedOption ? selectedOption.id : ""
+                                                                            )
+                                                                        }
+                                                                        options={siteOptions}
+                                                                        placeholder="Select Project"
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        styles={{
+                                                                            ...customStyles,
+                                                                            menu: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                                maxHeight: '300px',
+                                                                                overflow: 'auto',
+                                                                            }),
+                                                                            menuList: (provided) => ({
+                                                                                ...provided,
+                                                                                maxHeight: '300px',
+                                                                                overflowY: 'auto',
+                                                                                overflowX: 'hidden',
+                                                                                padding: '4px',
+                                                                                WebkitOverflowScrolling: 'touch',
+                                                                            }),
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcProjectNameBodyCell
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    getDisplayValue={(entry) => siteOptions.find(opt => opt.id === Number(entry.project_id))?.label || ''}
+                                                                />
+                                                            )}
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                {editingRowId === row.id ? (
+                                                                    <select
+                                                                        name="type"
+                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass || ''} h-[38px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none`}
+                                                                        value={row.type}
+                                                                        onChange={(e) => handleEditExpense(row.id, 'type', e.target.value)}
+                                                                    >
+                                                                        <option value="">Select</option>
+                                                                        {weeklyTypes.map((type, index) => (
+                                                                            <option key={index} value={type.type}>
+                                                                                {type.type}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                ) : (
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span>{row.type}</span>
+                                                                        </div>
+                                                                        {(() => {
+                                                                            const payments = getPaymentsByExpenseId(row.id);
+                                                                            const paymentModes = [...new Set(payments.map(p => p.bill_payment_mode).filter(mode => mode !== null && mode !== undefined))];
+                                                                            if (paymentModes.length === 0) return null;
+                                                                            const hoverContent = payments.map(payment =>
+                                                                                `${payment.bill_payment_mode}: ₹${payment.amount.toLocaleString('en-IN')}`
+                                                                            ).join('\n');
+                                                                            return (
+                                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                                    {paymentModes.length === 1 ? (
+                                                                                        <span
+                                                                                            className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
+                                                                                            title={hoverContent}
+                                                                                        >
+                                                                                            {paymentModes[0]}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span
+                                                                                            className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-green-200 transition-colors"
+                                                                                            title={hoverContent}
+                                                                                        >
+                                                                                            Online
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                {editingRowId === row.id ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass || ''} h-[38px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner text-right`}
+                                                                        value={row.amount}
+                                                                        onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
+                                                                        disabled={editingRowId !== row.id}
+                                                                        onWheel={(e) => e.preventDefault()}
+                                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                    />
+                                                                ) : (
+                                                                    Number(row.amount).toLocaleString('en-IN')
+                                                                )}
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex items-center justify-between">
+                                                                {row.type !== "Daily" ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setCurrentProjectAdvanceRow(row);
+                                                                            setPaymentPopupData({
+                                                                                date: new Date().toISOString().split('T')[0],
+                                                                                amount: "",
+                                                                                paymentMode: "",
+                                                                                chequeNo: "",
+                                                                                chequeDate: "",
+                                                                                transactionNumber: "",
+                                                                                accountNumber: ""
+                                                                            });
+                                                                            const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                            setPreviousPayments(previousPaymentsForExpense);
+                                                                            setShowPaymentPopup(true);
+                                                                        }}
+                                                                        className=" text-white flex items-center justify-center transition-colors text-xs"
+                                                                        title="Add Payment"
+                                                                    >
+                                                                        <img src={AddExtra} className="w-4 h-4" alt="Add Payment" />
+                                                                    </button>
+                                                                ) : null}
+                                                                {row.type === "Project Advance" ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={async () => {
+                                                                            let description = "";
+                                                                            if (row.advance_portal_id) {
+                                                                                try {
+                                                                                    const res = await fetch(
+                                                                                        `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                    );
+                                                                                    if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                    const data = await res.json();
+                                                                                    description = data.description || "";
+                                                                                } catch (error) {
+                                                                                    console.error("Error fetching advance portal data:", error);
+                                                                                }
+                                                                            }
+                                                                            setEditFormData((prev) => ({ ...prev, description }));
+                                                                            setCurrentRow(row);
+                                                                            setShowPopups(true);
+                                                                        }}
+                                                                    >
+                                                                        <img
+                                                                            src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
+                                                                            alt="Notes"
+                                                                            className="w-4 h-4"
+                                                                        />
+                                                                    </button>
+                                                                ) : null}
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex w-full items-center justify-center">
+                                                                    <span className="inline-flex items-center gap-1">
+                                                                        {row.bill_copy_url ? (
+                                                                            <>
+                                                                                <a
+                                                                                    href={cleanUrl(row.bill_copy_url)}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer"
+                                                                                    title="View File"
+                                                                                >
+                                                                                    <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                                </a>
+                                                                                {canEditDelete ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRemoveBillCopyUrl(row)}
+                                                                                        className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full p-0 border-0 bg-transparent"
+                                                                                        title="Remove File"
+                                                                                    >
+                                                                                        <img src={FileRemover} className="w-2 h-2" alt="Remove File" />
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0" aria-hidden="true" />
+                                                                                )}
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleFileUploadClick(row)}
+                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer p-0 border-0 bg-transparent"
+                                                                                    title="Upload File"
+                                                                                >
+                                                                                    <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
+                                                                                </button>
+                                                                                {canEditDelete && removedBillCopyRows[row.id] ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
+                                                                                        className="inline-flex shrink-0 rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
+                                                                                        title="Restore Removed File"
+                                                                                    >
+                                                                                        Restore
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center pointer-events-none" aria-hidden="true">
+                                                                                        <img src={FileRemover} className="w-2 h-2 opacity-0" alt="" />
+                                                                                    </span>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                {canEditSelectedWeek && (
+                                                                    <>
+                                                                        {editingRowId === row.id ? (
+                                                                            <button type="button" onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg p-0 leading-none">
+                                                                                ✓
+                                                                            </button>
+                                                                        ) : (
+                                                                            row.type === "Daily" ? (
+                                                                                <button type="button" disabled className="rounded-full transition duration-200 p-0 leading-none opacity-40 cursor-not-allowed">
+                                                                                    <img className="w-5 h-4 block" src={Edit} alt="Edit Disabled" />
+                                                                                </button>
+                                                                            ) : (
+                                                                                <button type="button" className="rounded-full transition duration-200 p-0 leading-none">
+                                                                                    <img
+                                                                                        src={Edit}
+                                                                                        onClick={() => {
+                                                                                            setEditingRowId(row.id);
+                                                                                            setEditingOriginalRow({ ...row });
+                                                                                        }}
+                                                                                        alt="Edit"
+                                                                                        className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                                    />
+                                                                                </button>
+                                                                            )
+                                                                        )}
+                                                                        {row.type === "Daily" ? (
+                                                                            <button type="button" disabled className="rounded-full transition duration-200 p-0 leading-none opacity-40 cursor-not-allowed">
+                                                                                <img className="w-5 h-4 block" src={Delete} alt="Delete Disabled" />
+                                                                            </button>
+                                                                        ) : (
+                                                                            canEditDelete && (
+                                                                                <button type="button" className="rounded-full transition duration-200 p-0 leading-none">
+                                                                                    <img
+                                                                                        src={Delete}
+                                                                                        className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                                        onClick={() => handleWeeklyExpensesDelete(row.id)}
+                                                                                        alt="Delete"
+                                                                                    />
+                                                                                </button>
+                                                                            )
+                                                                        )}
+                                                                        {row.type === "Daily" ? (
+                                                                            <button type="button" disabled className="rounded-full transition duration-200 p-0 leading-none opacity-40 cursor-not-allowed">
+                                                                                <img className="w-5 h-4 block" src={history} alt="History Disabled" />
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button type="button" onClick={() => fetchAuditDetailsForExpense(row.id)} className="rounded-full transition duration-200 p-0 leading-none">
+                                                                                <img
+                                                                                    src={history}
+                                                                                    className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                                    alt="History"
+                                                                                />
+                                                                            </button>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </td>
+                                                        </EdbcTableBodyRow>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            {!isExpensesEntryUploadOnly && (
+                                <div className="w-fit shrink-0 flex flex-col">
+                                    <div className="flex justify-between items-center">
+                                        <h1 className="font-bold text-base">Income</h1>
+                                        <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                            ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </h1>
+                                    </div>
+                                    <div className={`text-left flex ${(selectPaymentDate || selectPaymentAmount || selectPaymentType) ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
+                                        <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                                            <EdbcFilterToggleButton onClick={() => setShowPaymentsFilters(!showPaymentsFilters)} />
+                                            {(selectPaymentDate || selectPaymentAmount || selectPaymentType) && (
+                                                <div
+                                                    ref={paymentsFilterChipsRef}
+                                                    className="flex flex-row flex-wrap items-center gap-2 min-w-0 overflow-x-auto no-scrollbar cursor-grab"
+                                                    onMouseDown={(e) => handleMouseDown(e, paymentsFilterChipsRef)}
+                                                    onMouseMove={(e) => handleMouseMove(e, paymentsFilterChipsRef)}
+                                                    onMouseUp={() => handleMouseUp(paymentsFilterChipsRef)}
+                                                    onMouseLeave={() => handleMouseUp(paymentsFilterChipsRef)}
+                                                >
+                                                    {selectPaymentDate && (
+                                                        <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Date: </span>
+                                                            <span className="font-semibold text-[14px]">{formatDateOnly(selectPaymentDate)}</span>
+                                                            <button onClick={() => setSelectPaymentDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                        </span>
+                                                    )}
+                                                    {selectPaymentAmount && (
+                                                        <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Amount: </span>
+                                                            <span className="font-semibold text-[14px]">{selectPaymentAmount}</span>
+                                                            <button onClick={() => setSelectPaymentAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                        </span>
+                                                    )}
+                                                    {selectPaymentType && (
+                                                        <span className="inline-flex shrink-0 items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Type: </span>
+                                                            <span className="font-semibold text-[14px]">{selectPaymentType}</span>
+                                                            <button onClick={() => setSelectPaymentType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <EdbcTableToolbarRightActions
+                                            onClearFilters={clearPaymentsFilters}
+                                            overallSearch={paymentsOverallSearch}
+                                            onOverallSearchChange={setPaymentsOverallSearch}
+                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[143px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 sm:w-[143px] sm:min-w-[143px] sm:flex-none sm:shrink-0"
+                                        />
+                                    </div>
+                                    <div className="shrink-0">
+                                        <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar"
+                                            style={{
+                                                height: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                willChange: 'scroll-position',
+                                                WebkitOverflowScrolling: 'touch',
+                                                transform: 'translateZ(0)',
+                                                backfaceVisibility: 'hidden'
+                                            }}
+                                            onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
+                                            onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
+                                            onMouseUp={() => handleMouseUp(paymentsScrollRef)}
+                                            onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
+                                            onWheel={(e) => e.stopPropagation()}
+                                        >
+                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_th#EDBC-8]:!box-border [&_td#EDBC-8]:!box-border [&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0`}>
+                                                
+                                                <thead className="sticky top-0 z-[99999] bg-white">
+                                                    <EdbcTableHeaderRow>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="Activity" />
+                                                    </EdbcTableHeaderRow>
+                                                    {showPaymentsFilters && (
+                                                        <EdbcTableFilterRow>
+                                                            <EdbcDateFilter
+                                                                placeholder="Date"
+                                                                value={selectPaymentDate}
+                                                                onChange={setSelectPaymentDate}
+                                                            />
+                                                            <EdbcTotalAmountFilter
+                                                                columnId={EDBC_IDS.EDBC8}
+                                                                totalAmount={payments.reduce((total, row) => total + Number(row.amount || 0), 0)}
+                                                                value={selectPaymentAmount}
+                                                                onChange={(e) => setSelectPaymentAmount(e.target.value)}
+                                                            />
+                                                            <EdbcSelectFilter
+                                                                columnId={EDBC_IDS.EDBC12}
+                                                                placeholder="Type"
+                                                                options={weeklyReceivedTypes.map((type) => ({
+                                                                    value: type.received_type,
+                                                                    label: type.received_type,
+                                                                }))}
+                                                                value={selectPaymentType}
+                                                                onChange={setSelectPaymentType}
+                                                            />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                        </EdbcTableFilterRow>
+                                                    )}
+                                                    {canEditSelectedWeek ? (
+                                                        <EdbcTableBodyRow>
+                                                            <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-visible`}>
+                                                                <div
+                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} overflow-visible relative z-[99999]`}
+                                                                    onKeyDown={handleKeyDown1}
+                                                                >
+                                                                    <CustomDateField
+                                                                        value={newPayment.date}
+                                                                        onChange={(dateStr) => handlePaymentChange({ target: { name: 'date', value: dateStr } })}
+                                                                        placeholder="Date"
+                                                                        alwaysOpenBelow
+                                                                        calendarPortal
+                                                                        controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                        className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newPayment.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterThClass}>
+                                                                <input
+                                                                    type="number"
+                                                                    name="amount"
+                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                    value={newPayment.amount}
+                                                                    onChange={handlePaymentChange}
+                                                                    onKeyDown={handleKeyDown1}
+                                                                    onWheel={(e) => e.preventDefault()}
+                                                                    onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                    onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                />
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                <div
+                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}
+                                                                    onKeyDown={handleKeyDown1}
+                                                                >
+                                                                    <Select
+                                                                        name="type"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        value={newPayment.type ? { value: newPayment.type, label: newPayment.type } : null}
+                                                                        onChange={(selectedOption) => handlePaymentChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                        options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
+                                                                        placeholder="Select Type..."
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        menuPortalTarget={document.body}
+                                                                        menuPosition="fixed"
+                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                        styles={{
+                                                                            ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+                                                                            menu: (provided) => ({
+                                                                                ...DATABASE_TABLE_FILTER_SELECT_STYLES.menu(provided),
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                            menuList: entryRowSelectMenuListStyle,
+                                                                            menuPortal: (provided) => ({
+                                                                                ...provided,
+                                                                                zIndex: 10050,
+                                                                            }),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                        </EdbcTableBodyRow>
+                                                    ) : null}
+                                                </thead>
+                                                <tbody>
+                                                    {payments.map((row, index) => ({ row, index })).filter(({ row }) => {
+                                                        if (paymentsOverallSearch.trim()) {
+                                                            const q = paymentsOverallSearch.toLowerCase().trim();
+                                                            if (
+                                                                !String(row.type || '').toLowerCase().includes(q) &&
+                                                                !String(row.amount || '').includes(q) &&
+                                                                !String(formatDateOnly(row.date) || '').toLowerCase().includes(q)
+                                                            ) {
+                                                                return false;
+                                                            }
+                                                        }
+                                                        if (selectPaymentDate) {
+                                                            const [year, month, day] = selectPaymentDate.split("-");
+                                                            const formattedSelectDate = `${parseInt(day)}-${parseInt(month)}-${year}`;
+                                                            const entryDateObj = new Date(row.date);
+                                                            const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+                                                            if (formattedEntryDate !== formattedSelectDate) return false;
+                                                        }
+                                                        if (selectPaymentAmount && !matchesEdbcAmountFilter(row.amount, selectPaymentAmount)) return false;
+                                                        if (selectPaymentType && String(row.type || '').toLowerCase() !== selectPaymentType.toLowerCase()) return false;
+                                                        return true;
+                                                    }).map(({ row, index }) => (
+                                                        <EdbcTableBodyRow key={row.id || index}>
+                                                            {editingPaymentId === (row.id || null) ? (
+                                                                <td id={EDBC_IDS.EDBC2} className={`${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left`}>
+                                                                    <input
+                                                                        type="date"
+                                                                        value={row.date || ""}
+                                                                        onChange={(e) =>
+                                                                            handleEditPayment(index, "date", e.target.value)
+                                                                        }
+                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none`}
+                                                                    />
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcDateBodyCell
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    formatValue={formatDateOnly}
+                                                                    columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                                                                />
+                                                            )}
+                                                            {editingPaymentId === (row.id || null) ? (
+                                                                <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={row.amount || ""}
+                                                                        onChange={(e) =>
+                                                                            handleEditPayment(index, "amount", e.target.value)
+                                                                        }
+                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass || ''} h-[38px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner text-right`}
+                                                                        onWheel={(e) => e.preventDefault()}
+                                                                        onFocus={() =>
+                                                                            window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
+                                                                        }
+                                                                        onBlur={() =>
+                                                                            window.removeEventListener("wheel", (e) => e.preventDefault())
+                                                                        }
+                                                                    />
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC8}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    textAlignClass="text-right"
+                                                                    getDisplayValue={(entry) => `₹${Number(entry.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                                />
+                                                            )}
+                                                            {editingPaymentId === (row.id || null) ? (
+                                                                <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                    <select
+                                                                        value={row.type || ""}
+                                                                        onChange={(e) =>
+                                                                            handleEditPayment(index, "type", e.target.value)
+                                                                        }
+                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass || ''} h-[38px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none`}
+                                                                        disabled={editingPaymentId !== row.id}
+                                                                    >
+                                                                        <option value="">Select</option>
+                                                                        {weeklyReceivedTypes.map((type, idx) => (
+                                                                            <option key={idx} value={type.received_type}>
+                                                                                {type.received_type}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC12}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    getDisplayValue={(entry) => entry.type}
+                                                                />
+                                                            )}
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                {canEditSelectedWeek && (
+                                                                    <div className="flex gap-1">
+                                                                        {editingPaymentId === row.id ? (
+                                                                            <button
+                                                                                className="text-green-600 font-bold text-lg"
+                                                                                onClick={() => saveEditedPaymentReceived(row)}
+                                                                                disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
+                                                                            >
+                                                                                ✓
+                                                                            </button>
+                                                                        ) : (
+                                                                            weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                canEditSelectedWeek && (
+                                                                                    <button onClick={() => {
+                                                                                        setEditingPaymentId(row.id);
+                                                                                        setEditingOriginalPayment({ ...row });
+                                                                                    }}>
+                                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                                    </button>
+                                                                                )
+                                                                            ) : (
+                                                                                <img
+                                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                    src={Edit}
+                                                                                    alt="Edit Disabled"
+                                                                                />
+                                                                            )
+                                                                        )}
+                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                            canEditDelete && canEditSelectedWeek && (
+                                                                                <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
+                                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                </button>
+                                                                            )
+                                                                        ) : (
+                                                                            <img
+                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                src={Delete}
+                                                                                alt="Delete Disabled"
+                                                                            />
+                                                                        )}
+                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                            <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                                                <img src={history} className="w-5 h-4" alt="History" />
+                                                                            </button>
+                                                                        ) : (
+                                                                            <img
+                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                src={history}
+                                                                                alt="History Disabled"
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </EdbcTableBodyRow>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 shrink-0 rounded-xl bg-white p-[10px] border border-[#E0E0E0] shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-left">
+                                        <div className="rounded-lg border border-[#E0E0E0] p-[10px]">
+                                            <div className="flex items-center justify-between rounded-lg mb-[4px]">
+                                                <p className="text-[14px] font-semibold text-black">Summary Details</p>
+                                                <div className="flex items-center gap-2">
+                                                    {canEditDelete &&
+                                                        lastDeletedWeeklySummary &&
+                                                        String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
+                                                        String(lastDeletedWeeklySummary.year) === String(year) && (
+                                                            <button
+                                                                type="button"
+                                                                disabled={weeklySummaryDeleteLoading}
+                                                                onClick={handleWeeklySummaryUndoDelete}
+                                                                className="text-sm font-semibold text-[#BF9853] flex items-center gap-1 disabled:opacity-50"
+                                                                title="Restore removed summary"
+                                                            >
+                                                                <img src={restore} alt="" className="w-4 h-4" />
+                                                                Restore
+                                                            </button>
+                                                        )}
+                                                    <input
+                                                        ref={weeklySummaryFileInputRef}
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
+                                                        onChange={handleWeeklySummaryFileChange}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        disabled={weeklySummaryUploading}
+                                                        onClick={() => weeklySummaryFileInputRef.current?.click()}
+                                                        className="flex items-center gap-1 text-[12px] text-[#666666] disabled:opacity-50"
+                                                        title="Upload Signature Copy for this week"
+                                                    >
+                                                        <img src={fileUpload} alt="" className="w-4 h-4" />
+                                                        {weeklySummaryUploading ? "Uploading…" : "Signature"}
+                                                    </button>
+                                                    {weeklySummaryFile && canEditDelete && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={weeklySummaryDeleteLoading}
+                                                            onClick={handleWeeklySummaryMarkDeleted}
+                                                            className="rounded-full transition duration-200 p-0 leading-none disabled:opacity-50"
+                                                        >
+                                                            <img
+                                                                src={Delete}
+                                                                className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                alt="Delete"
+                                                            />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {Object.entries(
+                                                filteredExpenses
+                                                    .filter(expense => Number(expense.amount) > 0)
+                                                    .reduce((acc, expense) => {
+                                                        const type = expense.type;
+                                                        const amount = Number(expense.amount);
+                                                        acc[type] = (acc[type] || 0) + amount;
+                                                        return acc;
+                                                    }, {})
+                                            ).map(([type, total]) => (
+                                                <div key={type} className="flex items-center justify-between py-[6px]">
+                                                    <p className="text-[12px] text-[#666666]">{type}</p>
+                                                    <p className="text-[12px] font-semibold text-black">
+                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                            <div className="border-t border-dashed border-[#E5E7EB] my-[4px]" />
+                                            <div className="flex items-center justify-between py-[6px]">
+                                                <p className="text-[12px] font-semibold text-black">Total Amount</p>
+                                                <p className="text-[12px] font-semibold text-black">
+                                                    ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => {
-                                    setShowCategoryPopup(false);
-                                    setSelectedCategory(null);
-                                    setIsConfirmingCategory(false);
-                                }}
-                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    if (!selectedCategory || isConfirmingCategory) {
-                                        if (!selectedCategory) {
-                                            alert("Please select a category");
-                                        }
-                                        return;
-                                    }
-                                    setIsConfirmingCategory(true);
-                                    setShowCategoryPopup(false);
-                                    try {
-                                        const enoResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
-                                        if (!enoResponse.ok) {
-                                            throw new Error('Failed to fetch ENo');
-                                        }
-                                        const enoData = await enoResponse.json();
-                                        const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
-                                        const expensesFormData = {
-                                            accountType: "Claim",
-                                            eno: nextEno,
-                                            date: currentProjectAdvanceRow.date,
-                                            siteName: siteOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.project_id))?.label || "",
-                                            vendor: vendorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.vendor_id))?.label || "",
-                                            quantity: 1,
-                                            contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
-                                            amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
-                                            category: selectedCategory.value,
-                                            comments: categoryComments || "",
-                                            machineTools: "",
-                                            source: "Cash Register",
-                                            billCopyUrl: cleanUrl(currentProjectAdvanceRow.bill_copy_url || ''),
-                                            branchId: activeBranchId ?? null,
-                                            enteredBy: enteredBy,
-                                        };
-                                        const expensesFormResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/save', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                            },
-                                            body: JSON.stringify(expensesFormData)
-                                        });
-                                        if (!expensesFormResponse.ok) {
-                                            throw new Error('Failed to save to expenses form');
-                                        }
-                                        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
-                                            method: 'PUT',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                            },
-                                        });
-                                        if (response.ok) {
-                                            const [expensesRes, paymentsRes] = await Promise.all([
-                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
-                                            ]);
-                                            setExpenses(expensesRes.data);
-                                            const filteredPayments = paymentsRes.data.filter(
-                                                (payment) => payment.type !== "Handover"
-                                            );
-                                            setPayments(filteredPayments);
-                                            await fetchWeeklyPaymentBills();
-                                            setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
-                                            setPopup({
-                                                show: true,
-                                                message: "Successfully added to expense entry!",
-                                                type: "success",
-                                                dateStr: new Date().toLocaleDateString('en-GB')
-                                            });
-                                            setTimeout(() => {
+                        <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
+                            siteOptions={siteOptions} />
+                        <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
+                            audits={weeklyPaymentReceivedAudits} />
+                    </div>
+                    {showPaymentPopup && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white text-left rounded-xl  p-6 w-[800px] h-[770px] overflow-y-auto">
+                                <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
+                                <div className="space-y-4 mb-4 justify-items-center">
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="date"
+                                                        value={paymentPopupData.date}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
+                                                        readOnly
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                <input
+                                                    type="number"
+                                                    value={paymentPopupData.amount}
+                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, amount: e.target.value }))}
+                                                    placeholder="Enter amount"
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none no-spinner"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                                <select
+                                                    value={paymentPopupData.paymentMode}
+                                                    onChange={(e) => setPaymentPopupData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                >
+                                                    <option value="">---Select---</option>
+                                                    <option value="Gpay">Gpay</option>
+                                                    <option value="PhonePe">PhonePe</option>
+                                                    <option value="Net Banking">Net Banking</option>
+                                                    <option value="Cheque">Cheque</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                                        <div className="space-y-4">
+                                            {paymentPopupData.paymentMode === "Cheque" && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentPopupData.chequeNo}
+                                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeNo: e.target.value }))}
+                                                            placeholder="Enter cheque number"
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={paymentPopupData.chequeDate}
+                                                            onChange={(e) => setPaymentPopupData(prev => ({ ...prev, chequeDate: e.target.value }))}
+                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                    <input
+                                                        type="text"
+                                                        value={paymentPopupData.transactionNumber}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, transactionNumber: e.target.value }))}
+                                                        placeholder="Enter transaction number"
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                    <select
+                                                        value={paymentPopupData.accountNumber}
+                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                    >
+                                                        <option value="">Select Account</option>
+                                                        {accountDetails.map((account) => (
+                                                            <option key={account.id} value={account.account_number}>
+                                                                {account.account_number}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {previousPayments.length > 0 && (
+                                    <div>
+                                        <h4 className="text-md font-medium text-gray-700 mb-3 ml-20">Previous Payments: {previousPayments.length} </h4>
+                                        <div className="mb-6 justify-items-center">
+                                            <div className="space-y-4 max-h-64 overflow-y-auto">
+                                                {previousPayments.map((payment, index) => (
+                                                    <div key={index} className="">
+                                                        <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
+                                                            <div className="grid grid-cols-3 gap-4">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={new Date(payment.date).toLocaleDateString('en-GB')}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={payment.amount.toLocaleString('en-IN')}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={payment.bill_payment_mode}
+                                                                        readOnly
+                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                                                            <div className="space-y-4">
+                                                                {payment.bill_payment_mode === "Cheque" && (
+                                                                    <div className="grid grid-cols-2 gap-4">
+                                                                        <div>
+                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.cheque_number || ""}
+                                                                                readOnly
+                                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
+                                                                                readOnly
+                                                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Number</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={payment.transaction_number || ""}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={payment.account_number || ""}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
+                                    <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                        <div className="text-center">
+                                            <span className="text-sm font-medium text-green-700">
+                                                This Claim Amount Was Already Sent to the Expense Entry
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-end items-center mt-6">
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => {
                                                 setShowPaymentPopup(false);
                                                 setPaymentPopupData({
                                                     date: new Date().toISOString().split('T')[0],
@@ -6023,186 +5441,770 @@ const History = ({ username, userRoles = [], viewMode = 'default' }) => {
                                                 });
                                                 setPreviousPayments([]);
                                                 setCurrentProjectAdvanceRow(null);
-                                                setSelectedCategory(null);
-                                                setIsConfirmingCategory(false);
-                                                setCategoryComments("");
-                                            }, 2000);
-                                        } else {
-                                            throw new Error('Failed to update expense entry status');
-                                        }
-                                    } catch (error) {
-                                        console.error('Error updating expense entry status:', error);
-                                        setIsConfirmingCategory(false);
-                                        setPopup({
-                                            show: true,
-                                            message: "Failed to add to expense entry. Please try again.",
-                                            type: "error",
-                                            dateStr: new Date().toLocaleDateString('en-GB')
-                                        });
-                                    }
-                                }}
-                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#BF9853]/90 transition-colors"
-                                disabled={!selectedCategory || isConfirmingCategory}
-                            >
-                                {isConfirmingCategory ? "Processing..." : "Confirm"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {popup.show && (
-                <div className="fixed top-1/3 left-1/2 transform -translate-x-1/2 bg-white border rounded-lg shadow-lg p-4 z-50 w-96">
-                    <p className="mb-4 font-semibold text-center">{popup.message}</p>
-                    <div className="flex justify-around">
-                        <button
-                            className="px-4 py-2 border border-[#BF9853] w-[90px] rounded-lg"
-                            onClick={() => {
-                                if (popup.type === "expense") {
-                                    setNewExpense((prev) => ({ ...prev, date: "" }));
-                                } else if (popup.type === "payment") {
-                                    setNewPayment((prev) => ({ ...prev, date: "" }));
-                                } else if (popup.type === "edit-expense" && popup.editRowId !== null && popup.originalDate) {
-                                    setExpenses((prevExpenses) =>
-                                        prevExpenses.map((expense) =>
-                                            expense.id === popup.editRowId ? { ...expense, date: popup.originalDate } : expense
-                                        )
-                                    );
-                                } else if (popup.type === "edit-payment" && popup.editIndex !== null && popup.originalDate) {
-                                    setPayments((prevPayments) =>
-                                        prevPayments.map((payment, i) =>
-                                            i === popup.editIndex ? { ...payment, date: popup.originalDate } : payment
-                                        )
-                                    );
-                                }
-                                setPopup({ show: false, message: "", type: "", dateStr: "", editRowId: null, editField: null, editIndex: null, originalDate: "" });
-                            }}
-                        >
-                            OK
-                        </button>
-                    </div>
-                </div>
-            )}
-            {showPurposePopup && (
-                <div
-                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                            setShowPurposePopup(false);
-                            setSelectedPurpose(null);
-                            setLoanPurposeDescription("");
-                            setPendingLoanData(null);
-                        }
-                    }}
-                    tabIndex={0}
-                >
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
-                        <h3 className="text-lg font-semibold mb-4 text-center">
-                            Select Purpose for Loan
-                        </h3>
-                        <div className="mb-4">
-                            <label className="block mb-2 text-sm font-medium">
-                                Purpose <span className="text-red-500">*</span>
-                            </label>
-                            <Select
-                                name="purpose"
-                                className="w-full"
-                                placeholder="Select Purpose"
-                                isSearchable
-                                isClearable
-                                value={selectedPurpose}
-                                onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
-                                options={purposeOptions}
-                                menuPortalTarget={document.body}
-                                menuPosition="fixed"
-                                styles={{
-                                    control: (provided, state) => ({
-                                        ...provided,
-                                        minHeight: '45px',
-                                        border: '2px solid rgba(191, 152, 83, 0.25)',
-                                        borderRadius: '8px',
-                                        boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                        '&:hover': {
-                                            border: '2px solid rgba(191, 152, 83, 0.5)'
-                                        }
-                                    }),
-                                    valueContainer: (provided) => ({
-                                        ...provided,
-                                        padding: '2px 8px'
-                                    }),
-                                    input: (provided) => ({
-                                        ...provided,
-                                        margin: '0px'
-                                    }),
-                                    indicatorSeparator: () => ({
-                                        display: 'none'
-                                    }),
-                                    indicatorsContainer: (provided) => ({
-                                        ...provided,
-                                        height: '45px',
-                                        gap: '0px'
-                                    }),
-                                    clearIndicator: (provided) => ({
-                                        ...provided,
-                                        padding: '2px'
-                                    }),
-                                    dropdownIndicator: (provided) => ({
-                                        ...provided,
-                                        padding: '2px'
-                                    }),
-                                    menuPortal: (provided) => ({
-                                        ...provided,
-                                        zIndex: 10050
-                                    }),
-                                    menu: (provided) => ({
-                                        ...provided,
-                                        zIndex: 10050
-                                    })
-                                }}
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block mb-2 text-sm font-medium">
-                                Description <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                                value={loanPurposeDescription}
-                                onChange={(e) => setLoanPurposeDescription(e.target.value)}
-                                placeholder="Enter description"
-                                rows={3}
-                                className="w-full border-2 border-[rgba(191, 152, 83, 0.25)] rounded-lg px-3 py-2 focus:outline-none focus:border-[rgba(191, 152, 83, 0.5)]"
-                            />
-                        </div>
-                        {pendingLoanData && (
-                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-1">Loan Details:</p>
-                                <p className="text-sm">Amount: ₹{Number(pendingLoanData.amount || 0).toLocaleString('en-IN')}</p>
-                                <p className="text-sm">Date: {formatDateOnly(pendingLoanData.date)}</p>
+                                            }}
+                                            className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                                        if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
+                                                            let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
+                                                            if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                                mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
+                                                            } else if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                                mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
+                                                            }
+                                                            await postBankRegisterLogSave(
+                                                                bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
+                                                                "Cash Register — Weekly Payment History",
+                                                                {
+                                                                    bill_payment_mode: paymentPopupData.paymentMode,
+                                                                    amount: paymentPopupData.amount,
+                                                                    entered_by: enteredBy,
+                                                                }
+                                                            );
+                                                        }
+                                                        let advancePortalId = null;
+                                                        let staffAdvancePortalId = null;
+                                                        if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                            try {
+                                                                const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
+                                                                if (!res.ok) throw new Error("Failed to fetch entry numbers");
+                                                                const allData = await res.json();
+                                                                const maxEntryNo =
+                                                                    allData.length > 0
+                                                                        ? Math.max(...allData.map((item) => item.entry_no || 0))
+                                                                        : 0;
+                                                                const nextEntryNo = maxEntryNo + 1;
+                                                                const getWeekNumber = () => {
+                                                                    return getISOWeekNumber(new Date());
+                                                                };
+                                                                const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
+                                                                const advanceUpdateData = {
+                                                                    type: "Advance",
+                                                                    date: paymentPopupData.date,
+                                                                    description: description,
+                                                                    bill_amount: 0,
+                                                                    amount: parseFloat(paymentPopupData.amount),
+                                                                    project_id: currentProjectAdvanceRow.project_id,
+                                                                    vendor_id: currentProjectAdvanceRow.vendor_id,
+                                                                    contractor_id: currentProjectAdvanceRow.contractor_id,
+                                                                    entry_no: nextEntryNo,
+                                                                    week_no: getWeekNumber(),
+                                                                    file_url: "",
+                                                                    transfer_site_id: 0,
+                                                                    refund_amount: 0,
+                                                                    payment_mode: paymentPopupData.paymentMode,
+                                                                    not_allow_to_edit: true,
+                                                                    branch_id: activeBranchId ?? null,
+                                                                    source: "Cash Register",
+                                                                    entered_by: enteredBy,
+                                                                };
+                                                                const advanceResponse = await fetch(
+                                                                    "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
+                                                                    {
+                                                                        method: "POST",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify(advanceUpdateData)
+                                                                    }
+                                                                );
+                                                                if (!advanceResponse.ok) {
+                                                                    console.error("Failed to update advance portal payment mode");
+                                                                } else {
+                                                                    const advanceResponseData = await advanceResponse.json();
+                                                                    advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
+                                                                }
+                                                            } catch (error) {
+                                                                console.error("Error updating advance portal payment mode:", error);
+                                                            }
+                                                        }
+                                                        if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                            try {
+                                                                const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                                                                if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                                                                const staffAdvanceData = await staffAdvanceRes.json();
+                                                                const maxEntryNo =
+                                                                    staffAdvanceData.length > 0
+                                                                        ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                                                                        : 0;
+                                                                const nextEntryNo = maxEntryNo + 1;
+                                                                const getWeekNumber = () => {
+                                                                    return getISOWeekNumber(new Date());
+                                                                };
+                                                                const staffAdvanceSaveData = {
+                                                                    date: paymentPopupData.date,
+                                                                    employee_id: currentProjectAdvanceRow.employee_id,
+                                                                    project_id: currentProjectAdvanceRow.project_id,
+                                                                    type: "Advance",
+                                                                    from_purpose_id: 4,
+                                                                    staff_payment_mode: paymentPopupData.paymentMode,
+                                                                    entry_no: nextEntryNo,
+                                                                    week_no: getWeekNumber(),
+                                                                    amount: parseFloat(paymentPopupData.amount),
+                                                                    staff_refund_amount: 0.0,
+                                                                    description: "",
+                                                                    file_url: null,
+                                                                    labour_id: 0,
+                                                                    not_allow_to_edit: true,
+                                                                    branch_id: activeBranchId ?? null,
+                                                                    entered_by: enteredBy,
+                                                                    source: "Cash Register",
+                                                                };
+                                                                const staffAdvanceResponse = await fetch(
+                                                                    "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                                                                    {
+                                                                        method: "POST",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify(staffAdvanceSaveData)
+                                                                    }
+                                                                );
+                                                                if (!staffAdvanceResponse.ok) {
+                                                                    console.error("Failed to save staff advance");
+                                                                } else {
+                                                                    const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                                                                    staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
+                                                                }
+                                                            } catch (error) {
+                                                                console.error("Error saving staff advance:", error);
+                                                            }
+                                                        }
+                                                        const paymentData = {
+                                                            date: paymentPopupData.date,
+                                                            created_at: new Date().toISOString(),
+                                                            contractor_id: currentProjectAdvanceRow.contractor_id || null,
+                                                            vendor_id: currentProjectAdvanceRow.vendor_id || null,
+                                                            employee_id: currentProjectAdvanceRow.employee_id || null,
+                                                            project_id: currentProjectAdvanceRow.project_id || null,
+                                                            type: currentProjectAdvanceRow.type || null,
+                                                            bill_payment_mode: paymentPopupData.paymentMode,
+                                                            amount: parseFloat(paymentPopupData.amount),
+                                                            status: true,
+                                                            weekly_number: Number(selectedWeek),
+                                                            weekly_payment_expense_id: currentProjectAdvanceRow.id,
+                                                            advance_portal_id: advancePortalId,
+                                                            staff_advance_portal_id: staffAdvancePortalId,
+                                                            cheque_number: paymentPopupData.chequeNo || null,
+                                                            cheque_date: paymentPopupData.chequeDate || null,
+                                                            transaction_number: paymentPopupData.transactionNumber || null,
+                                                            account_number: paymentPopupData.accountNumber || null,
+                                                            branch_id: activeBranchId ?? null,
+                                                            entered_by: enteredBy,
+                                                            source: "Cash Register",
+                                                        };
+                                                        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify(paymentData)
+                                                        });
+                                                        if (!response.ok) {
+                                                            throw new Error("Failed to save payment");
+                                                        }
+                                                        const [expensesRes, paymentsRes] = await Promise.all([
+                                                            axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                            axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                        ]);
+                                                        setExpenses(expensesRes.data);
+                                                        const filteredPayments = paymentsRes.data.filter(
+                                                            (payment) => payment.type !== "Handover"
+                                                        );
+                                                        setPayments(filteredPayments);
+                                                        await fetchWeeklyPaymentBills();
+                                                    }
+                                                } catch (error) {
+                                                    console.error("Error saving payment:", error);
+                                                }
+
+                                                setShowPaymentPopup(false);
+                                                setPaymentPopupData({
+                                                    date: new Date().toISOString().split('T')[0],
+                                                    amount: "",
+                                                    paymentMode: "",
+                                                    chequeNo: "",
+                                                    chequeDate: "",
+                                                    transactionNumber: "",
+                                                    accountNumber: ""
+                                                });
+                                                setPreviousPayments([]);
+                                                setCurrentProjectAdvanceRow(null);
+                                            }}
+                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                            disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                                        >
+                                            Submit
+                                        </button>
+                                    </div>
+                                </div>
+                                {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && (
+                                    <div className="mt- p-3 text-center -ml-[600px]">
+                                        <span className="text-sm font-medium text-gray-700">Total Amount: </span>
+                                        <span className="text-lg font-semibold text-gray-900">
+                                            ₹{(Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => {
+                        </div>
+                    )}
+                    {showPopups && (currentRow?.type === "Project Advance" || currentRow?.type === "Bill Payment") && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <label className="block mb-3 text-left">
+                                    <span className="font-semibold">Description</span>
+                                    <input
+                                        type="text"
+                                        name="description"
+                                        value={editFormData.description}
+                                        className="w-full p-2 border border-gray-300 rounded-lg mt-1"
+                                        onChange={handleEditChange}
+                                        readOnly={Boolean(currentRow?.description)}
+                                    />
+                                </label>
+                                <div className="flex justify-end gap-3 mt-4">
+                                    <button onClick={() => setShowPopups(false)} className="px-4 py-2 bg-gray-200 rounded-lg">
+                                        Close
+                                    </button>
+                                    {!portalDescriptions[currentRow?.advance_portal_id] && (
+                                        <button
+                                            onClick={async () => {
+                                                await updateDescription(currentRow.advance_portal_id, editFormData.description);
+                                                setShowPopups(false);
+                                            }}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg"
+                                        >
+                                            Save
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showBillExpenseEntryModal ? (
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                                <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-[#202020]">Expense Entry</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!canCloseExpenseEntryModal()) return;
+                                            setShowBillExpenseEntryModal(false);
+                                            localStorage.removeItem('expenseEntryPrefill');
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="p-3">
+                                    <ExpenseEntryForm
+                                        username={username}
+                                        userRoles={userRoles}
+                                        embedded
+                                        lockAccountTypePrefill
+                                        disableWeeklyExpensesSave
+                                        onSuccess={() => {
+                                            setShowBillExpenseEntryModal(false);
+                                            localStorage.removeItem('expenseEntryPrefill');
+                                            setExpenseEntryRefreshNonce((n) => n + 1);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                    {showBillSettlementAdvanceModal ? (
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg w-full max-w-[1824px] max-h-[92vh] overflow-y-auto shadow-lg relative">
+                                <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-[#202020]">Advance Portal</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowBillSettlementAdvanceModal(false);
+                                            try {
+                                                sessionStorage.removeItem("selectedType");
+                                                sessionStorage.removeItem("selectedOption");
+                                                sessionStorage.removeItem("selectedSite");
+                                                sessionStorage.removeItem("advanceAmount");
+                                                sessionStorage.removeItem("billAmount");
+                                                sessionStorage.removeItem("paymentMode");
+                                                sessionStorage.removeItem("description");
+                                                sessionStorage.removeItem("cashRegisterBillSettlementDate");
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-200 text-gray-500 text-xl"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="p-3">
+                                    <AdvancePortalForm
+                                        username={username}
+                                        userRoles={userRoles}
+                                        embedded
+                                        lockTypePrefill
+                                        onSuccess={() => {
+                                            setShowBillSettlementAdvanceModal(false);
+                                            try {
+                                                sessionStorage.removeItem("selectedType");
+                                                sessionStorage.removeItem("selectedOption");
+                                                sessionStorage.removeItem("selectedSite");
+                                                sessionStorage.removeItem("advanceAmount");
+                                                sessionStorage.removeItem("billAmount");
+                                                sessionStorage.removeItem("paymentMode");
+                                                sessionStorage.removeItem("description");
+                                                sessionStorage.removeItem("cashRegisterBillSettlementDate");
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                            setExpenseEntryRefreshNonce((n) => n + 1);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                    {fileUploadPopup && (
+                        <div
+                            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    setFileUploadPopup(false);
+                                    setCurrentFileRow(null);
+                                    setSelectedFileForPopup(null);
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">
+                                    {currentFileRow?.bill_copy_url ? 'Change File' : 'Upload File'}
+                                </h3>
+                                {currentFileRow?.bill_copy_url && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-2">Current file:</p>
+                                        <a href={cleanUrl(currentFileRow.bill_copy_url)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 underline"
+                                        >
+                                            View Current File
+                                        </a>
+                                    </div>
+                                )}
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Select PDF File
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={handleFileSelectInPopup}
+                                        className="w-full p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none"
+                                    />
+                                    {selectedFileForPopup && (
+                                        <p className="text-sm text-green-600 mt-2">
+                                            ✓ {selectedFileForPopup.name} selected
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => {
+                                            setFileUploadPopup(false);
+                                            setCurrentFileRow(null);
+                                            setSelectedFileForPopup(null);
+                                        }}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button onClick={handleSaveFileFromPopup} disabled={!selectedFileForPopup}
+                                        className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-green-600 hover:bg-green-700'
+                                            } text-white`}
+                                    >
+                                        {currentFileRow?.bill_copy_url ? 'Update File' : 'Upload File'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showCategoryPopup && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">Select Category</h3>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Category
+                                    </label>
+                                    <Select
+                                        value={selectedCategory}
+                                        onChange={(selectedOption) => setSelectedCategory(selectedOption)}
+                                        options={categoryOptions}
+                                        placeholder="Select Category..."
+                                        isSearchable
+                                        isClearable
+                                        menuPortalTarget={document.body}
+                                        menuPosition="fixed"
+                                        styles={{
+                                            control: (provided, state) => ({
+                                                ...provided,
+                                                backgroundColor: 'white',
+                                                borderWidth: '2px',
+                                                borderColor: state.isFocused
+                                                    ? '#BF9853'
+                                                    : '#BF9853',
+                                                borderRadius: '8px',
+                                                boxShadow: state.isFocused ? '0 0 0 1px #BF9853' : 'none',
+                                                '&:hover': {
+                                                    borderColor: '#BF9853',
+                                                },
+                                            }),
+                                            placeholder: (provided) => ({
+                                                ...provided,
+                                                color: '#999',
+                                                textAlign: 'left',
+                                            }),
+                                            menu: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050,
+                                                maxHeight: '300px',
+                                                overflow: 'auto',
+                                            }),
+                                            menuList: (provided) => ({
+                                                ...provided,
+                                                maxHeight: '300px',
+                                                overflowY: 'auto',
+                                                padding: '4px',
+                                            }),
+                                            menuPortal: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050,
+                                            }),
+                                            option: (provided, state) => ({
+                                                ...provided,
+                                                textAlign: 'left',
+                                                fontWeight: 'normal',
+                                                fontSize: '15px',
+                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                                color: 'black',
+                                            }),
+                                            singleValue: (provided) => ({
+                                                ...provided,
+                                                textAlign: 'left',
+                                                fontWeight: 'normal',
+                                                color: 'black',
+                                            }),
+                                            indicatorSeparator: () => ({
+                                                display: 'none'
+                                            }),
+                                            indicatorsContainer: (provided) => ({
+                                                ...provided,
+                                                height: '40px',
+                                                gap: '0px'
+                                            }),
+                                            clearIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px'
+                                            }),
+                                            dropdownIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px'
+                                            })
+                                        }}
+                                    />
+                                </div>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Comments
+                                    </label>
+                                    <textarea
+                                        value={categoryComments}
+                                        onChange={(e) => setCategoryComments(e.target.value)}
+                                        placeholder="Enter comments..."
+                                        className="w-full border-2 border-[#BF9853] border-opacity-25 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#BF9853] focus:border-transparent resize-none"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => {
+                                            setShowCategoryPopup(false);
+                                            setSelectedCategory(null);
+                                            setIsConfirmingCategory(false);
+                                        }}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (!selectedCategory || isConfirmingCategory) {
+                                                if (!selectedCategory) {
+                                                    alert("Please select a category");
+                                                }
+                                                return;
+                                            }
+                                            setIsConfirmingCategory(true);
+                                            setShowCategoryPopup(false);
+                                            try {
+                                                const enoResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/get_form');
+                                                if (!enoResponse.ok) {
+                                                    throw new Error('Failed to fetch ENo');
+                                                }
+                                                const enoData = await enoResponse.json();
+                                                const nextEno = enoData.length > 0 ? Math.max(...enoData.map(item => item.eno || 0)) + 1 : 1;
+                                                const expensesFormData = {
+                                                    accountType: "Claim",
+                                                    eno: nextEno,
+                                                    date: currentProjectAdvanceRow.date,
+                                                    siteName: siteOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.project_id))?.label || "",
+                                                    vendor: vendorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.vendor_id))?.label || "",
+                                                    quantity: 1,
+                                                    contractor: contractorOptions.find(opt => opt.id === Number(currentProjectAdvanceRow.contractor_id))?.label || "",
+                                                    amount: Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+                                                    category: selectedCategory.value,
+                                                    comments: categoryComments || "",
+                                                    machineTools: "",
+                                                    source: "Cash Register",
+                                                    billCopyUrl: cleanUrl(currentProjectAdvanceRow.bill_copy_url || ''),
+                                                    branchId: activeBranchId ?? null,
+                                                    enteredBy: enteredBy,
+                                                };
+                                                const expensesFormResponse = await fetch('https://backendaab.in/demoAabuilderDash/expenses_form/save', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                    },
+                                                    body: JSON.stringify(expensesFormData)
+                                                });
+                                                if (!expensesFormResponse.ok) {
+                                                    throw new Error('Failed to save to expenses form');
+                                                }
+                                                const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/${currentProjectAdvanceRow.id}/send-to-expenses`, {
+                                                    method: 'PUT',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                    },
+                                                });
+                                                if (response.ok) {
+                                                    const [expensesRes, paymentsRes] = await Promise.all([
+                                                        axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                        axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                    ]);
+                                                    setExpenses(expensesRes.data);
+                                                    const filteredPayments = paymentsRes.data.filter(
+                                                        (payment) => payment.type !== "Handover"
+                                                    );
+                                                    setPayments(filteredPayments);
+                                                    await fetchWeeklyPaymentBills();
+                                                    setCurrentProjectAdvanceRow(prev => ({ ...prev, send_to_expenses_entry: true }));
+                                                    setPopup({
+                                                        show: true,
+                                                        message: "Successfully added to expense entry!",
+                                                        type: "success",
+                                                        dateStr: new Date().toLocaleDateString('en-GB')
+                                                    });
+                                                    setTimeout(() => {
+                                                        setShowPaymentPopup(false);
+                                                        setPaymentPopupData({
+                                                            date: new Date().toISOString().split('T')[0],
+                                                            amount: "",
+                                                            paymentMode: "",
+                                                            chequeNo: "",
+                                                            chequeDate: "",
+                                                            transactionNumber: "",
+                                                            accountNumber: ""
+                                                        });
+                                                        setPreviousPayments([]);
+                                                        setCurrentProjectAdvanceRow(null);
+                                                        setSelectedCategory(null);
+                                                        setIsConfirmingCategory(false);
+                                                        setCategoryComments("");
+                                                    }, 2000);
+                                                } else {
+                                                    throw new Error('Failed to update expense entry status');
+                                                }
+                                            } catch (error) {
+                                                console.error('Error updating expense entry status:', error);
+                                                setIsConfirmingCategory(false);
+                                                setPopup({
+                                                    show: true,
+                                                    message: "Failed to add to expense entry. Please try again.",
+                                                    type: "error",
+                                                    dateStr: new Date().toLocaleDateString('en-GB')
+                                                });
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#BF9853]/90 transition-colors"
+                                        disabled={!selectedCategory || isConfirmingCategory}
+                                    >
+                                        {isConfirmingCategory ? "Processing..." : "Confirm"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {popup.show && (
+                        <div className="fixed top-1/3 left-1/2 transform -translate-x-1/2 bg-white border rounded-lg shadow-lg p-4 z-50 w-96">
+                            <p className="mb-4 font-semibold text-center">{popup.message}</p>
+                            <div className="flex justify-around">
+                                <button
+                                    className="px-4 py-2 border border-[#BF9853] w-[90px] rounded-lg"
+                                    onClick={() => {
+                                        if (popup.type === "expense") {
+                                            setNewExpense((prev) => ({ ...prev, date: "" }));
+                                        } else if (popup.type === "payment") {
+                                            setNewPayment((prev) => ({ ...prev, date: "" }));
+                                        } else if (popup.type === "edit-expense" && popup.editRowId !== null && popup.originalDate) {
+                                            setExpenses((prevExpenses) =>
+                                                prevExpenses.map((expense) =>
+                                                    expense.id === popup.editRowId ? { ...expense, date: popup.originalDate } : expense
+                                                )
+                                            );
+                                        } else if (popup.type === "edit-payment" && popup.editIndex !== null && popup.originalDate) {
+                                            setPayments((prevPayments) =>
+                                                prevPayments.map((payment, i) =>
+                                                    i === popup.editIndex ? { ...payment, date: popup.originalDate } : payment
+                                                )
+                                            );
+                                        }
+                                        setPopup({ show: false, message: "", type: "", dateStr: "", editRowId: null, editField: null, editIndex: null, originalDate: "" });
+                                    }}
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    {showPurposePopup && (
+                        <div
+                            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
                                     setShowPurposePopup(false);
                                     setSelectedPurpose(null);
                                     setLoanPurposeDescription("");
                                     setPendingLoanData(null);
-                                }}
-                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handlePurposeSelection}
-                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
-                                disabled={!selectedPurpose || !(loanPurposeDescription || "").trim() || isSubmitting}
-                            >
-                                {isSubmitting ? "Saving..." : "Save"}
-                            </button>
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">
+                                    Select Purpose for Loan
+                                </h3>
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Purpose <span className="text-red-500">*</span>
+                                    </label>
+                                    <Select
+                                        name="purpose"
+                                        className="w-full"
+                                        placeholder="Select Purpose"
+                                        isSearchable
+                                        isClearable
+                                        value={selectedPurpose}
+                                        onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
+                                        options={purposeOptions}
+                                        menuPortalTarget={document.body}
+                                        menuPosition="fixed"
+                                        styles={{
+                                            control: (provided, state) => ({
+                                                ...provided,
+                                                minHeight: '45px',
+                                                border: '2px solid rgba(191, 152, 83, 0.25)',
+                                                borderRadius: '8px',
+                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                '&:hover': {
+                                                    border: '2px solid rgba(191, 152, 83, 0.5)'
+                                                }
+                                            }),
+                                            valueContainer: (provided) => ({
+                                                ...provided,
+                                                padding: '2px 8px'
+                                            }),
+                                            input: (provided) => ({
+                                                ...provided,
+                                                margin: '0px'
+                                            }),
+                                            indicatorSeparator: () => ({
+                                                display: 'none'
+                                            }),
+                                            indicatorsContainer: (provided) => ({
+                                                ...provided,
+                                                height: '45px',
+                                                gap: '0px'
+                                            }),
+                                            clearIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px'
+                                            }),
+                                            dropdownIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px'
+                                            }),
+                                            menuPortal: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050
+                                            }),
+                                            menu: (provided) => ({
+                                                ...provided,
+                                                zIndex: 10050
+                                            })
+                                        }}
+                                    />
+                                </div>
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Description <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={loanPurposeDescription}
+                                        onChange={(e) => setLoanPurposeDescription(e.target.value)}
+                                        placeholder="Enter description"
+                                        rows={3}
+                                        className="w-full border-2 border-[rgba(191, 152, 83, 0.25)] rounded-lg px-3 py-2 focus:outline-none focus:border-[rgba(191, 152, 83, 0.5)]"
+                                    />
+                                </div>
+                                {pendingLoanData && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Loan Details:</p>
+                                        <p className="text-sm">Amount: ₹{Number(pendingLoanData.amount || 0).toLocaleString('en-IN')}</p>
+                                        <p className="text-sm">Date: {formatDateOnly(pendingLoanData.date)}</p>
+                                    </div>
+                                )}
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => {
+                                            setShowPurposePopup(false);
+                                            setSelectedPurpose(null);
+                                            setLoanPurposeDescription("");
+                                            setPendingLoanData(null);
+                                        }}
+                                        className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handlePurposeSelection}
+                                        className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                        disabled={!selectedPurpose || !(loanPurposeDescription || "").trim() || isSubmitting}
+                                    >
+                                        {isSubmitting ? "Saving..." : "Save"}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-            )}
-            </div>
             </div>
         </body >
     )

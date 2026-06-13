@@ -10,6 +10,7 @@ import Reload from '../Images/Clear.svg'
 import Pdf from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 import edit from '../Images/Edit.svg';
+import remove from '../Images/Delete.svg';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import {
@@ -31,10 +32,20 @@ import {
   EDBC_TABLE_EDGE_TABLE_CLASS,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import {
-  resolveLoanAdvancePortalId,
-  syncAdvancePortalFromLoanEdit,
+  clearLinkedAdvancePortalForLoanDelete,
+  formatWeeklyBillDeleteMessage,
 } from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+  buildLoanEditPayloadFromForm,
+  clearLoanPortalRecordsOnDelete,
+  fetchLoanEditPaymentModalData,
+  getLoanPortalDisplayAmount,
+  isLoanChequePaymentMode,
+  performLoanPortalEditWithSync,
+  shouldPromptLoanEditPaymentModal,
+} from '../../utils/loanPortalWeeklyPaymentBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
 
 const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -70,6 +81,16 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
   const [editTransferAmount, setEditTransferAmount] = useState('');
   const [editPaymentMode, setEditPaymentMode] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [isEditPaymentSubmitting, setIsEditPaymentSubmitting] = useState(false);
+  const [editPaymentModalData, setEditPaymentModalData] = useState({
+    chequeNo: '',
+    chequeDate: '',
+    transactionNumber: '',
+    accountNumber: '',
+  });
+  const [accountDetails, setAccountDetails] = useState([]);
+  const pendingLoanUpdateRef = useRef(null);
   const [combinedSitePurposeOptions, setCombinedSitePurposeOptions] = useState([]);
   const [laboursList, setLaboursList] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
@@ -669,6 +690,22 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
     };
     fetchProjectClients();
   }, []);
+
+  useEffect(() => {
+    const fetchAccountDetails = async () => {
+      try {
+        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/account-details/getAll');
+        if (response.ok) {
+          const data = await response.json();
+          setAccountDetails(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching account details:', error);
+      }
+    };
+    fetchAccountDetails();
+  }, []);
+
   const fetchLoanTableData = useCallback(async () => {
     try {
       const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loans/all');
@@ -1093,89 +1130,168 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
     link.click();
     document.body.removeChild(link);
   };
+  const performLoanUpdate = async (payload, modalPaymentData = null) => {
+    const currentEntry = loanData.find(
+      (entry) => String(entry.loanPortalId || entry.id) === String(editingId)
+    );
+
+    const { advanceSyncFailed } = await performLoanPortalEditWithSync({
+      editingId,
+      payload,
+      editedBy: username,
+      currentEntry,
+      siteOptions,
+      selectedOption: editSelectedOption,
+      modalPaymentData,
+    });
+    if (advanceSyncFailed) {
+      toast.warning('Loan updated, but linked advance portal entry could not be synced.', {
+        position: 'top-center',
+        autoClose: 4000,
+        theme: 'colored',
+      });
+    }
+
+    await fetchLoanTableData();
+    setShowEditPaymentModal(false);
+    pendingLoanUpdateRef.current = null;
+    setIsEditModalOpen(false);
+    notifyOrbitModuleDataChanged('loan');
+    notifyOrbitModuleDataChanged('portal');
+    toast.success('Entry updated successfully!', {
+      position: 'top-center',
+      autoClose: 3000,
+      theme: 'colored',
+    });
+  };
+
   const handleUpdate = async () => {
     try {
       const currentEntry = loanData.find(
         (entry) => String(entry.loanPortalId || entry.id) === String(editingId)
       );
-      const payload = {
-        loanPortalId: editingId,
-        type: editSelectedType,
-        date: editFormData.date,
-        amount:
-          editSelectedType === "Loan"
-            ? Number(editFormData.loan_amount || 0)
-            : editSelectedType === "Transfer"
-              ? Number(editTransferAmount || 0)
-              : 0,
-        loan_refund_amount: editSelectedType === "Refund"
-          ? parseFloat(editFormData.loan_refund_amount || 0)
-          : 0,
-        loan_payment_mode: editPaymentMode || "",
-        from_purpose_id: editPurpose || 0,
-        to_purpose_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Purpose")
-          ? (editTransferSelection?.id || 0)
-          : 0,
-        vendor_id: editSelectedOption?.type === "Vendor" ? editSelectedOption.id : 0,
-        contractor_id: editSelectedOption?.type === "Contractor" ? editSelectedOption.id : 0,
-        project_id: editFormData.project_id || 0,
-        transfer_Project_id: (editSelectedType === "Transfer" && editTransferSelection.type === "Site")
-          ? (editTransferSelection?.id || 0)
-          : 0,
-        entry_no: editFormData.entry_no || 0,
-        description: editDescription || "",
-      };
-      const res = await fetch(
-        `https://backendaab.in/demoAabuildersDash/api/loans/${editingId}?editedBy=${username}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to update');
-      const updatedDataArray = await res.json();
-
-      const advancePortalId = resolveLoanAdvancePortalId(currentEntry);
-      if (advancePortalId) {
-        try {
-          await syncAdvancePortalFromLoanEdit(advancePortalId, payload, {
-            editedBy: username,
-            siteOptions,
-            selectedOption: editSelectedOption,
-          });
-        } catch (syncErr) {
-          console.error('Failed to sync linked advance portal entry:', syncErr);
-          toast.warning('Loan updated, but linked advance portal entry could not be synced.', {
-            position: 'top-center',
-            autoClose: 4000,
-            theme: 'colored',
-          });
-        }
+      if (!currentEntry) {
+        toast.error('Record not found.', { position: 'top-center', autoClose: 3000, theme: 'colored' });
+        return;
       }
 
-      setLoanData(prev => {
-        const newData = [...prev];
-        updatedDataArray.forEach(entry => {
-          const idx = newData.findIndex(item => item.loanPortalId === entry.loanPortalId);
-          if (idx === -1) newData.push(entry);
-          else newData[idx] = entry;
-        });
-        return newData;
+      const payload = buildLoanEditPayloadFromForm({
+        editingId,
+        editSelectedType,
+        editFormData,
+        editTransferSelection,
+        editSelectedOption,
+        editPurpose,
+        editTransferAmount,
+        editPaymentMode,
+        editDescription,
+        currentEntry,
       });
-      setIsEditModalOpen(false);
-      notifyOrbitModuleDataChanged('loan');
-      toast.success("Entry updated successfully!", {
-        position: "top-center",
-        autoClose: 3000,
-        theme: "colored",
-      });
+
+      if (shouldPromptLoanEditPaymentModal(payload)) {
+        pendingLoanUpdateRef.current = { payload };
+        const modalData = await fetchLoanEditPaymentModalData(editingId, accountDetails);
+        setEditPaymentModalData(modalData);
+        setShowEditPaymentModal(true);
+        return;
+      }
+
+      await performLoanUpdate(payload);
     } catch (error) {
       console.error(error);
-      toast.error(error.message || "Failed to update entry!", {
-        position: "top-center",
+      toast.error(error.message || 'Failed to update entry!', {
+        position: 'top-center',
         autoClose: 3000,
-        theme: "colored",
+        theme: 'colored',
+      });
+    }
+  };
+
+  const handleEditPaymentModalSubmit = async () => {
+    if (!editPaymentModalData.accountNumber) {
+      alert('Please select account number.');
+      return;
+    }
+    const pendingPaymentMode =
+      pendingLoanUpdateRef.current?.payload?.loan_payment_mode ?? editPaymentMode;
+    if (
+      isLoanChequePaymentMode(pendingPaymentMode) &&
+      (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)
+    ) {
+      alert('Please enter cheque number and date.');
+      return;
+    }
+    const pending = pendingLoanUpdateRef.current;
+    if (!pending?.payload || !editingId) return;
+
+    setIsEditPaymentSubmitting(true);
+    try {
+      await performLoanUpdate(pending.payload, editPaymentModalData);
+    } catch (err) {
+      console.error('Loan payment modal update error:', err);
+      toast.error(err.message || 'Failed to update entry!', {
+        position: 'top-center',
+        autoClose: 3000,
+        theme: 'colored',
+      });
+    } finally {
+      setIsEditPaymentSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (idToDelete) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this record?');
+    if (!confirmDelete) return;
+
+    try {
+      const record = loanData.find(
+        (row) => String(row.loanPortalId || row.id) === String(idToDelete)
+      );
+      if (!record) {
+        toast.error('Record not found', {
+          position: 'top-center',
+          autoClose: 3000,
+          theme: 'colored',
+        });
+        return;
+      }
+
+      const { clearedRecords, weeklyBillDelete } = await clearLoanPortalRecordsOnDelete(
+        idToDelete,
+        record,
+        loanData,
+        username
+      );
+
+      try {
+        await clearLinkedAdvancePortalForLoanDelete(clearedRecords, username);
+      } catch (linkErr) {
+        console.error('Failed to clear linked advance portal(s) for loan delete:', linkErr);
+        toast.warning('Loan record cleared, but linked advance portal entry could not be fully removed.', {
+          position: 'top-center',
+          autoClose: 4000,
+          theme: 'colored',
+        });
+      }
+
+      await fetchLoanTableData();
+      notifyOrbitModuleDataChanged('loan');
+      notifyOrbitModuleDataChanged('portal');
+      const billDeleteMessage = formatWeeklyBillDeleteMessage(
+        weeklyBillDelete.deletedCount,
+        weeklyBillDelete.failedCount
+      );
+      toast.success(`Record deleted successfully.${billDeleteMessage}`, {
+        position: 'top-center',
+        autoClose: 3000,
+        theme: 'colored',
+      });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error(error.message || 'Failed to delete record!', {
+        position: 'top-center',
+        autoClose: 3000,
+        theme: 'colored',
       });
     }
   };
@@ -1636,7 +1752,7 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                         textAlignClass="text-right"
                         getDisplayValue={(row) => row.entry_no}
                       />
-                      <td className={edbc19TdClass.replace(/\bjustify-between\b/, 'justify-center items-center')}>
+                      <td className={edbc19TdClass.replace(/\bjustify-between\b/, 'justify-center items-center gap-2')}>
                         <button className="rounded-full transition duration-200">
                           <img
                             src={edit}
@@ -1685,6 +1801,14 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
                               setEditDescription(entry.description || '');
                               setIsEditModalOpen(true);
                             }}
+                          />
+                        </button>
+                        <button className="rounded-full transition duration-200">
+                          <img
+                            src={remove}
+                            alt="delete"
+                            className="w-4 h-4 transform hover:scale-110 hover:brightness-110 transition duration-200"
+                            onClick={() => handleDelete(entry.loanPortalId || entry.id)}
                           />
                         </button>
                       </td>
@@ -1933,6 +2057,31 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
           </div>
         )}
         </div>
+        <AdvancePortalEditPaymentModal
+          isOpen={showEditPaymentModal}
+          onClose={() => {
+            setShowEditPaymentModal(false);
+            pendingLoanUpdateRef.current = null;
+          }}
+          onSubmit={handleEditPaymentModalSubmit}
+          isSubmitting={isEditPaymentSubmitting}
+          paymentMode={
+            pendingLoanUpdateRef.current?.payload?.loan_payment_mode ?? editPaymentMode
+          }
+          date={pendingLoanUpdateRef.current?.payload?.date ?? editFormData.date}
+          amount={getLoanPortalDisplayAmount(
+            pendingLoanUpdateRef.current?.payload || {
+              type: editSelectedType,
+              amount: editFormData.loan_amount,
+              loan_refund_amount: editFormData.loan_refund_amount,
+              loan_payment_mode: editPaymentMode,
+            }
+          )}
+          paymentModalData={editPaymentModalData}
+          setPaymentModalData={setEditPaymentModalData}
+          accountDetails={accountDetails}
+          selectStyles={customStyles}
+        />
         <ToastContainer position="top-center" autoClose={3000} theme="colored" />
       </div>
     </body>

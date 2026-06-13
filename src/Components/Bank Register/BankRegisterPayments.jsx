@@ -442,6 +442,61 @@ const mapIncomeLedgerRow = (r) => ({
   chequeDate: "-",
 });
 
+const resolveWeeklyBillSource = (item) => {
+  const direct =
+    (typeof item?.source === "string" && item.source.trim()) ||
+    (typeof item?.source_from === "string" && item.source_from.trim()) ||
+    (typeof item?.sourceFrom === "string" && item.sourceFrom.trim()) ||
+    "";
+  if (direct) return direct;
+
+  if (item?.rent_management_id ?? item?.rentManagementId) return "Rent Management";
+  if (item?.advance_portal_id ?? item?.advancePortalId) return "Advance Portal";
+  if (item?.staff_advance_portal_id ?? item?.staffAdvancePortalId) return "Staff Advance Portal";
+  if (item?.loan_portal_id ?? item?.loanPortalId) return "Loan Portal";
+  if (item?.claim_payment_id ?? item?.claimPaymentId) return "Claim Payment";
+  if (item?.expenses_entry_id ?? item?.expensesEntryId) return "Expenses Entry";
+
+  const paymentStatus = String(item?.payment_status || item?.paymentStatus || "")
+    .trim()
+    .toLowerCase();
+  if (paymentStatus === "expense") return "Bank Register";
+
+  return "";
+};
+
+const resolveBankRegisterPurpose = (item) => {
+  const paymentStatus = String(item?.payment_status || item?.paymentStatus || "")
+    .trim()
+    .toLowerCase();
+  const billType = String(item?.type || "").trim();
+
+  if (paymentStatus === "expense") {
+    const description = item.description && String(item.description).trim();
+    const purpose = description || "-";
+    if (billType.toLowerCase() === "refund" || purpose.toLowerCase() === "refund") {
+      const source = resolveWeeklyBillSource(item);
+      if (source) return `${source} - Refund`;
+    }
+    return purpose;
+  }
+
+  if (billType.toLowerCase() === "refund") {
+    const source = resolveWeeklyBillSource(item);
+    return source ? `${source} - ${billType}` : billType;
+  }
+
+  return billType || "-";
+};
+
+const isExpenseRegisterCredit = (r) => {
+  const billType = String(r?.billType ?? "").trim().toLowerCase();
+  if (billType === "refund") return true;
+  const displayType = String(r?.type ?? "").trim().toLowerCase();
+  if (displayType === "refund" || displayType.endsWith("+ refund")) return true;
+  return billType === "rent payment" && r.rent_management_id;
+};
+
 // ---------- Date Range Picker (modal) ----------
 const DateRangeModal = ({open, value, onClose, onApply}) => {
   const [from,setFrom] = useState(value?.from || "");
@@ -735,14 +790,11 @@ const MergedBankLedger = ({
   const getSelected = (value) => (value ? { value, label: value } : null);
 
   const mergedBase = useMemo(() => {
-    const deb = expenseRows.map((r) => {
-      const creditSide = r.type === "Rent Payment" && r.rent_management_id;
-      return {
-        ...r,
-        _source: "expense",
-        _entry: creditSide ? "credit" : "debit",
-      };
-    });
+    const deb = expenseRows.map((r) => ({
+      ...r,
+      _source: "expense",
+      _entry: isExpenseRegisterCredit(r) ? "credit" : "debit",
+    }));
     const cr = incomeRows.map(mapIncomeLedgerRow);
     return [...deb, ...cr];
   }, [expenseRows, incomeRows]);
@@ -2346,15 +2398,16 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
           project: getProjectOrPurposeName(item),
           party: partyData.name,
           partyType: partyData.type,
-          type: (() => {
-            const paymentStatus = String(item.payment_status || item.paymentStatus || "").trim().toLowerCase();
-            if (paymentStatus === "expense") {
-              const description = item.description && String(item.description).trim();
-              return description || "-";
-            }
-            return item.type || "-";
-          })(),
+          billType: item.type || "-",
+          type: resolveBankRegisterPurpose(item),
+          description: item.description && String(item.description).trim() ? String(item.description).trim() : "",
           rent_management_id: item.rent_management_id,
+          loan_portal_id: item.loan_portal_id ?? item.loanPortalId ?? null,
+          advance_portal_id: item.advance_portal_id ?? item.advancePortalId ?? null,
+          staff_advance_portal_id: item.staff_advance_portal_id ?? item.staffAdvancePortalId ?? null,
+          expenses_entry_id: item.expenses_entry_id ?? item.expensesEntryId ?? null,
+          claim_payment_id: item.claim_payment_id ?? item.claimPaymentId ?? null,
+          source: resolveWeeklyBillSource(item) || "",
           mode: item.bill_payment_mode || "-",
           chequeNo: item.cheque_number || "-",
           chequeDate: item.cheque_date ? new Date(item.cheque_date).toLocaleDateString("en-GB") : "-",
@@ -2440,14 +2493,13 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   const netbankTotal = accountExpenses.filter(r=>["Net Banking","RTGS","NEFT"].includes(r.mode)).reduce((s,r)=>s+r.amount,0);
   const balance = totalIncome - totalExpense;
 
-  const isBillRegisterCredit = (r) => r.type === "Rent Payment" && r.rent_management_id;
   const registerDebitTotal = filteredExpenses.reduce(
-    (s, r) => s + (isBillRegisterCredit(r) ? 0 : Number(r.amount) || 0),
+    (s, r) => s + (isExpenseRegisterCredit(r) ? 0 : Number(r.amount) || 0),
     0
   );
   const registerCreditTotal =
     accountIncome.reduce((s, r) => s + (Number(r.amount) || 0), 0) +
-    filteredExpenses.reduce((s, r) => s + (isBillRegisterCredit(r) ? Number(r.amount) || 0 : 0), 0);
+    filteredExpenses.reduce((s, r) => s + (isExpenseRegisterCredit(r) ? Number(r.amount) || 0 : 0), 0);
   const registerNetTotal = registerCreditTotal - registerDebitTotal;
 
   // Reconciliation stats
@@ -2872,14 +2924,11 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
     if(!w){ showToast("Popup blocked — allow popups"); return; }
     const fmt = (n)=>"₹"+Number(n).toLocaleString("en-IN",{minimumFractionDigits:2});
     const mergedBase = [
-      ...filteredExpenses.map((r) => {
-        const creditSide = r.type === "Rent Payment" && r.rent_management_id;
-        return {
-          ...r,
-          _source: "expense",
-          _entry: creditSide ? "credit" : "debit",
-        };
-      }),
+      ...filteredExpenses.map((r) => ({
+        ...r,
+        _source: "expense",
+        _entry: isExpenseRegisterCredit(r) ? "credit" : "debit",
+      })),
       ...accountIncome.map(mapIncomeLedgerRow),
     ];
     let merged = [...mergedBase];
@@ -2990,7 +3039,6 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
             <button className="export-btn pdf" onClick={exportPDF}><I.Pdf/> PDF</button>
           </div>
         </div>
-
         {/* Account picker (wider) + 4 stat cards — single row from md+ */}
         <div className="acct-stat-grid text-left mb-5 lg:px-4">
           <AccountPicker banks={banksForBranch} bank={bank} setBank={setBank} account={account} setAccount={setAccount}/>
@@ -3015,7 +3063,6 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
             </div>
           </div>
         </div>
-
         {!account ? (
           <div className="ledger-card"><div className="accent"/><div className="body p-8 text-center">
             <p className="muted text-sm">Please select a bank account above to view its register.</p>
@@ -3028,7 +3075,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
               totalExpense={totalExpense}
               totalIncome={totalIncome}
               onAddExp={()=>setExpModal({open:true,initial:null})}
-              onEditExp={(r)=>{ if (!r.canEdit) return; const {_entry,_source,...rest} = r; setExpModal({open:true,initial:rest}); }}
+              onEditExp={(r)=>{ if (!r.canEdit) return; const {_entry,_source,description,billType,...rest} = r; setExpModal({open:true,initial:{...rest,type:description||rest.type}}); }}
               onDeleteExp={deleteExp}
               onAddInc={()=>setIncModal({open:true,initial:null})}
               onEditInc={(r)=>{ if (!r.canEdit) return; const row = income.find((x)=>x.id===r.id); if(row) setIncModal({open:true,initial:row}); }}

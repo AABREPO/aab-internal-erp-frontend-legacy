@@ -677,6 +677,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
         entryNo: nextEntryNo,
         weekNo: 0,
         branch_id: activeBranchId,
+        entered_by: username,
+        source: 'Staff Portal',
       };
       if (dataToSubmit.selectedType === 'Transfer') {
         payload.from_purpose_id = dataToSubmit.purpose.id;
@@ -739,7 +741,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
           transaction_number: paymentDetails.transactionNumber || null,
           account_number: paymentDetails.accountNumber || null,
           branch_id: activeBranchId,
-          entered_by: username
+          entered_by: username,
+          source: "Staff Portal",
         };
         try {
           const weeklyBillSaveUrl = withBranchUrl("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save");

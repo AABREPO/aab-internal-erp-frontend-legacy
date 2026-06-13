@@ -36,7 +36,8 @@ import {
   EDBC_TABLE_EDGE_TABLE_CLASS,
   formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
-import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, clearAdvancePortalRecordsOnDelete, deleteLinkedExpenseEntryOnAdvancePortalDelete, formatWeeklyBillDeleteMessage, resolveFilesUploadResponseUrl } from '../../utils/advancePortalWeeklyPaymentBill';
+import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchAdvanceEditPaymentModalData, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, clearAdvancePortalRecordsOnDelete, deleteLinkedExpenseEntryOnAdvancePortalDelete, formatWeeklyBillDeleteMessage, formatVendorCarryForwardDeleteMessage, resolveFilesUploadResponseUrl, syncVendorCarryForwardFromAdvancePortalEdit } from '../../utils/advancePortalWeeklyPaymentBill';
+import { isChequePaymentMode } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
@@ -1588,6 +1589,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
             console.error('Linked expense sync failed after advance edit:', expenseErr);
           }
         }
+        if (sourceRecord) {
+          try {
+            await syncVendorCarryForwardFromAdvancePortalEdit(sourceRecord, payload);
+          } catch (carryForwardErr) {
+            console.error('Linked vendor carry forward sync failed after advance edit:', carryForwardErr);
+          }
+        }
       };
       const setAllowToEdit = async (id, allow) => {
         try {
@@ -1686,20 +1694,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         const payload = buildPayload();
         if (isAdvanceOnlinePaymentModeForModal(payload.payment_mode)) {
           pendingAdvanceUpdateRef.current = { payload };
-          let existingBill = null;
-          try {
-            const bills = await fetchWeeklyPaymentBillsByAdvancePortalId(editingId);
-            existingBill = Array.isArray(bills) && bills.length > 0 ? bills[0] : null;
-          } catch (e) {
-            console.warn('Could not fetch existing weekly bill to prefill payment details', e);
-          }
-          setEditPaymentModalData({
-            chequeNo: existingBill?.cheque_number ?? existingBill?.chequeNumber ?? '',
-            chequeDate: existingBill?.cheque_date ?? existingBill?.chequeDate ?? '',
-            transactionNumber:
-              existingBill?.transaction_number ?? existingBill?.transactionNumber ?? '',
-            accountNumber: existingBill?.account_number ?? existingBill?.accountNumber ?? '',
-          });
+          const modalData = await fetchAdvanceEditPaymentModalData(editingId, accountDetails);
+          setEditPaymentModalData(modalData);
           setShowEditPaymentModal(true);
           return;
         }
@@ -1730,7 +1726,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       alert('Please select account number.');
       return;
     }
-    if (editFormData.payment_mode === 'Cheque' && (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)) {
+    const pendingPaymentMode =
+      pendingAdvanceUpdateRef.current?.payload?.payment_mode ?? editFormData.payment_mode;
+    if (isChequePaymentMode(pendingPaymentMode) && (!editPaymentModalData.chequeNo || !editPaymentModalData.chequeDate)) {
       alert('Please enter cheque number and date.');
       return;
     }
@@ -1771,6 +1769,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           });
         } catch (expenseErr) {
           console.error('Linked expense sync failed after advance edit:', expenseErr);
+        }
+      }
+      if (sourceRecord) {
+        try {
+          await syncVendorCarryForwardFromAdvancePortalEdit(sourceRecord, payload);
+        } catch (carryForwardErr) {
+          console.error('Linked vendor carry forward sync failed after advance edit:', carryForwardErr);
         }
       }
       try {
@@ -1820,8 +1825,9 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       }
       const expensesEntryId = resolveAdvancePortalExpensesEntryId(record);
       let billDeleteMessage = '';
+      let vendorCarryForwardDeleteMessage = '';
       try {
-        const { weeklyBillDelete } = await clearAdvancePortalRecordsOnDelete(
+        const { weeklyBillDelete, vendorCarryForwardDelete } = await clearAdvancePortalRecordsOnDelete(
           idToDelete,
           record,
           advanceData,
@@ -1830,6 +1836,10 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
         billDeleteMessage = formatWeeklyBillDeleteMessage(
           weeklyBillDelete.deletedCount,
           weeklyBillDelete.failedCount
+        );
+        vendorCarryForwardDeleteMessage = formatVendorCarryForwardDeleteMessage(
+          vendorCarryForwardDelete?.deletedCount ?? 0,
+          vendorCarryForwardDelete?.failedCount ?? 0
         );
       } catch (billDeleteError) {
         console.error('Failed to delete related bill payments:', billDeleteError);
@@ -1928,7 +1938,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
       }
 
       alert(
-        `Record deleted successfully.${billDeleteMessage}${expenseDeleteMessage}${loanDeleteMessage}`
+        `Record deleted successfully.${billDeleteMessage}${vendorCarryForwardDeleteMessage}${expenseDeleteMessage}${loanDeleteMessage}`
       );
       await fetchAdvanceData();
     } catch (error) {
@@ -3024,9 +3034,13 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           }}
           onSubmit={handleEditPaymentModalSubmit}
           isSubmitting={isEditPaymentSubmitting}
-          paymentMode={editFormData.payment_mode}
-          date={editFormData.date}
-          amount={getAdvancePortalDisplayAmount(editFormData)}
+          paymentMode={
+            pendingAdvanceUpdateRef.current?.payload?.payment_mode ?? editFormData.payment_mode
+          }
+          date={pendingAdvanceUpdateRef.current?.payload?.date ?? editFormData.date}
+          amount={getAdvancePortalDisplayAmount(
+            pendingAdvanceUpdateRef.current?.payload || editFormData
+          )}
           paymentModalData={editPaymentModalData}
           setPaymentModalData={setEditPaymentModalData}
           accountDetails={accountDetails}

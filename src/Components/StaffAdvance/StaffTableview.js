@@ -24,7 +24,7 @@ const TableRow = memo(({ entry, index, onEditClick, getEmployeeName, getLabourNa
   <tr key={entry.id} className="odd:bg-white even:bg-[#FAF6ED]">
     <td className="text-sm text-left p-2 w-40 font-semibold">{formatDateOnly(entry.date)}</td>
     <td className="text-sm text-left w-[150px] font-semibold">
-      {getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "N/A"}
+      {getEmployeeName(entry.employee_id) || getLabourName(entry.labour_id) || "0"}
     </td>
     <td className="text-sm text-left w-[250px] font-semibold">
       {getPurposeName(entry.from_purpose_id)}
@@ -312,11 +312,6 @@ const EditModal = memo(({
 EditModal.displayName = 'EditModal';
 
 const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
-  const normalizeStaffAdvanceRecords = (recData) =>
-    (Array.isArray(recData) ? recData : []).filter(
-      (entry) => String(entry?.type || '').trim() !== ''
-    );
-
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [combinedOptions, setCombinedOptions] = useState([]);
@@ -353,14 +348,12 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const scrollRef = useRef(null);
-  const [virtualScroll, setVirtualScroll] = useState(false);
   const [staffAdvanceCombinedOptions, setStaffAdvanceCombinedOptions] = useState([]);
   const adminUsernames = ['Mahalingam M', 'Admin'];
   const normalizedUsername = (username || '').trim().toLowerCase();
   const isAdminUser = adminUsernames.some(name => name.toLowerCase() === normalizedUsername);
   const isAdmin = isAdminUser;
   const [requestingStaffEntry, setRequestingStaffEntry] = useState(null);
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
   const isDragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
   const scroll = useRef({ left: 0, top: 0 });
@@ -386,7 +379,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       const purData = purRes.status === 'fulfilled' && purRes.value.ok
         ? await purRes.value.json()
         : [];
-      setRecords(normalizeStaffAdvanceRecords(recData));
+      setRecords(Array.isArray(recData) ? recData : []);
       setEmployees(empData.map(e => ({ id: e.id, label: e.employee_name, type: "Employee" })));
       setPurposes(purData.map(p => ({ id: p.id, label: p.purpose })));
       const failedAPIs = [];
@@ -412,7 +405,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
       const recRes = await fetch('https://backendaab.in/demoAabuildersDash/api/staff-advance/all');
       if (recRes.ok) {
         const recData = await recRes.json();
-        setRecords(normalizeStaffAdvanceRecords(recData));
+        setRecords(Array.isArray(recData) ? recData : []);
       }
     } catch (error) {
       console.warn('Error refreshing staff advance records:', error);
@@ -921,16 +914,7 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
         return 0;
       });
     } else {
-      sortableData.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        if (dateB.getTime() !== dateA.getTime()) {
-          return dateB - dateA;
-        }
-        const idA = a.staffAdvancePortalId || a.id || a.entry_no || a.entryNo || 0;
-        const idB = b.staffAdvancePortalId || b.id || b.entry_no || b.entryNo || 0;
-        return idB - idA;
-      });
+      sortableData.sort((a, b) => Number(b.entry_no) - Number(a.entry_no));
     }
     return sortableData;
   }, [filteredRecords, sortConfig, getEmployeeName, getPurposeName]);
@@ -1051,22 +1035,10 @@ const TableView = ({ username, userRoles = [], paymentModeOptions = [], refreshS
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const shouldUseVirtualScroll = sortedData.length > 1000;
-  const currentData = useMemo(() => {
-    if (shouldUseVirtualScroll && virtualScroll) {
-      return sortedData.slice(visibleRange.start, visibleRange.end);
-    }
-    return sortedData.slice(startIndex, endIndex);
-  }, [sortedData, startIndex, endIndex, shouldUseVirtualScroll, virtualScroll, visibleRange]);
-  useEffect(() => {
-    if (sortedData.length > 1000 && !virtualScroll) {
-      setVirtualScroll(true);
-      setItemsPerPage(100);
-    } else if (sortedData.length <= 1000 && virtualScroll) {
-      setVirtualScroll(false);
-      setItemsPerPage(50);
-    }
-  }, [sortedData.length, virtualScroll]);
+  const currentData = useMemo(
+    () => sortedData.slice(startIndex, endIndex),
+    [sortedData, startIndex, endIndex]
+  );
   const goToPage = useCallback((page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }, [totalPages]);

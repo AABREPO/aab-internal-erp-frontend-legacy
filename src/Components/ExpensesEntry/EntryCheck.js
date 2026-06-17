@@ -808,13 +808,13 @@ const EntryChecking = () => {
                         </div>                        
                         <div className="flex flex-col">
                             <label className="font-semibold text-left text-[16px]">No Of Bills</label>
-                            <div className="w-full lg:w-[80px] h-[40px] p-2 mt-2 rounded-lg bg-[#F2F2F2] border-2 border-[rgba(191,152,83,0.2)] hover:border-[rgba(191,152,83,0.4)] text-left">
+                            <div className="w-full lg:w-[80px] h-[40px] p-2 mt-2 rounded-lg bg-[#EDEDED] border-2 border-[rgba(191,152,83,0.2)] hover:border-[rgba(191,152,83,0.4)] text-left">
                                 {isAnyFilterSelected ? filteredCount : ''}
                             </div>
                         </div>
                         <div className="flex flex-col">
                             <label className="font-semibold text-left text-[16px]">Amount</label>
-                            <div className="w-full lg:w-[140px] h-[40px] p-2 mt-2 rounded-lg bg-[#F2F2F2] border-2 border-[rgba(191,152,83,0.2)] hover:border-[rgba(191,152,83,0.4)] text-left">
+                            <div className="w-full lg:w-[140px] h-[40px] p-2 mt-2 rounded-lg bg-[#EDEDED] border-2 border-[rgba(191,152,83,0.2)] hover:border-[rgba(191,152,83,0.4)] text-left">
                                 {isAnyFilterSelected
                                     ? `₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}`
                                     : ''}

@@ -685,6 +685,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
           { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
           { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
         ];
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
         setSiteOptions(combinedSiteOptions);
@@ -703,6 +704,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
           { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
           { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
           { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
         ];
         setSiteOptions(predefinedSiteOptions);
         setProgress(75);

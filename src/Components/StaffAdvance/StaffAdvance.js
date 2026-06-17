@@ -698,6 +698,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
             bill_payment_mode: paymentDetails.paymentMode,
             amount: paymentDetails.amount,
             entered_by: username,
+            source: "Staff Portal",
           }
         );
       }
@@ -727,7 +728,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
           vendor_id: null,
           employee_id: dataToSubmit.empName?.type === "Employee" ? dataToSubmit.empName.id : null,
           project_id: null,
-          type: "Staff Advance",
+          type: dataToSubmit.selectedType,
           bill_payment_mode: paymentDetails.paymentMode,
           amount: parseFloat(paymentDetails.amount),
           status: true,
@@ -736,6 +737,7 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
           advance_portal_id: null,
           staff_advance_portal_id: staffAdvanceResult.id || staffAdvanceResult.staffAdvancePortalId,
           claim_payment_id: null,
+          purpose_id: payload.from_purpose_id ?? null,
           cheque_number: paymentDetails.chequeNo || null,
           cheque_date: paymentDetails.chequeDate || null,
           transaction_number: paymentDetails.transactionNumber || null,
@@ -1286,7 +1288,8 @@ const StaffAdvance = ({ username, userRoles = [], paymentModeOptions = [], refre
         from_purpose_id: editFormData.purpose?.id,
         amount: editFormData.amountGivenInput,
         staff_payment_mode: editFormData.paymentMode,
-        branch_id: editFormData.branch_id ?? activeBranchId
+        branch_id: editFormData.branch_id ?? activeBranchId,
+        source: 'Staff Portal',
       };
       if (editFormData.selectedType === 'Transfer') {
         updatePayload.to_purpose_id = editFormData.transferPurpose?.id;

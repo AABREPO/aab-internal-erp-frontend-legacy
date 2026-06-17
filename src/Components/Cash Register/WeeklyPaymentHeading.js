@@ -98,7 +98,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                         Handover
                     </h2>
                     <h2 className={`link whitespace-nowrap ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypaymentaddinput')} >
-                        Add Input
+                        Input Data
                     </h2>
                 </div>
                 {(activeTab === 'weeklyhistory' || activeTab === 'dailyhistory') && (

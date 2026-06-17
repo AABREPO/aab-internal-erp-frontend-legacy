@@ -640,7 +640,8 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           { value: "Daily Wage", label: "Daily Wage", id: 8, sNo: "8" },
           { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
           { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
-          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },          
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
         ];
         // Combine backend data with predefined options
         const combinedSiteOptions = [...predefinedSiteOptions, ...formattedData];
@@ -660,6 +661,7 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
           { value: "Rent Management Portal", label: "Rent Management Portal", id: 9, sNo: "9" },
           { value: "Multi-Project Batch", label: "Multi-Project Batch", id: 10, sNo: "10" },
           { value: "Loan Portal", label: "Loan Portal", id: 11, sNo: "11" },
+          { value: "Bill Payment Tracker", label: "Bill Payment Tracker", id: 12, sNo: "12" },
         ];
         setSiteOptions(predefinedSiteOptions);
         setProgress(75);

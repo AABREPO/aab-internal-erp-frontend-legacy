@@ -1068,6 +1068,21 @@ const DailyPayment = ({ username, userRoles = [] }) => {
     };
     const clearStaffAdvancePortalEntry = async (staffAdvancePortalId, date, entry_no) => {
         if (!staffAdvancePortalId) return;
+        let resolvedEntryNo = entry_no;
+        if (resolvedEntryNo == null || resolvedEntryNo === "") {
+            try {
+                const response = await axios.get("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                const allData = Array.isArray(response.data) ? response.data : [];
+                const staffRecord = allData.find(
+                    (item) =>
+                        String(item.staffAdvancePortalId ?? item.staff_advance_portal_id ?? item.id) ===
+                        String(staffAdvancePortalId)
+                );
+                resolvedEntryNo = staffRecord?.entry_no ?? null;
+            } catch (error) {
+                console.warn("Could not resolve staff advance entry_no:", error);
+            }
+        }
         const clearedData = {
             date: date || new Date().toISOString().split("T")[0],
             amount: null,
@@ -1080,7 +1095,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
             staff_payment_mode: null,
             file_url: null,
             staff_refund_amount: null,
-            entry_no,
+            entry_no: resolvedEntryNo,
             branch_id: activeBranchId,
         };
         const response = await fetch(
@@ -1116,6 +1131,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     entry_no: entryNo,
                     branch_id: activeBranchId,
                     entered_by: enteredBy,
+                    source: "Cash Register",
                 };
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -1325,6 +1341,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                         entry_no: entryNo,
                         branch_id: activeBranchId,
                         entered_by: enteredBy,
+                        source: "Cash Register",
                     };
                     const staffAdvanceResponse = await axios.post(
                         "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -1487,12 +1504,15 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                 const expenseData = dailyExpenses.find(expense => expense.id === id);
                 if (expenseData && expenseData.staff_advance_portal_id) {
                     try {
-                        await axios.delete(
-                            `https://backendaab.in/demoAabuildersDash/api/staff-advance/${expenseData.staff_advance_portal_id}`,
-                            { headers: { "Content-Type": "application/json" } }
+                        await clearStaffAdvancePortalEntry(
+                            expenseData.staff_advance_portal_id,
+                            expenseData.date,
+                            expenseData.entry_no
                         );
                     } catch (error) {
-                        console.error("Error deleting staff advance portal:", error);
+                        console.error("Error clearing staff advance portal for daily expense:", error);
+                        alert("Failed to clear the associated Staff Advance Portal entry. Please try again.");
+                        return;
                     }
                 }
                 const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/daily-payments/delete/${id}`, {
@@ -1582,6 +1602,7 @@ const DailyPayment = ({ username, userRoles = [] }) => {
                     entry_no: entryNo,
                     branch_id: activeBranchId,
                     entered_by: enteredBy,
+                    source: "Cash Register",
                 };
                 const staffAdvanceResponse = await axios.post(
                     "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",

@@ -28,6 +28,7 @@ import {
     EdbcTotalAmountFilter,
     EDBC_TABLE_EDGE_TABLE_CLASS,
     EDBC_FILTER_CONTROL_BOX_STYLE,
+    formatEdbcTotalAmountPlaceholder,
     getEdbcColumnConfig,
     getEdbcColumnHeaderSortProps,
     matchesEdbcAmountFilter,
@@ -134,6 +135,10 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         employee_id: "",
         amount: ""
     });
+    const [purposeOptions, setPurposeOptions] = useState([]);
+    const [showPurposePopup, setShowPurposePopup] = useState(false);
+    const [selectedPurpose, setSelectedPurpose] = useState(null);
+    const [pendingRefundData, setPendingRefundData] = useState(null);
     const [showPopups, setShowPopups] = useState(false);
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
@@ -158,7 +163,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         amount: "",
         extra_amount: "",
         description: "",
-        file_url: ""
+        file_url: "",
+        staff_advance_portal_id: ""
     });
     const [editRefundPaymentData, setEditRefundPaymentData] = useState({
         labour_id: "",
@@ -331,6 +337,18 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
 
     const getCurrentISOWeekNumber = () => {
         return getISOWeekNumber(new Date());
+    };
+
+    const getWeekNumberFromDate = (dateString) => {
+        if (!dateString) return Number(selectedWeek) || getISOWeekNumber(new Date());
+        const date = new Date(dateString);
+        if (dateString.includes('/')) {
+            const parts = dateString.split('/');
+            if (parts.length === 3) {
+                date.setFullYear(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+            }
+        }
+        return getISOWeekNumber(date);
     };
 
     function getStartAndEndDateOfISOWeek(weekNo, year) {
@@ -557,6 +575,32 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions, ...employeeOptions]);
     }, [vendorOptions, contractorOptions, employeeOptions]);
+    useEffect(() => {
+        const fetchPurposeOptions = async () => {
+            try {
+                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/loan-purposes/getAll', {
+                    method: "GET",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                });
+                if (!response.ok) {
+                    throw new Error("Network response was not ok: " + response.statusText);
+                }
+                const data = await response.json();
+                const formattedData = data.map((item) => ({
+                    value: item.purpose,
+                    label: item.purpose,
+                    id: item.id,
+                    type: 'Purpose',
+                }));
+                setPurposeOptions(formattedData);
+            } catch (error) {
+                console.error("Error fetching purpose options: ", error);
+                setPurposeOptions([]);
+            }
+        };
+        fetchPurposeOptions();
+    }, []);
     useEffect(() => {
         return () => {
             cancelMomentum();
@@ -819,7 +863,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         }),
     };
     const totalAmount = dailyExpenses
-        .filter(row => row.date === selectedDate)
         .reduce((sum, row) => sum + (Number(row.amount || 0) + Number(row.extra_amount || 0)), 0);
     const totalRefund = refundPayments
         .reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -895,47 +938,200 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
             return next;
         });
     };
+    const refreshSelectedDateData = async () => {
+        if (!selectedDate) return;
+        const [dailyRes, refundRes] = await Promise.all([
+            axios.get(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${selectedDate}`, withBranchParams()),
+            axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams()),
+        ]);
+        setDailyExpenses(dailyRes.data);
+        setRefundPayments(refundRes.data);
+    };
+    const getLastEntryNumber = async () => {
+        try {
+            const response = await axios.get("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+            if (response.data && response.data.length > 0) {
+                const lastEntry = response.data[response.data.length - 1];
+                return (lastEntry.entry_no || 0) + 1;
+            }
+            return 1;
+        } catch (error) {
+            console.error("Error fetching last entry number:", error);
+            return 1;
+        }
+    };
+    const clearLoanPortalEntry = async (loanPortalId, date, entry_no) => {
+        if (!loanPortalId) return;
+        const payload = {
+            loanPortalId,
+            type: "",
+            date,
+            amount: 0,
+            loan_refund_amount: 0,
+            loan_payment_mode: "",
+            from_purpose_id: 0,
+            to_purpose_id: 0,
+            vendor_id: 0,
+            contractor_id: 0,
+            employee_id: 0,
+            project_id: 0,
+            transfer_Project_id: 0,
+            entry_no,
+            description: "",
+            branch_id: activeBranchId,
+        };
+        const response = await fetch(`https://backendaab.in/demoAabuildersDash/api/loans/${loanPortalId}?editedBy=${encodeURIComponent(username)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error("Failed to clear Loan Portal entry");
+        }
+    };
     const handleRefundSubmit = async () => {
         try {
-            const hasPayee =
-                (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) ||
-                (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) ||
-                (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0) ||
+            const isLabourOrEmployeeRefund = (newRefundReceived.labour_id && Number(newRefundReceived.labour_id) > 0) ||
                 (newRefundReceived.employee_id && Number(newRefundReceived.employee_id) > 0);
-            if (!hasPayee || !newRefundReceived.amount) {
-                alert("Please select payee and enter amount.");
+            const isVendorOrContractorRefund = (newRefundReceived.vendor_id && Number(newRefundReceived.vendor_id) > 0) ||
+                (newRefundReceived.contractor_id && Number(newRefundReceived.contractor_id) > 0);
+            if (!newRefundReceived.amount) {
+                alert("Please enter amount.");
                 return;
             }
-            const payload = {
+            if (isLabourOrEmployeeRefund) {
+                const entryNo = await getLastEntryNumber();
+                const staffAdvancePayload = {
+                    date: selectedDate,
+                    type: "Refund",
+                    labour_id: Number(newRefundReceived.labour_id) || null,
+                    employee_id: Number(newRefundReceived.employee_id) || null,
+                    staff_refund_amount: Number(newRefundReceived.amount),
+                    week_no: Number(selectedWeek),
+                    staff_payment_mode: "Cash",
+                    from_purpose_id: 5,
+                    entry_no: entryNo,
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                    source: "Cash Register",
+                };
+                const staffAdvanceResponse = await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                    staffAdvancePayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+                const refundPayload = {
+                    date: selectedDate,
+                    labour_id: Number(newRefundReceived.labour_id) || null,
+                    employee_id: Number(newRefundReceived.employee_id) || null,
+                    amount: Number(newRefundReceived.amount),
+                    weekly_number: Number(selectedWeek),
+                    staff_advance_portal_id: staffAdvancePortalId,
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                };
+                await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/refund_received/save",
+                    refundPayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+            } else if (isVendorOrContractorRefund) {
+                setPendingRefundData({
+                    date: selectedDate,
+                    vendor_id: Number(newRefundReceived.vendor_id) || null,
+                    contractor_id: Number(newRefundReceived.contractor_id) || null,
+                    amount: Number(newRefundReceived.amount),
+                    weekly_number: Number(selectedWeek),
+                    branch_id: activeBranchId,
+                });
+                setShowPurposePopup(true);
+                return;
+            } else {
+                alert("Please select a labour, employee, vendor, or contractor for the refund.");
+                return;
+            }
+            await refreshSelectedDateData();
+            setNewRefundReceived({
                 date: selectedDate,
-                labour_id: newRefundReceived.labour_id ? Number(newRefundReceived.labour_id) : null,
-                vendor_id: newRefundReceived.vendor_id ? Number(newRefundReceived.vendor_id) : null,
-                contractor_id: newRefundReceived.contractor_id ? Number(newRefundReceived.contractor_id) : null,
-                employee_id: newRefundReceived.employee_id ? Number(newRefundReceived.employee_id) : null,
-                amount: Number(newRefundReceived.amount),
-                weekly_number: Number(selectedWeek),
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
+                amount: "",
+            });
+        } catch (error) {
+            console.error("Error saving refund:", error);
+            alert("Error adding refund. Please try again.");
+        }
+    };
+    const handlePurposeSelection = async () => {
+        if (!selectedPurpose) {
+            alert("Please select a purpose");
+            return;
+        }
+        if (!pendingRefundData) {
+            alert("No pending refund data found");
+            return;
+        }
+        try {
+            const weekNo = getWeekNumberFromDate(pendingRefundData.date);
+            const loanPortalPayload = {
+                type: "Refund",
+                date: pendingRefundData.date,
+                amount: 0,
+                loan_payment_mode: "Cash",
+                loan_refund_amount: Number(pendingRefundData.amount),
+                from_purpose_id: selectedPurpose.id,
+                transfer_Project_id: 0,
+                to_purpose_id: 0,
+                vendor_id: Number(pendingRefundData.vendor_id) || 0,
+                contractor_id: Number(pendingRefundData.contractor_id) || 0,
+                project_id: 0,
+                week_no: Number(weekNo),
+                description: "Refund from Cash Register",
+                file_url: "",
+                source: "Cash Register",
                 branch_id: activeBranchId,
                 entered_by: enteredBy,
             };
-            const response = await axios.post(
-                'https://backendaab.in/demoAabuildersDash/api/refund_received/save',
-                payload
+            const loanPortalResponse = await axios.post(
+                "https://backendaab.in/demoAabuildersDash/api/loans/save",
+                loanPortalPayload,
+                { headers: { "Content-Type": "application/json" } }
             );
-            if (response.status === 200) {
-                const refundRes = await axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams());
-                setRefundPayments(refundRes.data);
-                setNewRefundReceived({
-                    date: selectedDate,
-                    labour_id: "",
-                    vendor_id: "",
-                    contractor_id: "",
-                    employee_id: "",
-                    amount: "",
-                });
-            }
+            const correctWeeklyNumber = getWeekNumberFromDate(pendingRefundData.date);
+            const refundPayload = {
+                date: pendingRefundData.date,
+                vendor_id: Number(pendingRefundData.vendor_id) || null,
+                contractor_id: Number(pendingRefundData.contractor_id) || null,
+                amount: Number(pendingRefundData.amount),
+                weekly_number: Number(correctWeeklyNumber),
+                staff_advance_portal_id: null,
+                loan_portal_id: loanPortalResponse.data?.id || loanPortalResponse.data?.loanPortalId,
+                branch_id: activeBranchId,
+                entered_by: enteredBy,
+            };
+            await axios.post(
+                "https://backendaab.in/demoAabuildersDash/api/refund_received/save",
+                refundPayload,
+                { headers: { "Content-Type": "application/json" } }
+            );
+            setShowPurposePopup(false);
+            setSelectedPurpose(null);
+            setPendingRefundData(null);
+            await refreshSelectedDateData();
+            setNewRefundReceived({
+                date: selectedDate,
+                labour_id: "",
+                vendor_id: "",
+                contractor_id: "",
+                employee_id: "",
+                amount: "",
+            });
         } catch (error) {
-            console.error("Error adding refund:", error);
-            alert("Error adding refund. Please try again.");
+            console.error("Error saving refund with purpose:", error);
+            alert("Error saving refund. Please try again.");
         }
     };
     const handleKeyDown = (e) => {
@@ -955,34 +1151,110 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                 alert("Please select all required details.");
                 return;
             }
-            const expenseData = {
-                date: selectedDate,
-                created_at: new Date().toISOString(),
-                labour_id: Number(newDailyExpense.labour_id) || null,
-                vendor_id: Number(newDailyExpense.vendor_id) || null,
-                contractor_id: Number(newDailyExpense.contractor_id) || null,
-                employee_id: Number(newDailyExpense.employee_id) || null,
-                project_id: Number(newDailyExpense.project_id),
-                quantity: Number(newDailyExpense.quantity) || 0,
-                type: newDailyExpense.type,
-                type_id: getWeeklyExpenseTypeId(newDailyExpense.type),
-                amount: Number(newDailyExpense.amount),
-                extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
-                description: newDailyExpense.description || "",
-                weekly_number: Number(selectedWeek),
-                branch_id: activeBranchId,
-                entered_by: enteredBy,
-            };
-            await axios.post(
-                'https://backendaab.in/demoAabuildersDash/api/daily-payments/save',
-                expenseData
-            );
-            const [dailyRes, refundRes] = await Promise.all([
-                axios.get(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${selectedDate}`, withBranchParams()),
-                axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams())
-            ]);
-            setDailyExpenses(dailyRes.data);
-            setRefundPayments(refundRes.data);
+            if (newDailyExpense.type === "Staff Advance") {
+                const entryNo = await getLastEntryNumber();
+                const staffAdvancePayload = {
+                    date: selectedDate,
+                    type: "Advance",
+                    labour_id: Number(newDailyExpense.labour_id) || null,
+                    amount: Number(newDailyExpense.amount),
+                    week_no: Number(selectedWeek),
+                    staff_payment_mode: "Cash",
+                    from_purpose_id: 5,
+                    entry_no: entryNo,
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                    source: "Cash Register",
+                };
+                const staffAdvanceResponse = await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                    staffAdvancePayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+                const dailyPaymentPayload = {
+                    date: selectedDate,
+                    created_at: new Date().toISOString(),
+                    labour_id: Number(newDailyExpense.labour_id) || null,
+                    vendor_id: Number(newDailyExpense.vendor_id) || null,
+                    contractor_id: Number(newDailyExpense.contractor_id) || null,
+                    employee_id: Number(newDailyExpense.employee_id) || null,
+                    project_id: Number(newDailyExpense.project_id),
+                    quantity: Number(newDailyExpense.quantity) || 0,
+                    type: newDailyExpense.type,
+                    type_id: getWeeklyExpenseTypeId(newDailyExpense.type),
+                    amount: Number(newDailyExpense.amount),
+                    extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
+                    description: newDailyExpense.description || "",
+                    weekly_number: Number(selectedWeek),
+                    staff_advance_portal_id: staffAdvancePortalId,
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                };
+                await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/daily-payments/save",
+                    dailyPaymentPayload,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+                const expenseForBackend = {
+                    date: selectedDate,
+                    contractor_id: contractorOptions.find((opt) => opt.label === "Company Labour")?.id || null,
+                    vendor_id: null,
+                    project_id: siteOptions.find((opt) => opt.label === "Daily Wage")?.id || null,
+                    type: "Daily",
+                    amount: 0,
+                    weekly_number: Number(selectedWeek),
+                    status: false,
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                };
+                await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save-daily",
+                    expenseForBackend,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+            } else {
+                const expenseData = {
+                    date: selectedDate,
+                    created_at: new Date().toISOString(),
+                    labour_id: Number(newDailyExpense.labour_id) || null,
+                    vendor_id: Number(newDailyExpense.vendor_id) || null,
+                    contractor_id: Number(newDailyExpense.contractor_id) || null,
+                    employee_id: Number(newDailyExpense.employee_id) || null,
+                    project_id: Number(newDailyExpense.project_id),
+                    quantity: Number(newDailyExpense.quantity) || 0,
+                    type: newDailyExpense.type,
+                    type_id: getWeeklyExpenseTypeId(newDailyExpense.type),
+                    amount: Number(newDailyExpense.amount),
+                    extra_amount: newDailyExpense.extra_amount ? Number(newDailyExpense.extra_amount) : 0,
+                    description: newDailyExpense.description || "",
+                    weekly_number: Number(selectedWeek),
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                };
+                await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/daily-payments/save",
+                    expenseData
+                );
+                const expenseForBackend = {
+                    date: selectedDate,
+                    contractor_id: contractorOptions.find((opt) => opt.label === "Company Labour")?.id || null,
+                    vendor_id: null,
+                    project_id: siteOptions.find((opt) => opt.label === "Daily Wage")?.id || null,
+                    type: "Daily",
+                    amount: 0,
+                    weekly_number: Number(selectedWeek),
+                    status: false,
+                    branch_id: activeBranchId,
+                    entered_by: enteredBy,
+                };
+                await axios.post(
+                    "https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save-daily",
+                    expenseForBackend,
+                    { headers: { "Content-Type": "application/json" } }
+                );
+            }
+            await refreshSelectedDateData();
             setNewDailyExpense({
                 labour_id: "",
                 vendor_id: "",
@@ -2153,9 +2425,9 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
             amount: row.amount || "",
             extra_amount: row.extra_amount || "",
             description: row.description || "",
-            file_url: row.file_url || ""
+            file_url: row.file_url || "",
+            staff_advance_portal_id: row.staff_advance_portal_id || "",
         });
-        // Snapshot the original values in the same normalized shape used for saving.
         editDailyExpenseOriginalRef.current = {
             date: row.date,
             labour_id: Number(row.labour_id) || null,
@@ -2189,8 +2461,14 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                 extra_amount: Number(editDailyExpenseData.extra_amount || 0),
                 description: editDailyExpenseData.description || "",
                 file_url: editDailyExpenseData.file_url || null,
+                staff_advance_portal_id: editDailyExpenseData.staff_advance_portal_id || null,
                 branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
             };
+            const wasStaffAdvance = row.type === "Staff Advance";
+            const isNowStaffAdvance = editDailyExpenseData.type === "Staff Advance";
+            const typeChangedFromStaffAdvance = wasStaffAdvance && !isNowStaffAdvance;
+            const typeChangedToStaffAdvance = !wasStaffAdvance && isNowStaffAdvance;
+            const amountChanged = Number(row.amount) !== Number(editDailyExpenseData.amount);
             const original = editDailyExpenseOriginalRef.current;
             const keysToCompare = [
                 "date",
@@ -2214,13 +2492,79 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                     const a = original[key];
                     const b = payload[key];
                     return a !== b;
-                });
-
+                }) ||
+                typeChangedFromStaffAdvance ||
+                typeChangedToStaffAdvance;
+            if (typeChangedFromStaffAdvance) {
+                payload.staff_advance_portal_id = null;
+                if (row.staff_advance_portal_id) {
+                    try {
+                        await clearStaffAdvancePortalEntry(
+                            row.staff_advance_portal_id,
+                            editDailyExpenseData.date || row.date,
+                            row.entry_no
+                        );
+                    } catch (error) {
+                        console.error("Error clearing staff advance portal:", error);
+                    }
+                }
+            }
+            if (typeChangedToStaffAdvance) {
+                try {
+                    const entryNo = await getLastEntryNumber();
+                    const staffAdvancePayload = {
+                        date: editDailyExpenseData.date,
+                        type: "Advance",
+                        labour_id: Number(editDailyExpenseData.labour_id) || null,
+                        amount: Number(editDailyExpenseData.amount),
+                        week_no: Number(selectedWeek),
+                        staff_payment_mode: "Cash",
+                        from_purpose_id: 5,
+                        entry_no: entryNo,
+                        branch_id: activeBranchId,
+                        entered_by: enteredBy,
+                        source: "Cash Register",
+                    };
+                    const staffAdvanceResponse = await axios.post(
+                        "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                        staffAdvancePayload,
+                        { headers: { "Content-Type": "application/json" } }
+                    );
+                    const staffAdvancePortalId = staffAdvanceResponse.data?.staffAdvancePortalId;
+                    payload.staff_advance_portal_id = staffAdvancePortalId;
+                } catch (error) {
+                    console.error("Error creating staff advance portal:", error);
+                }
+            }
+            if (amountChanged && isNowStaffAdvance && row.staff_advance_portal_id) {
+                try {
+                    const staffAdvanceUpdatePayload = {
+                        type: "Advance",
+                        date: editDailyExpenseData.date,
+                        labour_id: Number(editDailyExpenseData.labour_id) || null,
+                        from_purpose_id: 5,
+                        to_purpose_id: null,
+                        staff_payment_mode: "Cash",
+                        amount: Number(editDailyExpenseData.amount),
+                        staff_refund_amount: 0,
+                        description: editDailyExpenseData.description || "",
+                        file_url: editDailyExpenseData.file_url || null,
+                        branch_id: row.branch_id ?? row.branchId ?? activeBranchId ?? null,
+                    };
+                    await axios.put(
+                        `https://backendaab.in/demoAabuildersDash/api/staff-advance/${row.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
+                        staffAdvanceUpdatePayload,
+                        { headers: { "Content-Type": "application/json" } }
+                    );
+                } catch (error) {
+                    console.error("Error updating staff advance portal amount:", error);
+                }
+            }
             if (!hasChanges) {
                 setEditingDailyExpenseRowId(null);
                 return;
             }
-            const response = await axios.put(
+            await axios.put(
                 `https://backendaab.in/demoAabuildersDash/api/daily-payments/edit/${row.id}?username=${encodeURIComponent(username)}`,
                 payload,
                 { headers: { "Content-Type": "application/json" } }
@@ -2262,13 +2606,41 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
     };
     const saveEditedRefundPayment = async (id) => {
         try {
+            const refundData = refundPayments.find((refund) => refund.id === id);
+            if (refundData && refundData.staff_advance_portal_id) {
+                try {
+                    const staffAdvanceUpdatePayload = {
+                        type: "Refund",
+                        date: refundData.date,
+                        labour_id: Number(editRefundPaymentData.labour_id) || null,
+                        vendor_id: Number(editRefundPaymentData.vendor_id) || null,
+                        contractor_id: Number(editRefundPaymentData.contractor_id) || null,
+                        employee_id: Number(editRefundPaymentData.employee_id) || null,
+                        from_purpose_id: 5,
+                        to_purpose_id: null,
+                        staff_payment_mode: "Cash",
+                        amount: 0,
+                        staff_refund_amount: Number(editRefundPaymentData.amount),
+                        description: "",
+                        file_url: null,
+                        branch_id: refundData?.branch_id ?? refundData?.branchId ?? activeBranchId ?? null,
+                    };
+                    await axios.put(
+                        `https://backendaab.in/demoAabuildersDash/api/staff-advance/${refundData.staff_advance_portal_id}?editedBy=${encodeURIComponent(username)}`,
+                        staffAdvanceUpdatePayload,
+                        { headers: { "Content-Type": "application/json" } }
+                    );
+                } catch (error) {
+                    console.error("Error updating staff advance portal for refund:", error);
+                }
+            }
             const payload = {
                 labour_id: editRefundPaymentData.labour_id ? Number(editRefundPaymentData.labour_id) : null,
                 vendor_id: editRefundPaymentData.vendor_id ? Number(editRefundPaymentData.vendor_id) : null,
                 contractor_id: editRefundPaymentData.contractor_id ? Number(editRefundPaymentData.contractor_id) : null,
                 employee_id: editRefundPaymentData.employee_id ? Number(editRefundPaymentData.employee_id) : null,
                 amount: Number(editRefundPaymentData.amount),
-                branch_id: refundPayments.find((row) => row.id === id)?.branch_id ?? activeBranchId ?? null,
+                branch_id: refundData?.branch_id ?? refundData?.branchId ?? activeBranchId ?? null,
             };
             await axios.put(
                 `https://backendaab.in/demoAabuildersDash/api/refund_received/edit/${id}?username=${encodeURIComponent(username)}`,
@@ -2285,10 +2657,69 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
             alert("Error updating refund payment. Please try again.");
         }
     };
+    const clearStaffAdvancePortalEntry = async (staffAdvancePortalId, date, entry_no) => {
+        if (!staffAdvancePortalId) return;
+        let resolvedEntryNo = entry_no;
+        if (resolvedEntryNo == null || resolvedEntryNo === "") {
+            try {
+                const response = await axios.get("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                const allData = Array.isArray(response.data) ? response.data : [];
+                const staffRecord = allData.find(
+                    (item) =>
+                        String(item.staffAdvancePortalId ?? item.staff_advance_portal_id ?? item.id) ===
+                        String(staffAdvancePortalId)
+                );
+                resolvedEntryNo = staffRecord?.entry_no ?? null;
+            } catch (error) {
+                console.warn("Could not resolve staff advance entry_no:", error);
+            }
+        }
+        const clearedData = {
+            date: date || new Date().toISOString().split("T")[0],
+            amount: null,
+            employee_id: null,
+            labour_id: null,
+            description: null,
+            type: null,
+            week_no: null,
+            from_purpose_id: null,
+            staff_payment_mode: null,
+            file_url: null,
+            staff_refund_amount: null,
+            entry_no: resolvedEntryNo,
+            branch_id: activeBranchId,
+        };
+        const response = await fetch(
+            `https://backendaab.in/demoAabuildersDash/api/staff-advance/${staffAdvancePortalId}?editedBy=${encodeURIComponent(username)}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(clearedData),
+            }
+        );
+        if (!response.ok) {
+            throw new Error("Failed to clear Staff Advance Portal entry");
+        }
+        return response.json();
+    };
     const handleDailyExpensesDelete = async (id) => {
         const confirmed = window.confirm("Are you sure you want to delete This Daily Expense Data?");
         if (confirmed) {
             try {
+                const expenseData = dailyExpenses.find((expense) => expense.id === id);
+                if (expenseData?.staff_advance_portal_id) {
+                    try {
+                        await clearStaffAdvancePortalEntry(
+                            expenseData.staff_advance_portal_id,
+                            expenseData.date,
+                            expenseData.entry_no
+                        );
+                    } catch (error) {
+                        console.error("Error clearing staff advance portal for daily expense:", error);
+                        alert("Failed to clear the associated Staff Advance Portal entry. Please try again.");
+                        return;
+                    }
+                }
                 await axios.delete(
                     `https://backendaab.in/demoAabuildersDash/api/daily-payments/delete/${id}?username=${encodeURIComponent(username)}`,
                     { headers: { "Content-Type": "application/json" } }
@@ -2306,6 +2737,29 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         const confirmed = window.confirm("Are you sure you want to delete This Refund Received Data?");
         if (confirmed) {
             try {
+                const refundData = refundPayments.find((refund) => refund.id === id);
+                if (refundData?.staff_advance_portal_id) {
+                    try {
+                        await clearStaffAdvancePortalEntry(
+                            refundData.staff_advance_portal_id,
+                            refundData.date,
+                            refundData.entry_no
+                        );
+                    } catch (error) {
+                        console.error("Error clearing staff advance portal for refund:", error);
+                        alert("Failed to clear the associated Staff Advance Portal entry. Please try again.");
+                        return;
+                    }
+                }
+                if (refundData?.loan_portal_id) {
+                    try {
+                        await clearLoanPortalEntry(refundData.loan_portal_id, refundData.date, refundData.entry_no);
+                    } catch (error) {
+                        console.error("Error clearing loan portal for refund:", error);
+                        alert("Failed to clear the associated Loan Portal entry. Please try again.");
+                        return;
+                    }
+                }
                 await axios.delete(
                     `https://backendaab.in/demoAabuildersDash/api/refund_received/delete/${id}?username=${encodeURIComponent(username)}`,
                     { headers: { "Content-Type": "application/json" } }
@@ -2804,6 +3258,15 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                     styles={entryCheckLikeSelectStyles}
                                                 />
                                             </div>
+                                            <div className="min-w-0">
+                                                <label className="block font-semibold mb-[8px]">Weekly Balance</label>
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={`₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                    className="min-w-0 w-[150px] h-[40px] px-3 text-[#000000] text-left text-[14px] font-semibold bg-[#ededed] border-2 border-[rgba(191,152,83,0.2)] rounded-lg bg-transparent focus:outline-none"
+                                                />
+                                            </div>
                                         </div>
                                     );
                                 })()}
@@ -2815,7 +3278,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                         <div className="relative flex items-center rounded-lg bg-[#FFFDF9] border border-[#FFEBC9]">
                                             {selectedDayIndex >= 0 && (
                                                 <div
-                                                    className="absolute top-0 bottom-0 rounded-md bg-[#BF9853] transition-all duration-300 ease-in-out"
+                                                    className="absolute top-0 bottom-0 rounded-md bg-[#BF9853] transition-all duration-700 ease-in-out"
                                                     style={{
                                                         width: `${100 / weekDays.length}%`,
                                                         left: `${(selectedDayIndex * 100) / weekDays.length}%`,
@@ -2849,17 +3312,12 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                 })()}
                             </div>
                             <div className="flex items-center space-x-3 flex-wrap justify-end pr-[18px]">
-                                <h1 className="font-bold text-xl shrink-0">
-                                    Weekly Balance: <span style={{ color: "#E4572E" }} className="inline-block text-right min-w-[120px]">
-                                        {balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                </h1>
                                 <button
                                     onClick={handleSendToExpensesEntry}
-                                    className={`font-semibold shrink-0 hover:text-[#E4572E] ${sendingToExpensesEntry ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className="h-[36px] bg-[#BF9853] text-white text-[14px] font-bold px-[16px] rounded shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
                                     disabled={sendingToExpensesEntry}
                                 >
-                                    {sendingToExpensesEntry ? 'Sending...' : 'Send To Expenses Entry'}
+                                    {sendingToExpensesEntry ? 'Sending...' : 'Send Expenses'}
                                 </button>
                                 <div
                                     className="rounded-md px-4 py-[8px] text-sm shrink-0"
@@ -2990,7 +3448,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                     </EdbcTableFilterRow>
                                                 )}
                                                 {canEditSelectedWeek && (
-                                                    <tr className="bg-white border-b border-gray-200">
+                                                    <tr className="bg-white border-b border-gray-200 items-center justify-center">
                                                         <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
                                                         <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
                                                             <div className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}>
@@ -3084,9 +3542,9 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                 />
                                                             </div>
                                                         </td>
-                                                        <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible">
-                                                            <button onClick={() => setShowExtraAmount(prev => !prev)} type="button">
-                                                                <img src={showExtraAmount ? ExtraFeildClose : ExtraFeild} className="w-4 h-4" alt="Extra" />
+                                                        <td className=" p-0 overflow-visible items-center justify-center">
+                                                            <button onClick={() => setShowExtraAmount(prev => !prev)} type="button" className="inline-flex pl-[6px] h-4 w-4 shrink-0">
+                                                                <img src={showExtraAmount ? ExtraFeildClose : ExtraFeild} className={`h-4 w-4 min-h-4 min-w-4 max-h-4 max-w-4 shrink-0 object-contain origin-center ${showExtraAmount ? 'scale-[1.375]' : ''}`} alt="Extra" />
                                                             </button>
                                                         </td>
                                                         <td className="pl-[6px] w-[66px] text-center">
@@ -3260,7 +3718,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     ) : (
                                                                         <div className="h-[40px] flex flex-col justify-center leading-tight cursor-default text-right">
                                                                             <span>
-                                                                                {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
+                                                                                {formatEdbcTotalAmountPlaceholder(Number((row.amount || 0) + (row.extra_amount || 0)))}
                                                                             </span>
                                                                             <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
                                                                                 Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
@@ -3423,7 +3881,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                 </div>
                             </div>
                             <div className="shrink-0 flex flex-col min-h-0 overflow-hidden">
-                                <div className="w-fit max-w-full flex flex-col">
+                                <div className="w-fit max-w-full flex flex-col min-h-0">
                                 <div className="flex justify-between items-center mb-[8px] w-full">
                                     <h1 className="font-bold text-base">Refund Received</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
@@ -3440,10 +3898,18 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                         searchWrapperClassName="h-[34px] min-w-0 w-1/2 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1"
                                     />
                                 </div>
-                                <div>
-                                    <div className="w-fit max-w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                                        <div className="w-fit max-w-full flex-1 min-h-0 overflow-auto">
-                                        <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>td#EDBC-4:first-child]:!pl-[12px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
+                                <div className="shrink-0">
+                                    <div className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar"
+                                        style={{
+                                            height: `${40 + (showRefundFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                            maxHeight: `${40 + (showRefundFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                            willChange: 'scroll-position',
+                                            WebkitOverflowScrolling: 'touch',
+                                            transform: 'translateZ(0)',
+                                            backfaceVisibility: 'hidden'
+                                        }}
+                                    >
+                                        <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
                                             <thead className="sticky top-0 z-10 bg-white">
                                                 <EdbcTableHeaderRow>
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={refundDstCol4Label} sortProps={refundEdbcSortProps} />
@@ -3474,30 +3940,28 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                 )}
                                                 {canEditSelectedWeek && (
                                                     <tr className="bg-white border-b border-gray-200">
-                                                        <td id={EDBC_IDS.EDBC4} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} overflow-hidden`}>
-                                                            <div className="w-full">
-                                                                <Select
-                                                                    name="refund_party"
-                                                                    className="text-xs focus:outline-none w-full"
-                                                                    placeholder={refundDstCol4Label}
-                                                                    isSearchable
-                                                                    isClearable
-                                                                    value={
-                                                                        isRefundChangeButtonActive
-                                                                            ? combinedOptions.find(opt =>
-                                                                                (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
-                                                                                (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
-                                                                                (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
-                                                                            ) || null
-                                                                            : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
-                                                                    }
-                                                                    onChange={handleRefundSelectChange}
-                                                                    onKeyDown={handleKeyDown}
-                                                                    options={isRefundChangeButtonActive ? combinedOptions : laboursList}
-                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                                    menuPortalTarget={document.body}
-                                                                />
-                                                            </div>
+                                                        <td id={EDBC_IDS.EDBC4} className="pl-[12px] pr-[1px] w-[218px] text-left">
+                                                            <Select
+                                                                name="refund_party"
+                                                                className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}
+                                                                placeholder={refundDstCol4Label}
+                                                                isSearchable
+                                                                isClearable
+                                                                value={
+                                                                    isRefundChangeButtonActive
+                                                                        ? combinedOptions.find(opt =>
+                                                                            (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
+                                                                            (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
+                                                                            (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
+                                                                        ) || null
+                                                                        : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
+                                                                }
+                                                                onChange={handleRefundSelectChange}
+                                                                onKeyDown={handleKeyDown}
+                                                                options={isRefundChangeButtonActive ? combinedOptions : laboursList}
+                                                                styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                menuPortalTarget={document.body}
+                                                            />
                                                         </td>
                                                         <td className="pl-[6px] w-[100px] overflow-visible">
                                                             <button type="button" onClick={handleRefundChangeButtonClick}>
@@ -3589,12 +4053,12 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     onWheel={(e) => e.preventDefault()}
                                                                 />
                                                             ) : (
-                                                                Number(row.amount).toLocaleString("en-IN")
+                                                                formatEdbcTotalAmountPlaceholder(row.amount)
                                                             )}
                                                         </td>
                                                         <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                             {canEditSelectedWeek && (
-                                                                <div className="flex">
+                                                                <div className="flex gap-1 justify-center">
                                                                     {editingPaymentId === row.id ? (
                                                                         <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
                                                                             ✓
@@ -3606,12 +4070,12 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     )}
                                                                     {canEditDelete && (
                                                                         <>
-                                                                            <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
+                                                                            <button onClick={() => handleRefundPaymentsDelete(row.id)}>
                                                                                 <img src={Delete} className="w-5 h-4" alt="Delete" />
                                                                             </button>
                                                                         </>
                                                                     )}
-                                                                    <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className={canEditDelete ? "pl-3" : ""}>
+                                                                    <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)}>
                                                                         <img src={history} className="w-5 h-4" alt="History" />
                                                                     </button>
                                                                 </div>
@@ -3621,34 +4085,35 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                 ))}
                                             </tbody>
                                         </table>
-                                        </div>
                                     </div>
-                                    <div className="mt-2 shrink-0 rounded-xl bg-white p-[10px] border border-[#E0E0E0] shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-left">
-                                        <div className="rounded-lg border border-[#E0E0E0] p-[10px]">
+                                </div>
+                                    <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden">
+                                        <div className="flex flex-col h-full min-h-0">
                                             <div className="flex items-center justify-between rounded-lg mb-[4px]">
-                                                <p className="text-[14px] font-semibold text-black">Summary Details</p>
+                                                <p className="text-[16px] font-semibold text-black">Summary Details</p>
                                             </div>
-                                            {Object.entries(
-                                                sortedDailyExpenses
-                                                    .filter((expense) => expense.date === selectedDate && Number(expense.amount) > 0)
-                                                    .reduce((acc, expense) => {
-                                                        const type = expense.type;
-                                                        const amount = Number(expense.amount);
-                                                        acc[type] = (acc[type] || 0) + amount;
-                                                        return acc;
-                                                    }, {})
-                                            ).map(([type, total]) => (
-                                                <div key={type} className="flex items-center justify-between py-[6px]">
-                                                    <p className="text-[12px] text-[#666666]">{type}</p>
-                                                    <p className="text-[12px] font-semibold text-black">
-                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                            <div className="border-t border-dashed border-[#E5E7EB] my-[4px]" />
-                                            <div className="flex items-center justify-between py-[6px]">
-                                                <p className="text-[12px] font-semibold text-black">Total Amount</p>
-                                                <p className="text-[12px] font-semibold text-black">
+                                            <div className="overflow-y-auto no-scrollbar flex-1 min-h-0">
+                                                {Object.entries(
+                                                    sortedDailyExpenses
+                                                        .filter((expense) => expense.date === selectedDate && Number(expense.amount) > 0)
+                                                        .reduce((acc, expense) => {
+                                                            const type = expense.type;
+                                                            const amount = Number(expense.amount);
+                                                            acc[type] = (acc[type] || 0) + amount;
+                                                            return acc;
+                                                        }, {})
+                                                ).map(([type, total]) => (
+                                                    <div key={type} className="flex items-center justify-between py-[4px]">
+                                                        <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
+                                                        <p className="text-[14px] font-semibold text-black">
+                                                            ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
+                                                <p className="text-[14px] font-semibold text-black">Total Amount</p>
+                                                <p className="text-[14px] font-semibold text-black">
                                                     ₹{sortedDailyExpenses
                                                         .filter((expense) => expense.date === selectedDate)
                                                         .reduce((total, expense) => total + Number(expense.amount || 0), 0)
@@ -3914,8 +4379,115 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                             </div>
                         </div>
                     )}
+                    {showPurposePopup && (
+                        <div
+                            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    setShowPurposePopup(false);
+                                    setSelectedPurpose(null);
+                                    setPendingRefundData(null);
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">
+                                    Select Purpose for Refund
+                                </h3>
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Purpose <span className="text-red-500">*</span>
+                                    </label>
+                                    <Select
+                                        name="purpose"
+                                        className="w-full"
+                                        placeholder="Select Purpose"
+                                        isSearchable
+                                        isClearable
+                                        value={selectedPurpose}
+                                        onChange={(selectedOption) => setSelectedPurpose(selectedOption)}
+                                        options={purposeOptions}
+                                        menuPortalTarget={document.body}
+                                        styles={{
+                                            control: (provided, state) => ({
+                                                ...provided,
+                                                minHeight: '45px',
+                                                border: '2px solid rgba(191, 152, 83, 0.25)',
+                                                borderRadius: '8px',
+                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                                '&:hover': {
+                                                    border: '2px solid rgba(191, 152, 83, 0.5)',
+                                                },
+                                            }),
+                                            valueContainer: (provided) => ({
+                                                ...provided,
+                                                padding: '2px 8px',
+                                            }),
+                                            input: (provided) => ({
+                                                ...provided,
+                                                margin: '0px',
+                                            }),
+                                            indicatorSeparator: () => ({
+                                                display: 'none',
+                                            }),
+                                            indicatorsContainer: (provided) => ({
+                                                ...provided,
+                                                height: '45px',
+                                                gap: '0px',
+                                            }),
+                                            clearIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px',
+                                            }),
+                                            dropdownIndicator: (provided) => ({
+                                                ...provided,
+                                                padding: '2px',
+                                            }),
+                                            menuPortal: (provided) => ({
+                                                ...provided,
+                                                zIndex: 9999,
+                                            }),
+                                            menu: (provided) => ({
+                                                ...provided,
+                                                zIndex: 9999,
+                                            }),
+                                        }}
+                                    />
+                                </div>
+                                {pendingRefundData && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Refund Details:</p>
+                                        <p className="text-sm">Amount: ₹{Number(pendingRefundData.amount).toLocaleString('en-IN')}</p>
+                                        <p className="text-sm">Date: {formatDateOnly(pendingRefundData.date)}</p>
+                                    </div>
+                                )}
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => {
+                                            setShowPurposePopup(false);
+                                            setSelectedPurpose(null);
+                                            setPendingRefundData(null);
+                                        }}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handlePurposeSelection}
+                                        disabled={!selectedPurpose}
+                                        className={`px-4 py-2 rounded-lg ${!selectedPurpose
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-green-600 hover:bg-green-700'
+                                            } text-white`}
+                                    >
+                                        Submit Refund
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            </div>
         </body>
     );
 };

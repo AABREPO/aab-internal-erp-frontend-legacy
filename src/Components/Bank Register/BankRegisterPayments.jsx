@@ -2056,6 +2056,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   const [contractorOptions, setContractorOptions] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
+  const [staffPurposeOptions, setStaffPurposeOptions] = useState([]);
   const [tenantOptions, setTenantOptions] = useState([]);
   const [tenantShopData, setTenantShopData] = useState([]);
   const [siteOptions, setSiteOptions] = useState([]);
@@ -2250,6 +2251,25 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
       }
     };
 
+    const fetchStaffPurposeOptions = async () => {
+      try {
+        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/purposes/getAll", {
+          method: "GET",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        setStaffPurposeOptions((Array.isArray(data) ? data : []).map((purpose) => ({
+          label: purpose.purpose,
+          id: purpose.id,
+        })));
+      } catch (error) {
+        console.error("Error fetching staff purpose options:", error);
+        setStaffPurposeOptions([]);
+      }
+    };
+
     const fetchTenantOptions = async () => {
       try {
         const response = await fetch("https://backendaab.in/demoAabuildersDash/api/tenant_link_shop/getAll", {
@@ -2280,6 +2300,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
       fetchEmployeeOptions(),
       fetchProjectOptions(),
       fetchPurposeOptions(),
+      fetchStaffPurposeOptions(),
       fetchTenantOptions(),
     ]);
   }, [fetchBillPayments]);
@@ -2311,8 +2332,12 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
       const employee = employeeOptions.find((o) => sameId(o.id, employeeId));
       return employee ? employee.label : "-";
     };
-    const getPurposeName = (purposeId) => {
-      const purpose = purposeOptions.find((o) => sameId(o.id, purposeId));
+    const getPurposeNameForBill = (item, purposeId) => {
+      if (purposeId == null || purposeId === "") return "-";
+      const hasStaffAdvance =
+        item?.staff_advance_portal_id != null || item?.staffAdvancePortalId != null;
+      const options = hasStaffAdvance ? staffPurposeOptions : purposeOptions;
+      const purpose = options.find((o) => sameId(o.id, purposeId));
       return purpose ? purpose.label : "-";
     };
     const getTenantName = (tenantId) => {
@@ -2356,7 +2381,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
       }
       const purposeId = item.purpose_id ?? item.purposeId;
       if (purposeId != null && purposeId !== "") {
-        const purposeName = getPurposeName(purposeId);
+        const purposeName = getPurposeNameForBill(item, purposeId);
         if (purposeName !== "-") return purposeName;
       }
       return "-";
@@ -2432,6 +2457,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
     contractorOptions,
     employeeOptions,
     purposeOptions,
+    staffPurposeOptions,
     tenantOptions,
     tenantShopData,
   ]);

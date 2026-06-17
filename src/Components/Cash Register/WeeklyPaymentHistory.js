@@ -7,7 +7,7 @@ import Change from '../Images/dropdownchange.png';
 import Select from 'react-select';
 import NotesStart from '../Images/TextUpload.svg';
 import NotesEnd from '../Images/TextView.svg';
-import fileUpload from '../Images/FileUpload.svg';
+import fileUpload from '../Images/SignatureIcon.svg';
 import file from '../Images/FileView.svg';
 import AddExtra from '../Images/AddExtra.svg';
 import FileRemover from '../Images/FileRemover.svg';
@@ -28,7 +28,7 @@ import { i } from 'mathjs';
 import ExpenseEntryForm from '../ExpensesEntry/Form';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
 import AdvancePortalForm from '../Advance Portal/AdvancePortal';
-import restore from '../Images/data-recovery.png';
+import restore from '../Images/Restore.svg';
 import {
     DATABASE_TABLE_FILTER_SELECT_STYLES,
     EDBC_FILTER_CONTROL_BOX_STYLE,
@@ -2177,6 +2177,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
             file_url: "",
             branch_id: activeBranchId ?? null,
             entered_by: enteredBy,
+            source: "Cash Register",
         };
         const saveResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/save", {
             method: "POST",
@@ -2327,6 +2328,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                         file_url: null,
                         branch_id: activeBranchId ?? null,
                         entered_by: enteredBy,
+                        source: "Cash Register",
                     };
                     const staffAdvanceResponse = await fetch(
                         "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -3358,6 +3360,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                             file_url: null,
                             branch_id: activeBranchId ?? null,
                             entered_by: enteredBy,
+                            source: "Cash Register",
                         };
                         const staffAdvanceResponse = await fetch(
                             "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
@@ -4066,7 +4069,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             columnId={EDBC_IDS.EDBC4}
                                                             label={expensesAssociateLabel}
                                                         />
-                                                        <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible" aria-hidden="true"></th>
+                                                        <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible" aria-hidden="true"></th>
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} />
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} />
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} />
@@ -4095,7 +4098,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 onChange={setSelectContractororVendorName}
                                                                 selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                             />
-                                                            <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></th>
+                                                            <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible"></th>
                                                             <EdbcProjectNameFilter
                                                                 placeholder={expensesDstCol3Label}
                                                                 options={projectFilterOptions}
@@ -4123,7 +4126,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                         </EdbcTableFilterRow>
                                                     )}
                                                     {!isExpensesEntryUploadOnly && canEditSelectedWeek ? (
-                                                        <tr className="bg-white border-b border-gray-200">
+                                                        <tr className="bg-white border-b-2 border-gray-200">
                                                             <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
                                                                 {filteredExpenses.length + 1}.
                                                             </td>
@@ -4312,7 +4315,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     />
                                                                 </div>
                                                             </td>
-                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible">
+                                                            <td className="w-[30px] min-w-[30px] max-w-[30px] px-[6px] p-0 overflow-visible">
                                                                 <button type="button" onClick={handlePartySourceToggle}>
                                                                     <img
                                                                         src={Change}
@@ -4535,7 +4538,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     getDisplayValue={getPartyDisplayName}
                                                                 />
                                                             )}
-                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
+                                                            <td className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible"></td>
                                                             {editingRowId === row.id ? (
                                                                 <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
                                                                     <Select
@@ -4667,59 +4670,59 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             )}
                                                             <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}>
                                                                 <div className="flex items-center w-[70px] gap-[20px]">
-                                                                {row.type !== "Daily" ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setCurrentProjectAdvanceRow(row);
-                                                                            setPaymentPopupData({
-                                                                                date: new Date().toISOString().split('T')[0],
-                                                                                amount: "",
-                                                                                paymentMode: "",
-                                                                                chequeNo: "",
-                                                                                chequeDate: "",
-                                                                                transactionNumber: "",
-                                                                                accountNumber: ""
-                                                                            });
-                                                                            const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
-                                                                            setPreviousPayments(previousPaymentsForExpense);
-                                                                            setShowPaymentPopup(true);
-                                                                        }}
-                                                                        className=" text-white flex items-center justify-center transition-colors text-xs"
-                                                                        title="Add Payment"
-                                                                    >
-                                                                        <img src={AddExtra} className="w-[18px] h-[18px]" alt="Add Payment" />
-                                                                    </button>
-                                                                ) : null}
-                                                                {row.type === "Project Advance" ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={async () => {
-                                                                            let description = "";
-                                                                            if (row.advance_portal_id) {
-                                                                                try {
-                                                                                    const res = await fetch(
-                                                                                        `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
-                                                                                    );
-                                                                                    if (!res.ok) throw new Error("Failed to fetch advance portal data");
-                                                                                    const data = await res.json();
-                                                                                    description = data.description || "";
-                                                                                } catch (error) {
-                                                                                    console.error("Error fetching advance portal data:", error);
+                                                                    {row.type !== "Daily" ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setCurrentProjectAdvanceRow(row);
+                                                                                setPaymentPopupData({
+                                                                                    date: new Date().toISOString().split('T')[0],
+                                                                                    amount: "",
+                                                                                    paymentMode: "",
+                                                                                    chequeNo: "",
+                                                                                    chequeDate: "",
+                                                                                    transactionNumber: "",
+                                                                                    accountNumber: ""
+                                                                                });
+                                                                                const previousPaymentsForExpense = getPaymentsByExpenseId(row.id);
+                                                                                setPreviousPayments(previousPaymentsForExpense);
+                                                                                setShowPaymentPopup(true);
+                                                                            }}
+                                                                            className=" text-white flex items-center justify-center transition-colors text-xs"
+                                                                            title="Add Payment"
+                                                                        >
+                                                                            <img src={AddExtra} className="w-[18px] h-[18px]" alt="Add Payment" />
+                                                                        </button>
+                                                                    ) : null}
+                                                                    {row.type === "Project Advance" ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={async () => {
+                                                                                let description = "";
+                                                                                if (row.advance_portal_id) {
+                                                                                    try {
+                                                                                        const res = await fetch(
+                                                                                            `https://backendaab.in/demoAabuildersDash/api/advance_portal/get/${row.advance_portal_id}`
+                                                                                        );
+                                                                                        if (!res.ok) throw new Error("Failed to fetch advance portal data");
+                                                                                        const data = await res.json();
+                                                                                        description = data.description || "";
+                                                                                    } catch (error) {
+                                                                                        console.error("Error fetching advance portal data:", error);
+                                                                                    }
                                                                                 }
-                                                                            }
-                                                                            setEditFormData((prev) => ({ ...prev, description }));
-                                                                            setCurrentRow(row);
-                                                                            setShowPopups(true);
-                                                                        }}
-                                                                    >
-                                                                        <img
-                                                                            src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
-                                                                            alt="Notes"
-                                                                            className="w-[18px] h-[18px]"
-                                                                        />
-                                                                    </button>
-                                                                ) : null}
+                                                                                setEditFormData((prev) => ({ ...prev, description }));
+                                                                                setCurrentRow(row);
+                                                                                setShowPopups(true);
+                                                                            }}
+                                                                        >
+                                                                            <img
+                                                                                src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
+                                                                                alt="Notes"
+                                                                                className="w-[18px] h-[18px]"
+                                                                            />
+                                                                        </button>
+                                                                    ) : null}
                                                                 </div>
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
@@ -4841,7 +4844,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                 </div>
                             </div>
                             {!isExpensesEntryUploadOnly && (
-                                <div className="w-fit shrink-0 flex flex-col">
+                                <div className="w-fit shrink-0 flex flex-col min-h-0">
                                     <div className="flex justify-between items-center mb-[8px]">
                                         <h1 className="font-bold text-base">Income</h1>
                                         <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
@@ -4909,7 +4912,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             onWheel={(e) => e.stopPropagation()}
                                         >
                                             <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
-                                                
+
                                                 <thead className="sticky top-0 z-[99999] bg-white">
                                                     <EdbcTableHeaderRow>
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={paymentsDstCol2Label} columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} />
@@ -4945,7 +4948,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                         </EdbcTableFilterRow>
                                                     )}
                                                     {canEditSelectedWeek ? (
-                                                        <EdbcTableBodyRow>
+                                                        <EdbcTableBodyRow className="!bg-white border-b-2 border-gray-200">
                                                             <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-visible`}>
                                                                 <div
                                                                     className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} overflow-visible relative z-[99999]`}
@@ -5182,10 +5185,10 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             </table>
                                         </div>
                                     </div>
-                                    <div className="mt-2 shrink-0 rounded-xl bg-white p-[10px] border border-[#E0E0E0] shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-left">
-                                        <div className="rounded-lg border border-[#E0E0E0] p-[10px] overflow-y-auto no-scrollbar max-h-[180px]">
+                                    <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden">
+                                        <div className="flex flex-col h-full min-h-0">
                                             <div className="flex items-center justify-between rounded-lg mb-[4px]">
-                                                <p className="text-[14px] font-semibold text-black">Summary Details</p>
+                                                <p className="text-[16px] font-semibold text-black">Summary Details</p>
                                                 <div className="flex items-center gap-2">
                                                     {canEditDelete &&
                                                         lastDeletedWeeklySummary &&
@@ -5199,7 +5202,6 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 title="Restore removed summary"
                                                             >
                                                                 <img src={restore} alt="" className="w-4 h-4" />
-                                                                Restore
                                                             </button>
                                                         )}
                                                     <input
@@ -5215,7 +5217,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 href={weeklySummaryBillCopyUrl}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="text-[12px] font-normal text-[#BF9853] hover:underline"
+                                                                className="text-[16px] font-semibold text-[#E4572E] hover:underline"
                                                                 title="View Signature Copy"
                                                             >
                                                                 {weeklySummaryFileLabel}
@@ -5241,7 +5243,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             type="button"
                                                             disabled={weeklySummaryUploading || weeklySummaryLoading}
                                                             onClick={() => weeklySummaryFileInputRef.current?.click()}
-                                                            className="inline-flex flex-row items-center gap-1 rounded border border-[#a1a1a1] px-2 h-[34px] shrink-0 text-[12px] font-normal text-[#666666] disabled:opacity-50"
+                                                            className="inline-flex flex-row items-center gap-1 rounded h-[34px] shrink-0 text-[14px] font-semibold text-[#BF9853] disabled:opacity-50"
                                                             title="Upload Signature Copy for this week"
                                                         >
                                                             <span>{weeklySummaryUploading ? "Uploading…" : "Signature"}</span>
@@ -5250,27 +5252,28 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                     ) : null}
                                                 </div>
                                             </div>
-                                            {Object.entries(
-                                                filteredExpenses
-                                                    .filter(expense => Number(expense.amount) > 0)
-                                                    .reduce((acc, expense) => {
-                                                        const type = expense.type;
-                                                        const amount = Number(expense.amount);
-                                                        acc[type] = (acc[type] || 0) + amount;
-                                                        return acc;
-                                                    }, {})
-                                            ).map(([type, total]) => (
-                                                <div key={type} className="flex items-center justify-between py-[6px]">
-                                                    <p className="text-[12px] text-[#666666]">{type}</p>
-                                                    <p className="text-[12px] font-semibold text-black">
-                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                            <div className="border-t border-dashed border-[#E5E7EB] my-[4px]" />
-                                            <div className="flex items-center justify-between py-[6px]">
-                                                <p className="text-[12px] font-semibold text-black">Total Amount</p>
-                                                <p className="text-[12px] font-semibold text-black">
+                                            <div className="overflow-y-auto no-scrollbar flex-1 min-h-0">
+                                                {Object.entries(
+                                                    filteredExpenses
+                                                        .filter(expense => Number(expense.amount) > 0)
+                                                        .reduce((acc, expense) => {
+                                                            const type = expense.type;
+                                                            const amount = Number(expense.amount);
+                                                            acc[type] = (acc[type] || 0) + amount;
+                                                            return acc;
+                                                        }, {})
+                                                ).map(([type, total]) => (
+                                                    <div key={type} className="flex items-center justify-between py-[4px]">
+                                                        <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
+                                                        <p className="text-[14px] font-semibold text-black">
+                                                            ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
+                                                <p className="text-[14px] font-semibold text-black">Total Amount</p>
+                                                <p className="text-[14px] font-semibold text-black">
                                                     ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </p>
                                             </div>
@@ -5285,23 +5288,24 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                             audits={weeklyPaymentReceivedAudits} />
                     </div>
                     {showPaymentPopup && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                            <div className="bg-white text-left rounded-xl  p-6 w-[800px] h-[770px] overflow-y-auto">
-                                <h3 className="text-lg font-semibold mb-4 text-center">Add Payment</h3>
-                                <div className="space-y-4 mb-4 justify-items-center">
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+                            <div className="bg-white text-left rounded-xl  p-6 w-[800px] h-[500px] overflow-y-auto">
+                                <label className="font-bold text-[20px]">Add Payment</label>
+                                <div className="space-y-4 mb-4 mt-[12px] justify-items-center">
                                     <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
                                         <div className="grid grid-cols-3 gap-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="date"
-                                                        value={paymentPopupData.date}
-                                                        onChange={(e) => setPaymentPopupData(prev => ({ ...prev, date: e.target.value }))}
-                                                        readOnly
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                                    />
-                                                </div>
+                                                <CustomDateField
+                                                    value={paymentPopupData.date || ''}
+                                                    onChange={() => {}}
+                                                    disabled
+                                                    placeholder="Date"
+                                                    alwaysOpenBelow
+                                                    calendarPortal
+                                                    controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                    className={` [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] ${paymentPopupData.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>

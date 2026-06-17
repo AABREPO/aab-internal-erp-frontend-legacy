@@ -11,6 +11,7 @@ import {
 } from './advancePortalWeeklyPaymentBill';
 
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
+const STAFF_ADVANCE_SOURCE = 'Staff Portal';
 
 const normalizeWeeklyBillNullableId = (value) => {
   if (value == null || value === '') return null;
@@ -100,6 +101,13 @@ const resolveStaffWeeklyBillAmount = (staffPayload) => {
   return parseFloat(staffPayload.amount) || 0;
 };
 
+const resolveStaffWeeklyBillType = (staffPayload, bill = null) => {
+  const selectedType = String(staffPayload?.type || '').trim();
+  if (selectedType) return selectedType;
+  const existingType = String(bill?.type || '').trim();
+  return existingType || null;
+};
+
 const shouldSyncStaffAdvanceToWeeklyBill = (staffPayload) => {
   if (staffPayload?.type === 'Transfer') return false;
   const mode = String(staffPayload?.staff_payment_mode || '').trim();
@@ -131,6 +139,7 @@ export const buildStaffEditPayloadFromForm = ({ editFormData }) => ({
   entry_no: editFormData.entryNo ?? null,
   description: editFormData.description || '',
   file_url: editFormData.file_url || '',
+  source: STAFF_ADVANCE_SOURCE,
 });
 
 export const buildStaffAdvanceWeeklyBillUpdatePayload = (
@@ -168,7 +177,7 @@ export const buildStaffAdvanceWeeklyBillUpdatePayload = (
       normalizeWeeklyBillNullableId(staffPayload.labour_id) ??
       normalizeWeeklyBillNullableId(bill.labour_id ?? bill.labourId),
     project_id: normalizeWeeklyBillNullableId(bill.project_id ?? bill.projectId),
-    type: 'Staff Advance',
+    type: resolveStaffWeeklyBillType(staffPayload, bill),
     amount: resolveStaffWeeklyBillAmount(staffPayload),
     status: bill.status !== false,
     weekly_number: bill.weekly_number ?? bill.weeklyNumber ?? null,
@@ -230,7 +239,7 @@ export const buildStaffAdvanceWeeklyBillUpdatePayload = (
     discount_amount: parseFloat(bill.discount_amount ?? bill.discountAmount) || 0,
     edited_by: editedBy || bill.edited_by || bill.editedBy || null,
     entered_by: (bill.entered_by ?? bill.enteredBy) ?? (editedBy || null),
-    source: bill.source ?? 'Staff Advance',
+    source: STAFF_ADVANCE_SOURCE,
   };
 };
 
@@ -253,7 +262,7 @@ export const buildStaffAdvanceWeeklyBillSavePayload = (
     employee_id: normalizeWeeklyBillNullableId(staffPayload.employee_id),
     labour_id: normalizeWeeklyBillNullableId(staffPayload.labour_id),
     project_id: null,
-    type: 'Staff Advance',
+    type: resolveStaffWeeklyBillType(staffPayload),
     bill_payment_mode: staffPayload.staff_payment_mode || null,
     amount: resolveStaffWeeklyBillAmount(staffPayload),
     status: true,
@@ -269,7 +278,7 @@ export const buildStaffAdvanceWeeklyBillSavePayload = (
     account_number: pickStaffModalPaymentField(modalPaymentData, 'accountNumber'),
     branch_id: normalizeWeeklyBillNullableId(branchId ?? staffPayload.branch_id),
     entered_by: enteredBy || null,
-    source: 'Staff Advance',
+    source: STAFF_ADVANCE_SOURCE,
   };
 };
 

@@ -74,7 +74,7 @@ const StatementRow = ({
 	</div>
 );
 
-const StatementMobile = () => {
+const StatementMobile = ({ paymentModeLabels: paymentModeLabelsFromProps = [] }) => {
 	const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
 
 	const [query, setQuery] = useState('');
@@ -268,15 +268,7 @@ const StatementMobile = () => {
 		name
 	}));
 
-	const modeOptions = [
-		'Carry Forward',
-		'Net Banking',
-		'PhonePe',
-		'GPay',
-		'Cheque',
-		'Cash',
-		'NEFT/RTGS'
-	];
+	const modeOptions = paymentModeLabelsFromProps;
 
 	const statementRows = useMemo(() => {
 		const list = Array.isArray(rows) ? rows : [];
@@ -457,13 +449,9 @@ const StatementMobile = () => {
 									className="w-full h-[38px] rounded-[8px] border border-[#D1D5DB] bg-white px-[10px] text-[12px] font-medium text-[#111827] outline-none"
 								>
 									<option value="">All</option>
-									<option value="Carry Forward">Carry Forward</option>
-									<option value="Net Banking">Net Banking</option>
-									<option value="PhonePe">PhonePe</option>
-									<option value="GPay">GPay</option>
-									<option value="Cheque">Cheque</option>
-									<option value="Cash">Cash</option>
-									<option value="NEFT/RTGS">NEFT/RTGS</option>
+									{modeOptions.map((mode) => (
+										<option key={mode} value={mode}>{mode}</option>
+									))}
 								</select>
 							</div>
 						</div>

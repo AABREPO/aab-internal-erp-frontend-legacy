@@ -58,7 +58,7 @@ const Chip = ({ label, tone = 'neutral', onClick, disabled = false }) => {
 	);
 };
 
-const PendingBillMobile = ({ username, userRoles = [] }) => {
+const PendingBillMobile = ({ username, userRoles = [], paymentModeLabels: paymentModeLabelsFromProps = [] }) => {
 	const resolveActiveBranchId = () => {
 		try {
 			const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -280,15 +280,7 @@ const PendingBillMobile = ({ username, userRoles = [] }) => {
 	);
 	const overallPdfInputRef = useRef(null);
 
-	const paymentModeOptions = useMemo(() => ([
-		'Carry Forward',
-		'Net Banking',
-		'PhonePe',
-		'GPay',
-		'Cheque',
-		'Cash',
-		'NEFT/RTGS'
-	]), []);
+	const paymentModeOptions = paymentModeLabelsFromProps;
 
 	// Mouse drag swipe (desktop testing): mirror touch swipe behavior.
 	useEffect(() => {

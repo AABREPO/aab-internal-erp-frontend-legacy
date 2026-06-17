@@ -8,7 +8,9 @@ import History from './History';
 import Report from './Report';
 import Summary from './Summary';
 import StaffAdvanceTabs from './StaffAdvanceTabs';
-import { loadStaffAdvanceData, resolveActiveBranchId } from './staffAdvanceHelpers';
+import { loadStaffAdvanceData, resolveActiveBranchId, PAYMENT_MODE_OPTIONS } from './staffAdvanceHelpers';
+import { STAFF_ADVANCE_MODULE_NAME } from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 const TAB_IDS = ['advance', 'history', 'report', 'summary'];
 
@@ -48,6 +50,11 @@ const StaffAdvance = ({ user, onLogout }) => {
     purposes: [],
     records: []
   });
+
+  const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+    STAFF_ADVANCE_MODULE_NAME,
+    PAYMENT_MODE_OPTIONS
+  );
 
   const refreshData = useCallback(async () => {
     setDataState((previousState) => ({
@@ -142,7 +149,8 @@ const StaffAdvance = ({ user, onLogout }) => {
     const sharedProps = {
       records: dataState.records,
       peopleOptions: dataState.peopleOptions,
-      purposeOptions: dataState.purposes
+      purposeOptions: dataState.purposes,
+      paymentModeOptions,
     };
 
     switch (tabId) {
@@ -153,6 +161,7 @@ const StaffAdvance = ({ user, onLogout }) => {
             peopleOptions={dataState.peopleOptions}
             purposeOptions={dataState.purposes}
             records={dataState.records}
+            paymentModeOptions={paymentModeOptions}
             onSaved={refreshData}
           />
         );

@@ -6,6 +6,10 @@ import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import Download from '../Images/Download.svg';
 import Pen from '../Images/Pen.svg';
 import CloseIcon from '../Images/Close F.svg';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 // ISO 8601 week helpers (same as AdvanceReport.js)
 const getISOWeekNumber = (date) => {
@@ -200,6 +204,14 @@ const Report = () => {
     { value: 'Cheque', label: 'Cheque' },
     { value: 'Online', label: 'Online' }
   ];
+  const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+    ADVANCE_PORTAL_MODULE_NAME,
+    defaultPaymentModeOptions
+  );
+  const paymentModeFilterOptions = useMemo(
+    () => paymentModeOptions.map((opt) => opt.label),
+    [paymentModeOptions]
+  );
 
   const fetchVendors = async () => {
     try {
@@ -1359,7 +1371,7 @@ const Report = () => {
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentModeFilter}
-        options={defaultPaymentModeOptions.map((opt) => opt.label)}
+        options={paymentModeFilterOptions}
         fieldName="Payment Mode"
         showStarIcon={false}
       />

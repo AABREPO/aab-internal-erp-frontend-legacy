@@ -46,6 +46,11 @@ import {
 } from '../../utils/loanPortalWeeklyPaymentBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import AdvancePortalEditPaymentModal from '../Advance Portal/AdvancePortalEditPaymentModal';
+import {
+  LOAN_PORTAL_MODULE_NAME,
+  fetchPaymentModeSelectOptionsForModule,
+  subscribePaymentModeArrangementRefresh,
+} from '../../utils/paymentModeArrangement';
 
 const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -213,25 +218,18 @@ const LoanTableview = ({ username, userRoles = [], paymentModeOptions = [], refr
   useEffect(() => {
     const fetchPaymentModes = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const options = Array.isArray(data)
-            ? data
-              .filter(mode => mode.modeOfPayment)
-              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
-            : [];
-          if (!options.some(option => option.value === 'Advance Transfer')) {
-            options.push({ value: 'Advance Transfer', label: 'Advance Transfer' });
-          }
-          setBackendPaymentModeOptions(options);
-        }
+        const options = await fetchPaymentModeSelectOptionsForModule(
+          LOAN_PORTAL_MODULE_NAME,
+          paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions
+        );
+        setBackendPaymentModeOptions(options);
       } catch (error) {
         console.error('Error fetching payment modes:', error);
       }
     };
     fetchPaymentModes();
-  }, []);
+    return subscribePaymentModeArrangementRefresh(fetchPaymentModes);
+  }, [paymentModeOptions, defaultPaymentModeOptions]);
 
   // Get unique Associate names from loanData for filter dropdown (only show what exists in table)
   const uniqueAssociateOptions = useMemo(() => {

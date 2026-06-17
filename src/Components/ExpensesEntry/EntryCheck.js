@@ -17,6 +17,11 @@ import Pdf from '../Images/pdf.png'
 import CalendarIcon from "../Images/Calendoricon.png";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+    EXPENSE_ENTRY_MODULE_NAME,
+    sortValuesByArrangement,
+} from '../../utils/paymentModeArrangement';
+import { useModulePaymentModeArrangementList } from '../../utils/usePaymentModeArrangement';
 Modal.setAppElement('#root');
 const EntryChecking = () => {
     const [filteredCount, setFilteredCount] = useState(0);
@@ -46,6 +51,7 @@ const EntryChecking = () => {
     const [selectedBranch, setSelectedBranch] = useState('');
     const [selectedPaymentMode, setSelectedPaymentMode] = useState('');
     const [paymentModeFilterOptions, setPaymentModeFilterOptions] = useState([]);
+    const expenseEntryPaymentModeOrder = useModulePaymentModeArrangementList(EXPENSE_ENTRY_MODULE_NAME);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [enoOptions, setEnoOptions] = useState([]);
     const [branchFilterOptions, setBranchFilterOptions] = useState([]);
@@ -218,10 +224,11 @@ const EntryChecking = () => {
                 uniquePaymentModes.push(String(mode));
             }
         });
-        const paymentModeOptionsBuilt = uniquePaymentModes.map((val) => ({ value: val, label: val }));
+        const sortedPaymentModes = sortValuesByArrangement(uniquePaymentModes, expenseEntryPaymentModeOrder);
+        const paymentModeOptionsBuilt = sortedPaymentModes.map((val) => ({ value: val, label: val }));
         paymentModeOptionsBuilt.unshift(blankOption);
         setPaymentModeFilterOptions(paymentModeOptionsBuilt);
-    }, [expenses, branchOptions]);
+    }, [expenses, branchOptions, expenseEntryPaymentModeOrder]);
     useEffect(() => {
         const isBlankish = (value) =>
             value === null || value === undefined || (typeof value === 'string' && value.trim() === '');

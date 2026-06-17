@@ -38,6 +38,11 @@ import {
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchAdvanceEditPaymentModalData, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, clearAdvancePortalRecordsOnDelete, deleteLinkedExpenseEntryOnAdvancePortalDelete, formatWeeklyBillDeleteMessage, formatVendorCarryForwardDeleteMessage, resolveFilesUploadResponseUrl, syncVendorCarryForwardFromAdvancePortalEdit } from '../../utils/advancePortalWeeklyPaymentBill';
 import { isChequePaymentMode } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+  fetchPaymentModeSelectOptionsForModule,
+  subscribePaymentModeArrangementRefresh,
+} from '../../utils/paymentModeArrangement';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
@@ -178,22 +183,18 @@ const AdvanceDatabase = ({ username, userRoles = [], paymentModeOptions = [], re
   useEffect(() => {
     const fetchPaymentModes = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const options = Array.isArray(data)
-            ? data
-              .filter(mode => mode.modeOfPayment)
-              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
-            : [];
-          setBackendPaymentModeOptions(options);
-        }
+        const options = await fetchPaymentModeSelectOptionsForModule(
+          ADVANCE_PORTAL_MODULE_NAME,
+          paymentModeOptions
+        );
+        setBackendPaymentModeOptions(options);
       } catch (error) {
         console.error('Error fetching payment modes:', error);
       }
     };
     fetchPaymentModes();
-  }, []);
+    return subscribePaymentModeArrangementRefresh(fetchPaymentModes);
+  }, [paymentModeOptions]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);

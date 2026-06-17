@@ -9,6 +9,10 @@ import {
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import {
+    RENT_MANAGEMENT_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 import CustomMonthField from "../ExpensesEntry/CustomMonthField";
 const Form = ({ embedded = false, onSuccess } = {}) => {
     const resolveActiveBranchId = () => {
@@ -80,7 +84,7 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
     const [selectedRentFile, setSelectedRentFile] = useState(null);
     const fileInputRef = useRef(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const paymentModeOptions = usePaymentModesForModule(RENT_MANAGEMENT_MODULE_NAME);
     const [advanceAmount, setAdvanceAmount] = useState(0);
     const [rentalFormsData, setRentalFormsData] = useState([]);
     const [amountError, setAmountError] = useState('');
@@ -357,24 +361,10 @@ const Form = ({ embedded = false, onSuccess } = {}) => {
         fetchLatestEno();
     }, []);
     useEffect(() => {
-        fetchPaymentModes();
         fetchRentalForms();
         fetchRentHistory();
         fetchAccountDetails();
     }, []);
-    const fetchPaymentModes = async () => {
-        try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-            if (response.ok) {
-                const data = await response.json();
-                setPaymentModeOptions(data);
-            } else {
-                setMessage('Error fetching tile area names.');
-            }
-        } catch (error) {
-            setMessage('Error fetching tile area names.');
-        }
-    };
     const fetchRentalForms = async () => {
         try {
             const response = await fetch('https://backendaab.in/demoAabuildersDash/api/rental_forms/getAll');

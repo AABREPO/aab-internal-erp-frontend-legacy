@@ -43,6 +43,14 @@ import {
 } from './databaseExpensesSharedColumns';
 import { useExpensesListLoader } from './expensesListStore';
 import { uploadExpensesEntryBillCopy } from './expensesBillCopyUpload';
+import {
+    EXPENSE_ENTRY_MODULE_NAME,
+    sortEdbcFilterOptionsByArrangement,
+} from '../../utils/paymentModeArrangement';
+import {
+    useModulePaymentModeArrangementList,
+    usePaymentModesForModule,
+} from '../../utils/usePaymentModeArrangement';
 Modal.setAppElement('#root');
 
 const TABLE_VIEW_EXPENSE_FIELDS = {
@@ -664,7 +672,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [accountDetails, setAccountDetails] = useState([]);
     const pendingUpdateFormDataRef = useRef(null);
     const [userPermissions, setUserPermissions] = useState([]);
-    const moduleName = "Expense Entry";
+    const moduleName = EXPENSE_ENTRY_MODULE_NAME;
     const defaultPaymentModeOptions = [
         { modeOfPayment: 'Cash' },
         { modeOfPayment: 'GPay' },
@@ -672,7 +680,10 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         { modeOfPayment: 'Net Banking' },
         { modeOfPayment: 'Cheque' }
     ];
-    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const paymentModeOptions = usePaymentModesForModule(moduleName, {
+        fallbackModes: defaultPaymentModeOptions,
+    });
+    const expenseEntryPaymentModeOrder = useModulePaymentModeArrangementList(moduleName);
     const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
     const editPopupSelectablePaymentModeOptions = useMemo(() => {
         const allModes = Array.isArray(finalPaymentModeOptions) ? finalPaymentModeOptions : [];
@@ -703,20 +714,6 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             setFormData((prev) => ({ ...prev, paymentMode: '' }));
         }
     }, [modalIsOpen, formData.accountType, formData.paymentMode]);
-    useEffect(() => {
-        const fetchPaymentModes = async () => {
-            try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-                if (response.ok) {
-                    const data = await response.json();
-                    setPaymentModeOptions(Array.isArray(data) ? data : []);
-                }
-            } catch (error) {
-                console.error('Error fetching payment modes:', error);
-            }
-        };
-        fetchPaymentModes();
-    }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -1242,7 +1239,12 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
         setSourceOptions(getOptions(filtered, "source"));
-        setPaymentModeFilterOptions(getOptions(filtered, "paymentMode"));
+        setPaymentModeFilterOptions(
+            sortEdbcFilterOptionsByArrangement(
+                getOptions(filtered, "paymentMode"),
+                expenseEntryPaymentModeOrder
+            )
+        );
         const uniqueBranchIds = [...new Set(filtered.map(item => item.branch_id ?? item.branchId).filter(val => !isBlankish(val)))];
         const branchFilterOptionsBuilt = uniqueBranchIds.map(id => ({
             value: String(id),
@@ -1299,7 +1301,8 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         overallSearch,
         expenses,
         machineToolsIdToLabel,
-        branchOptions
+        branchOptions,
+        expenseEntryPaymentModeOrder
     ]);
     useEffect(() => {
         if (!showBillArrivalCalendar) return undefined;

@@ -11,7 +11,7 @@ import {
   parseStatementDate,
 } from './billStatementFilters';
 
-const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true, refreshSignal }) => {
+const BillStatement = ({ username, userRoles = [], paymentModeOptions: arrangementPaymentModeOptions = [], billPaymentsTabActive = true, refreshSignal }) => {
   const API_BASE = 'https://backendaab.in/demoAabuildersDash/api';
   const [apiData, setApiData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -23,16 +23,14 @@ const BillStatement = ({ username, userRoles = [], billPaymentsTabActive = true,
   const [toDate, setToDate] = useState('')
   const [fromPaymentDate, setFromPaymentDate] = useState('')
   const [selectedPaymentMode, setSelectedPaymentMode] = useState(null)
-  const paymentModeOptions = useMemo(() => {
-    const modes = new Set();
-    (Array.isArray(apiData) ? apiData : []).forEach((r) => {
-      const m = String(r?.mode ?? '').trim();
-      if (m && m !== '-') modes.add(m);
-    });
-    return Array.from(modes)
-      .sort((a, b) => a.localeCompare(b))
-      .map((m) => ({ value: m, label: m }));
-  }, [apiData])
+  const paymentModeOptions = useMemo(() => (
+    (Array.isArray(arrangementPaymentModeOptions) ? arrangementPaymentModeOptions : [])
+      .map((opt) => {
+        const value = String(opt?.value || opt?.label || '').trim();
+        return value ? { value, label: value } : null;
+      })
+      .filter(Boolean)
+  ), [arrangementPaymentModeOptions])
   // Sort state
   const [sortConfig, setSortConfig] = useState({
     key: 'bill_arrival_date',

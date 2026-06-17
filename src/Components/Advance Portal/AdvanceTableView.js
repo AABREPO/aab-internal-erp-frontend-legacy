@@ -34,6 +34,11 @@ import {
   formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, resolveFilesUploadResponseUrl, syncVendorCarryForwardFromAdvancePortalEdit } from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+  fetchPaymentModeSelectOptionsForModule,
+  subscribePaymentModeArrangementRefresh,
+} from '../../utils/paymentModeArrangement';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
 
 const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
@@ -166,22 +171,18 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   useEffect(() => {
     const fetchPaymentModes = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const options = Array.isArray(data)
-            ? data
-              .filter(mode => mode.modeOfPayment)
-              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
-            : [];
-          setBackendPaymentModeOptions(options);
-        }
+        const options = await fetchPaymentModeSelectOptionsForModule(
+          ADVANCE_PORTAL_MODULE_NAME,
+          paymentModeOptions
+        );
+        setBackendPaymentModeOptions(options);
       } catch (error) {
         console.error('Error fetching payment modes:', error);
       }
     };
     fetchPaymentModes();
-  }, []);
+    return subscribePaymentModeArrangementRefresh(fetchPaymentModes);
+  }, [paymentModeOptions]);
 
   useEffect(() => {
     const isPageRefresh = sessionStorage.getItem('advanceTableViewPageLoaded') === null;

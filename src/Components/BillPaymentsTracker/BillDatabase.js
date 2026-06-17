@@ -12,9 +12,14 @@ import {
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import {
+    BILL_PAYMENT_TRACKER_MODULE_NAME,
+    fetchPaymentModeSelectOptionsForModule,
+    subscribePaymentModeArrangementRefresh,
+} from '../../utils/paymentModeArrangement';
 
 // BillDatabase component - displays fully paid bills (verified + entered + fully paid with tick)
-const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true, refreshSignal }) => {
+const BillDatabase = ({ username, userRoles = [], paymentModeOptions: paymentModeOptionsFromProps = [], billPaymentsTabActive = true, refreshSignal }) => {
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId")
@@ -147,18 +152,10 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true, 
     const [paymentProcessingMessage, setPaymentProcessingMessage] = useState('')
     const [paidTodayBills, setPaidTodayBills] = useState({})
     const [lastPaymentDates, setLastPaymentDates] = useState({})
-    const defaultPaymentModeOptions = useMemo(() => ([
-        { value: "Cash", label: "Cash" },
-        { value: "Direct", label: "Direct" },
-        { value: "Net Banking", label: "Net Banking" },
-        { value: "Gpay", label: "Gpay" },
-        { value: "PhonePe", label: "PhonePe" },
-        { value: "Cheque", label: "Cheque" },
-    ]), [])
-    const [paymentModeOptions, setPaymentModeOptions] = useState(() => ([
-        { value: "Carry Forward", label: "Carry Forward" },
-        ...defaultPaymentModeOptions
-    ]))
+    const [loadedPaymentModeOptions, setLoadedPaymentModeOptions] = useState([])
+    const paymentModeOptions = paymentModeOptionsFromProps.length > 0
+        ? paymentModeOptionsFromProps
+        : loadedPaymentModeOptions
 
     // Edit modal states
     const [showEditModal, setShowEditModal] = useState(false)
@@ -3134,37 +3131,21 @@ const BillDatabase = ({ username, userRoles = [], billPaymentsTabActive = true, 
         }
     };
     useEffect(() => {
-        const normalizeMode = (modeOfPayment) => {
-            const raw = String(modeOfPayment || "").trim();
-            const lower = raw.toLowerCase();
-            if (lower === "gpay") return "Gpay";
-            if (lower === "phonepe") return "PhonePe";
-            if (lower === "cheque") return "Cheque";
-            if (lower === "cash") return "Cash";
-            if (lower === "direct") return "Direct";
-            if (lower === "net banking" || lower === "netbanking") return "Net Banking";
-            return raw;
-        };
-        const fetchPaymentModes = async () => {
+        if (paymentModeOptionsFromProps.length > 0) return;
+        const loadPaymentModes = async () => {
             try {
-                const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll");
-                if (!response.ok) return;
-                const data = await response.json();
-                const backendOptions = (Array.isArray(data) ? data : [])
-                    .map((m) => normalizeMode(m?.modeOfPayment))
-                    .filter(Boolean)
-                    .map((mode) => ({ value: mode, label: mode }));
-                const uniqueByValue = new Map();
-                backendOptions.forEach((opt) => uniqueByValue.set(opt.value, opt));
-                defaultPaymentModeOptions.forEach((opt) => uniqueByValue.set(opt.value, opt));
-                const merged = Array.from(uniqueByValue.values());
-                setPaymentModeOptions([{ value: "Carry Forward", label: "Carry Forward" }, ...merged]);
+                const options = await fetchPaymentModeSelectOptionsForModule(
+                    BILL_PAYMENT_TRACKER_MODULE_NAME,
+                    []
+                );
+                setLoadedPaymentModeOptions(options);
             } catch (e) {
-                // keep fallback options
+                // keep empty until arrangement loads
             }
         };
-        fetchPaymentModes();
-    }, [defaultPaymentModeOptions]);
+        loadPaymentModes();
+        return subscribePaymentModeArrangementRefresh(loadPaymentModes);
+    }, [paymentModeOptionsFromProps, refreshSignal]);
     useEffect(() => {
         setCombinedOptions([...vendorOptions, ...contractorOptions]);
     }, [vendorOptions, contractorOptions]);

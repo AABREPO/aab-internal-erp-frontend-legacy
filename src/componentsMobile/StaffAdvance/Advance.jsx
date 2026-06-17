@@ -245,7 +245,7 @@ const convertDisplayDateToIso = (displayDate, fallbackDate) => {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
 
-const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, onSaved }) => {
+const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, paymentModeOptions = PAYMENT_MODE_OPTIONS, onSaved }) => {
   const [formData, setFormData] = useState(initialFormState);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -601,7 +601,7 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, onSav
           setShowPaymentModeModal(false);
         }}
         selectedValue={formData.paymentMode || ''}
-        options={PAYMENT_MODE_OPTIONS.map((option) => option.label)}
+        options={paymentModeOptions.map((option) => option.label)}
         fieldName="Payment Mode"
         showStarIcon={false}
       />

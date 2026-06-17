@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react";
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  RENT_MANAGEMENT_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 const Summary = ({ username, userRoles = [] }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const today = new Date();
@@ -10,7 +14,7 @@ const Summary = ({ username, userRoles = [] }) => {
     const month = `${previousMonth.getMonth() + 1}`.padStart(2, '0');
     return `${year}-${month}`;
   });
-  const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+  const paymentModeOptions = usePaymentModesForModule(RENT_MANAGEMENT_MODULE_NAME);
   const [rentForms, setRentForms] = useState([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -56,9 +60,6 @@ const Summary = ({ username, userRoles = [] }) => {
         console.error('Error fetching expenses:', error);
       });
   }, []);
-  useEffect(() => {
-    fetchPaymentModes();
-  }, []);
   const fetchProjects = async () => {
     try {
       const response = await fetch('https://backendaab.in/demoAabuilderDash/api/projects/getAll');
@@ -101,17 +102,6 @@ const Summary = ({ username, userRoles = [] }) => {
       }
     } catch (error) {
       console.error('Error fetching tenants:', error);
-    }
-  };
-  const fetchPaymentModes = async () => {
-    try {
-      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-      if (response.ok) {
-        const data = await response.json();
-        setPaymentModeOptions(data);
-      }
-    } catch (error) {
-      console.error('Error fetching payment modes:', error);
     }
   };
   useEffect(() => {

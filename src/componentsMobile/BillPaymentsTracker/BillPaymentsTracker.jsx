@@ -7,6 +7,10 @@ import DatabaseMobile from './Database';
 import StatementMobile from './Statement';
 import Kebab from '../Images/Kebab.svg';
 import { useNavigate } from 'react-router-dom';
+import {
+  BILL_PAYMENT_TRACKER_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 const BILL_PAYMENTS_TAB_STORAGE_KEY = 'billPaymentsTrackerActiveTab';
 
@@ -228,6 +232,15 @@ const MobileBillPaymentsTracker = ({ user, onLogout }) => {
 		}
 		return tab;
 	});
+	const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+		BILL_PAYMENT_TRACKER_MODULE_NAME,
+		[]
+	);
+	const paymentModeLabels = useMemo(
+		() => paymentModeOptions.map((opt) => opt.label),
+		[paymentModeOptions]
+	);
+
 	useEffect(() => {
 		localStorage.setItem(BILL_PAYMENTS_TAB_STORAGE_KEY, activeTab);
 	}, [activeTab]);
@@ -246,13 +259,17 @@ const MobileBillPaymentsTracker = ({ user, onLogout }) => {
 				<div className="pt-[87px] pb-[88px]">
 					{/* Keep tabs mounted so data/state doesn't reload on tab switch */}
 					<div style={{ display: activeTab === 'pendingbill' ? 'block' : 'none' }}>
-						<PendingBillMobile username={user?.username} userRoles={user?.userRoles || []} />
+						<PendingBillMobile
+							username={user?.username}
+							userRoles={user?.userRoles || []}
+							paymentModeLabels={paymentModeLabels}
+						/>
 					</div>
 					<div style={{ display: activeTab === 'billdatabase' ? 'block' : 'none' }}>
 						<DatabaseMobile username={user?.username} userRoles={user?.userRoles || []} />
 					</div>
 					<div style={{ display: activeTab === 'billstatement' ? 'block' : 'none' }}>
-						<StatementMobile username={user?.username} userRoles={user?.userRoles || []} />
+						<StatementMobile paymentModeLabels={paymentModeLabels} />
 					</div>
 				</div>
 				<BottomNav activeTab="home" />

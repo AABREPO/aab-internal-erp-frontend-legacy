@@ -13,6 +13,10 @@ import {
     isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { resolveExpensesEntryIdAfterSave } from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+    EXPENSE_ENTRY_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 import SideTable from '../Advance Portal/SideTable';
 
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
@@ -279,10 +283,10 @@ const Form = ({
     const prevCategoryOptionsLenRef = useRef(0);
     const billPaymentsPrefillAttemptsRef = useRef(0);
     const [userPermissions, setUserPermissions] = useState([]);
-    const moduleName = "Expense Entry";
+    const moduleName = EXPENSE_ENTRY_MODULE_NAME;
     const [paymentMode, setPaymentMode] = useState('');
     
-    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const paymentModeOptions = usePaymentModesForModule(moduleName);
     const selectablePaymentModeOptions = useMemo(() => {
         const allModes = Array.isArray(paymentModeOptions) ? paymentModeOptions : [];
         let modes = allModes.filter(
@@ -353,20 +357,6 @@ const Form = ({
         return () => {
             window.removeEventListener("branchSelectionChanged", syncBranch);
         };
-    }, []);
-    useEffect(() => {
-        const fetchPaymentModes = async () => {
-            try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-                if (response.ok) {
-                    const data = await response.json();
-                    setPaymentModeOptions(Array.isArray(data) ? data : []);
-                }
-            } catch (error) {
-                console.error('Error fetching payment modes:', error);
-            }
-        };
-        fetchPaymentModes();
     }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {

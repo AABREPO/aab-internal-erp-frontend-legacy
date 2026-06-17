@@ -5,6 +5,10 @@ import BillDatabase from './BillDatabase';
 import BillStatement from './BillStatement';
 import MobileBillPaymentsTracker from '../../componentsMobile/BillPaymentsTracker/BillPaymentsTracker';
 import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
+import {
+    BILL_PAYMENT_TRACKER_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 const BILL_PAYMENTS_TAB_STORAGE_KEY = 'billPaymentsTrackerActiveTab';
 
@@ -34,6 +38,10 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(() => initialTab);
     const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
     const [refreshNonce, setRefreshNonce] = useState(0);
+    const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+        BILL_PAYMENT_TRACKER_MODULE_NAME,
+        []
+    );
     const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
     useEffect(() => {
@@ -74,6 +82,7 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                         <PendingBill
                             username={username}
                             userRoles={userRoles}
+                            paymentModeOptions={paymentModeOptions}
                             billPaymentsTabActive={activeTab === 'pendingbill'}
                             refreshSignal={refreshNonce}
                         />
@@ -84,6 +93,7 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                         <BillDatabase
                             username={username}
                             userRoles={userRoles}
+                            paymentModeOptions={paymentModeOptions}
                             billPaymentsTabActive={activeTab === 'billdatabase'}
                             refreshSignal={refreshNonce}
                         />
@@ -94,6 +104,7 @@ const BillPaymentsTrackerHeadingDesktop = ({ username, userRoles = [] }) => {
                         <BillStatement
                             username={username}
                             userRoles={userRoles}
+                            paymentModeOptions={paymentModeOptions}
                             billPaymentsTabActive={activeTab === 'billstatement'}
                             refreshSignal={refreshNonce}
                         />

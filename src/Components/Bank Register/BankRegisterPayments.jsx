@@ -4,6 +4,8 @@ import CreatableSelect from 'react-select/creatable';
 import CustomDateField from '../ExpensesEntry/CustomDateField';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
+import { BANK_REGISTER_MODULE_NAME } from '../../utils/paymentModeArrangement';
 
 const BANK_REGISTER_6_FONT = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600;700&display=swap';
 
@@ -258,14 +260,11 @@ const BANKS = [
   {name:"Axis Bank", branch:"Madurai", accounts:["918020047822102 — Current"]},
   {name:"Kotak Mahindra", branch:"Madurai", accounts:["7411455125512 — Current"]},
 ];
-const MODES = ["G-Pay","PhonePe","Paytm","Net Banking","Cheque","Cash","RTGS","NEFT"];
-const DEFAULT_PAYMENT_MODE_OPTIONS = [
-  { modeOfPayment: "Cash" },
-  { modeOfPayment: "GPay" },
-  { modeOfPayment: "PhonePe" },
-  { modeOfPayment: "Net Banking" },
-  { modeOfPayment: "Cheque" },
-];
+const buildSelectablePaymentModeOptions = (paymentModeOptions = []) =>
+  (Array.isArray(paymentModeOptions) ? paymentModeOptions : [])
+    .map((mode) => mode?.modeOfPayment)
+    .filter(Boolean)
+    .filter((mode) => String(mode).trim().toLowerCase() !== "advance adjustment");
 
 const EXPENSE_PURPOSE_OPTIONS = [
   "Cash Withdrawal",
@@ -274,13 +273,6 @@ const EXPENSE_PURPOSE_OPTIONS = [
   "Miscellaneous",
 ].map((label) => ({ value: label, label }));
 
-const buildSelectablePaymentModeOptions = (paymentModeOptions = []) => {
-  const allModes = paymentModeOptions.length > 0 ? paymentModeOptions : DEFAULT_PAYMENT_MODE_OPTIONS;
-  return allModes
-    .map((mode) => mode?.modeOfPayment)
-    .filter(Boolean)
-    .filter((mode) => String(mode).trim().toLowerCase() !== "advance adjustment");
-};
 const PARTY_TYPES = ["Tenant","Contractor","Vendor","Employee","Other"];
 const PARTIES = [
   "Welding Perumal","Sivan Centring","Karuppiah Centering","Mani Centring","Lingam Centring",
@@ -541,7 +533,7 @@ const DateRangeModal = ({open, value, onClose, onApply}) => {
 };
 
 // ---------- Filter Modal ----------
-const FilterModal = ({open, value, onClose, onApply, onReset}) => {
+const FilterModal = ({open, value, onClose, onApply, onReset, paymentModeLabels = []}) => {
   const [f,setF] = useState(value);
   useEffect(()=>{ setF(value); }, [value, open]);
   if(!open) return null;
@@ -559,7 +551,7 @@ const FilterModal = ({open, value, onClose, onApply, onReset}) => {
             <select className="input" value={f.partyType} onChange={e=>set("partyType",e.target.value)}><option value="">All</option>{PARTY_TYPES.map(p=><option key={p}>{p}</option>)}</select>
           </div>
           <div><div className="label-text mb-1">Payment Mode</div>
-            <select className="input" value={f.mode} onChange={e=>set("mode",e.target.value)}><option value="">All</option>{MODES.map(m=><option key={m}>{m}</option>)}</select>
+            <select className="input" value={f.mode} onChange={e=>set("mode",e.target.value)}><option value="">All</option>{paymentModeLabels.map(m=><option key={m}>{m}</option>)}</select>
           </div>
           <div><div className="label-text mb-1">Match Status</div>
             <select className="input" value={f.matched} onChange={e=>set("matched",e.target.value)}><option value="">All</option><option value="yes">Reconciled</option><option value="no">Unreconciled</option></select>
@@ -2056,7 +2048,11 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
   const [account,setAccount] = useState(banksForBranch[0]?.accounts[0] || "");
   const [billPayments, setBillPayments] = useState([]);
   const [vendorOptions, setVendorOptions] = useState([]);
-  const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+  const paymentModeOptions = usePaymentModesForModule(BANK_REGISTER_MODULE_NAME);
+  const paymentModeLabels = useMemo(
+    () => buildSelectablePaymentModeOptions(paymentModeOptions),
+    [paymentModeOptions]
+  );
   const [contractorOptions, setContractorOptions] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
@@ -2162,17 +2158,6 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
         })));
       } catch (error) {
         console.error("Error fetching vendor options:", error);
-      }
-    };
-
-    const fetchPaymentModes = async () => {
-      try {
-        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll");
-        if (!response.ok) return;
-        const data = await response.json();
-        setPaymentModeOptions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching payment modes:", error);
       }
     };
 
@@ -2291,7 +2276,6 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
     void Promise.all([
       fetchBillPayments().catch((error) => console.error("Error fetching bill payments:", error)),
       fetchVendorOptions(),
-      fetchPaymentModes(),
       fetchContractorOptions(),
       fetchEmployeeOptions(),
       fetchProjectOptions(),
@@ -3121,7 +3105,7 @@ const BankRegister6Inner = ({ refreshSignal, isActive = true }) => {
         receivedFromOptions={receivedFromOptions}
         isSaving={isSavingIncome}
       />
-      <FilterModal open={false} value={filter} onClose={()=>setFilterOpen(false)} onApply={setFilter} onReset={clearAllFilters}/>
+      <FilterModal open={false} value={filter} onClose={()=>setFilterOpen(false)} onApply={setFilter} onReset={clearAllFilters} paymentModeLabels={paymentModeLabels}/>
       <DateRangeModal open={dateRangeOpen} value={dateRange} onClose={()=>setDateRangeOpen(false)} onApply={setDateRange}/>
 
       {toast && <div className="toast">{toast}</div>}

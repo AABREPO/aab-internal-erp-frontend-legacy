@@ -6,9 +6,16 @@ import {
     postBankRegisterLogSave,
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
+  isChequePaymentMode,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import Filter from '../Images/filter (3).png'
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
+import { CLAIM_PAYMENTS_MODULE_NAME } from '../../utils/paymentModeArrangement';
+
+const isCashPaymentMode = (paymentMode) =>
+  String(paymentMode || '').trim().toLowerCase() === 'cash';
+
 const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive = true }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -48,6 +55,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive
   const [discountSubmitted, setDiscountSubmitted] = useState(false);
   const [submittedDiscounts, setSubmittedDiscounts] = useState(new Set());
   const [accountDetails, setAccountDetails] = useState([]);
+  const paymentModeSelectOptions = usePaymentModeSelectOptionsForModule(CLAIM_PAYMENTS_MODULE_NAME, []);
 
   const resolveActiveBranchId = (fallbackBranchId) => {
     try {
@@ -397,7 +405,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive
       amount: paymentPopupData.amount,
       cash_register_status: false,
       discount_amount: discount || 0,
-      ...(paymentPopupData.paymentMode === "Cheque" && {
+      ...(isChequePaymentMode(paymentPopupData.paymentMode) && {
         cheque_number: paymentPopupData.chequeNo,
         cheque_date: paymentPopupData.chequeDate
       }),
@@ -431,7 +439,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive
         return;
       }
       const claimPaymentResult = await response.json();
-      if (["Gpay", "PhonePe", "Net Banking", "Cheque"].includes(paymentPopupData.paymentMode) && !isDiscountOnlyPayment) {
+      if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode) && !isDiscountOnlyPayment) {
         const weeklyPaymentBillPayload = {
           date: paymentPopupData.date,
           created_at: new Date().toISOString(),
@@ -1033,20 +1041,16 @@ const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive
                                   className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                 >
                                   <option value="">---Select---</option>
-                                  <option value="Cash">Cash</option>
-                                  <option value="Gpay">Gpay</option>
-                                  <option value="PhonePe">PhonePe</option>
-                                  <option value="Net Banking">Net Banking</option>
-                                  <option value="Cheque">Cheque</option>
-                                  <option value="Invoice Payment">Invoice Payment</option>
+                                  {paymentModeSelectOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
                                 </select>
                               </div>
                             </div>
-                            {(paymentPopupData.paymentMode === "Gpay" || paymentPopupData.paymentMode === "PhonePe" ||
-                              paymentPopupData.paymentMode === "Net Banking" || paymentPopupData.paymentMode === "Cheque") && (
+                            {isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode) && (
                                 <div className=" p-4">
                                   <div className="space-y-4">
-                                    {paymentPopupData.paymentMode === "Cheque" && (
+                                    {isChequePaymentMode(paymentPopupData.paymentMode) && (
                                       <div className="grid grid-cols-2 gap-4">
                                         <div>
                                           <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>
@@ -1141,7 +1145,7 @@ const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive
                                             readOnly
                                             className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full text-gray-600"
                                           />
-                                          {payment.payment_mode === "Cash" && (
+                                          {isCashPaymentMode(payment.payment_mode) && (
                                             <button
                                               className={`w-20 h-[45px] rounded-lg text-white font-semibold 
                                                   ${payment.cash_register_status ? "bg-gray-400 cursor-not-allowed" : "bg-[#BF9853] hover:bg-[#a57f3f]"}`}
@@ -1210,11 +1214,10 @@ const ClaimPaymentSummary = ({ username, userRoles = [], refreshSignal, isActive
                                         </div>
                                       </div>
                                     </div>
-                                    {(payment.payment_mode === "Gpay" || payment.payment_mode === "PhonePe" || 
-                                      payment.payment_mode === "Net Banking" || payment.payment_mode === "Cheque") && (
+                                    {isPaymentModeRequiringBankRegisterLog(payment.payment_mode) && (
                                         <div className="p-4">
                                           <div className="space-y-4">
-                                            {payment.payment_mode === "Cheque" && (
+                                            {isChequePaymentMode(payment.payment_mode) && (
                                               <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                   <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>

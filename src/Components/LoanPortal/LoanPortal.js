@@ -14,6 +14,11 @@ import {
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
+import {
+  LOAN_PORTAL_MODULE_NAME,
+  fetchPaymentModeSelectOptionsForModule,
+  subscribePaymentModeArrangementRefresh,
+} from '../../utils/paymentModeArrangement';
 
 const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refreshSignal, isActive = true }) => {
   const resolveActiveBranchId = () => {
@@ -101,25 +106,18 @@ const LoanPortal = ({ username, userRoles = [], paymentModeOptions = [], refresh
   useEffect(() => {
     const fetchPaymentModes = async () => {
       try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const options = Array.isArray(data)
-            ? data
-              .filter(mode => mode.modeOfPayment)
-              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
-            : [];
-          if (!options.some(option => option.value === 'Advance Transfer')) {
-            options.push({ value: 'Advance Transfer', label: 'Advance Transfer' });
-          }
-          setBackendPaymentModeOptions(options);
-        }
+        const options = await fetchPaymentModeSelectOptionsForModule(
+          LOAN_PORTAL_MODULE_NAME,
+          paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions
+        );
+        setBackendPaymentModeOptions(options);
       } catch (error) {
         console.error('Error fetching payment modes:', error);
       }
     };
     fetchPaymentModes();
-  }, []);
+    return subscribePaymentModeArrangementRefresh(fetchPaymentModes);
+  }, [paymentModeOptions, defaultPaymentModeOptions]);
 
   useEffect(() => {
     const syncBranch = () => {

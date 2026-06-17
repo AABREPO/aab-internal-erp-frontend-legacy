@@ -16,11 +16,15 @@ const WHeading = ({ username, userRoles = [] }) => {
     const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]));
     const [showExportDropdown, setShowExportDropdown] = useState(false);
     const weeklyHistoryExportActionsRef = useRef(null);
+    const dailyHistoryExportActionsRef = useRef(null);
     const exportDropdownRef = useRef(null);
     const exportMenuRef = useRef(null);
     const [exportMenuPosition, setExportMenuPosition] = useState(null);
     const handleExportActionsReady = useCallback((actions) => {
         weeklyHistoryExportActionsRef.current = actions;
+    }, []);
+    const handleDailyHistoryExportActionsReady = useCallback((actions) => {
+        dailyHistoryExportActionsRef.current = actions;
     }, []);
 
     useEffect(() => {
@@ -69,7 +73,7 @@ const WHeading = ({ username, userRoles = [] }) => {
     }, [showExportDropdown]);
 
     useEffect(() => {
-        if (activeTab !== 'weeklyhistory') {
+        if (activeTab !== 'weeklyhistory' && activeTab !== 'dailyhistory') {
             setShowExportDropdown(false);
         }
     }, [activeTab]);
@@ -97,7 +101,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                         Add Input
                     </h2>
                 </div>
-                {activeTab === 'weeklyhistory' && (
+                {(activeTab === 'weeklyhistory' || activeTab === 'dailyhistory') && (
                     <div className="relative shrink-0 ml-3 mb-2 z-[500]" ref={exportDropdownRef}>
                         <button
                             type="button"
@@ -120,7 +124,11 @@ const WHeading = ({ username, userRoles = [] }) => {
                                     className="w-full font-semibold text-sm cursor-pointer flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50"
                                     onClick={() => {
                                         setShowExportDropdown(false);
-                                        weeklyHistoryExportActionsRef.current?.generatePDF?.();
+                                        if (activeTab === 'dailyhistory') {
+                                            dailyHistoryExportActionsRef.current?.generatePDF?.();
+                                        } else {
+                                            weeklyHistoryExportActionsRef.current?.generatePDF?.();
+                                        }
                                     }}
                                 >
                                     PDF
@@ -129,7 +137,12 @@ const WHeading = ({ username, userRoles = [] }) => {
                                 <button
                                     type="button"
                                     className="w-full font-semibold text-sm cursor-pointer flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50 text-[#007233]"
-                                    onClick={() => setShowExportDropdown(false)}
+                                    onClick={() => {
+                                        setShowExportDropdown(false);
+                                        if (activeTab === 'dailyhistory') {
+                                            dailyHistoryExportActionsRef.current?.generateExcel?.();
+                                        }
+                                    }}
                                 >
                                     XL
                                     <img className="w-4 h-4" src={XL} alt="XL" />
@@ -153,7 +166,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                 )}
                 {visitedTabs.has('dailyhistory') && (
                     <div className={activeTab === 'dailyhistory' ? '' : 'hidden'}>
-                        <DailyHistory username={username} userRoles={userRoles} />
+                        <DailyHistory username={username} userRoles={userRoles} onExportActionsReady={handleDailyHistoryExportActionsReady} />
                     </div>
                 )}
                 {visitedTabs.has('weeklyhistory') && (

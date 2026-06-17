@@ -15,6 +15,10 @@ import {
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 import { resolveExpensesEntryIdAfterSave } from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 /** Keeps dropdown mapping/render cheap on huge vendor/site lists. */
 const MAX_SELECT_OPTIONS = 500;
@@ -75,7 +79,7 @@ const AdvanceForm = ({
     return () => window.removeEventListener("branchSelectionChanged", syncBranch);
   }, []);
 
-  // Use paymentModeOptions from props, fallback to default if not provided
+  // Use paymentModeOptions from props, fallback to Master Data arrangement
   const defaultPaymentModeOptions = [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
@@ -83,7 +87,11 @@ const AdvanceForm = ({
     { value: 'Net Banking', label: 'Net Banking' },
     { value: 'Cheque', label: 'Cheque' }
   ];
-  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
+  const loadedPaymentModeOptions = usePaymentModeSelectOptionsForModule(
+    ADVANCE_PORTAL_MODULE_NAME,
+    defaultPaymentModeOptions
+  );
+  const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : loadedPaymentModeOptions;
 
   const [selectedType, setSelectedType] = useState('Advance');
   const [selectedOption, setSelectedOption] = useState(null);

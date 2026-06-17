@@ -2,18 +2,41 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import Select from 'react-select';
 import Change from '../Images/dropdownchange.png';
-import fileUpload from '../Images/file_upload.png';
-import file from '../Images/file.png';
-import NotesStart from '../Images/notes _start.png';
-import NotesEnd from '../Images/notes_end.png';
+import fileUpload from '../Images/FileUpload.svg';
+import file from '../Images/FileView.svg';
+import NotesStart from '../Images/TextUpload.svg';
+import NotesEnd from '../Images/TextView.svg';
+import FileRemover from '../Images/FileRemover.svg';
+import ExtraFeild from '../Images/ExtraFeild.svg';
+import ExtraFeildClose from '../Images/ExtraFeildClose.svg';
 import Edit from '../Images/Edit.svg';
 import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
-import Filter from '../Images/filter (3).png';
+import {
+    DATABASE_TABLE_FILTER_SELECT_STYLES,
+    EDBC_IDS,
+    EdbcColumnHeader,
+    EdbcEmptyFilterCell,
+    EdbcFilterToggleButton,
+    EdbcProjectNameFilter,
+    EdbcSelectFilter,
+    EdbcTableBodyRow,
+    EdbcTableFilterRow,
+    EdbcTableHeaderRow,
+    EdbcTableToolbarRightActions,
+    EdbcTextInputFilter,
+    EdbcTotalAmountFilter,
+    EDBC_TABLE_EDGE_TABLE_CLASS,
+    EDBC_FILTER_CONTROL_BOX_STYLE,
+    getEdbcColumnConfig,
+    getEdbcColumnHeaderSortProps,
+    matchesEdbcAmountFilter,
+} from '../ExpensesEntry/databaseExpensesSharedColumns';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from 'xlsx';
-const DailyHistory = ({ username, userRoles = [] }) => {
+
+const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -152,10 +175,17 @@ const DailyHistory = ({ username, userRoles = [] }) => {
     const [sendingToExpensesEntry, setSendingToExpensesEntry] = useState(false);
     const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
     const [showFilters, setShowFilters] = useState(false);
+    const [overallSearch, setOverallSearch] = useState('');
+    const [refundOverallSearch, setRefundOverallSearch] = useState('');
+    const [showRefundFilters, setShowRefundFilters] = useState(false);
+    const [selectRefundName, setSelectRefundName] = useState('');
+    const [selectRefundAmount, setSelectRefundAmount] = useState('');
+    const [refundSortConfig, setRefundSortConfig] = useState({ key: null, direction: 'asc' });
     const [selectDate, setSelectDate] = useState('');
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
+    const [selectQuantity, setSelectQuantity] = useState('');
     const scrollRef = useRef(null);
     const refundScrollRef = useRef(null);
     const isDragging = useRef(false);
@@ -811,6 +841,28 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         }
         setSortConfig({ key, direction });
     };
+    const edbcSortFieldMap = {
+        labour_name: 'vendor',
+        project_name: 'siteName',
+        amount: 'amount',
+        type: 'accountType',
+        quantity: 'quantity',
+    };
+    const edbcHandleSort = (field) => {
+        const reverseMap = {
+            vendor: 'labour_name',
+            siteName: 'project_name',
+            amount: 'amount',
+            accountType: 'type',
+            quantity: 'quantity',
+        };
+        handleSort(reverseMap[field] || field);
+    };
+    const edbcSortProps = getEdbcColumnHeaderSortProps(
+        edbcSortFieldMap[sortConfig.key] || sortConfig.key || '',
+        sortConfig.direction,
+        edbcHandleSort
+    );
     const handleInputChange = (e) => {
         setNewDailyExpense((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -961,6 +1013,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         setSelectContractororVendorName('');
         setSelectProjectName('');
         setSelectType('');
+        setSelectQuantity('');
+        setOverallSearch('');
+    };
+    const clearRefundFilters = () => {
+        setRefundOverallSearch('');
+        setSelectRefundName('');
+        setSelectRefundAmount('');
     };
     const getVendorName = (id) =>
         vendorOptions.find(v => String(v.id) === String(id))?.value || "";
@@ -968,6 +1027,13 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         contractorOptions.find(c => String(c.id) === String(id))?.value || "";
     const getEmployeeName = (id) =>
         employeeOptions.find(e => String(e.id) === String(id))?.value || "";
+    const getRefundRowName = (row) => {
+        const employee = getEmployeeName(row.employee_id);
+        const vendor = getVendorName(row.vendor_id);
+        const contractor = getContractorName(row.contractor_id);
+        const labour = laboursList.find(opt => String(opt.id) === String(row.labour_id))?.label || "";
+        return [employee, vendor, contractor, labour].filter(Boolean).join(", ") || "";
+    };
     const getSiteName = (id) =>
         siteOptions.find(s => String(s.id) === String(id))?.value || "";
     const filteredExpenses = dailyExpenses.filter((entry) => {
@@ -999,6 +1065,9 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         }
         if (selectType) {
             if (entry.type?.toLowerCase() !== selectType.toLowerCase()) return false;
+        }
+        if (selectQuantity.trim()) {
+            if (!String(entry.quantity ?? '').toLowerCase().includes(selectQuantity.toLowerCase().trim())) return false;
         }
         return true;
     });
@@ -1060,6 +1129,80 @@ const DailyHistory = ({ username, userRoles = [] }) => {
         });
         return Array.from(unique.values());
     }, [laboursList, combinedOptions]);
+    const refundNameFilterOptions = React.useMemo(() => {
+        const names = new Set();
+        const options = [];
+        refundPayments.forEach((row) => {
+            const name = getRefundRowName(row);
+            if (name && !names.has(name)) {
+                names.add(name);
+                options.push({ value: name, label: name });
+            }
+        });
+        return options;
+    }, [refundPayments, laboursList, vendorOptions, contractorOptions, employeeOptions]);
+    const filteredRefundPayments = refundPayments.filter((row) => {
+        if (refundOverallSearch.trim()) {
+            const q = refundOverallSearch.toLowerCase().trim();
+            const name = getRefundRowName(row).toLowerCase();
+            if (!name.includes(q) && !String(row.amount || '').includes(q)) return false;
+        }
+        if (selectRefundName) {
+            if (getRefundRowName(row).toLowerCase() !== selectRefundName.toLowerCase()) return false;
+        }
+        if (selectRefundAmount.trim()) {
+            if (!matchesEdbcAmountFilter(row.amount, selectRefundAmount)) return false;
+        }
+        return true;
+    });
+    const handleRefundSort = (key) => {
+        let direction = 'asc';
+        if (refundSortConfig.key === key && refundSortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setRefundSortConfig({ key, direction });
+    };
+    const refundEdbcSortFieldMap = {
+        refund_name: 'vendor',
+        amount: 'amount',
+    };
+    const refundEdbcHandleSort = (field) => {
+        const reverseMap = {
+            vendor: 'refund_name',
+            amount: 'amount',
+        };
+        handleRefundSort(reverseMap[field] || field);
+    };
+    const refundEdbcSortProps = getEdbcColumnHeaderSortProps(
+        refundEdbcSortFieldMap[refundSortConfig.key] || refundSortConfig.key || '',
+        refundSortConfig.direction,
+        refundEdbcHandleSort
+    );
+    const sortedRefundPayments = React.useMemo(() => {
+        const sortableData = [...filteredRefundPayments];
+        if (refundSortConfig.key) {
+            sortableData.sort((a, b) => {
+                let aValue;
+                let bValue;
+                switch (refundSortConfig.key) {
+                    case 'refund_name':
+                        aValue = getRefundRowName(a);
+                        bValue = getRefundRowName(b);
+                        break;
+                    case 'amount':
+                        aValue = Number(a.amount || 0);
+                        bValue = Number(b.amount || 0);
+                        break;
+                    default:
+                        return 0;
+                }
+                if (aValue < bValue) return refundSortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return refundSortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sortableData;
+    }, [filteredRefundPayments, refundSortConfig, laboursList, vendorOptions, contractorOptions, employeeOptions]);
     const sortedDailyExpenses = React.useMemo(() => {
         let sortableData = [...filteredExpenses];
         if (sortConfig.key) {
@@ -2504,549 +2647,385 @@ const DailyHistory = ({ username, userRoles = [] }) => {
             setSendingProgress({ current: 0, total: 0 });
         }
     };
+    useEffect(() => {
+        if (!onExportActionsReady) return;
+        onExportActionsReady({ generatePDF: generateExpensesPDF, generateExcel: generateWeekDataExcel });
+        return () => onExportActionsReady(null);
+    }, [onExportActionsReady, generateExpensesPDF, generateWeekDataExcel]);
+    const expensesDstCol21Label = 'S.No';
+    const expensesDstCol4Label = isChangeButtonActive ? 'Associate' : 'Labour Name';
+    const expensesDstCol3Label = 'Project Name';
+    const expensesDstCol8Label = 'Amount';
+    const expensesDstCol12Label = 'Type';
+    const expensesDstCol7Label = 'Quantity';
+    const expensesDstCol20FileLabel = 'File';
+    const expensesDstCol20ActivityLabel = 'Activity';
+    const refundDstCol4Label = isRefundChangeButtonActive ? 'Associate' : 'Labour Name';
+    const refundDstCol8Label = 'Amount';
+    const refundDstCol20Label = 'Activity';
     return (
-        <body>
-            <div className="flex justify-end mr-6 -mt-7">
-                <h1 className="font-bold text-xl">
-                    Balance: <span style={{ color: "#E4572E" }} className="inline-block text-right min-w-[120px]">
-                        {balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                </h1>
-            </div>
-            <div className='mx-auto flex justify-between w-auto p-4 pl-8 border-collapse text-left bg-[#FFFFFF] ml-[30px] mr-6 rounded-md lg:h-[147px]'>
-                <div className='flex gap-4'>
-                    <div className='flex gap-4 mb-4'>
-                        <div>
-                            <h1 className='font-semibold'>Select Week</h1>
-                            <div>
-                                <select className="w-[303px] h-[45px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2"
-                                    value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
-                                    <option value="">-- Select Week --</option>
-                                    {weeks.map((week) => {
-                                        const startDate = new Date(week.start);
-                                        const endDate = new Date(week.end);
-                                        const formatDate = (date) =>
-                                            date.toLocaleDateString("en-GB", {
-                                                day: "numeric",
-                                                month: "long"
-                                            });
-                                        return (
-                                            <option key={week.number} value={week.number}>
-                                                {`Week ${week.number}, ${formatDate(startDate)} to ${formatDate(endDate)}`}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                            </div>
-                        </div>
-                        <div className='block'>
-                            <label className="block font-semibold">Year</label>
-                            <select
-                                value={year}
-                                onChange={(e) => setYear(e.target.value)}
-                                className="border-2 border-[#BF9853] border-opacity-25 rounded-lg px-3 py-2 w-[168px] h-[45px] focus:outline-none"
-                            >
-                                {years.map((y) => (
-                                    <option key={y} value={y}>{y}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                    {weekDays.length > 0 && (
-                        <div className='lg:w-[600px]'>
-                            <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
-                                {weekDays.map((day, idx) => {
-                                    const dateStr = day.toISOString().split("T")[0];
+        <body className="bg-[#FAF6ED] overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
+                    <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
+                        <div className="flex flex-wrap items-center justify-between text-left">
+                            <div className='flex gap-[12px] p-[18px]'>
+                                {(() => {
+                                    const entryCheckLikeSelectStyles = {
+                                        control: (provided, state) => ({
+                                            ...provided,
+                                            backgroundColor: 'transparent',
+                                            fontSize: '14px',
+                                            border: '2px solid rgba(191, 152, 83, 0.2)',
+                                            borderRadius: '8px',
+                                            minHeight: '40px',
+                                            fontWeight: 'medium',
+                                            height: '40px',
+                                            flexWrap: 'nowrap',
+                                            boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
+                                            '&:hover': { borderColor: 'rgba(191, 152, 83, 0.4)' },
+                                        }),
+                                        valueContainer: (provided) => ({
+                                            ...provided,
+                                            flexWrap: 'nowrap',
+                                            overflow: 'hidden',
+                                            paddingLeft: '12px',
+                                            paddingRight: '2px',
+                                            height: '36px',
+                                            alignItems: 'center',
+                                        }),
+                                        placeholder: (provided) => ({
+                                            ...provided,
+                                            color: '#999',
+                                            textAlign: 'left',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            maxWidth: '100%',
+                                            position: 'absolute',
+                                        }),
+                                        menu: (provided) => ({ ...provided, zIndex: 9999, maxHeight: 288 }),
+                                        menuList: (provided) => ({
+                                            ...provided,
+                                            maxHeight: 288,
+                                            paddingTop: 0,
+                                            paddingBottom: 0,
+                                            overflowY: 'auto',
+                                            scrollbarWidth: 'none',
+                                            msOverflowStyle: 'none',
+                                            '&::-webkit-scrollbar': { display: 'none' },
+                                        }),
+                                        option: (provided, state) => ({
+                                            ...provided,
+                                            minHeight: 36,
+                                            height: 36,
+                                            paddingTop: 0,
+                                            paddingBottom: 0,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            textAlign: 'left',
+                                            fontWeight: 'normal',
+                                            fontSize: '15px',
+                                            backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
+                                            color: 'black',
+                                        }),
+                                        singleValue: (provided) => ({
+                                            ...provided,
+                                            textAlign: 'left',
+                                            color: 'black',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            maxWidth: '100%',
+                                        }),
+                                        input: (provided) => ({
+                                            ...provided,
+                                            margin: 0,
+                                            padding: 0,
+                                            whiteSpace: 'nowrap',
+                                        }),
+                                        dropdownIndicator: (provided, state) => ({
+                                            ...provided,
+                                            display: state.hasValue ? 'none' : 'flex',
+                                            color: '#000000',
+                                            flexShrink: 0,
+                                        }),
+                                        clearIndicator: (provided) => ({
+                                            ...provided,
+                                            cursor: 'pointer',
+                                            color: '#000000',
+                                            flexShrink: 0,
+                                        }),
+                                        indicatorSeparator: () => ({ display: 'none' }),
+                                    };
+                                    const entryCheckLikeSelectClassNames = {
+                                        menuList: () => 'no-scrollbar scrollbar-none',
+                                        valueContainer: () => '!flex-nowrap !overflow-hidden',
+                                        placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                        singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                    };
+                                    const formatWeekOptionDate = (date) =>
+                                        date.toLocaleDateString("en-GB", {
+                                            day: "numeric",
+                                            month: "long"
+                                        });
+                                    const weekSelectOptions = weeks.map((week) => ({
+                                        value: String(week.number),
+                                        label: `Week ${week.number}, ${formatWeekOptionDate(new Date(week.start))} to ${formatWeekOptionDate(new Date(week.end))}`,
+                                    }));
+                                    const yearSelectOptions = years.map((y) => ({ value: String(y), label: String(y) }));
                                     return (
-                                        <div key={idx} className="flex flex-col items-left w-20 mx-auto">
-                                            <div className="font-semibold text-[#E4572E]">
-                                                {day.toLocaleDateString("en-US", { weekday: "short" })}
+                                        <div className='flex gap-[12px]'>
+                                            <div className="min-w-0">
+                                                <h1 className='font-semibold mb-[8px]'>Select Week</h1>
+                                                <Select
+                                                    className="min-w-0 w-[260px]"
+                                                    classNames={entryCheckLikeSelectClassNames}
+                                                    options={weekSelectOptions}
+                                                    value={weekSelectOptions.find((opt) => opt.value === String(selectedWeek)) || null}
+                                                    onChange={(opt) => setSelectedWeek(opt ? opt.value : "")}
+                                                    placeholder="Select Week"
+                                                    isSearchable
+                                                    isClearable
+                                                    styles={entryCheckLikeSelectStyles}
+                                                />
                                             </div>
-                                            <button onClick={() => handleDateClick(dateStr)}
-                                                className={`p- rounded-lg border text-center w-20 h-[37px] mt-1 ${selectedDate === dateStr
-                                                    ? "bg-[#BF9853] text-white border-[#BF9853]"
-                                                    : "bg-white border-gray-300"
-                                                    }`}
-                                            >
-                                                {formatDate(day)}
-                                            </button>
+                                            <div className="min-w-0">
+                                                <label className="block font-semibold mb-[8px]">Year</label>
+                                                <Select
+                                                    className="min-w-0 w-[120px]"
+                                                    classNames={entryCheckLikeSelectClassNames}
+                                                    options={yearSelectOptions}
+                                                    value={yearSelectOptions.find((opt) => opt.value === String(year)) || null}
+                                                    onChange={(opt) => setYear(opt ? opt.value : getCurrentWeekYear().toString())}
+                                                    placeholder="Year"
+                                                    isSearchable
+                                                    isClearable
+                                                    styles={entryCheckLikeSelectStyles}
+                                                />
+                                            </div>
                                         </div>
                                     );
-                                })}
+                                })()}
+                                {weekDays.length > 0 && (() => {
+                                    const selectedDayIndex = weekDays.findIndex(
+                                        (day) => day.toISOString().split("T")[0] === selectedDate
+                                    );
+                                    return (
+                                        <div className="relative flex items-center rounded-lg bg-[#FFFDF9] border border-[#FFEBC9]">
+                                            {selectedDayIndex >= 0 && (
+                                                <div
+                                                    className="absolute top-0 bottom-0 rounded-md bg-[#BF9853] transition-all duration-300 ease-in-out"
+                                                    style={{
+                                                        width: `${100 / weekDays.length}%`,
+                                                        left: `${(selectedDayIndex * 100) / weekDays.length}%`,
+                                                    }}
+                                                />
+                                            )}
+                                            {weekDays.map((day, idx) => {
+                                                const dateStr = day.toISOString().split("T")[0];
+                                                const isSelected = selectedDate === dateStr;
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => handleDateClick(dateStr)}
+                                                        className={`relative z-10 flex flex-1 flex-col items-center min-w-[73px] pt-[10px] pb-[8px] px-[14px] rounded-md transition-colors duration-300 ${isSelected ? 'text-white' : 'text-black'}`}
+                                                    >
+                                                        <span className="text-[14px] font-semibold leading-tight">
+                                                            {day.toLocaleDateString("en-US", { weekday: "short" })}
+                                                        </span>
+                                                        <span className="text-[14px] font-semibold leading-tight mt-[2px]">
+                                                            {formatDate(day)}
+                                                        </span>
+                                                        {isSelected && (
+                                                            <span className="w-[6px] h-[6px] bg-white rounded-full mt-[6px]" />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                            <div className="flex items-center space-x-3 flex-wrap justify-end pr-[18px]">
+                                <h1 className="font-bold text-xl shrink-0">
+                                    Weekly Balance: <span style={{ color: "#E4572E" }} className="inline-block text-right min-w-[120px]">
+                                        {balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </h1>
+                                <button
+                                    onClick={handleSendToExpensesEntry}
+                                    className={`font-semibold shrink-0 hover:text-[#E4572E] ${sendingToExpensesEntry ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={sendingToExpensesEntry}
+                                >
+                                    {sendingToExpensesEntry ? 'Sending...' : 'Send To Expenses Entry'}
+                                </button>
+                                <div
+                                    className="rounded-md px-4 py-[8px] text-sm shrink-0"
+                                    style={{
+                                        backgroundColor: '#FFFDF9',
+                                        backgroundImage: [
+                                            'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                        ].join(', '),
+                                        backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                        backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                        backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                                    }}
+                                >
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Expenses</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Refund</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Balance</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{Number(netAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    )}
-                </div>
-                <div className="mr-5">
-                    <button onClick={generateExpensesPDF} className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'>Report</button>
-                    <button
-                        onClick={generateWeekDataExcel}
-                        className='font-semibold mt-4 mr-5 hover:text-[#E4572E]'
-                        disabled={loading}
-                    >
-                        {loading ? 'Generating...' : 'Export Excel'}
-                    </button>
-                    <button
-                        onClick={handleSendToExpensesEntry}
-                        className={`font-semibold mt-4 mr-5 hover:text-[#E4572E] ${sendingToExpensesEntry ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        disabled={sendingToExpensesEntry}
-                    >
-                        {sendingToExpensesEntry ? 'Sending...' : 'Send To Expenses Entry'}
-                    </button>
-                </div>
-            </div>
-            <div className="mt-4 flex justify-end mr-6">
-                <h1 className="font-bold text-xl">
-                    Net Amount: <span style={{ color: "#E4572E" }}>
-                        {Number(netAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                </h1>
-            </div>
-            <div className="mx-auto w-auto p-6 border-collapse bg-[#FFFFFF] ml-[30px] mr-6 rounded-md">
-                <div className="w-full mt- flex flex-col xl:flex-row gap-6">
-                    <div className="flex-[2] min-w-0">
-                        <div className="flex justify-between mb-4">
-                            <h1 className="font-bold text-xl">
-                                PS: <span style={{ color: "#E4572E" }}>{selectedWeek}</span>
-                            </h1>
-                            <h1 className="font-bold text-base mr-16">
-                                Expenses:<span style={{ color: "#E4572E" }}>{Number(filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
-                            </h1>
-                        </div>
-                        <div className="text-left mb-4">
-                            <button onClick={() => setShowFilters(!showFilters)}>
-                                <img
-                                    src={Filter}
-                                    alt="Toggle Filter"
-                                    className="w-7 h-7 border border-[#BF9853] rounded-md"
-                                />
-                            </button>
-                        </div>
-                        <div className="w-full h-[590px] rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden ">
-                            <div ref={scrollRef} className="overflow-auto max-h-[600px] thin-scrollbar" onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
-                                onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)} >
-                                <table className="w-[1200px] border-collapse text-left">
-                                    <thead className="sticky top-0 z-10 bg-white">
-                                        <tr className="bg-[#FAF6ED] h-12">
-                                            <th className="py-2 px-1 text-left w-[60px]">S.No</th>
-                                            <th className="py-2 px-1 text-left w-[140px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('labour_name')}>
-                                                Name {sortConfig.key === 'labour_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="py-2 px-1 text-left w-[170px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('project_name')}>
-                                                Project Name {sortConfig.key === 'project_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('amount')}>
-                                                Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="py-2 px-1 text-left w-[120px] cursor-pointer hover:bg-gray-200" onClick={() => handleSort('type')}>
-                                                Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="py-2 px-1 text-left w-[60px]">Qty</th>
-                                            <th className="py-2 px-1 text-left w-[80px]">Activity</th>
-                                        </tr>
-                                        {showFilters && (
-                                            <tr className="bg-white border-b border-gray-200">
-                                                <th className="pt-2 pb-2 w-[60px]"></th>
-                                                <th className="pt-2 pb-2 w-[120px] sm:w-[140px]">
-                                                    <Select
-                                                        options={contractorVendorFilterOptions}
-                                                        value={selectContractororVendorName ? { value: selectContractororVendorName, label: selectContractororVendorName } : null}
-                                                        onChange={(opt) => setSelectContractororVendorName(opt ? opt.value : "")}
-                                                        className="text-xs focus:outline-none"
-                                                        placeholder="Name..."
-                                                        isSearchable
-                                                        isClearable
-                                                        styles={{
-                                                            control: (provided, state) => ({
-                                                                ...provided,
-                                                                backgroundColor: 'transparent',
-                                                                borderWidth: '3px',
-                                                                borderColor: state.isFocused
-                                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                                borderRadius: '6px',
-                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                '&:hover': {
-                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                },
-                                                            }),
-                                                            placeholder: (provided) => ({
-                                                                ...provided,
-                                                                color: '#999',
-                                                                textAlign: 'left',
-                                                            }),
-                                                            menu: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 9,
-                                                            }),
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                fontSize: '15px',
-                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                color: 'black',
-                                                            }),
-                                                            singleValue: (provided) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                color: 'black',
-                                                            }),
-                                                            indicatorSeparator: () => ({
-                                                                display: 'none'
-                                                            }),
-                                                            indicatorsContainer: (provided) => ({
-                                                                ...provided,
-                                                                height: '40px',
-                                                                gap: '0px'
-                                                            }),
-                                                            clearIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            }),
-                                                            dropdownIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            })
-                                                        }}
-                                                    />
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[160px] sm:w-[170px]">
-                                                    <Select
-                                                        options={projectFilterOptions}
-                                                        value={selectProjectName ? { value: selectProjectName, label: selectProjectName } : null}
-                                                        onChange={(opt) => setSelectProjectName(opt ? opt.value : "")}
-                                                        className="focus:outline-none text-xs"
-                                                        placeholder="Project..."
-                                                        isSearchable
-                                                        isClearable
-                                                        styles={{
-                                                            control: (provided, state) => ({
-                                                                ...provided,
-                                                                backgroundColor: 'transparent',
-                                                                borderWidth: '3px',
-                                                                borderColor: state.isFocused
-                                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                                borderRadius: '6px',
-                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                '&:hover': {
-                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                },
-                                                            }),
-                                                            placeholder: (provided) => ({
-                                                                ...provided,
-                                                                color: '#999',
-                                                                textAlign: 'left',
-                                                            }),
-                                                            menu: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 9,
-                                                            }),
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                fontSize: '15px',
-                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                color: 'black',
-                                                            }),
-                                                            singleValue: (provided) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                color: 'black',
-                                                            }),
-                                                            indicatorSeparator: () => ({
-                                                                display: 'none'
-                                                            }),
-                                                            indicatorsContainer: (provided) => ({
-                                                                ...provided,
-                                                                height: '40px',
-                                                                gap: '0px'
-                                                            }),
-                                                            clearIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            }),
-                                                            dropdownIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            })
-                                                        }}
-                                                    />
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[100px] sm:w-[120px]"></th>
-                                                <th className="pt-2 pb-2 w-[100px] sm:w-[120px]">
-                                                    <Select
-                                                        options={typeFilterOptions}
-                                                        value={selectType ? { value: selectType, label: selectType } : null}
-                                                        onChange={(opt) => setSelectType(opt ? opt.value : "")}
-                                                        className="focus:outline-none text-xs"
-                                                        placeholder="Type..."
-                                                        isSearchable
-                                                        isClearable
-                                                        styles={{
-                                                            control: (provided, state) => ({
-                                                                ...provided,
-                                                                backgroundColor: 'transparent',
-                                                                borderWidth: '3px',
-                                                                borderColor: state.isFocused
-                                                                    ? 'rgba(191, 152, 83, 0.2)'
-                                                                    : 'rgba(191, 152, 83, 0.2)',
-                                                                borderRadius: '6px',
-                                                                boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.5)' : 'none',
-                                                                '&:hover': {
-                                                                    borderColor: 'rgba(191, 152, 83, 0.2)',
-                                                                },
-                                                            }),
-                                                            placeholder: (provided) => ({
-                                                                ...provided,
-                                                                color: '#999',
-                                                                textAlign: 'left',
-                                                            }),
-                                                            menu: (provided) => ({
-                                                                ...provided,
-                                                                zIndex: 10,
-                                                            }),
-                                                            option: (provided, state) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                fontSize: '15px',
-                                                                backgroundColor: state.isFocused ? 'rgba(191, 152, 83, 0.1)' : 'white',
-                                                                color: 'black',
-                                                            }),
-                                                            singleValue: (provided) => ({
-                                                                ...provided,
-                                                                textAlign: 'left',
-                                                                fontWeight: 'normal',
-                                                                color: 'black',
-                                                            }),
-                                                            indicatorSeparator: () => ({
-                                                                display: 'none'
-                                                            }),
-                                                            indicatorsContainer: (provided) => ({
-                                                                ...provided,
-                                                                height: '40px',
-                                                                gap: '0px'
-                                                            }),
-                                                            clearIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            }),
-                                                            dropdownIndicator: (provided) => ({
-                                                                ...provided,
-                                                                padding: '2px'
-                                                            })
-                                                        }}
-                                                    />
-                                                </th>
-                                                <th className="pt-2 pb-2 w-[50px] sm:w-[60px]"></th>
-                                                <th className="pt-2 pb-2 w-[70px] sm:w-[80px]">
-                                                    <button
-                                                        onClick={clearFilters}
-                                                        className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 focus:outline-none"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                </th>
-                                            </tr>
-                                        )}
-                                        {canEditSelectedWeek && (
-                                            <tr className="bg-white border-b border-gray-200">
-                                                <td className="px-1 py-2 font-bold">{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
-                                                <td className="flex items-center gap-2 py-2">
-                                                    <div>
-                                                        <Select
-                                                            name="labour_id"
-                                                            className="w-[265px]"
-                                                            placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
-                                                            isSearchable
+                    </div>
+                    <div className="w-full p-[18px] border-collapse bg-[#FFFFFF] rounded-md flex flex-col flex-1 min-h-0 overflow-hidden">
+                        <div className="w-full flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden">
+                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden">
+                                <div className="flex justify-between items-center mb-[8px]">
+                                    <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
+                                    <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                        ₹{Number(filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </h1>
+                                </div>
+                                <div className="text-left flex flex-row justify-between items-center mb-[12px] gap-[6px]">
+                                    <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                                        <EdbcFilterToggleButton onClick={() => setShowFilters(!showFilters)} />
+                                    </div>
+                                    <EdbcTableToolbarRightActions
+                                        onClearFilters={clearFilters}
+                                        overallSearch={overallSearch}
+                                        onOverallSearchChange={setOverallSearch}
+                                    />
+                                </div>
+                                <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                                    <div ref={scrollRef} className="w-full flex-1 min-h-0 overflow-y-auto overflow-x-hidden h-full no-scrollbar select-none" onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                        onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)} >
+                                        <table className={`border-collapse text-left w-full table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
+                                            <thead className="sticky top-0 z-10 bg-white">
+                                                <EdbcTableHeaderRow>
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={expensesDstCol4Label} sortProps={edbcSortProps} />
+                                                    <th className="w-[30px] px-[2px] overflow-visible" aria-hidden="true"></th>
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} sortProps={edbcSortProps} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} sortProps={edbcSortProps} />
+                                                    <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible" aria-hidden="true"></th>
+                                                    <th className=" w-[66px] font-bold text-center" aria-hidden="true"></th>
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} sortProps={edbcSortProps} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC7} label={expensesDstCol7Label} sortProps={edbcSortProps} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20ActivityLabel} />
+                                                </EdbcTableHeaderRow>
+                                                {showFilters && (
+                                                    <EdbcTableFilterRow>
+                                                        <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
+                                                        <EdbcSelectFilter
+                                                            columnId={EDBC_IDS.EDBC4}
+                                                            placeholder={expensesDstCol4Label}
+                                                            options={contractorVendorFilterOptions}
+                                                            value={selectContractororVendorName}
+                                                            onChange={setSelectContractororVendorName}
+                                                            selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                        />
+                                                        <th className=" p-0 overflow-visible"></th>
+                                                        <EdbcProjectNameFilter
+                                                            placeholder={expensesDstCol3Label}
+                                                            options={projectFilterOptions}
+                                                            value={selectProjectName}
+                                                            onChange={setSelectProjectName}
                                                             isClearable
-                                                            options={isChangeButtonActive ? combinedOptions : laboursList}
-                                                            styles={customStyles}
-                                                            menuPortalTarget={document.body}
-                                                            value={
-                                                                isChangeButtonActive
-                                                                    ? combinedOptions.find(opt =>
-                                                                        (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
-                                                                        (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
-                                                                        (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
-                                                                    ) || null
-                                                                    : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
-                                                            }
-                                                            onChange={(selectedOption) => {
-                                                                if (selectedOption) {
-                                                                    const { type, id, label, salary } = selectedOption;
-                                                                    setNewDailyExpense(prev => ({
-                                                                        ...prev,
-                                                                        labour_id: type === "Labour" ? id : "",
-                                                                        vendor_id: type === "Vendor" ? id : "",
-                                                                        contractor_id: type === "Contractor" ? id : "",
-                                                                        employee_id: type === "Employee" ? id : "",
-                                                                        labour_name: label,
-                                                                        amount: type === "Labour" ? salary : ""
-                                                                    }));
-                                                                } else {
-                                                                    setNewDailyExpense(prev => ({
-                                                                        ...prev,
-                                                                        labour_id: "",
-                                                                        vendor_id: "",
-                                                                        contractor_id: "",
-                                                                        employee_id: "",
-                                                                        labour_name: "",
-                                                                        amount: ""
-                                                                    }));
-                                                                }
-                                                            }}
+                                                            selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                         />
-                                                    </div>
-                                                    <div>
-                                                        <button onClick={handleChangeButtonClick}>
-                                                            <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-1 py-2">
-                                                    <Select
-                                                        name="project"
-                                                        value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
-                                                        onChange={(selectedOption) => {
-                                                            setNewDailyExpense(prev => ({
-                                                                ...prev,
-                                                                project_id: selectedOption ? selectedOption.id : ""
-                                                            }));
-                                                        }}
-                                                        options={siteOptions}
-                                                        menuPortalTarget={document.body}
-                                                        className="w-[260px]"
-                                                        placeholder="Select Site"
-                                                        isSearchable
-                                                        isClearable
-                                                        styles={customStyles}
-                                                    />
-                                                </td>
-                                                <td className="px-1 py-2 text-left flex items-center gap-2">
-                                                    <div>
-                                                        <input
-                                                            type="number"
-                                                            name="amount"
-                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                            value={newDailyExpense.amount || ""}
-                                                            onChange={(e) => setNewDailyExpense(prev => ({ ...prev, amount: e.target.value }))}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") {
-                                                                    e.preventDefault();
-                                                                    handleAddExpense();
-                                                                }
-                                                            }}
+                                                        <EdbcTotalAmountFilter
+                                                            columnId={EDBC_IDS.EDBC8}
+                                                            totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                            placeholder={expensesDstCol8Label}
                                                         />
-                                                    </div>
-                                                    <div>
-                                                        <button className="font-semibold text-[25px]" onClick={() => setShowExtraAmount(prev => !prev)} type="button">
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                    {showExtraAmount && (
-                                                        <div>
-                                                            <input
-                                                                type="number"
-                                                                name="extra_amount"
-                                                                className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                placeholder="Extra"
-                                                                value={newDailyExpense.extra_amount || ""}
-                                                                onChange={(e) => setNewDailyExpense(prev => ({
-                                                                    ...prev,
-                                                                    extra_amount: e.target.value
-                                                                }))}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === "Enter") {
-                                                                        e.preventDefault();
-                                                                        handleAddExpense();
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-1 py-2 text-left">
-                                                    <select
-                                                        name="type"
-                                                        value={newDailyExpense.type}
-                                                        onChange={handleInputChange}
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
-                                                    >
-                                                        <option value="">Select</option>
-                                                        {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
-                                                            <option key={index} value={isChangeButtonActive ? type.category : type.type}>
-                                                                {isChangeButtonActive ? type.category : type.type}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td className="px-1 py-2">
-                                                    <input
-                                                        type="number"
-                                                        name="quantity"
-                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                        value={newDailyExpense.quantity || ""}
-                                                        onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === "Enter") {
-                                                                e.preventDefault();
-                                                                handleAddExpense();
-                                                            }
-                                                        }}
-                                                    />
-                                                </td>
-                                                <td className="px-1 py-2">
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </thead>
-                                    <tbody>
-                                        {sortedDailyExpenses
-                                            .filter(row => row.date === selectedDate)
-                                            .map((row, index) => (
-                                                <tr key={row.id} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                    <td className="px-1 py-2 font-bold">{index + 1}</td>
-                                                    <td className="px-1 py-2">
-                                                        <div className="w-[200px] h-[40px] flex items-center">
-                                                            {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                        <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></th>
+                                                        <th className="pl-[6px] w-[66px]"></th>
+                                                        <EdbcSelectFilter
+                                                            columnId={EDBC_IDS.EDBC12}
+                                                            placeholder={expensesDstCol12Label}
+                                                            options={typeFilterOptions}
+                                                            value={selectType}
+                                                            onChange={setSelectType}
+                                                            selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                        />
+                                                        <EdbcTextInputFilter
+                                                            columnId={EDBC_IDS.EDBC7}
+                                                            placeholder={expensesDstCol7Label}
+                                                            value={selectQuantity}
+                                                            onChange={(e) => setSelectQuantity(e.target.value)}
+                                                        />
+                                                        <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                        <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                    </EdbcTableFilterRow>
+                                                )}
+                                                {canEditSelectedWeek && (
+                                                    <tr className="bg-white border-b border-gray-200">
+                                                        <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
+                                                        <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}>
                                                                 <Select
                                                                     name="labour_id"
-                                                                    className="w-[200px]"
-                                                                    placeholder={isChangeButtonActive ? "Vendor/Contractor" : "Labour Name"}
+                                                                    className="text-xs focus:outline-none w-full"
+                                                                    placeholder={expensesDstCol4Label}
                                                                     isSearchable
                                                                     isClearable
                                                                     options={isChangeButtonActive ? combinedOptions : laboursList}
-                                                                    styles={customStyles}
+                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                                     menuPortalTarget={document.body}
                                                                     value={
                                                                         isChangeButtonActive
                                                                             ? combinedOptions.find(opt =>
-                                                                                (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
-                                                                                (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
-                                                                                (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
+                                                                                (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
+                                                                                (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
+                                                                                (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
                                                                             ) || null
-                                                                            : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
+                                                                            : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
                                                                     }
                                                                     onChange={(selectedOption) => {
                                                                         if (selectedOption) {
                                                                             const { type, id, label, salary } = selectedOption;
-                                                                            setEditDailyExpenseData(prev => ({
+                                                                            setNewDailyExpense(prev => ({
                                                                                 ...prev,
                                                                                 labour_id: type === "Labour" ? id : "",
                                                                                 vendor_id: type === "Vendor" ? id : "",
                                                                                 contractor_id: type === "Contractor" ? id : "",
                                                                                 employee_id: type === "Employee" ? id : "",
                                                                                 labour_name: label,
-                                                                                amount: type === "Labour" ? salary : prev.amount
+                                                                                amount: type === "Labour" ? salary : ""
                                                                             }));
                                                                         } else {
-                                                                            setEditDailyExpenseData(prev => ({
+                                                                            setNewDailyExpense(prev => ({
                                                                                 ...prev,
                                                                                 labour_id: "",
                                                                                 vendor_id: "",
@@ -3058,106 +3037,325 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                         }
                                                                     }}
                                                                 />
-                                                            ) : (
-                                                                (() => {
-                                                                    const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
-                                                                    const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
-                                                                    const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
-                                                                    const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
-                                                                    return employee?.label || vendor?.label || contractor?.label || labour?.label || "";
-                                                                })()
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-1 py-2">
-                                                        <div className="w-[220px] h-[40px] flex items-center">
-                                                            {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                            </div>
+                                                        </td>
+                                                        <td className="w-[30px] px-[6px] overflow-visible">
+                                                            <button type="button" onClick={handleChangeButtonClick}>
+                                                                <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} alt="Toggle name type" />
+                                                            </button>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
+                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
                                                                 <Select
                                                                     name="project"
-                                                                    value={siteOptions.find(opt => opt.id === Number(editDailyExpenseData.project_id)) || null}
+                                                                    value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
                                                                     onChange={(selectedOption) => {
-                                                                        setEditDailyExpenseData(prev => ({
+                                                                        setNewDailyExpense(prev => ({
                                                                             ...prev,
                                                                             project_id: selectedOption ? selectedOption.id : ""
                                                                         }));
                                                                     }}
                                                                     options={siteOptions}
                                                                     menuPortalTarget={document.body}
-                                                                    className="w-[220px]"
-                                                                    placeholder="Select Site"
+                                                                    className="text-xs focus:outline-none w-full"
+                                                                    placeholder={expensesDstCol3Label}
                                                                     isSearchable
                                                                     isClearable
-                                                                    styles={customStyles}
+                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                                 />
-                                                            ) : (
-                                                                siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-1 py-2 relative group flex">
-                                                        <div className="flex items-center">
-                                                            {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
-                                                                <div className="flex items-center gap-2">
-                                                                    <input
-                                                                        type="number"
-                                                                        name="amount"
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                        value={editDailyExpenseData.amount || ""}
-                                                                        onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))}
-                                                                    />
+                                                            </div>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                <input
+                                                                    type="number"
+                                                                    name="amount"
+                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                    placeholder={expensesDstCol8Label}
+                                                                    value={newDailyExpense.amount || ""}
+                                                                    onChange={(e) => setNewDailyExpense(prev => ({ ...prev, amount: e.target.value }))}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter") {
+                                                                            e.preventDefault();
+                                                                            handleAddExpense();
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible">
+                                                            <button onClick={() => setShowExtraAmount(prev => !prev)} type="button">
+                                                                <img src={showExtraAmount ? ExtraFeildClose : ExtraFeild} className="w-4 h-4" alt="Extra" />
+                                                            </button>
+                                                        </td>
+                                                        <td className="pl-[6px] w-[66px] text-center">
+                                                            {showExtraAmount && (
+                                                                <div className="w-[60px]">
                                                                     <input
                                                                         type="number"
                                                                         name="extra_amount"
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                        style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner !w-[60px]`}
                                                                         placeholder="Extra"
-                                                                        value={editDailyExpenseData.extra_amount || ""}
-                                                                        onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, extra_amount: e.target.value }))}
+                                                                        value={newDailyExpense.extra_amount || ""}
+                                                                        onChange={(e) => setNewDailyExpense(prev => ({
+                                                                            ...prev,
+                                                                            extra_amount: e.target.value
+                                                                        }))}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === "Enter") {
+                                                                                e.preventDefault();
+                                                                                handleAddExpense();
+                                                                            }
+                                                                        }}
                                                                     />
                                                                 </div>
-                                                            ) : (
-                                                                <>
-                                                                    <div className="w-[120px] h-[40px] flex flex-col justify-center leading-tight cursor-default">
-                                                                        <span>
-                                                                            {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
-                                                                        </span>
-                                                                        <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
-                                                                            Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
-                                                                            Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
+                                                            )}
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
+                                                                <Select
+                                                                    name="type"
+                                                                    className="text-xs focus:outline-none w-full"
+                                                                    value={newDailyExpense.type ? { value: newDailyExpense.type, label: newDailyExpense.type } : null}
+                                                                    onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                    options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
+                                                                        value: isChangeButtonActive ? type.category : type.type,
+                                                                        label: isChangeButtonActive ? type.category : type.type,
+                                                                    }))}
+                                                                    placeholder={expensesDstCol12Label}
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC7} className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.tdClass}>
+                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.filterWidthClass}>
+                                                                <input
+                                                                    type="number"
+                                                                    name="quantity"
+                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC7)?.inputClassName || ''} no-spinner`}
+                                                                    placeholder={expensesDstCol7Label}
+                                                                    value={newDailyExpense.quantity || ""}
+                                                                    onChange={(e) => setNewDailyExpense(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter") {
+                                                                            e.preventDefault();
+                                                                            handleAddExpense();
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </thead>
+                                            <tbody>
+                                                {sortedDailyExpenses
+                                                    .filter(row => row.date === selectedDate)
+                                                    .map((row, index) => (
+                                                        <EdbcTableBodyRow key={row.id}>
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{index + 1}</td>
+                                                            <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                                <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center`}>
+                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                        <Select
+                                                                            name="labour_id"
+                                                                            className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass || ''}
+                                                                            placeholder={expensesDstCol4Label}
+                                                                            isSearchable
+                                                                            isClearable
+                                                                            options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                                            styles={customStyles}
+                                                                            menuPortalTarget={document.body}
+                                                                            value={
+                                                                                isChangeButtonActive
+                                                                                    ? combinedOptions.find(opt =>
+                                                                                        (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
+                                                                                        (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
+                                                                                        (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
+                                                                                    ) || null
+                                                                                    : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
+                                                                            }
+                                                                            onChange={(selectedOption) => {
+                                                                                if (selectedOption) {
+                                                                                    const { type, id, label, salary } = selectedOption;
+                                                                                    setEditDailyExpenseData(prev => ({
+                                                                                        ...prev,
+                                                                                        labour_id: type === "Labour" ? id : "",
+                                                                                        vendor_id: type === "Vendor" ? id : "",
+                                                                                        contractor_id: type === "Contractor" ? id : "",
+                                                                                        employee_id: type === "Employee" ? id : "",
+                                                                                        labour_name: label,
+                                                                                        amount: type === "Labour" ? salary : prev.amount
+                                                                                    }));
+                                                                                } else {
+                                                                                    setEditDailyExpenseData(prev => ({
+                                                                                        ...prev,
+                                                                                        labour_id: "",
+                                                                                        vendor_id: "",
+                                                                                        contractor_id: "",
+                                                                                        employee_id: "",
+                                                                                        labour_name: "",
+                                                                                        amount: ""
+                                                                                    }));
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                    ) : (
+                                                                        (() => {
+                                                                            const employee = employeeOptions.find(opt => opt.id === Number(row.employee_id));
+                                                                            const vendor = vendorOptions.find(opt => opt.id === Number(row.vendor_id));
+                                                                            const contractor = contractorOptions.find(opt => opt.id === Number(row.contractor_id));
+                                                                            const labour = laboursList.find(opt => opt.id === Number(row.labour_id));
+                                                                            return employee?.label || vendor?.label || contractor?.label || labour?.label || "";
+                                                                        })()
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
+                                                            <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
+                                                                <div className="w-[220px] h-[40px] flex items-center">
+                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                        <Select
+                                                                            name="project"
+                                                                            value={siteOptions.find(opt => opt.id === Number(editDailyExpenseData.project_id)) || null}
+                                                                            onChange={(selectedOption) => {
+                                                                                setEditDailyExpenseData(prev => ({
+                                                                                    ...prev,
+                                                                                    project_id: selectedOption ? selectedOption.id : ""
+                                                                                }));
+                                                                            }}
+                                                                            options={siteOptions}
+                                                                            menuPortalTarget={document.body}
+                                                                            className="w-[220px]"
+                                                                            placeholder={expensesDstCol3Label}
+                                                                            isSearchable
+                                                                            isClearable
+                                                                            styles={customStyles}
+                                                                        />
+                                                                    ) : (
+                                                                        siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC8} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} relative group`}>
+                                                                <div className="flex items-center justify-end">
+                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            name="amount"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            value={editDailyExpenseData.amount || ""}
+                                                                            onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))}
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="h-[40px] flex flex-col justify-center leading-tight cursor-default text-right">
+                                                                            <span>
+                                                                                {Number((row.amount || 0) + (row.extra_amount || 0)).toLocaleString("en-IN")}
+                                                                            </span>
+                                                                            <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                                Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
+                                                                                Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
+                                                                            </div>
                                                                         </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
+                                                            <td className="pl-[6px] w-[66px] text-center">
+                                                                {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                    <div className="w-[60px]">
+                                                                        <input
+                                                                            type="number"
+                                                                            name="extra_amount"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            placeholder="Extra"
+                                                                            value={editDailyExpenseData.extra_amount || ""}
+                                                                            onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, extra_amount: e.target.value }))}
+                                                                        />
                                                                     </div>
-                                                                    <div className="flex items-center gap-1 min-w-[100px] shrink-0">
+                                                                ) : null}
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                <div className="w-[120px] h-[40px] flex items-center">
+                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                        <select
+                                                                            name="type"
+                                                                            value={editDailyExpenseData.type}
+                                                                            onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, type: e.target.value }))}
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
+                                                                        >
+                                                                            <option value="">Select</option>
+                                                                            {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
+                                                                                <option key={index} value={isChangeButtonActive ? type.category : type.type}>
+                                                                                    {isChangeButtonActive ? type.category : type.type}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    ) : (
+                                                                        row.type
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC7} className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.tdClass}>
+                                                                <div className="w-[60px] h-[40px] flex items-center">
+                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            name="quantity"
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            value={editDailyExpenseData.quantity || ""}
+                                                                            onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                        />
+                                                                    ) : (
+                                                                        row.quantity || "-"
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex w-full items-center justify-center">
+                                                                    <span className="inline-flex items-center gap-[10px]">
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleDescriptionClick(row)}
-                                                                            className="inline-flex h-4 w-4 shrink-0 items-center justify-center"
+                                                                            className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center"
                                                                             title={row.description ? 'View Description' : 'Add Description'}
                                                                         >
                                                                             <img
                                                                                 src={row.description ? NotesEnd : NotesStart}
                                                                                 alt=""
-                                                                                className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100"
+                                                                                className=" cursor-pointer opacity-60 hover:opacity-100"
                                                                             />
                                                                         </button>
-                                                                        <span className="inline-flex min-w-[44px] items-center gap-1">
+                                                                        <span className="inline-flex items-center gap-[4px]">
                                                                             {row.file_url ? (
                                                                                 <>
                                                                                     <a
                                                                                         href={row.file_url}
                                                                                         target="_blank"
                                                                                         rel="noopener noreferrer"
-                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer"
+                                                                                        className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center cursor-pointer"
                                                                                         title="View File"
                                                                                     >
-                                                                                        <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                                        <img src={file} className="" alt="Open File" />
                                                                                     </a>
                                                                                     {canRemoveFileUrl && canEditSelectedWeek && (
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={() => handleRemoveFileUrl(row)}
-                                                                                            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[#E4572E] text-base font-bold leading-none hover:bg-[#fff1ee]"
+                                                                                            className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
                                                                                             title="Remove File"
                                                                                         >
-                                                                                            ×
+                                                                                            <img src={FileRemover} className="" alt="Remove File" />
                                                                                         </button>
                                                                                     )}
                                                                                 </>
@@ -3176,12 +3374,6 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                                             alt="Upload File"
                                                                                         />
                                                                                     </button>
-                                                                                    <span
-                                                                                        className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center"
-                                                                                        aria-hidden="true"
-                                                                                    >
-                                                                                        <span className="text-base font-bold leading-none opacity-0">×</span>
-                                                                                    </span>
                                                                                 </>
                                                                             )}
                                                                         </span>
@@ -3195,499 +3387,535 @@ const DailyHistory = ({ username, userRoles = [] }) => {
                                                                                 Restore
                                                                             </button>
                                                                         )}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                {canEditSelectedWeek && (
+                                                                    <div className="flex gap-1 justify-center">
+                                                                        {editingDailyExpenseRowId === row.id ? (
+                                                                            <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                                ✓
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button onClick={() => handleEditClick(row)}>
+                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                            </button>
+                                                                        )}
+                                                                        {canEditDelete && (
+                                                                            <>
+                                                                                <button onClick={() => handleDailyExpensesDelete(row.id)}>
+                                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                        <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
+                                                                            <img src={history} className="w-5 h-4" alt="History" />
+                                                                        </button>
                                                                     </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-1 py-2">
-                                                        <div className="w-[120px] h-[40px] flex items-center">
-                                                            {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
-                                                                <select
-                                                                    name="type"
-                                                                    value={editDailyExpenseData.type}
-                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, type: e.target.value }))}
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
-                                                                >
-                                                                    <option value="">Select</option>
-                                                                    {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
-                                                                        <option key={index} value={isChangeButtonActive ? type.category : type.type}>
-                                                                            {isChangeButtonActive ? type.category : type.type}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            ) : (
-                                                                row.type
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-1 py-2">
-                                                        <div className="w-[60px] h-[40px] flex items-center">
-                                                            {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                )}
+                                                            </td>
+                                                        </EdbcTableBodyRow>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="shrink-0 flex flex-col min-h-0 overflow-hidden">
+                                <div className="w-fit max-w-full flex flex-col">
+                                <div className="flex justify-between items-center mb-[8px] w-full">
+                                    <h1 className="font-bold text-base">Refund Received</h1>
+                                    <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                        ₹{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </h1>
+                                </div>
+                                <div className="text-left flex flex-row items-center mb-[12px] gap-[6px] w-full">
+                                        <EdbcFilterToggleButton onClick={() => setShowRefundFilters(!showRefundFilters)} />
+                                    <EdbcTableToolbarRightActions
+                                        onClearFilters={clearRefundFilters}
+                                        overallSearch={refundOverallSearch}
+                                        onOverallSearchChange={setRefundOverallSearch}
+                                        wrapperClassName="flex items-end gap-[6px] min-w-0 flex-1 justify-end"
+                                        searchWrapperClassName="h-[34px] min-w-0 w-1/2 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1"
+                                    />
+                                </div>
+                                <div>
+                                    <div className="w-fit max-w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
+                                        <div className="w-fit max-w-full flex-1 min-h-0 overflow-auto">
+                                        <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>td#EDBC-4:first-child]:!pl-[12px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
+                                            <thead className="sticky top-0 z-10 bg-white">
+                                                <EdbcTableHeaderRow>
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={refundDstCol4Label} sortProps={refundEdbcSortProps} />
+                                                    <th className="px-[2px] w-[100px] overflow-visible" aria-hidden="true"></th>
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={refundDstCol8Label} sortProps={refundEdbcSortProps} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={refundDstCol20Label} />
+                                                </EdbcTableHeaderRow>
+                                                {showRefundFilters && (
+                                                    <EdbcTableFilterRow>
+                                                        <EdbcSelectFilter
+                                                            columnId={EDBC_IDS.EDBC4}
+                                                            placeholder={refundDstCol4Label}
+                                                            options={refundNameFilterOptions}
+                                                            value={selectRefundName}
+                                                            onChange={setSelectRefundName}
+                                                            selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                        />
+                                                        <th className="px-[2px] w-[60px] overflow-visible"></th>
+                                                        <EdbcTotalAmountFilter
+                                                            columnId={EDBC_IDS.EDBC8}
+                                                            totalAmount={filteredRefundPayments.reduce((total, row) => total + Number(row.amount || 0), 0)}
+                                                            placeholder={refundDstCol8Label}
+                                                            value={selectRefundAmount}
+                                                            onChange={(e) => setSelectRefundAmount(e.target.value)}
+                                                        />
+                                                        <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                    </EdbcTableFilterRow>
+                                                )}
+                                                {canEditSelectedWeek && (
+                                                    <tr className="bg-white border-b border-gray-200">
+                                                        <td id={EDBC_IDS.EDBC4} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} overflow-hidden`}>
+                                                            <div className="w-full">
+                                                                <Select
+                                                                    name="refund_party"
+                                                                    className="text-xs focus:outline-none w-full"
+                                                                    placeholder={refundDstCol4Label}
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    value={
+                                                                        isRefundChangeButtonActive
+                                                                            ? combinedOptions.find(opt =>
+                                                                                (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
+                                                                                (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
+                                                                                (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
+                                                                            ) || null
+                                                                            : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
+                                                                    }
+                                                                    onChange={handleRefundSelectChange}
+                                                                    onKeyDown={handleKeyDown}
+                                                                    options={isRefundChangeButtonActive ? combinedOptions : laboursList}
+                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                    menuPortalTarget={document.body}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td className="pl-[6px] w-[100px] overflow-visible">
+                                                            <button type="button" onClick={handleRefundChangeButtonClick}>
+                                                                <img
+                                                                    src={Change}
+                                                                    className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
+                                                                    alt="Toggle options"
+                                                                />
+                                                            </button>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
                                                                 <input
                                                                     type="number"
-                                                                    name="quantity"
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                    value={editDailyExpenseData.quantity || ""}
-                                                                    onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                    name="amount"
+                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                    placeholder={refundDstCol8Label}
+                                                                    value={newRefundReceived.amount}
+                                                                    onChange={handleNewPaymentChange}
+                                                                    onKeyDown={handleKeyDown}
+                                                                    min="0"
+                                                                    step="any"
+                                                                    onWheel={(e) => e.preventDefault()}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </thead>
+                                            <tbody>
+                                                {sortedRefundPayments.map((row, index) => (
+                                                    <EdbcTableBodyRow key={row.id || index}>
+                                                        <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                            {editingPaymentId === row.id && canEditSelectedWeek ? (
+                                                                <Select
+                                                                    name="refund_party"
+                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass || ''}
+                                                                    placeholder={refundDstCol4Label}
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    value={
+                                                                        refundSelectOptions.find(opt =>
+                                                                            (opt.type === "Labour" && String(opt.id) === String(editRefundPaymentData.labour_id)) ||
+                                                                            (opt.type === "Vendor" && String(opt.id) === String(editRefundPaymentData.vendor_id)) ||
+                                                                            (opt.type === "Contractor" && String(opt.id) === String(editRefundPaymentData.contractor_id)) ||
+                                                                            (opt.type === "Employee" && String(opt.id) === String(editRefundPaymentData.employee_id))
+                                                                        ) || null
+                                                                    }
+                                                                    onChange={handleEditRefundLabourChange}
+                                                                    options={refundSelectOptions}
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={customStyles}
                                                                 />
                                                             ) : (
-                                                                row.quantity || "-"
+                                                                <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center overflow-hidden`}>
+                                                                    <div className="truncate">
+                                                                        {getRefundRowName(row)}
+                                                                    </div>
+                                                                </div>
                                                             )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-1 py-2 relative">
-                                                        {canEditSelectedWeek && (
-                                                            <div className="flex gap-2 w-[80px]">
-                                                                {editingDailyExpenseRowId === row.id ? (
-                                                                    <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
-                                                                        ✓
-                                                                    </button>
-                                                                ) : (
-                                                                    <button onClick={() => handleEditClick(row)}>
-                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                    </button>
-                                                                )}
-                                                                {canEditDelete && (
-                                                                    <>
-                                                                        <button onClick={() => handleDailyExpensesDelete(row.id)}>
-                                                                            <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                                <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
-                                                                    <img src={history} className="w-5 h-4" alt="History" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex-[1] min-w-0 ">
-                        <div className="flex justify-between mb-4">
-                            <h1 className="font-bold text-base">Refund Received</h1>
-                            <h1 className="font-bold text-base">
-                                Total: <span style={{ color: "#E4572E" }}>{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2, })}</span>
-                            </h1>
-                        </div>
-                        <div>
-                            <div className="w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-x-auto" style={{ maxHeight: "600px" }}>
-                                <table className="w-full min-w-[320px] border-collapse">
-                                    <thead className="bg-[#FAF6ED] h-12">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Name</th>
-                                            <th className="px-4 py-2">Amount</th>
-                                            <th className="px-4 py-2 text-left">Activity</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {refundPayments.map((row, index) => (
-                                            <tr key={row.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                <td className="py-2">
-                                                    {editingPaymentId === row.id && canEditSelectedWeek ? (
-                                                        <Select
-                                                            name="refund_party"
-                                                            className="w-[200px]"
-                                                            placeholder="Select Name"
-                                                            isSearchable
-                                                            isClearable
-                                                            value={
-                                                                refundSelectOptions.find(opt =>
-                                                                    (opt.type === "Labour" && String(opt.id) === String(editRefundPaymentData.labour_id)) ||
-                                                                    (opt.type === "Vendor" && String(opt.id) === String(editRefundPaymentData.vendor_id)) ||
-                                                                    (opt.type === "Contractor" && String(opt.id) === String(editRefundPaymentData.contractor_id)) ||
-                                                                    (opt.type === "Employee" && String(opt.id) === String(editRefundPaymentData.employee_id))
-                                                                ) || null
-                                                            }
-                                                            onChange={handleEditRefundLabourChange}
-                                                            options={refundSelectOptions}
-                                                            menuPortalTarget={document.body}
-                                                            styles={customStyles}
-                                                        />
-                                                    ) : (
-                                                        <div className="flex items-center justify-between w-full gap-2">
-                                                            <div className="truncate pr-2">
-                                                                {(() => {
-                                                                    const employee = getEmployeeName(row.employee_id);
-                                                                    const vendor = getVendorName(row.vendor_id);
-                                                                    const contractor = getContractorName(row.contractor_id);
-                                                                    const labour = laboursList.find(opt => String(opt.id) === String(row.labour_id))?.label || "";
-                                                                    const labels = [employee, vendor, contractor, labour].filter(Boolean);
-                                                                    return labels.join(", ") || "";
-                                                                })()}
-                                                            </div>
-                                                            {(() => {
+                                                        </td>
+                                                        <td className="px-[2px] overflow-visible">
+                                                            {editingPaymentId !== row.id && (() => {
                                                                 const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
                                                                 const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) ||
                                                                     (row.contractor_id && Number(row.contractor_id) > 0);
                                                                 if (!hasLabourId && !hasVendorOrContractorId) return null;
                                                                 return (
-                                                                    <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap">
+                                                                    <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap flex items-center justify-center">
                                                                         {hasLabourId ? 'Staff Portal' : 'Loan Portal'}
                                                                     </div>
                                                                 );
                                                             })()}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="py-2 text-center">
-                                                    {editingPaymentId === row.id && canEditSelectedWeek ? (
-                                                        <input
-                                                            type="number"
-                                                            name="amount"
-                                                            value={editRefundPaymentData.amount}
-                                                            onChange={handleEditRefundChange}
-                                                            className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
-                                                            min="0"
-                                                            step="any"
-                                                            onWheel={(e) => e.preventDefault()}
-                                                        />
-                                                    ) : (
-                                                        Number(row.amount).toLocaleString("en-IN")
-                                                    )}
-                                                </td>
-                                                <td className="py-2">
-                                                    {canEditSelectedWeek && (
-                                                        <div className="flex">
-                                                            {editingPaymentId === row.id ? (
-                                                                <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
-                                                                    ✓
-                                                                </button>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                            {editingPaymentId === row.id && canEditSelectedWeek ? (
+                                                                <input
+                                                                    type="number"
+                                                                    name="amount"
+                                                                    value={editRefundPaymentData.amount}
+                                                                    onChange={handleEditRefundChange}
+                                                                    className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
+                                                                    placeholder={refundDstCol8Label}
+                                                                    min="0"
+                                                                    step="any"
+                                                                    onWheel={(e) => e.preventDefault()}
+                                                                />
                                                             ) : (
-                                                                <button onClick={() => handleEditRefundClick(row)}>
-                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                </button>
+                                                                Number(row.amount).toLocaleString("en-IN")
                                                             )}
-                                                            {canEditDelete && (
-                                                                <>
-                                                                    <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
-                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                            {canEditSelectedWeek && (
+                                                                <div className="flex">
+                                                                    {editingPaymentId === row.id ? (
+                                                                        <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
+                                                                            ✓
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button onClick={() => handleEditRefundClick(row)}>
+                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                        </button>
+                                                                    )}
+                                                                    {canEditDelete && (
+                                                                        <>
+                                                                            <button className="pl-3" onClick={() => handleRefundPaymentsDelete(row.id)}>
+                                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className={canEditDelete ? "pl-3" : ""}>
+                                                                        <img src={history} className="w-5 h-4" alt="History" />
                                                                     </button>
-                                                                </>
+                                                                </div>
                                                             )}
-                                                            <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)} className={canEditDelete ? "pl-3" : ""}>
-                                                                <img src={history} className="w-5 h-4" alt="History" />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {canEditSelectedWeek && (
-                                            <tr>
-                                                <td className="py-2 text-left">
-                                                    <div className="flex items-center gap-2">
-                                                        <Select
-                                                            name="refund_party"
-                                                            className="w-[265px] text-left"
-                                                            placeholder={isRefundChangeButtonActive ? "Vendor/Contractor/Employee" : "Labour Name"}
-                                                            isSearchable
-                                                            isClearable
-                                                            value={
-                                                                isRefundChangeButtonActive
-                                                                    ? combinedOptions.find(opt =>
-                                                                        (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
-                                                                        (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
-                                                                        (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
-                                                                    ) || null
-                                                                    : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
-                                                            }
-                                                            onChange={handleRefundSelectChange}
-                                                            onKeyDown={handleKeyDown}
-                                                            options={isRefundChangeButtonActive ? combinedOptions : laboursList}
-                                                            styles={customStyles}
-                                                            menuPortalTarget={document.body}
-                                                        />
-                                                        <button onClick={handleRefundChangeButtonClick}>
-                                                            <img
-                                                                src={Change}
-                                                                className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
-                                                                alt="Toggle options"
-                                                            />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="py-2">
-                                                    <input
-                                                        type="number"
-                                                        name="amount"
-                                                        value={newRefundReceived.amount}
-                                                        onChange={handleNewPaymentChange}
-                                                        onKeyDown={handleKeyDown}
-                                                        className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
-                                                        min="0"
-                                                        step="any"
-                                                        onWheel={(e) => e.preventDefault()}
-                                                    />
-                                                </td>
-                                                <td className="py-2">
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                                        </td>
+                                                    </EdbcTableBodyRow>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 shrink-0 rounded-xl bg-white p-[10px] border border-[#E0E0E0] shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-left">
+                                        <div className="rounded-lg border border-[#E0E0E0] p-[10px]">
+                                            <div className="flex items-center justify-between rounded-lg mb-[4px]">
+                                                <p className="text-[14px] font-semibold text-black">Summary Details</p>
+                                            </div>
+                                            {Object.entries(
+                                                sortedDailyExpenses
+                                                    .filter((expense) => expense.date === selectedDate && Number(expense.amount) > 0)
+                                                    .reduce((acc, expense) => {
+                                                        const type = expense.type;
+                                                        const amount = Number(expense.amount);
+                                                        acc[type] = (acc[type] || 0) + amount;
+                                                        return acc;
+                                                    }, {})
+                                            ).map(([type, total]) => (
+                                                <div key={type} className="flex items-center justify-between py-[6px]">
+                                                    <p className="text-[12px] text-[#666666]">{type}</p>
+                                                    <p className="text-[12px] font-semibold text-black">
+                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                            <div className="border-t border-dashed border-[#E5E7EB] my-[4px]" />
+                                            <div className="flex items-center justify-between py-[6px]">
+                                                <p className="text-[12px] font-semibold text-black">Total Amount</p>
+                                                <p className="text-[12px] font-semibold text-black">
+                                                    ₹{sortedDailyExpenses
+                                                        .filter((expense) => expense.date === selectedDate)
+                                                        .reduce((total, expense) => total + Number(expense.amount || 0), 0)
+                                                        .toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            {showPopups && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                            setShowPopups(false);
-                            setEntryId(null);
-                            setDescription("");
-                        }
-                        if (e.key === 'Enter' && entryId && description.trim()) {
-                            handleUpdate();
-                        }
-                    }}
-                    tabIndex={0}
-                >
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                        <label className="block mb-3 text-left">
-                            <span className="font-semibold">Description</span>
-                            {entryId ? (
-                                <div>
-                                    <input
-                                        type="text"
-                                        name="description"
-                                        placeholder="Enter description"
-                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        maxLength={200}
-                                    />
-                                    <div className="text-xs text-gray-500 mt-1 text-right">
-                                        {description.length}/200 characters
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <textarea
-                                        name="description"
-                                        placeholder="Description"
-                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none h-24 resize-none"
-                                        value={description}
-                                        readOnly
-                                    />
-                                </div>
-                            )}
-                        </label>
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => {
+                    {showPopups && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
                                     setShowPopups(false);
                                     setEntryId(null);
                                     setDescription("");
-                                }}
-                                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            {entryId && (
-                                <button
-                                    onClick={handleUpdate}
-                                    disabled={loading || !description.trim()}
-                                    className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68A4A] disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {loading ? 'Saving...' : 'Save'}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            {fileUploadPopup && (
-                <div
-                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                            setFileUploadPopup(false);
-                            setCurrentFileRow(null);
-                            setSelectedFileForPopup(null);
-                        }
-                    }}
-                    tabIndex={0}
-                >
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
-                        <h3 className="text-lg font-semibold mb-4 text-center">
-                            {currentFileRow?.file_url ? 'Change File' : 'Upload File'}
-                        </h3>
-                        {currentFileRow?.file_url && (
-                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-2">Current file:</p>
-                                <a href={currentFileRow.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline"
-                                >
-                                    View Current File
-                                </a>
+                                }
+                                if (e.key === 'Enter' && entryId && description.trim()) {
+                                    handleUpdate();
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <label className="block mb-3 text-left">
+                                    <span className="font-semibold">Description</span>
+                                    {entryId ? (
+                                        <div>
+                                            <input
+                                                type="text"
+                                                name="description"
+                                                placeholder="Enter description"
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                value={description}
+                                                onChange={(e) => setDescription(e.target.value)}
+                                                maxLength={200}
+                                            />
+                                            <div className="text-xs text-gray-500 mt-1 text-right">
+                                                {description.length}/200 characters
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <textarea
+                                                name="description"
+                                                placeholder="Description"
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none h-24 resize-none"
+                                                value={description}
+                                                readOnly
+                                            />
+                                        </div>
+                                    )}
+                                </label>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setShowPopups(false);
+                                            setEntryId(null);
+                                            setDescription("");
+                                        }}
+                                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    {entryId && (
+                                        <button
+                                            onClick={handleUpdate}
+                                            disabled={loading || !description.trim()}
+                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68A4A] disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {loading ? 'Saving...' : 'Save'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                        <div className="mb-4">
-                            <label className="block mb-2 text-sm font-medium">
-                                Select PDF File
-                            </label>
-                            <input
-                                type="file"
-                                accept=".pdf"
-                                onChange={handleFileSelectInPopup}
-                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#BF9853] file:text-white hover:file:bg-[#A68A4A]"
-                            />
-                            {selectedFileForPopup && (
-                                <p className="mt-2 text-sm text-green-600">
-                                    Selected: {selectedFileForPopup.name}
-                                </p>
-                            )}
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => {
+                    )}
+                    {fileUploadPopup && (
+                        <div
+                            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
                                     setFileUploadPopup(false);
                                     setCurrentFileRow(null);
                                     setSelectedFileForPopup(null);
-                                }}
-                                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSaveFileFromPopup}
-                                disabled={!selectedFileForPopup}
-                                className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-green-600 hover:bg-green-700'
-                                    } text-white`}
-                            >
-                                {currentFileRow?.file_url ? 'Update File' : 'Upload File'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showWeeklyPaymentExpensesModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
-                        <div className="flex justify-between items-center mt-4 ml-7 mr-7">
-                            <h2 className="text-xl font-bold">History</h2>
-                            <button onClick={() => setShowWeeklyPaymentExpensesModal(false)}>
-                                <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
-                            </button>
-                        </div>
-                        <div className="overflow-auto max-h-[600px] w-full">
-                            <table className="w-full border-collapse text-left">
-                                <thead className="sticky top-0 z-10 bg-white">
-                                    <tr className="bg-[#FAF6ED] h-12">
-                                        <th className="py-2 px-4 text-left">S.No</th>
-                                        <th className="py-2 px-4 text-left">Date</th>
-                                        <th className="py-2 px-4 text-left">Action</th>
-                                        <th className="py-2 px-4 text-left">Changed By</th>
-                                        <th className="py-2 px-4 text-left">Old Values</th>
-                                        <th className="py-2 px-4 text-left">New Values</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {weeklyPaymentExpensesAudits.map((audit, index) => (
-                                        <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                            <td className="px-4 py-2">{index + 1}</td>
-                                            <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
-                                            <td className="px-4 py-2">{audit.action || '-'}</td>
-                                            <td className="px-4 py-2">{audit.changed_by || '-'}</td>
-                                            <td className="px-4 py-2">
-                                                <div className="max-w-xs overflow-auto">
-                                                    {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <div className="max-w-xs overflow-auto">
-                                                    {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showWeeklyPaymentReceivedModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
-                        <div className="flex justify-between items-center mt-4 ml-7 mr-7">
-                            <h2 className="text-xl font-bold">History</h2>
-                            <button onClick={() => setShowWeeklyPaymentReceivedModal(false)}>
-                                <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
-                            </button>
-                        </div>
-                        <div className="overflow-auto max-h-[600px] w-full">
-                            <table className="w-full border-collapse text-left">
-                                <thead className="sticky top-0 z-10 bg-white">
-                                    <tr className="bg-[#FAF6ED] h-12">
-                                        <th className="py-2 px-4 text-left">S.No</th>
-                                        <th className="py-2 px-4 text-left">Date</th>
-                                        <th className="py-2 px-4 text-left">Action</th>
-                                        <th className="py-2 px-4 text-left">Changed By</th>
-                                        <th className="py-2 px-4 text-left">Old Values</th>
-                                        <th className="py-2 px-4 text-left">New Values</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {weeklyPaymentReceivedAudits.map((audit, index) => (
-                                        <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                            <td className="px-4 py-2">{index + 1}</td>
-                                            <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
-                                            <td className="px-4 py-2">{audit.action || '-'}</td>
-                                            <td className="px-4 py-2">{audit.changed_by || '-'}</td>
-                                            <td className="px-4 py-2">
-                                                <div className="max-w-xs overflow-auto">
-                                                    {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <div className="max-w-xs overflow-auto">
-                                                    {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {sendingToExpensesEntry && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                        <h3 className="text-lg font-semibold mb-4 text-center">Sending to Expenses Entry</h3>
-                        <div className="mb-4">
-                            <div className="flex justify-between mb-2">
-                                <span className="text-sm text-gray-600">
-                                    Processing expense {sendingProgress.current} of {sendingProgress.total}
-                                </span>
-                                <span className="text-sm text-gray-600">
-                                    {sendingProgress.total > 0 ? Math.round((sendingProgress.current / sendingProgress.total) * 100) : 0}%
-                                </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    className="bg-[#BF9853] h-2.5 rounded-full transition-all duration-300"
-                                    style={{ width: `${(sendingProgress.current / sendingProgress.total) * 100}%` }}
-                                ></div>
+                                }
+                            }}
+                            tabIndex={0}
+                        >
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[500px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">
+                                    {currentFileRow?.file_url ? 'Change File' : 'Upload File'}
+                                </h3>
+                                {currentFileRow?.file_url && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-2">Current file:</p>
+                                        <a href={currentFileRow.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 underline"
+                                        >
+                                            View Current File
+                                        </a>
+                                    </div>
+                                )}
+                                <div className="mb-4">
+                                    <label className="block mb-2 text-sm font-medium">
+                                        Select PDF File
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={handleFileSelectInPopup}
+                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#BF9853] file:text-white hover:file:bg-[#A68A4A]"
+                                    />
+                                    {selectedFileForPopup && (
+                                        <p className="mt-2 text-sm text-green-600">
+                                            Selected: {selectedFileForPopup.name}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setFileUploadPopup(false);
+                                            setCurrentFileRow(null);
+                                            setSelectedFileForPopup(null);
+                                        }}
+                                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveFileFromPopup}
+                                        disabled={!selectedFileForPopup}
+                                        className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-green-600 hover:bg-green-700'
+                                            } text-white`}
+                                    >
+                                        {currentFileRow?.file_url ? 'Update File' : 'Upload File'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
+                    {showWeeklyPaymentExpensesModal && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+                                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+                                    <h2 className="text-xl font-bold">History</h2>
+                                    <button onClick={() => setShowWeeklyPaymentExpensesModal(false)}>
+                                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                                    </button>
+                                </div>
+                                <div className="overflow-auto max-h-[600px] w-full">
+                                    <table className="w-full border-collapse text-left">
+                                        <thead className="sticky top-0 z-10 bg-white">
+                                            <tr className="bg-[#FAF6ED] h-12">
+                                                <th className="py-2 px-4 text-left">S.No</th>
+                                                <th className="py-2 px-4 text-left">Date</th>
+                                                <th className="py-2 px-4 text-left">Action</th>
+                                                <th className="py-2 px-4 text-left">Changed By</th>
+                                                <th className="py-2 px-4 text-left">Old Values</th>
+                                                <th className="py-2 px-4 text-left">New Values</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {weeklyPaymentExpensesAudits.map((audit, index) => (
+                                                <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                                    <td className="px-4 py-2">{index + 1}</td>
+                                                    <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
+                                                    <td className="px-4 py-2">{audit.action || '-'}</td>
+                                                    <td className="px-4 py-2">{audit.changed_by || '-'}</td>
+                                                    <td className="px-4 py-2">
+                                                        <div className="max-w-xs overflow-auto">
+                                                            {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <div className="max-w-xs overflow-auto">
+                                                            {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showWeeklyPaymentReceivedModal && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
+                                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+                                    <h2 className="text-xl font-bold">History</h2>
+                                    <button onClick={() => setShowWeeklyPaymentReceivedModal(false)}>
+                                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                                    </button>
+                                </div>
+                                <div className="overflow-auto max-h-[600px] w-full">
+                                    <table className="w-full border-collapse text-left">
+                                        <thead className="sticky top-0 z-10 bg-white">
+                                            <tr className="bg-[#FAF6ED] h-12">
+                                                <th className="py-2 px-4 text-left">S.No</th>
+                                                <th className="py-2 px-4 text-left">Date</th>
+                                                <th className="py-2 px-4 text-left">Action</th>
+                                                <th className="py-2 px-4 text-left">Changed By</th>
+                                                <th className="py-2 px-4 text-left">Old Values</th>
+                                                <th className="py-2 px-4 text-left">New Values</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {weeklyPaymentReceivedAudits.map((audit, index) => (
+                                                <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
+                                                    <td className="px-4 py-2">{index + 1}</td>
+                                                    <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
+                                                    <td className="px-4 py-2">{audit.action || '-'}</td>
+                                                    <td className="px-4 py-2">{audit.changed_by || '-'}</td>
+                                                    <td className="px-4 py-2">
+                                                        <div className="max-w-xs overflow-auto">
+                                                            {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <div className="max-w-xs overflow-auto">
+                                                            {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {sendingToExpensesEntry && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
+                                <h3 className="text-lg font-semibold mb-4 text-center">Sending to Expenses Entry</h3>
+                                <div className="mb-4">
+                                    <div className="flex justify-between mb-2">
+                                        <span className="text-sm text-gray-600">
+                                            Processing expense {sendingProgress.current} of {sendingProgress.total}
+                                        </span>
+                                        <span className="text-sm text-gray-600">
+                                            {sendingProgress.total > 0 ? Math.round((sendingProgress.current / sendingProgress.total) * 100) : 0}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                        <div
+                                            className="bg-[#BF9853] h-2.5 rounded-full transition-all duration-300"
+                                            style={{ width: `${(sendingProgress.current / sendingProgress.total) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </body>
     );
 };

@@ -162,7 +162,7 @@ const RecordCard = ({ record, peopleOptions, purposeOptions }) => {
   );
 };
 
-const Report = ({ records, peopleOptions, purposeOptions }) => {
+const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = PAYMENT_MODE_OPTIONS }) => {
   const currentWeek = useMemo(() => getCurrentWeekRange(), []);
   const [startDate, setStartDate] = useState(toLocalDateString(currentWeek.start));
   const [endDate, setEndDate] = useState(toLocalDateString(currentWeek.end));
@@ -300,7 +300,7 @@ const Report = ({ records, peopleOptions, purposeOptions }) => {
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentModeFilter}
-        options={PAYMENT_MODE_OPTIONS.map((option) => option.label)}
+        options={paymentModeOptions.map((option) => option.label)}
         fieldName="Payment Mode"
         showStarIcon={false}
       />

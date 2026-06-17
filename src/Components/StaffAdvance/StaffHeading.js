@@ -8,8 +8,12 @@ import StaffSummary from './StaffSummary';
 import StaffAddInput from './StaffAddInput';
 import MobileStaffAdvance from '../../componentsMobile/StaffAdvance/StaffAdvance';
 import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
+import {
+    STAFF_ADVANCE_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
-const defaultPaymentModeOptions = [
+const DEFAULT_PAYMENT_MODE_OPTIONS = [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
     { value: 'PhonePe', label: 'PhonePe' },
@@ -53,25 +57,10 @@ const StaffHeading = ({ username, userRoles = [] }) => {
         };
     }, []);
 
-    const [paymentModeOptions, setPaymentModeOptions] = useState(defaultPaymentModeOptions);
-    useEffect(() => {
-        const fetchPaymentModes = async () => {
-            try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-                if (response.ok) {
-                    const data = await response.json();
-                    const formattedOptions = data.map((mode) => ({
-                        value: mode.modeOfPayment,
-                        label: mode.modeOfPayment,
-                    }));
-                    setPaymentModeOptions(formattedOptions);
-                }
-            } catch (error) {
-                console.error('Error fetching payment modes:', error);
-            }
-        };
-        fetchPaymentModes();
-    }, []);
+    const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+        STAFF_ADVANCE_MODULE_NAME,
+        DEFAULT_PAYMENT_MODE_OPTIONS
+    );
 
     const initialTab = getInitialStaffTab(username);
     const [activeTab, setActiveTab] = useState(() => initialTab);

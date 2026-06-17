@@ -8,9 +8,13 @@ import LoanReport from './LoanReport';
 import LoanSummary from './LoanSummary';
 import MobileLoanPortal from '../../componentsMobile/LoanPortal/LoanPortal';
 import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
+import {
+    LOAN_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
-// Payment Mode options
-const paymentModeOptions = [
+// Payment Mode options (fallback when Master Data arrangement is not configured)
+const DEFAULT_PAYMENT_MODE_OPTIONS = [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
     { value: 'PhonePe', label: 'PhonePe' },
@@ -42,6 +46,10 @@ const LoanPoratlHeading = ({ username, userRoles = [] }) => {
 
     const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
     const [refreshNonce, setRefreshNonce] = useState(0);
+    const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+        LOAN_PORTAL_MODULE_NAME,
+        DEFAULT_PAYMENT_MODE_OPTIONS
+    );
     const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
     useEffect(() => {

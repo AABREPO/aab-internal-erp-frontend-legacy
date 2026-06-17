@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 import axios from 'axios';
@@ -21,6 +21,10 @@ import {
     syncWeeklyPaymentBillsForRentManagement,
 } from '../../utils/rentManagementWeeklyPaymentBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import {
+    RENT_MANAGEMENT_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 import QRCode from '../Images/AAB_QR_CODE.jpeg';
 Modal.setAppElement('#root');
 
@@ -306,28 +310,14 @@ const RentDatabase = ({ username, userRoles = [], refreshSignal, isActive = true
     const handleCancel = () => {
         setModalIsOpen(false);
     };
-    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
-    useEffect(() => {
-        fetchPaymentModes();
-    }, []);
-    const fetchPaymentModes = async () => {
-        try {
-            const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-            if (response.ok) {
-                const data = await response.json();
-                const formattedOptions = data.map(mode => ({
-                    value: mode.modeOfPayment,
-                    label: mode.modeOfPayment
-                }));
-                setPaymentModeOptions(formattedOptions);
-            } else {
-                console.log('Error fetching tile area names.');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            console.log('Error fetching tile area names.');
-        }
-    };
+    const rentPaymentModes = usePaymentModesForModule(RENT_MANAGEMENT_MODULE_NAME);
+    const paymentModeOptions = useMemo(
+        () => rentPaymentModes.map((mode) => ({
+            value: mode.modeOfPayment,
+            label: mode.modeOfPayment,
+        })),
+        [rentPaymentModes]
+    );
     useEffect(() => {
         const fetchAccountDetails = async () => {
             try {

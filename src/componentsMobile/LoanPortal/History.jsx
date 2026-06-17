@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Filter from '../Images/Filter.png';
@@ -9,6 +9,10 @@ import Edit from '../Images/edit1.png';
 import Delete from '../Images/delete.png';
 import CloseIcon from '../Images/Close F.svg';
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
+import {
+  LOAN_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 const History = ({ user }) => {
   const resolveActiveBranchId = () => {
@@ -51,6 +55,22 @@ const History = ({ user }) => {
   const [showEntryNoModal, setShowEntryNoModal] = useState(false);
   const [showPurposeModal, setShowPurposeModal] = useState(false);
   const [showPaymentModeModal, setShowPaymentModeModal] = useState(false);
+  const defaultPaymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Advance Transfer', label: 'Advance Transfer' }
+  ];
+  const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+    LOAN_PORTAL_MODULE_NAME,
+    defaultPaymentModeOptions
+  );
+  const paymentModeFilterOptions = useMemo(
+    () => paymentModeOptions.map((opt) => opt.label),
+    [paymentModeOptions]
+  );
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [selectedDescription, setSelectedDescription] = useState('');
   const [showFilePreviewModal, setShowFilePreviewModal] = useState(false);
@@ -2119,7 +2139,7 @@ const History = ({ user }) => {
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentModeFilter}
-        options={['Cash', 'GPay', 'PhonePe', 'Net Banking', 'Cheque', 'Advance Transfer']}
+        options={paymentModeFilterOptions}
         fieldName="Mode"
         showStarIcon={false}
       />

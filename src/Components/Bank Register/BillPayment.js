@@ -9,6 +9,9 @@ import NotesEnd from '../Images/notes_end.png';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from 'xlsx';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
+import { BANK_REGISTER_MODULE_NAME } from '../../utils/paymentModeArrangement';
+import { isChequePaymentMode } from '../../utils/bankRegisterLogBeforeWeeklyBill';
 
 const BillPayment = ({ username, userRoles = [] }) => {
     const [billPayments, setBillPayments] = useState([]);
@@ -38,6 +41,7 @@ const BillPayment = ({ username, userRoles = [] }) => {
         accountNumber: ""
     });
     const [currentBillPaymentRow, setCurrentBillPaymentRow] = useState(null);
+    const paymentModeSelectOptions = usePaymentModeSelectOptionsForModule(BANK_REGISTER_MODULE_NAME, []);
     // Filter state variables
     const [showFilters, setShowFilters] = useState(false);
     const [selectDate, setSelectDate] = useState('');
@@ -1260,14 +1264,13 @@ const BillPayment = ({ username, userRoles = [] }) => {
                                                         className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
                                                     >
                                                         <option value="">Select Payment Mode</option>
-                                                        <option value="UPI">UPI</option>
-                                                        <option value="Net Banking">Net Banking</option>
-                                                        <option value="Cheque">Cheque</option>
-                                                        <option value="Cash">Cash</option>
+                                                        {paymentModeSelectOptions.map((opt) => (
+                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                        ))}
                                                     </select>
                                                 </div>
                                             </div>
-                                            {paymentPopupData.paymentMode === "Cheque" && (
+                                            {isChequePaymentMode(paymentPopupData.paymentMode) && (
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">Cheque No</label>

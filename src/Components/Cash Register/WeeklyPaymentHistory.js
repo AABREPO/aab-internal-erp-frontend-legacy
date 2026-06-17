@@ -5,7 +5,7 @@ import Delete from '../Images/Delete.svg';
 import history from '../Images/History.svg';
 import Change from '../Images/dropdownchange.png';
 import Select from 'react-select';
-import NotesStart from '../Images/notes _start.png';
+import NotesStart from '../Images/TextUpload.svg';
 import NotesEnd from '../Images/TextView.svg';
 import fileUpload from '../Images/FileUpload.svg';
 import file from '../Images/FileView.svg';
@@ -66,6 +66,12 @@ const entryRowSelectMenuListStyle = (provided) => ({
 });
 
 const WEEKLY_SUMMARY_FILE_API = 'https://backendaab.in/demoAabuildersDash/api/weekly_summary';
+
+const WEEKLY_PAYMENT_EDBC8_TABLE_CLASS =
+    '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_td#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_td#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_td#EDBC-8]:!overflow-hidden';
+
+const formatWeeklyPaymentAmountDisplay = (amount) =>
+    `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function cleanUrl(url) {
     if (!url) return url;
@@ -245,6 +251,13 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
     const [weeklySummaryDeleteLoading, setWeeklySummaryDeleteLoading] = useState(false);
     const [lastDeletedWeeklySummary, setLastDeletedWeeklySummary] = useState(null);
     const weeklySummaryFileInputRef = useRef(null);
+    const resolveWeeklySummaryBillCopyUrl = (record) => {
+        if (!record) return '';
+        return cleanUrl(record.summary_bill_copy_url ?? record.summaryBillCopyUrl ?? '');
+    };
+    const weeklySummaryBillCopyUrl = resolveWeeklySummaryBillCopyUrl(weeklySummaryFile);
+    const hasWeeklySummaryBillCopyUrl = Boolean(String(weeklySummaryBillCopyUrl || '').trim());
+    const weeklySummaryFileLabel = 'Signature.PDF';
     const fetchWeeklySummaryFile = useCallback(async () => {
         if (!selectedWeek || !year) {
             setWeeklySummaryFile(null);
@@ -925,7 +938,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         const file = e.target.files?.[0];
         e.target.value = "";
         if (!file || !selectedWeek || !year) return;
-        if (weeklySummaryFile) {
+        if (hasWeeklySummaryBillCopyUrl) {
             alert("A summary bill is already uploaded for this week. Remove it first to replace.");
             return;
         }
@@ -3582,6 +3595,20 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         onExportActionsReady({ generatePDF });
         return () => onExportActionsReady(null);
     }, [onExportActionsReady, isExpensesEntryUploadOnly, generatePDF]);
+    const expensesDstCol21Label = 'S.No';
+    const expensesDstCol2Label = 'Date';
+    const expensesDstCol4Label = 'Associate';
+    const expensesDstCol4ClientLabel = 'Client Name';
+    const expensesDstCol3Label = 'Project Name';
+    const expensesDstCol12Label = 'Type';
+    const expensesDstCol8Label = 'Amount';
+    const expensesDstCol20FileLabel = 'File';
+    const expensesDstCol20ActivityLabel = 'Activity';
+    const expensesAssociateLabel = isClientToggleActive ? expensesDstCol4ClientLabel : expensesDstCol4Label;
+    const paymentsDstCol2Label = 'Date';
+    const paymentsDstCol8Label = 'Amount';
+    const paymentsDstCol12Label = 'Type';
+    const paymentsDstCol20Label = 'Activity';
     return (
         <body className="bg-[#FAF6ED] overflow-hidden">
             <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
@@ -3798,7 +3825,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                         )}
                         <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden">
                             <div className={`flex flex-col min-h-0 overflow-hidden ${isExpensesEntryUploadOnly ? 'w-full min-w-0 flex-1' : 'min-w-[1240] max-w-[1240] shrink-0'}`}>
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center mb-[8px]">
                                     <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                         ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -3865,41 +3892,42 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                         onMouseLeave={() => handleMouseUp(scrollRef)}
                                     >
                                         {isExpensesEntryUploadOnly ? (
-                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0`}>
+                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
                                                 <thead className="sticky top-0 z-10 bg-white">
                                                     <EdbcTableHeaderRow>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={expensesDstCol2Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={expensesDstCol4Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} />
                                                         <th
                                                             id={EDBC_IDS.EDBC20}
-                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim()}
+                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim() + ' !pr-0'}
+                                                            style={{ paddingRight: 0 }}
                                                             aria-hidden="true"
                                                         />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="Activity" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20ActivityLabel} />
                                                     </EdbcTableHeaderRow>
                                                     {showFilters && (
                                                         <EdbcTableFilterRow>
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
                                                             <EdbcDateFilter
-                                                                placeholder="Date"
+                                                                placeholder={expensesDstCol2Label}
                                                                 value={selectDate}
                                                                 onChange={setSelectDate}
                                                             />
                                                             <EdbcSelectFilter
                                                                 columnId={EDBC_IDS.EDBC4}
-                                                                placeholder="Associate"
+                                                                placeholder={expensesDstCol4Label}
                                                                 options={contractorVendorFilterOptions}
                                                                 value={selectContractororVendorName}
                                                                 onChange={setSelectContractororVendorName}
                                                                 selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                             />
                                                             <EdbcProjectNameFilter
-                                                                placeholder="Project Name"
+                                                                placeholder={expensesDstCol3Label}
                                                                 options={projectFilterOptions}
                                                                 value={selectProjectName}
                                                                 onChange={setSelectProjectName}
@@ -3908,7 +3936,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             />
                                                             <EdbcSelectFilter
                                                                 columnId={EDBC_IDS.EDBC12}
-                                                                placeholder="Type"
+                                                                placeholder={expensesDstCol12Label}
                                                                 options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
                                                                 value={selectType}
                                                                 onChange={setSelectType}
@@ -3917,6 +3945,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             <EdbcTotalAmountFilter
                                                                 columnId={EDBC_IDS.EDBC8}
                                                                 totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                                placeholder={expensesDstCol8Label}
                                                             />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
@@ -3967,9 +3996,9 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 expandedCells={expandedCells}
                                                                 onToggleExpanded={toggleExpandedCell}
                                                                 textAlignClass="text-right"
-                                                                getDisplayValue={(entry) => Number(entry.amount).toLocaleString('en-IN')}
+                                                                getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
                                                             />
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                                 <div className="flex w-full items-center justify-center">
                                                                     <span className="inline-flex items-center gap-1">
@@ -4016,54 +4045,51 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     >
                                                                                         Restore
                                                                                     </button>
-                                                                                ) : (
-                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center pointer-events-none" aria-hidden="true">
-                                                                                        <span className="text-[22px] font-bold leading-none opacity-0">×</span>
-                                                                                    </span>
-                                                                                )}
+                                                                                ) : null}
                                                                             </>
                                                                         )}
                                                                     </span>
                                                                 </div>
                                                             </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
                                                         </EdbcTableBodyRow>
                                                     ))}
                                                 </tbody>
                                             </table>
                                         ) : (
-                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0`}>
+                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
                                                 <thead className="sticky top-0 z-10 bg-white">
                                                     <EdbcTableHeaderRow>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label="S.No" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={expensesDstCol2Label} />
                                                         <EdbcColumnHeader
                                                             columnId={EDBC_IDS.EDBC4}
-                                                            label={isClientToggleActive ? "Client Name" : "Associate"}
+                                                            label={expensesAssociateLabel}
                                                         />
                                                         <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible" aria-hidden="true"></th>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} />
                                                         <th
                                                             id={EDBC_IDS.EDBC20}
-                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim()}
+                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim() + ' !pr-0'}
+                                                            style={{ paddingRight: 0 }}
                                                             aria-hidden="true"
                                                         />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="Activity" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20ActivityLabel} />
                                                     </EdbcTableHeaderRow>
                                                     {showFilters && (
                                                         <EdbcTableFilterRow>
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
                                                             <EdbcDateFilter
-                                                                placeholder="Date"
+                                                                placeholder={expensesDstCol2Label}
                                                                 value={selectDate}
                                                                 onChange={setSelectDate}
                                                             />
                                                             <EdbcSelectFilter
                                                                 columnId={EDBC_IDS.EDBC4}
-                                                                placeholder={isClientToggleActive ? "Client Name" : "Associate"}
+                                                                placeholder={expensesAssociateLabel}
                                                                 options={contractorVendorFilterOptions}
                                                                 value={selectContractororVendorName}
                                                                 onChange={setSelectContractororVendorName}
@@ -4071,7 +4097,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             />
                                                             <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></th>
                                                             <EdbcProjectNameFilter
-                                                                placeholder="Project Name"
+                                                                placeholder={expensesDstCol3Label}
                                                                 options={projectFilterOptions}
                                                                 value={selectProjectName}
                                                                 onChange={setSelectProjectName}
@@ -4080,7 +4106,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             />
                                                             <EdbcSelectFilter
                                                                 columnId={EDBC_IDS.EDBC12}
-                                                                placeholder="Type"
+                                                                placeholder={expensesDstCol12Label}
                                                                 options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
                                                                 value={selectType}
                                                                 onChange={setSelectType}
@@ -4089,6 +4115,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             <EdbcTotalAmountFilter
                                                                 columnId={EDBC_IDS.EDBC8}
                                                                 totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                                placeholder={expensesDstCol8Label}
                                                             />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
@@ -4108,7 +4135,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     <CustomDateField
                                                                         value={newExpense.date}
                                                                         onChange={(dateStr) => handleExpenseChange({ target: { name: 'date', value: dateStr } })}
-                                                                        placeholder="Date"
+                                                                        placeholder={expensesDstCol2Label}
                                                                         alwaysOpenBelow
                                                                         controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
                                                                         className={` [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newExpense.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
@@ -4257,7 +4284,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                             }
                                                                         }}
                                                                         options={isClientToggleActive ? clientOptions : combinedOptions}
-                                                                        placeholder={isClientToggleActive ? "Client Name" : "Contractor/Vendor"}
+                                                                        placeholder={expensesAssociateLabel}
                                                                         isSearchable
                                                                         isClearable
                                                                         menuPortalTarget={document.body}
@@ -4316,7 +4343,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                             setProjectId(selectedOption ? selectedOption.id : "");
                                                                         }}
                                                                         options={(isClientToggleActive && clientProjectOptions.length > 0) ? clientProjectOptions : siteOptionsForNewEntry}
-                                                                        placeholder={isClientToggleActive ? "Client Project..." : "Project Name..."}
+                                                                        placeholder={expensesDstCol3Label}
                                                                         isSearchable
                                                                         menuPortalTarget={document.body}
                                                                         menuPosition="fixed"
@@ -4347,7 +4374,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                         value={newExpense.type ? { value: newExpense.type, label: newExpense.type } : null}
                                                                         onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
                                                                         options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
-                                                                        placeholder="Select Type..."
+                                                                        placeholder={expensesDstCol12Label}
                                                                         isSearchable
                                                                         isClearable
                                                                         menuPortalTarget={document.body}
@@ -4374,7 +4401,8 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                         type="number"
                                                                         name="amount"
                                                                         style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                                                                        className="p-1 rounded-lg bg-transparent w-full box-border font-normal border-2 border-[#BF9853] border-opacity-25 focus:outline-none no-spinner text-right"
+                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                        placeholder={expensesDstCol8Label}
                                                                         value={newExpense.amount}
                                                                         onChange={handleExpenseChange}
                                                                         onKeyDown={handleKeyDown}
@@ -4383,9 +4411,9 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     />
                                                                 </div>
                                                             </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
                                                         </tr>
                                                     ) : null}
                                                 </thead>
@@ -4469,7 +4497,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                             }
                                                                         }}
                                                                         options={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? clientOptions : combinedOptions}
-                                                                        placeholder={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? "Client Name" : "Select Contractor/Vendor"}
+                                                                        placeholder={((isClientToggleActive || (!row.contractor_id && !row.vendor_id && !row.employee_id && (row.client_name || row.client_id))) && ["Loan", "Bank", "Claim"].includes(row.type)) ? expensesDstCol4ClientLabel : expensesDstCol4Label}
                                                                         isSearchable
                                                                         isClearable
                                                                         menuPortalTarget={document.body}
@@ -4522,7 +4550,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                             )
                                                                         }
                                                                         options={siteOptions}
-                                                                        placeholder="Select Project"
+                                                                        placeholder={expensesDstCol3Label}
                                                                         isSearchable
                                                                         isClearable
                                                                         menuPortalTarget={document.body}
@@ -4609,25 +4637,36 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
-                                                                {editingRowId === row.id ? (
-                                                                    <input
-                                                                        type="number"
-                                                                        name="amount"
-                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass || ''} h-[38px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner text-right`}
-                                                                        value={row.amount}
-                                                                        onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
-                                                                        disabled={editingRowId !== row.id}
-                                                                        onWheel={(e) => e.preventDefault()}
-                                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                                    />
-                                                                ) : (
-                                                                    Number(row.amount).toLocaleString('en-IN')
-                                                                )}
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                <div className="flex items-center justify-between">
+                                                            {editingRowId === row.id ? (
+                                                                <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                        <input
+                                                                            type="number"
+                                                                            name="amount"
+                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner border-[3px] border-[#BF9853] border-opacity-[20%]`}
+                                                                            value={row.amount}
+                                                                            onChange={(e) => handleEditExpense(row.id, 'amount', e.target.value)}
+                                                                            disabled={editingRowId !== row.id}
+                                                                            onWheel={(e) => e.preventDefault()}
+                                                                            onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                            onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC8}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    textAlignClass="text-right"
+                                                                    getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
+                                                                />
+                                                            )}
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}>
+                                                                <div className="flex items-center w-[70px] gap-[20px]">
                                                                 {row.type !== "Daily" ? (
                                                                     <button
                                                                         type="button"
@@ -4649,7 +4688,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                         className=" text-white flex items-center justify-center transition-colors text-xs"
                                                                         title="Add Payment"
                                                                     >
-                                                                        <img src={AddExtra} className="w-4 h-4" alt="Add Payment" />
+                                                                        <img src={AddExtra} className="w-[18px] h-[18px]" alt="Add Payment" />
                                                                     </button>
                                                                 ) : null}
                                                                 {row.type === "Project Advance" ? (
@@ -4677,7 +4716,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                         <img
                                                                             src={portalDescriptions[row.advance_portal_id] ? NotesEnd : NotesStart}
                                                                             alt="Notes"
-                                                                            className="w-4 h-4"
+                                                                            className="w-[18px] h-[18px]"
                                                                         />
                                                                     </button>
                                                                 ) : null}
@@ -4729,11 +4768,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                     >
                                                                                         Restore
                                                                                     </button>
-                                                                                ) : (
-                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center pointer-events-none" aria-hidden="true">
-                                                                                        <img src={FileRemover} className="w-2 h-2 opacity-0" alt="" />
-                                                                                    </span>
-                                                                                )}
+                                                                                ) : null}
                                                                             </>
                                                                         )}
                                                                     </span>
@@ -4807,14 +4842,14 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                             </div>
                             {!isExpensesEntryUploadOnly && (
                                 <div className="w-fit shrink-0 flex flex-col">
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center mb-[8px]">
                                         <h1 className="font-bold text-base">Income</h1>
                                         <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                             ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </h1>
                                     </div>
-                                    <div className={`text-left flex ${(selectPaymentDate || selectPaymentAmount || selectPaymentType) ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
-                                        <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
+                                    <div className="text-left flex flex-row items-center mb-[12px] gap-[6px] w-full">
+                                        <div className="flex flex-row items-center sm:space-x-3 min-w-0 overflow-hidden">
                                             <EdbcFilterToggleButton onClick={() => setShowPaymentsFilters(!showPaymentsFilters)} />
                                             {(selectPaymentDate || selectPaymentAmount || selectPaymentType) && (
                                                 <div
@@ -4853,11 +4888,12 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             onClearFilters={clearPaymentsFilters}
                                             overallSearch={paymentsOverallSearch}
                                             onOverallSearchChange={setPaymentsOverallSearch}
-                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 max-w-[143px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 sm:w-[143px] sm:min-w-[143px] sm:flex-none sm:shrink-0"
+                                            wrapperClassName="flex items-end gap-[6px] min-w-0 flex-1 justify-end"
+                                            searchWrapperClassName="h-[34px] min-w-0 w-1/2 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1"
                                         />
                                     </div>
                                     <div className="shrink-0">
-                                        <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar"
+                                        <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar"
                                             style={{
                                                 height: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
                                                 maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
@@ -4872,37 +4908,38 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
                                             onWheel={(e) => e.stopPropagation()}
                                         >
-                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_th#EDBC-8]:!box-border [&_td#EDBC-8]:!box-border [&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0`}>
+                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
                                                 
                                                 <thead className="sticky top-0 z-[99999] bg-white">
                                                     <EdbcTableHeaderRow>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="Activity" />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={paymentsDstCol2Label} columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={paymentsDstCol12Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={paymentsDstCol8Label} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={paymentsDstCol20Label} />
                                                     </EdbcTableHeaderRow>
                                                     {showPaymentsFilters && (
                                                         <EdbcTableFilterRow>
                                                             <EdbcDateFilter
-                                                                placeholder="Date"
+                                                                placeholder={paymentsDstCol2Label}
                                                                 value={selectPaymentDate}
                                                                 onChange={setSelectPaymentDate}
                                                             />
-                                                            <EdbcTotalAmountFilter
-                                                                columnId={EDBC_IDS.EDBC8}
-                                                                totalAmount={payments.reduce((total, row) => total + Number(row.amount || 0), 0)}
-                                                                value={selectPaymentAmount}
-                                                                onChange={(e) => setSelectPaymentAmount(e.target.value)}
-                                                            />
                                                             <EdbcSelectFilter
                                                                 columnId={EDBC_IDS.EDBC12}
-                                                                placeholder="Type"
+                                                                placeholder={paymentsDstCol12Label}
                                                                 options={weeklyReceivedTypes.map((type) => ({
                                                                     value: type.received_type,
                                                                     label: type.received_type,
                                                                 }))}
                                                                 value={selectPaymentType}
                                                                 onChange={setSelectPaymentType}
+                                                            />
+                                                            <EdbcTotalAmountFilter
+                                                                columnId={EDBC_IDS.EDBC8}
+                                                                totalAmount={payments.reduce((total, row) => total + Number(row.amount || 0), 0)}
+                                                                value={selectPaymentAmount}
+                                                                onChange={(e) => setSelectPaymentAmount(e.target.value)}
+                                                                placeholder={paymentsDstCol8Label}
                                                             />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                                                         </EdbcTableFilterRow>
@@ -4917,27 +4954,13 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     <CustomDateField
                                                                         value={newPayment.date}
                                                                         onChange={(dateStr) => handlePaymentChange({ target: { name: 'date', value: dateStr } })}
-                                                                        placeholder="Date"
+                                                                        placeholder={paymentsDstCol2Label}
                                                                         alwaysOpenBelow
                                                                         calendarPortal
                                                                         controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
                                                                         className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newPayment.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
                                                                     />
                                                                 </div>
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterThClass}>
-                                                                <input
-                                                                    type="number"
-                                                                    name="amount"
-                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
-                                                                    value={newPayment.amount}
-                                                                    onChange={handlePaymentChange}
-                                                                    onKeyDown={handleKeyDown1}
-                                                                    onWheel={(e) => e.preventDefault()}
-                                                                    onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                                    onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                                />
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
                                                                 <div
@@ -4950,7 +4973,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                         value={newPayment.type ? { value: newPayment.type, label: newPayment.type } : null}
                                                                         onChange={(selectedOption) => handlePaymentChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
                                                                         options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
-                                                                        placeholder="Select Type..."
+                                                                        placeholder={paymentsDstCol12Label}
                                                                         isSearchable
                                                                         isClearable
                                                                         menuPortalTarget={document.body}
@@ -4971,7 +4994,24 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     />
                                                                 </div>
                                                             </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}></td>
+                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                        placeholder={paymentsDstCol8Label}
+                                                                        value={newPayment.amount}
+                                                                        onChange={handlePaymentChange}
+                                                                        onKeyDown={handleKeyDown1}
+                                                                        onWheel={(e) => e.preventDefault()}
+                                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
                                                         </EdbcTableBodyRow>
                                                     ) : null}
                                                 </thead>
@@ -5021,35 +5061,6 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 />
                                                             )}
                                                             {editingPaymentId === (row.id || null) ? (
-                                                                <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={row.amount || ""}
-                                                                        onChange={(e) =>
-                                                                            handleEditPayment(index, "amount", e.target.value)
-                                                                        }
-                                                                        className={`p-1 rounded-md bg-transparent box-border ${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass || ''} h-[38px] font-normal border-[3px] border-[#BF9853] border-opacity-[20%] focus:outline-none no-spinner text-right`}
-                                                                        onWheel={(e) => e.preventDefault()}
-                                                                        onFocus={() =>
-                                                                            window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
-                                                                        }
-                                                                        onBlur={() =>
-                                                                            window.removeEventListener("wheel", (e) => e.preventDefault())
-                                                                        }
-                                                                    />
-                                                                </td>
-                                                            ) : (
-                                                                <EdbcExpandableBodyCell
-                                                                    columnId={EDBC_IDS.EDBC8}
-                                                                    expense={row}
-                                                                    rowIndex={index}
-                                                                    expandedCells={expandedCells}
-                                                                    onToggleExpanded={toggleExpandedCell}
-                                                                    textAlignClass="text-right"
-                                                                    getDisplayValue={(entry) => `₹${Number(entry.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                                                />
-                                                            )}
-                                                            {editingPaymentId === (row.id || null) ? (
                                                                 <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
                                                                     <select
                                                                         value={row.type || ""}
@@ -5075,6 +5086,38 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                     expandedCells={expandedCells}
                                                                     onToggleExpanded={toggleExpandedCell}
                                                                     getDisplayValue={(entry) => entry.type}
+                                                                />
+                                                            )}
+                                                            {editingPaymentId === (row.id || null) ? (
+                                                                <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={row.amount || ""}
+                                                                            onChange={(e) =>
+                                                                                handleEditPayment(index, "amount", e.target.value)
+                                                                            }
+                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner border-[3px] border-[#BF9853] border-opacity-[20%]`}
+                                                                            onWheel={(e) => e.preventDefault()}
+                                                                            onFocus={() =>
+                                                                                window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
+                                                                            }
+                                                                            onBlur={() =>
+                                                                                window.removeEventListener("wheel", (e) => e.preventDefault())
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ) : (
+                                                                <EdbcExpandableBodyCell
+                                                                    columnId={EDBC_IDS.EDBC8}
+                                                                    expense={row}
+                                                                    rowIndex={index}
+                                                                    expandedCells={expandedCells}
+                                                                    onToggleExpanded={toggleExpandedCell}
+                                                                    textAlignClass="text-right"
+                                                                    getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
                                                                 />
                                                             )}
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
@@ -5140,7 +5183,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                         </div>
                                     </div>
                                     <div className="mt-2 shrink-0 rounded-xl bg-white p-[10px] border border-[#E0E0E0] shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-left">
-                                        <div className="rounded-lg border border-[#E0E0E0] p-[10px]">
+                                        <div className="rounded-lg border border-[#E0E0E0] p-[10px] overflow-y-auto no-scrollbar max-h-[180px]">
                                             <div className="flex items-center justify-between rounded-lg mb-[4px]">
                                                 <p className="text-[14px] font-semibold text-black">Summary Details</p>
                                                 <div className="flex items-center gap-2">
@@ -5166,30 +5209,45 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                         accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
                                                         onChange={handleWeeklySummaryFileChange}
                                                     />
-                                                    <button
-                                                        type="button"
-                                                        disabled={weeklySummaryUploading}
-                                                        onClick={() => weeklySummaryFileInputRef.current?.click()}
-                                                        className="flex items-center gap-1 text-[12px] text-[#666666] disabled:opacity-50"
-                                                        title="Upload Signature Copy for this week"
-                                                    >
-                                                        <img src={fileUpload} alt="" className="w-4 h-4" />
-                                                        {weeklySummaryUploading ? "Uploading…" : "Signature"}
-                                                    </button>
-                                                    {weeklySummaryFile && canEditDelete && (
+                                                    {hasWeeklySummaryBillCopyUrl ? (
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <a
+                                                                href={weeklySummaryBillCopyUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-[12px] font-normal text-[#BF9853] hover:underline"
+                                                                title="View Signature Copy"
+                                                            >
+                                                                {weeklySummaryFileLabel}
+                                                            </a>
+                                                            {canEditDelete && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={weeklySummaryDeleteLoading}
+                                                                    onClick={handleWeeklySummaryMarkDeleted}
+                                                                    className="inline-flex shrink-0 items-center justify-center rounded-full p-0 leading-none border-0 bg-transparent disabled:opacity-50"
+                                                                    title="Remove Signature Copy"
+                                                                >
+                                                                    <img
+                                                                        src={Delete}
+                                                                        className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                        alt="Delete"
+                                                                    />
+                                                                </button>
+                                                            )}
+                                                        </span>
+                                                    ) : canEditDelete ? (
                                                         <button
                                                             type="button"
-                                                            disabled={weeklySummaryDeleteLoading}
-                                                            onClick={handleWeeklySummaryMarkDeleted}
-                                                            className="rounded-full transition duration-200 p-0 leading-none disabled:opacity-50"
+                                                            disabled={weeklySummaryUploading || weeklySummaryLoading}
+                                                            onClick={() => weeklySummaryFileInputRef.current?.click()}
+                                                            className="inline-flex flex-row items-center gap-1 rounded border border-[#a1a1a1] px-2 h-[34px] shrink-0 text-[12px] font-normal text-[#666666] disabled:opacity-50"
+                                                            title="Upload Signature Copy for this week"
                                                         >
-                                                            <img
-                                                                src={Delete}
-                                                                className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                alt="Delete"
-                                                            />
+                                                            <span>{weeklySummaryUploading ? "Uploading…" : "Signature"}</span>
+                                                            <img src={fileUpload} alt="" className="w-4 h-4 shrink-0" />
                                                         </button>
-                                                    )}
+                                                    ) : null}
                                                 </div>
                                             </div>
                                             {Object.entries(

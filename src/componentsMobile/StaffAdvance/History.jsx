@@ -154,7 +154,7 @@ const RecordCard = ({ record, peopleOptions, purposeOptions }) => {
   );
 };
 
-const History = ({ records, peopleOptions, purposeOptions }) => {
+const History = ({ records, peopleOptions, purposeOptions, paymentModeOptions = PAYMENT_MODE_OPTIONS }) => {
   const [typeFilter, setTypeFilter] = useState('');
   const [personFilter, setPersonFilter] = useState('');
   const [entryNoFilter, setEntryNoFilter] = useState('');
@@ -286,7 +286,7 @@ const History = ({ records, peopleOptions, purposeOptions }) => {
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentModeFilter}
-        options={PAYMENT_MODE_OPTIONS.map((option) => option.label)}
+        options={paymentModeOptions.map((option) => option.label)}
         fieldName="Mode"
         showStarIcon={false}
       />

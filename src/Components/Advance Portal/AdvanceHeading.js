@@ -7,15 +7,18 @@ import AdvanceReport from './AdvanceReport';
 import AdvanceSummary from './AdvanceSummary';
 import MobileProjectAdvance from '../../componentsMobile/ProjectAdvance/ProjectAdvance';
 import { isMobileViewportWidth } from '../../constants/mobileBreakpoint';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
-// Payment Mode options
-const paymentModeOptions = [
+const DEFAULT_PAYMENT_MODE_OPTIONS = [
     { value: 'Cash', label: 'Cash' },
     { value: 'GPay', label: 'GPay' },
     { value: 'PhonePe', label: 'PhonePe' },
     { value: 'Net Banking', label: 'Net Banking' },
     { value: 'Cheque', label: 'Cheque' },
-    { value: 'Direct', label:'Direct'}
+    { value: 'Direct', label: 'Direct' },
 ];
 
 const ADVANCE_MODULE_TABS = ['advanceportal', 'advacetablview', 'advancedatabase', 'advancereport', 'advancesummary'];
@@ -41,6 +44,10 @@ const AdvanceHeading = ({ username, userRoles = [] }) => {
 
     const [isMobile, setIsMobile] = useState(() => isMobileViewportWidth());
     const [refreshNonce, setRefreshNonce] = useState(0);
+    const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+        ADVANCE_PORTAL_MODULE_NAME,
+        DEFAULT_PAYMENT_MODE_OPTIONS
+    );
     const bumpRefresh = () => setRefreshNonce((n) => n + 1);
 
     useEffect(() => {

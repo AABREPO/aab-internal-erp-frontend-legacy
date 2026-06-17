@@ -12,6 +12,10 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+  LOAN_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 const LoanForm = () => {
   // Resolve module permissions (Create/Edit/Delete) for mobile actions.
@@ -166,33 +170,13 @@ const LoanForm = () => {
     { value: 'Advance Transfer', label: 'Advance Transfer' }
   ], []);
 
-  const [backendPaymentModeOptions, setBackendPaymentModeOptions] = useState([]);
+  const backendPaymentModeOptions = usePaymentModeSelectOptionsForModule(
+    LOAN_PORTAL_MODULE_NAME,
+    defaultPaymentModeOptions
+  );
   const finalPaymentModeOptions = backendPaymentModeOptions.length > 0
     ? backendPaymentModeOptions
     : defaultPaymentModeOptions;
-
-  useEffect(() => {
-    const fetchPaymentModes = async () => {
-      try {
-        const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-        if (response.ok) {
-          const data = await response.json();
-          const options = Array.isArray(data)
-            ? data
-              .filter(mode => mode.modeOfPayment)
-              .map(mode => ({ value: mode.modeOfPayment, label: mode.modeOfPayment }))
-            : [];
-          if (!options.some(option => option.value === 'Advance Transfer')) {
-            options.push({ value: 'Advance Transfer', label: 'Advance Transfer' });
-          }
-          setBackendPaymentModeOptions(options);
-        }
-      } catch (error) {
-        console.error('Error fetching payment modes:', error);
-      }
-    };
-    fetchPaymentModes();
-  }, []);
 
   useEffect(() => {
     accountDetailsLoadedRef.current = false;

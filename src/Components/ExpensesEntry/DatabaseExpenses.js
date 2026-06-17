@@ -51,6 +51,14 @@ import {
 } from './databaseExpensesSharedColumns';
 import { useExpensesListLoader } from './expensesListStore';
 import { uploadExpensesEntryBillCopy } from './expensesBillCopyUpload';
+import {
+    EXPENSE_ENTRY_MODULE_NAME,
+    sortEdbcFilterOptionsByArrangement,
+} from '../../utils/paymentModeArrangement';
+import {
+    useModulePaymentModeArrangementList,
+    usePaymentModesForModule,
+} from '../../utils/usePaymentModeArrangement';
 Modal.setAppElement('#root');
 const TOOLS_API_BASE = 'https://backendaab.in/demoAabuildersDash';
 const BLANK_VALUE = 'BLANK';
@@ -418,7 +426,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [sortField, setSortField] = useState('');
     const [sortDirection, setSortDirection] = useState('asc');
     const [userPermissions, setUserPermissions] = useState([]);
-    const moduleName = "Expense Entry";
+    const moduleName = EXPENSE_ENTRY_MODULE_NAME;
     const defaultPaymentModeOptions = [
         { modeOfPayment: 'Cash' },
         { modeOfPayment: 'GPay' },
@@ -426,22 +434,11 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         { modeOfPayment: 'Net Banking' },
         { modeOfPayment: 'Cheque' }
     ];
-    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const paymentModeOptions = usePaymentModesForModule(moduleName, {
+        fallbackModes: defaultPaymentModeOptions,
+    });
+    const expenseEntryPaymentModeOrder = useModulePaymentModeArrangementList(moduleName);
     const finalPaymentModeOptions = paymentModeOptions.length > 0 ? paymentModeOptions : defaultPaymentModeOptions;
-    useEffect(() => {
-        const fetchPaymentModes = async () => {
-            try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-                if (response.ok) {
-                    const data = await response.json();
-                    setPaymentModeOptions(Array.isArray(data) ? data : []);
-                }
-            } catch (error) {
-                console.error('Error fetching payment modes:', error);
-            }
-        };
-        fetchPaymentModes();
-    }, []);
     useEffect(() => {
         const fetchUserRoles = async () => {
             try {
@@ -1306,7 +1303,12 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setContractorOptions(getOptions(filtered, "contractor"));
         setCategoryOptions(getOptions(filtered, "category"));
         setSourceOptions(getOptions(filtered, "source"));
-        setPaymentModeFilterOptions(getOptions(filtered, "paymentMode"));
+        setPaymentModeFilterOptions(
+            sortEdbcFilterOptionsByArrangement(
+                getOptions(filtered, "paymentMode"),
+                expenseEntryPaymentModeOrder
+            )
+        );
         const uniqueStaff = [];
         const seenStaff = new Set();
         let hasBlankStaff = false;
@@ -1411,7 +1413,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         uniqueEno.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEno);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions, expenseEntryPaymentModeOrder]);
     useEffect(() => {
         if (filterScrollResetSkipRef.current) {
             filterScrollResetSkipRef.current = false;

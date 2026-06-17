@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Filter from '../Images/Filter.png';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import UploadFile from '../Images/Upload Small.svg';
@@ -8,6 +8,10 @@ import DeleteConfirmModal from '../PurchaseOrder/DeleteConfirmModal';
 import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
+import {
+  ADVANCE_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 // ISO 8601 week helpers (same as AdvanceReport.js)
 const getISOWeekNumber = (date) => {
@@ -134,6 +138,22 @@ const History = ({ onVendorClick, user } = {}) => {
   const [showEntryNoModal, setShowEntryNoModal] = useState(false);
   const [showProjectNameModal, setShowProjectNameModal] = useState(false);
   const [showPaymentModeModal, setShowPaymentModeModal] = useState(false);
+  const defaultPaymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Online', label: 'Online' }
+  ];
+  const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+    ADVANCE_PORTAL_MODULE_NAME,
+    defaultPaymentModeOptions
+  );
+  const paymentModeFilterOptions = useMemo(
+    () => paymentModeOptions.map((opt) => opt.label),
+    [paymentModeOptions]
+  );
 
   // Swipe-to-upload: same as PO History Clone - right swipe reveals upload button on left
   const [swipeStates, setSwipeStates] = useState({});
@@ -1704,7 +1724,7 @@ const History = ({ onVendorClick, user } = {}) => {
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentModeFilter}
-        options={['Cash', 'GPay', 'PhonePe', 'Net Banking', 'Cheque', 'Online']}
+        options={paymentModeFilterOptions}
         fieldName="Mode"
         showStarIcon={false}
         zIndex={10000}

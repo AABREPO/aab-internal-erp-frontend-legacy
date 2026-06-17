@@ -2,6 +2,10 @@ import { prefetchIncomingTrackerData } from '../componentsMobile/Inventory/incom
 import { prefetchInventoryNetStockData } from '../componentsMobile/Inventory/inventoryNetStockPrefetch';
 import { prefetchToolsNetStockData } from '../componentsMobile/ToolsTracker/netStockPrefetch';
 import { populateExpensesFormCache } from './expensesFormPrefetch';
+import {
+  populatePaymentModeArrangementCache,
+  populatePaymentModesMasterCache,
+} from './paymentModeArrangement';
 
 export const ORBIT_MODULE_SYNC_INTERVAL_MS = 20_000;
 const SYNC_INTERVAL_MS = ORBIT_MODULE_SYNC_INTERVAL_MS;
@@ -12,6 +16,11 @@ const PAGE_TABLE_REFRESH_EVENT = 'orbitPageTableRefresh';
 const BASE8081 = 'https://backendaab.in/demoAabuilderDash/api';
 const BASE8082 = 'https://backendaab.in/demoAabuildersDash/api';
 const EXP8081 = 'https://backendaab.in/demoAabuilderDash';
+const PAYMENT_MODE_GET_ALL_URL = `${BASE8082}/payment_mode/getAll`;
+const PAYMENT_MODE_ARRANGEMENT_GET_ALL_URL = `${BASE8082}/payment_mode_arrangement/getAll`;
+
+const prefetchPaymentModeArrangementData = () =>
+  fetchAll([PAYMENT_MODE_GET_ALL_URL, PAYMENT_MODE_ARRANGEMENT_GET_ALL_URL]);
 
 let lastSyncedAt = null;
 let isSyncing = false;
@@ -28,17 +37,20 @@ const ORBIT_SYNC_MODULES = [
     id: 'expense-entry',
     paths: ['/expense-entry'],
     notifyEvent: 'expensesDataSync',
-    run: () =>
-      fetchAll(
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll(
         [`${EXP8081}/expenses_form/get_form`, `${BASE8081}/expenses_categories/getAll`],
         { useBranch: true }
-      ),
+      );
+    },
   },
   {
     id: 'portal',
     paths: ['/portal'],
     notifyEvent: 'advanceUpdated',
     run: async () => {
+      await prefetchPaymentModeArrangementData();
       await fetchAll([`${BASE8082}/advance_portal/getAll`, `${BASE8082}/weekly-payment-bills/all`]);
       await fetchJson(`${EXP8081}/expenses_form/get_form`, { useBranch: true });
     },
@@ -47,70 +59,86 @@ const ORBIT_SYNC_MODULES = [
     id: 'loan',
     paths: ['/loan'],
     notifyEvent: 'loanUpdated',
-    run: () =>
-      fetchAll(
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll(
         [
           `${BASE8082}/loans/all`,
           `${BASE8082}/loan-purposes/getAll`,
           `${BASE8082}/weekly-payment-bills/all`,
         ],
         { useBranch: true }
-      ),
+      );
+    },
   },
   {
     id: 'staffadvance',
     paths: ['/staffadvance'],
     notifyEvent: 'staffAdvanceUpdated',
-    run: () => fetchAll([`${BASE8082}/staff-advance/all`, `${BASE8082}/weekly-payment-bills/all`]),
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll([`${BASE8082}/staff-advance/all`, `${BASE8082}/weekly-payment-bills/all`]);
+    },
   },
   {
     id: 'rent',
     paths: ['/rent'],
     notifyEvent: 'rentDataSync',
-    run: () =>
-      fetchAll([
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll([
         `${BASE8082}/rental_forms/getAll`,
         `${BASE8082}/tenant_link_shop/getAll`,
         `${BASE8082}/weekly-payment-bills/all`,
-      ]),
+      ]);
+    },
   },
   {
     id: 'tracker',
     paths: ['/tracker'],
     notifyEvent: 'billTrackerDataSync',
-    run: () =>
-      fetchAll([
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll([
         `${BASE8082}/vendor-payments/trackers/pending`,
         `${BASE8082}/vendor-payments/trackers/enriched/paid`,
         `${BASE8082}/bill-entry/getAll`,
         `${BASE8082}/weekly-payment-bills/all`,
-      ]),
+      ]);
+    },
   },
   {
     id: 'weekly-payment',
     paths: ['/weekly-payment'],
     notifyEvent: 'weeklyPaymentDataSync',
-    run: () =>
-      fetchAll([
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll([
         `${BASE8082}/weekly-payment-bills/all`,
         `${BASE8082}/weekly-expenses/getAll`,
-      ]),
+      ]);
+    },
   },
   {
     id: 'bank-register',
     paths: ['/bank-register', '/orbit-erp/bill-payment'],
     notifyEvent: 'bankRegisterDataSync',
-    run: () =>
-      fetchAll(
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll(
         [`${BASE8082}/weekly-payment-bills/all`, `${BASE8082}/account-details/getAll`],
         { useBranch: true }
-      ),
+      );
+    },
   },
   {
     id: 'Claim',
     paths: ['/Claim'],
     notifyEvent: 'claimPaymentDataSync',
-    run: () => fetchAll([`${BASE8082}/claim_payments/getAll`, `${BASE8082}/weekly-payment-bills/all`]),
+    run: async () => {
+      await prefetchPaymentModeArrangementData();
+      await fetchAll([`${BASE8082}/claim_payments/getAll`, `${BASE8082}/weekly-payment-bills/all`]);
+    },
   },
   {
     id: 'purchaseorder',
@@ -176,7 +204,8 @@ const ORBIT_SYNC_MODULES = [
         `${BASE8082}/account-details/getAll`,
         `${BASE8082}/employee_details/getAll`,
         `${BASE8082}/labours-details/getAll`,
-        `${BASE8082}/payment_mode/getAll`,
+        PAYMENT_MODE_GET_ALL_URL,
+        PAYMENT_MODE_ARRANGEMENT_GET_ALL_URL,
       ]),
   },
 ];
@@ -312,6 +341,12 @@ const fetchJson = async (url, { useBranch = false } = {}) => {
       const branchId = useBranch ? localStorage.getItem('selectedBranchId') : null;
       populateExpensesFormCache(data, branchId);
     }
+    if (String(url).includes('/payment_mode_arrangement/getAll') && Array.isArray(data)) {
+      populatePaymentModeArrangementCache(data);
+    }
+    if (String(url).includes('/payment_mode/getAll') && Array.isArray(data)) {
+      populatePaymentModesMasterCache(data);
+    }
     return data;
   } catch {
     return null;
@@ -338,7 +373,8 @@ const syncMasterData = async () => {
       `${BASE8081}/contractor_Names/getAll`,
       `${BASE8081}/projects/getAll`,
       `${BASE8082}/branch/getAll`,
-      `${BASE8082}/payment_mode/getAll`,
+      PAYMENT_MODE_GET_ALL_URL,
+      PAYMENT_MODE_ARRANGEMENT_GET_ALL_URL,
       `${BASE8082}/account-details/getAll`,
       `${BASE8082}/purposes/getAll`,
     ],

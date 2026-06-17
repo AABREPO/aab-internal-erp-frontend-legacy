@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Filter from '../Images/Filter.png';
 import DateRangePickerModal from '../PurchaseOrder/DateRangePickerModal';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import CloseIcon from '../Images/Close F.svg'
+import {
+  LOAN_PORTAL_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 
 const Report = () => {
   const [loanData, setLoanData] = useState([]);
@@ -28,6 +32,22 @@ const Report = () => {
   const [associateFilter, setAssociateFilter] = useState('');
   const [showAssociateModal, setShowAssociateModal] = useState(false);
   const [purposeFilter, setPurposeFilter] = useState('');
+  const defaultPaymentModeOptions = [
+    { value: 'Cash', label: 'Cash' },
+    { value: 'GPay', label: 'GPay' },
+    { value: 'PhonePe', label: 'PhonePe' },
+    { value: 'Net Banking', label: 'Net Banking' },
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Advance Transfer', label: 'Advance Transfer' }
+  ];
+  const paymentModeOptions = usePaymentModeSelectOptionsForModule(
+    LOAN_PORTAL_MODULE_NAME,
+    defaultPaymentModeOptions
+  );
+  const paymentModeFilterOptions = useMemo(
+    () => paymentModeOptions.map((opt) => opt.label),
+    [paymentModeOptions]
+  );
   const [showPurposeModal, setShowPurposeModal] = useState(false);
 
   useEffect(() => {
@@ -757,7 +777,7 @@ const Report = () => {
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentModeFilter}
-        options={['Cash', 'GPay', 'PhonePe', 'Net Banking', 'Cheque', 'Advance Transfer']}
+        options={paymentModeFilterOptions}
         fieldName="Payment Mode"
         showStarIcon={false}
       />

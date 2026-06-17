@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import edit from '../Images/Edit.svg';
@@ -18,6 +18,10 @@ import {
     syncWeeklyPaymentBillsForRentManagement,
 } from '../../utils/rentManagementWeeklyPaymentBill';
 import { notifyOrbitModuleDataChanged } from '../../utils/orbitProjectDataSync';
+import {
+    RENT_MANAGEMENT_MODULE_NAME,
+} from '../../utils/paymentModeArrangement';
+import { usePaymentModesForModule } from '../../utils/usePaymentModeArrangement';
 import { useOrbitPageSync } from '../../utils/useOrbitPageSync';
 import { useTabRefreshSignal } from '../../utils/useTabRefreshSignal';
 Modal.setAppElement('#root');
@@ -63,7 +67,14 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
         forTheMonthOf: '',
         attachedFile: '',
     });
-    const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+    const rentPaymentModes = usePaymentModesForModule(RENT_MANAGEMENT_MODULE_NAME);
+    const paymentModeOptions = useMemo(
+        () => rentPaymentModes.map((mode) => ({
+            value: mode.modeOfPayment,
+            label: mode.modeOfPayment,
+        })),
+        [rentPaymentModes]
+    );
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -837,26 +848,6 @@ const Table = ({ username = '', refreshSignal, isActive = true }) => {
             tenant.shopNos.some(shop => shop.shopNoId === shopNoId && !shop.shopClosureDate)
         );
     };
-
-    // Fetch payment modes
-    useEffect(() => {
-        const fetchPaymentModes = async () => {
-            try {
-                const response = await fetch('https://backendaab.in/demoAabuildersDash/api/payment_mode/getAll');
-                if (response.ok) {
-                    const data = await response.json();
-                    const formattedOptions = data.map(mode => ({
-                        value: mode.modeOfPayment,
-                        label: mode.modeOfPayment
-                    }));
-                    setPaymentModeOptions(formattedOptions);
-                }
-            } catch (error) {
-                console.error('Error fetching payment modes:', error);
-            }
-        };
-        fetchPaymentModes();
-    }, []);
 
     // Fetch account details
     useEffect(() => {

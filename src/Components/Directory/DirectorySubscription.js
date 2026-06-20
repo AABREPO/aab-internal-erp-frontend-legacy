@@ -832,8 +832,24 @@ const DirectorySubscription = () => {
     }
   };
 
+  const resolveListItemId = (items, selectedName, fallbackId) => {
+    if (selectedName) {
+      const match = items.find((item) => item.name === selectedName);
+      if (match?.id != null) {
+        return String(match.id);
+      }
+    }
+    if (fallbackId != null && String(fallbackId).trim() !== '') {
+      return String(fallbackId);
+    }
+    return null;
+  };
+
   const handleSubmitSubscription = async () => {
     const projectIdValue = resolveProjectIdForSave(subscriptionForm.project);
+    const editingEntry = isEditingSubscription
+      ? subscriptionEntries.find((entry) => String(entry.id) === String(editingSubscriptionId))
+      : null;
 
     const payload = {
       service_type: subscriptionForm.type || null,
@@ -841,10 +857,25 @@ const DirectorySubscription = () => {
       service_number: subscriptionForm.planNumber || null,
       project_id: projectIdValue,
       purpose: subscriptionForm.purpose || null,
+      purpose_id: resolveListItemId(
+        purposeItems,
+        subscriptionForm.purpose,
+        editingEntry?.purpose_id ?? editingEntry?.purposeId
+      ),
+      service_type_id: resolveListItemId(
+        typeItems,
+        subscriptionForm.type,
+        editingEntry?.service_type_id ?? editingEntry?.serviceTypeId
+      ),
+      service_provider_id: resolveListItemId(
+        networkItems,
+        subscriptionForm.network,
+        editingEntry?.service_provider_id ?? editingEntry?.serviceProviderId ?? editingEntry?.serviceProvideId
+      ),
       amount: subscriptionForm.amount ? Number(subscriptionForm.amount) : 0,
       payment_date: subscriptionForm.paymentDate || null,
       service_starting_date: subscriptionForm.serviceStart || null,
-    service_end_date: subscriptionForm.serviceEnd || null,
+      service_end_date: subscriptionForm.serviceEnd || null,
       validity: subscriptionForm.validityValue ? String(subscriptionForm.validityValue) : null,
       validity_type: subscriptionForm.validityUnit || null,
       registered_person: subscriptionForm.registeredPerson || null,

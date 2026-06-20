@@ -2,9 +2,17 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import axios from 'axios'
 import ExpenseEntryForm from '../ExpensesEntry/Form'
+import {
+  getDistinctPaymentVendorsForService,
+  paymentMatchesRowVendor,
+  vendorNamesMatch,
+} from './utilityHubTabFilters'
 
 /** Show upcoming payments only when the next due date is within this many days (inclusive). */
 const UPCOMING_PAYMENT_DAYS_WINDOW = 10
+
+/** Telecom recharge alerts in TelecomTab use a 30-day upcoming window. */
+const TELECOM_UPCOMING_DAYS_WINDOW = 30
 
 /** Show expired services from day 1 through day 30 after the due date (day 31+ hidden). */
 const EXPIRED_DAYS_WINDOW = 30
@@ -439,157 +447,253 @@ const UtilityDashboard = () => {
     return y * 12 + (m - 1)
   }
 
-  const lastDayOfYearMonthIndex = (idx) => {
-    const year = Math.floor(idx / 12)
-    const month = (idx % 12) + 1
-    const daysInMonth = new Date(year, month, 0).getDate()
-    return toDateOnly(new Date(year, month - 1, daysInMonth))
+  const getTelecomServiceNoFromPayment = (payment) =>
+    normalizeUtilityServiceNo(
+      payment?.utilityTypeNumber ??
+        payment?.utility_type_number ??
+        payment?.utilityTypeNo ??
+        payment?.serviceNumber ??
+        payment?.service_number ??
+        ''
+    )
+
+  const getServiceStartingDateRaw = (record) =>
+    record?.service_starting_date ??
+    record?.serviceStartingDate ??
+    record?.service_starting ??
+    record?.serviceStarting ??
+    null
+
+  const getServiceStartingYearMonth = (record) => toYearMonth(getServiceStartingDateRaw(record))
+
+  const isTelecomExpensePayment = (source) => {
+    if (!source || typeof source !== 'object') return false
+    const utilityType = String(source.utility_type ?? source.utilityType ?? '').trim().toLowerCase()
+    if (utilityType === 'telecom') return true
+    if (source.utility_for_the_month != null || source.utilityForTheMonth != null) return true
+    if (source.eno != null) return true
+    return false
   }
+
+  const isDirectoryFirstStub = (source) =>
+    Boolean(
+      source &&
+        typeof source === 'object' &&
+        source.ym != null &&
+        source.amount != null &&
+        !isTelecomExpensePayment(source) &&
+        !(source.service_number ?? source.serviceNumber)
+    )
 
   const getTelecomValidityFields = (source, dirEntry) => {
     const countRaw =
       source?.utilityValidityDays ??
+      source?.utility_validity_days ??
       source?.validityDays ??
+      source?.validity_days ??
       source?.validity ??
+      source?.validity_value ??
+      source?.validityValue ??
       dirEntry?.utilityValidityDays ??
+      dirEntry?.utility_validity_days ??
       dirEntry?.validityDays ??
+      dirEntry?.validity_days ??
       dirEntry?.validity ??
+      dirEntry?.validity_value ??
+      dirEntry?.validityValue ??
       null
     const typeRaw =
       source?.utilityValidityType ??
+      source?.utility_validity_type ??
       source?.validityType ??
       source?.validity_type ??
       source?.validityUnit ??
       dirEntry?.utilityValidityType ??
+      dirEntry?.utility_validity_type ??
       dirEntry?.validityType ??
       dirEntry?.validity_type ??
+      dirEntry?.validityUnit ??
       null
     return { countRaw, typeRaw }
   }
 
-  /** Matches TelecomTab getLatestCoverageMonths unit conversion. */
-  const getTelecomCoverageMonths = (countRaw, typeRaw) => {
-    const count = countRaw != null && String(countRaw).trim() !== '' ? Number(countRaw) : 0
-    const type = typeRaw != null ? String(typeRaw).trim().toLowerCase() : ''
-    if (!Number.isFinite(count) || count <= 0) return 0
-    if (type === 'year' || type === 'years') return Math.max(1, count * 12)
-    if (type === 'month' || type === 'months') return Math.max(1, count)
-    if (type === 'day' || type === 'days') return Math.max(1, Math.ceil(count / 30))
-    return 0
+  const addMonthsRespectingEndOfMonth = (sourceDate, months) => {
+    const result = new Date(sourceDate)
+    const originalDay = result.getDate()
+    result.setDate(1)
+    result.setMonth(result.getMonth() + months)
+    const lastDayOfTargetMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()
+    result.setDate(Math.min(originalDay, lastDayOfTargetMonth))
+    result.setHours(0, 0, 0, 0)
+    return result
   }
 
-  const getDirectoryTelecomPlanMeta = (dirEntry, serviceNumber) => {
+  /** Same rules as TelecomTab / DirectoryTelecom — service start + validity (days/months/years). */
+  const computeTelecomServiceEndDate = (startValue, validityValue, validityUnit) => {
+    const startDate = startValue ? toDateOnly(new Date(startValue)) : null
+    const numericValidity = Number(validityValue)
+    const normalizedUnit = String(validityUnit ?? '').trim().toLowerCase()
+    if (!startDate || !Number.isFinite(numericValidity) || numericValidity <= 0 || !normalizedUnit) {
+      return null
+    }
+    let endDate
+    if (normalizedUnit === 'day' || normalizedUnit === 'days') {
+      endDate = new Date(startDate)
+      endDate.setDate(endDate.getDate() + (numericValidity - 1))
+    } else if (normalizedUnit === 'month' || normalizedUnit === 'months') {
+      endDate = addMonthsRespectingEndOfMonth(startDate, numericValidity)
+    } else if (normalizedUnit === 'year' || normalizedUnit === 'years') {
+      endDate = addMonthsRespectingEndOfMonth(startDate, numericValidity * 12)
+    } else {
+      return null
+    }
+    endDate.setHours(0, 0, 0, 0)
+    return endDate
+  }
+
+  const resolveTelecomAmountValidityMeta = (source, dirEntry) => {
+    const empty = { serviceStartingDate: null, expiryDate: null }
+    if (!source) return empty
+
+    const isExpense = isTelecomExpensePayment(source)
+    const isDirStub = isDirectoryFirstStub(source)
+
+    const serviceStartingDate = isDirStub
+      ? (source.date || getServiceStartingDateRaw(dirEntry))
+      : (getServiceStartingDateRaw(source) || (isExpense ? null : getServiceStartingDateRaw(dirEntry)))
+
+    const { countRaw, typeRaw } = isExpense
+      ? getTelecomValidityFields(source, null)
+      : getTelecomValidityFields(isDirStub ? dirEntry : source, dirEntry)
+
+    let expiryDate = computeTelecomServiceEndDate(serviceStartingDate, countRaw, typeRaw)
+
+    if (!expiryDate && !isExpense) {
+      const explicitEndRaw =
+        source?.service_end_date ??
+        source?.serviceEndDate ??
+        (isDirStub ? null : (dirEntry?.service_end_date ?? dirEntry?.serviceEndDate ?? null))
+      if (explicitEndRaw) {
+        const explicitEnd = new Date(explicitEndRaw)
+        if (!Number.isNaN(explicitEnd.getTime())) {
+          expiryDate = toDateOnly(explicitEnd)
+        }
+      }
+    }
+
+    return { serviceStartingDate, expiryDate }
+  }
+
+  const getDirectoryFirstPaymentMeta = (serviceNumber, dirEntry) => {
     if (!dirEntry) return null
     const normalized = normalizeUtilityServiceNo(serviceNumber)
-    if (!normalized) return null
-    const entryService = dirEntry.service_number ?? dirEntry.serviceNumber ?? null
+    const entryService = dirEntry.service_number ?? dirEntry.serviceNumber ?? dirEntry.utilityTypeNumber ?? null
     if (entryService && normalizeUtilityServiceNo(entryService) !== normalized) return null
 
-    const ymCandidate =
-      dirEntry.service_starting_date ??
-      dirEntry.serviceStartingDate ??
-      dirEntry.serviceStarting ??
-      dirEntry.service_starting ??
-      dirEntry.payment_date ??
-      dirEntry.paymentDate ??
-      dirEntry.utilityForTheMonth ??
-      dirEntry.utility_for_the_month ??
-      dirEntry.startingMonth ??
-      dirEntry.startMonth ??
-      dirEntry.createdAt ??
-      dirEntry.created_at ??
+    const amountRaw =
+      dirEntry.amount ??
+      dirEntry.Amount ??
+      dirEntry.planAmount ??
+      dirEntry.plan_amount ??
+      dirEntry.initialAmount ??
+      dirEntry.initial_amount ??
       null
-    const ym = toYearMonth(ymCandidate)
+    const amount = amountRaw != null && String(amountRaw).trim() !== '' ? String(amountRaw) : null
+    if (!amount) return null
+
+    const ym = getServiceStartingYearMonth(dirEntry)
     const idx = yearMonthToIndex(ym)
     if (!ym || idx == null) return null
 
-    return { ym, idx, source: dirEntry }
+    const { countRaw, typeRaw } = getTelecomValidityFields(dirEntry, dirEntry)
+    return {
+      ym,
+      idx,
+      amount,
+      date: getServiceStartingDateRaw(dirEntry),
+      utilityValidityDays: countRaw,
+      utilityValidityType: typeRaw,
+    }
   }
 
-  /** Latest recharge at/before today (by utility month), same as TelecomTab coverage anchor. */
-  const getLatestTelecomCoverageSource = (serviceNumber, dirEntry, payments, referenceDate = new Date()) => {
+  const getMonthLabelFromYearMonth = (yearMonth) => {
+    const monthNumber = String(yearMonth || '').split('-')[1]
+    const labels = {
+      '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+      '05': 'May', '06': 'June', '07': 'July', '08': 'Aug',
+      '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
+    }
+    return labels[monthNumber] || null
+  }
+
+  const resolveTelecomPaymentRowVendor = (serviceNumber, rowVendor, yearMonth, payments) => {
+    const vendor = String(rowVendor ?? '').trim()
+    if (!vendor) return undefined
+    const year = String(yearMonth || '').split('-')[0]
+    const monthLabel = getMonthLabelFromYearMonth(yearMonth)
+    const paymentVendors = getDistinctPaymentVendorsForService(
+      payments,
+      serviceNumber,
+      year || new Date().getFullYear().toString(),
+      monthLabel || null
+    )
+    if (paymentVendors.some((name) => vendorNamesMatch(name, vendor))) {
+      return vendor
+    }
+    return undefined
+  }
+
+  /** Latest recharge anchor at/before today — matches TelecomTab getLatestCoverageAnchor. */
+  const getLatestTelecomCoverageAnchor = (serviceNumber, targetYearMonth, dirEntry, rowVendor, payments) => {
+    const targetIdx = yearMonthToIndex(targetYearMonth)
+    if (targetIdx == null) return null
+
     const normalized = normalizeUtilityServiceNo(serviceNumber)
     if (!normalized) return null
 
-    const ref = toDateOnly(referenceDate)
-    const refYm = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`
-    const refIdx = yearMonthToIndex(refYm)
-    if (refIdx == null) return null
-
-    const paymentList = Array.isArray(payments) ? payments : []
-    const eligible = paymentList
-      .filter((p) => normalizeUtilityServiceNo(p?.utilityTypeNumber) === normalized)
+    const paymentVendor = resolveTelecomPaymentRowVendor(serviceNumber, rowVendor, targetYearMonth, payments)
+    const eligible = (Array.isArray(payments) ? payments : [])
+      .filter((p) => getTelecomServiceNoFromPayment(p) === normalized)
+      .filter((p) => paymentMatchesRowVendor(p, paymentVendor))
       .map((p) => {
-        const ym = toYearMonth(p?.utilityForTheMonth || p?.date || p?.timestamp)
+        const ym = getServiceStartingYearMonth(p)
         const idx = yearMonthToIndex(ym)
         return { source: p, ym, idx, isDirectory: false }
       })
-      .filter((x) => x.ym && x.idx != null && x.idx <= refIdx)
-      .sort((a, b) => b.idx - a.idx)
+      .filter((x) => x.ym && x.idx != null && x.idx <= targetIdx)
+      .sort((a, b) => (b.idx ?? 0) - (a.idx ?? 0))
 
     if (eligible.length > 0) return eligible[0]
 
-    const dirPlan = getDirectoryTelecomPlanMeta(dirEntry, normalized)
-    if (dirPlan && dirPlan.idx != null && dirPlan.idx <= refIdx) {
-      return { source: dirPlan.source, ym: dirPlan.ym, idx: dirPlan.idx, isDirectory: true }
+    const dirFirst = getDirectoryFirstPaymentMeta(serviceNumber, dirEntry)
+    if (dirFirst && dirFirst.idx != null && dirFirst.idx <= targetIdx) {
+      return { source: dirFirst, ym: dirFirst.ym, idx: dirFirst.idx, isDirectory: true }
+    }
+
+    const dirYm = getServiceStartingYearMonth(dirEntry)
+    const dirIdx = yearMonthToIndex(dirYm)
+    if (dirEntry && dirYm && dirIdx != null && dirIdx <= targetIdx) {
+      return { source: dirEntry, ym: dirYm, idx: dirIdx, isDirectory: true }
     }
 
     return null
   }
 
-  const getTelecomBaseDate = (expenseEntry, dirEntry) => {
-    const baseDateRaw =
-      expenseEntry?.serviceStartingDate ??
-      expenseEntry?.service_starting_date ??
-      expenseEntry?.date ??
-      expenseEntry?.timestamp ??
-      dirEntry?.service_starting_date ??
-      dirEntry?.serviceStartingDate ??
-      dirEntry?.payment_date ??
-      dirEntry?.paymentDate ??
-      null
-    const baseDate = baseDateRaw ? new Date(baseDateRaw) : null
-    return baseDate && !Number.isNaN(baseDate.getTime()) ? baseDate : null
-  }
+  /** Expiry for dashboard cards — same path as TelecomTab getTelecomRechargeAlert. */
+  const computeTelecomExpiryForEntry = (dirEntry, payments, referenceDate = new Date()) => {
+    const serviceNumber = normalizeUtilityServiceNo(dirEntry?.service_number ?? dirEntry?.serviceNumber)
+    if (!serviceNumber) return null
 
-  /**
-   * Expiry from plan start + validity (days/months/years), aligned with TelecomTab month coverage.
-   * Month/year validity ends on the last day of the final covered month.
-   */
-  const computeTelecomCoverageExpiry = (dirEntry, serviceNumber, payments) => {
-    const explicitEndRaw = dirEntry?.service_end_date ?? dirEntry?.serviceEndDate ?? null
-    if (explicitEndRaw) {
-      const explicitEnd = new Date(explicitEndRaw)
-      if (!Number.isNaN(explicitEnd.getTime())) return toDateOnly(explicitEnd)
-    }
+    const rowVendor = dirEntry?.service_provider ?? dirEntry?.serviceProvider ?? ''
+    const ref = toDateOnly(referenceDate)
+    const refYm = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`
+    const anchor = getLatestTelecomCoverageAnchor(serviceNumber, refYm, dirEntry, rowVendor, payments)
 
-    const coverage = getLatestTelecomCoverageSource(serviceNumber, dirEntry, payments)
-    const { countRaw, typeRaw } = getTelecomValidityFields(coverage?.source ?? null, dirEntry)
-    const unit = typeRaw != null ? String(typeRaw).trim().toLowerCase() : ''
-    const count = countRaw != null && String(countRaw).trim() !== '' ? Number(countRaw) : 0
-    if (!Number.isFinite(count) || count <= 0) return null
+    const validityMeta = anchor?.source
+      ? resolveTelecomAmountValidityMeta(anchor.source, dirEntry)
+      : resolveTelecomAmountValidityMeta(dirEntry, dirEntry)
 
-    if (unit === 'day' || unit === 'days') {
-      const baseDate = getTelecomBaseDate(coverage?.isDirectory ? null : coverage?.source, dirEntry)
-      const expiry = addDurationToDate(baseDate, count, typeRaw)
-      return expiry ? toDateOnly(expiry) : null
-    }
-
-    const coverMonths = getTelecomCoverageMonths(countRaw, typeRaw)
-    if (!coverMonths) return null
-
-    let startIdx = coverage?.idx ?? null
-    if (startIdx == null) {
-      const dirPlan = getDirectoryTelecomPlanMeta(dirEntry, serviceNumber)
-      startIdx = dirPlan?.idx ?? null
-    }
-    if (startIdx == null) {
-      const baseDate = getTelecomBaseDate(null, dirEntry)
-      const expiry = addDurationToDate(baseDate, count, typeRaw)
-      return expiry ? toDateOnly(expiry) : null
-    }
-
-    return lastDayOfYearMonthIndex(startIdx + coverMonths - 1)
+    return validityMeta.expiryDate ? toDateOnly(validityMeta.expiryDate) : null
   }
 
   const getTelecomExpiryMeta = (dirEntry) => {
@@ -598,11 +702,7 @@ const UtilityDashboard = () => {
     const normalizedService = normalizeUtilityServiceNo(serviceNumber)
     if (!normalizedService) return null
 
-    const expiry = computeTelecomCoverageExpiry(
-      dirEntry,
-      normalizedService,
-      telecomExpensePayments
-    )
+    const expiry = computeTelecomExpiryForEntry(dirEntry, telecomExpensePayments)
     if (!expiry) return null
 
     return {
@@ -639,7 +739,7 @@ const UtilityDashboard = () => {
       })
       .filter(item => {
         if (telecomView === 'upcoming') {
-          return item.daysOverdue === 0 && item.daysUntilDue <= UPCOMING_PAYMENT_DAYS_WINDOW
+          return item.daysOverdue === 0 && item.daysUntilDue <= TELECOM_UPCOMING_DAYS_WINDOW
         }
         return isExpiredWithinWindow(item.expiry, EXPIRED_DAYS_WINDOW, today)
       })

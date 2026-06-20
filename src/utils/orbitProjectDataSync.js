@@ -7,7 +7,7 @@ import {
   populatePaymentModesMasterCache,
 } from './paymentModeArrangement';
 
-export const ORBIT_MODULE_SYNC_INTERVAL_MS = 10_000;
+export const ORBIT_MODULE_SYNC_INTERVAL_MS = 20_000;
 const SYNC_INTERVAL_MS = ORBIT_MODULE_SYNC_INTERVAL_MS;
 const SYNC_STATUS_EVENT = 'orbitSyncStatusChanged';
 const SYNC_DATA_EVENT = 'orbitProjectDataSync';

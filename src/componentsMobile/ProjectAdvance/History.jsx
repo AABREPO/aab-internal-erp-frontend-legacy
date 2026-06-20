@@ -8,6 +8,7 @@ import DeleteConfirmModal from '../PurchaseOrder/DeleteConfirmModal';
 import Edit from '../Images/edit1.png'
 import Delete from '../Images/delete.png'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
+import { isAdvancePortalAdmin } from '../../utils/advancePortalAdmin';
 import {
   ADVANCE_PORTAL_MODULE_NAME,
 } from '../../utils/paymentModeArrangement';
@@ -115,6 +116,16 @@ const History = ({ onVendorClick, user } = {}) => {
   const canEdit = modulePermissions.includes('Edit');
   const canDelete = modulePermissions.includes('Delete');
 
+  const resolveUsername = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      return (user?.username || user?.name || stored?.username || stored?.name || '').trim();
+    } catch {
+      return (user?.username || user?.name || '').trim();
+    }
+  };
+  const isAdmin = isAdvancePortalAdmin(resolveUsername());
+
   const [vendorOptions, setVendorOptions] = useState([]);
   const [contractorOptions, setContractorOptions] = useState([]);
   const [siteOptions, setSiteOptions] = useState([...PREDEFINED_SITE_OPTIONS]);
@@ -180,32 +191,44 @@ const History = ({ onVendorClick, user } = {}) => {
     editDeleteExpandedIdRef.current = editDeleteExpandedId;
   }, [editDeleteExpandedId]);
 
-  const formatDateTime = (dateTimeString) => {
-    if (!dateTimeString) return '';
+  const formatRelativeDateLabel = (input) => {
+    if (!input) return '';
     try {
-      const date = new Date(dateTimeString);
+      const d = new Date(input);
+      if (Number.isNaN(d.getTime())) return '';
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      let hours = date.getHours();
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12 || 12;
-      const timeStr = `${hours}:${minutes} ${ampm}`;
-      if (dateOnly.getTime() === today.getTime()) {
-        return `Today • ${timeStr}`;
-      } else if (dateOnly.getTime() === yesterday.getTime()) {
-        return `Yesterday • ${timeStr}`;
-      } else {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year} • ${timeStr}`;
-      }
+      const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (dateOnly.getTime() === today.getTime()) return 'Today';
+      if (dateOnly.getTime() === yesterday.getTime()) return 'Yesterday';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
     } catch {
       return '';
+    }
+  };
+
+  const formatDateTimeParts = (timestamp) => {
+    if (!timestamp) return { date: '', time: '', dateTime: '' };
+    try {
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return { date: '', time: '', dateTime: '' };
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const formattedDate = `${day}/${month}/${year}`;
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const formattedTime = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+      return { date: formattedDate, time: formattedTime, dateTime: `${formattedDate} • ${formattedTime}` };
+    } catch {
+      return { date: '', time: '', dateTime: '' };
     }
   };
 
@@ -327,9 +350,20 @@ const History = ({ onVendorClick, user } = {}) => {
           amount = parseFloat(entry.amount) || 0;
         }
 
-        const dateStr = entry.timestamp || entry.createdAt || entry.created_at || '';
+        const recordDate = entry.date || '';
+        const recordTimestamp =
+          entry.created_date_time ||
+          entry.createdAt ||
+          entry.created_at ||
+          entry.timestamp ||
+          entry.date ||
+          '';
         const entryNo = entry.entry_no || 0;
-        const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+        const year = recordDate
+          ? new Date(recordDate).getFullYear()
+          : recordTimestamp
+            ? new Date(recordTimestamp).getFullYear()
+            : new Date().getFullYear();
         let prefix = 'AD';
         if (t === 'Bill Settlement') {
           prefix = 'BS';
@@ -351,7 +385,9 @@ const History = ({ onVendorClick, user } = {}) => {
           entityName,
           projectName,
           transferSiteName,
-          timestamp: dateStr,
+          recordDate,
+          recordTimestamp,
+          timestamp: recordTimestamp,
           type: t || 'Advance',
           paymentMode: entry.payment_mode || '',
           amount,
@@ -555,7 +591,37 @@ const History = ({ onVendorClick, user } = {}) => {
     }
   };
 
-  const handleEdit = (item) => {
+  const sendEditRequest = async (entry) => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const requestUsername = user?.username || user?.name || storedUser?.username || storedUser?.name || '';
+      const requestData = {
+        module_name: 'Advance Portal',
+        module_name_id: entry.advancePortalId || entry.id,
+        module_name_eno: entry.entry_no,
+        request_send_by: requestUsername,
+        request_approval: false,
+        request_completed: false,
+      };
+      const response = await fetch('https://backendaab.in/demoAabuildersDash/api/edit_requests/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestData),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create edit request');
+      }
+      alert('Edit request sent successfully. Waiting for admin approval.');
+    } catch (error) {
+      console.error('Error creating edit request:', error);
+      alert('Failed to send edit request. Please try again.');
+    }
+  };
+
+  const handleEdit = async (item) => {
+    try {
     if (!canEdit) {
       alert("You don't have permission to edit.");
       return;
@@ -563,9 +629,24 @@ const History = ({ onVendorClick, user } = {}) => {
     if (!item) return;
 
     const entry = item.entry || {};
+    const sourceVal = entry?.source_from ?? entry?.sourceFrom ?? entry?.source ?? '';
+    if (String(sourceVal).trim() === 'Loan Portal') {
+      return;
+    }
+    if (!isAdmin && (entry.not_allow_to_edit || entry.allow_to_edit === false)) {
+      const wantsRequest = window.confirm(
+        'Editing is not allowed for this record. Send an edit request to admin for approval?'
+      );
+      if (wantsRequest) {
+        await sendEditRequest(entry);
+      }
+      return;
+    }
+
     const vendorId = entry.vendor_id;
     const contractorId = entry.contractor_id;
     const projectId = entry.project_id;
+    const editingId = entry.advancePortalId || entry.id;
 
     let selectedOption = null;
     if (vendorId) {
@@ -580,30 +661,82 @@ const History = ({ onVendorClick, user } = {}) => {
     const site = siteOptions.find((x) => x.id === projectId);
     const selectedSite = site ? { value: site.value || site.label, label: site.label, id: site.id, sNo: site.sNo } : null;
 
-    // Prefill AdvanceForm using its sessionStorage reader (mobile form uses sessionStorage for initial values).
-    ['selectedType', 'selectedOption', 'selectedSite', 'overallAdvance', 'billAmount', 'advanceAmount', 'transferSiteId', 'paymentMode', 'description'].forEach(
-      (k) => sessionStorage.removeItem(k)
-    );
-
     const resolvedType = item.type || entry.type || 'Advance';
-    const absAmount = Math.abs(parseFloat(item.amount || 0) || 0);
-    const absBillAmount = Math.abs(parseFloat(entry.bill_amount || item.amount || 0) || 0);
+    const absBillAmount = Math.abs(parseFloat(entry.bill_amount || 0) || 0);
     const transferSiteIdVal = entry.transfer_site_id ?? entry.transferSiteId ?? '';
+    let advanceAmountVal = Math.abs(parseFloat(item.amount || 0) || 0);
+    if (resolvedType === 'Refund') {
+      advanceAmountVal = Math.abs(parseFloat(entry.refund_amount || 0) || 0);
+    } else if (resolvedType === 'Transfer') {
+      advanceAmountVal = parseFloat(entry.amount || 0) || 0;
+    } else if (resolvedType === 'Bill Settlement') {
+      advanceAmountVal = Math.abs(parseFloat(entry.amount || 0) || 0);
+    }
+
+    let category = entry.category || '';
+
+    const dateValue = entry.date ? String(entry.date).split('T')[0] : '';
+    const otherTransferRecord =
+      resolvedType === 'Transfer'
+        ? advanceData.find(
+            (r) =>
+              String(r.entry_no) === String(entry.entry_no) &&
+              String(r.advancePortalId || r.id) !== String(editingId)
+          ) || null
+        : null;
+
+    const editContext = {
+      isEditMode: true,
+      editingId,
+      editEntry: entry,
+      otherTransferRecord,
+      type: resolvedType,
+      dateValue,
+      advanceAmount: advanceAmountVal,
+      billAmount: absBillAmount,
+      transferSiteId: transferSiteIdVal,
+      paymentMode: item.paymentMode || entry.payment_mode || '',
+      description: entry.description || '',
+      category,
+      file_url: entry.file_url || '',
+      entry_no: entry.entry_no,
+      week_no: entry.week_no,
+      discount_amount: entry.discount_amount ?? '',
+    };
+
+    [
+      'selectedType',
+      'selectedOption',
+      'selectedSite',
+      'overallAdvance',
+      'billAmount',
+      'advanceAmount',
+      'transferSiteId',
+      'paymentMode',
+      'description',
+      'dateValue',
+      'selectedCategory',
+      'advanceEditContext',
+    ].forEach((k) => sessionStorage.removeItem(k));
 
     sessionStorage.setItem('selectedType', JSON.stringify(resolvedType));
     if (selectedOption) sessionStorage.setItem('selectedOption', JSON.stringify(selectedOption));
     if (selectedSite) sessionStorage.setItem('selectedSite', JSON.stringify(selectedSite));
-    sessionStorage.setItem('overallAdvance', JSON.stringify(absAmount));
+    sessionStorage.setItem('overallAdvance', JSON.stringify(Math.abs(advanceAmountVal)));
+    if (dateValue) sessionStorage.setItem('dateValue', JSON.stringify(dateValue));
+    if (editContext.category) sessionStorage.setItem('selectedCategory', JSON.stringify(editContext.category));
     if (resolvedType === 'Bill Settlement') {
       sessionStorage.setItem('billAmount', JSON.stringify(absBillAmount));
+      if (advanceAmountVal) sessionStorage.setItem('advanceAmount', JSON.stringify(advanceAmountVal));
     } else {
-      sessionStorage.setItem('advanceAmount', JSON.stringify(absAmount));
+      sessionStorage.setItem('advanceAmount', JSON.stringify(advanceAmountVal));
       if (resolvedType === 'Transfer') {
         sessionStorage.setItem('transferSiteId', JSON.stringify(transferSiteIdVal));
       }
     }
-    sessionStorage.setItem('paymentMode', JSON.stringify(item.paymentMode || entry.payment_mode || ''));
-    sessionStorage.setItem('description', JSON.stringify(entry.description || ''));
+    sessionStorage.setItem('paymentMode', JSON.stringify(editContext.paymentMode));
+    sessionStorage.setItem('description', JSON.stringify(editContext.description));
+    sessionStorage.setItem('advanceEditContext', JSON.stringify(editContext));
 
     setUploadExpandedId(null);
     setEditDeleteExpandedId(null);
@@ -612,6 +745,7 @@ const History = ({ onVendorClick, user } = {}) => {
     onVendorClick?.({
       selectedOption,
       selectedSite,
+      editContext,
       billDetails: {
         ref: item.ref,
         amount: item.amount,
@@ -622,6 +756,10 @@ const History = ({ onVendorClick, user } = {}) => {
         date: entry.date || entry.timestamp,
       },
     });
+    } catch (err) {
+      console.error('Edit navigation failed:', err);
+      alert('Could not open this entry for edit. Please try again.');
+    }
   };
 
   const requestDelete = (item) => {
@@ -1280,10 +1418,18 @@ const History = ({ onVendorClick, user } = {}) => {
                           </p>
                         )}
                       </div>
-                      {/* Row 4: timestamp and bill_amount (or transfer site) */}
+                      {/* Row 4: date + timestamp and bill_amount (or transfer site) */}
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-medium text-[#777777] leading-snug">
-                          {formatDateTime(item.timestamp)}
+                        <span className="text-[11px] leading-normal min-w-0 flex-1 flex items-center flex-wrap gap-x-[4px]">
+                          <span className="font-bold text-black">
+                            {formatRelativeDateLabel(item.recordDate || item.recordTimestamp)}
+                          </span>
+                          {(() => {
+                            const { dateTime } = formatDateTimeParts(item.recordTimestamp);
+                            return dateTime ? (
+                              <span className="font-semibold text-[#9E9E9E]"> • {dateTime}</span>
+                            ) : null;
+                          })()}
                         </span>
                         {item.type === 'Transfer' && item.transferSiteName ? (
                           <p className={`text-[10px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#BF9853]' : 'text-[#007233]'}`}>

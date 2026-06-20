@@ -700,6 +700,21 @@ const fetchExpensesFormEntryById = async (expensesEntryId) => {
   return (Array.isArray(all) ? all : []).find((e) => String(e.id) === String(expensesEntryId)) || null;
 };
 
+/** Bill Settlement category may live on the linked expense row, not advance_portal.category */
+export const resolveBillSettlementCategoryForAdvance = async (record) => {
+  const direct = String(record?.category || '').trim();
+  if (direct) return direct;
+  const expensesEntryId = resolveAdvancePortalExpensesEntryId(record);
+  if (!expensesEntryId) return '';
+  try {
+    const expense = await fetchExpensesFormEntryById(expensesEntryId);
+    return String(expense?.category || '').trim();
+  } catch (error) {
+    console.warn('Could not resolve bill settlement category from linked expense', error);
+    return '';
+  }
+};
+
 export const buildExpenseUpdatePayloadFromAdvanceEdit = (
   advancePayload,
   existingExpense,

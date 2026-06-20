@@ -32,12 +32,27 @@ import {
     getEdbcColumnConfig,
     getEdbcColumnHeaderSortProps,
     matchesEdbcAmountFilter,
+    matchesWeeklyPaymentExpenseOverallSearch,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from 'xlsx';
+import { useLiveDataSync } from '../../utils/useLiveDataSync';
 
-const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
+const CASH_REGISTER_SELECT_STYLES = {
+    ...DATABASE_TABLE_FILTER_SELECT_STYLES,
+    clearIndicator: (provided) => ({
+        ...DATABASE_TABLE_FILTER_SELECT_STYLES.clearIndicator(provided),
+        color: '#000000',
+    }),
+    dropdownIndicator: (provided, state) => ({
+        ...DATABASE_TABLE_FILTER_SELECT_STYLES.dropdownIndicator(provided),
+        color: '#000000',
+        display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
+    }),
+};
+
+const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabActive = true }) => {
     const resolveActiveBranchId = () => {
         try {
             const selectedBranchId = localStorage.getItem("selectedBranchId");
@@ -83,10 +98,16 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         return () => window.removeEventListener("branchSelectionChanged", syncBranch);
     }, []);
     const [selectedWeek, setSelectedWeek] = useState("");
+    useEffect(() => {
+        selectedWeekRef.current = selectedWeek;
+    }, [selectedWeek]);
     const [weeks, setWeeks] = useState([]);
     const [lastWeekWithData, setLastWeekWithData] = useState(null);
     /** Tracks branch+year for the last fetchWeeks run — used to reset the week dropdown when branch/year changes. */
     const prevWeeksContextKeyRef = useRef(null);
+    const skipWeekChangeLoadRef = useRef(false);
+    const weekTableLoadTokenRef = useRef(0);
+    const selectedWeekRef = useRef("");
     const [selectedDate, setSelectedDate] = useState(null);
     const [dailyExpenses, setDailyExpenses] = useState([]);
     const [refundPayments, setRefundPayments] = useState([]);
@@ -399,22 +420,89 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         }, null);
     };
 
+    const computeLastEditableWeek = (branchPayments) => {
+        const now = new Date();
+        const currentWeekNumber = getISOWeekNumber(now);
+        const currentWeekYear = getWeekYear(now);
+        const hasCurrentWeekTrue = branchPayments.some((payment) => {
+            if (payment?.status !== true) return false;
+            const wn = Number(payment.weekly_number);
+            if (!Number.isFinite(wn) || wn !== currentWeekNumber) return false;
+            return getIsoYearFromRowDate(payment) === currentWeekYear;
+        });
+        if (hasCurrentWeekTrue) {
+            return { weekNumber: currentWeekNumber, year: currentWeekYear };
+        }
+        const latest = getLatestStatusTrueWeekFromPayments(branchPayments);
+        if (latest) return latest;
+        const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
+        const prevDate = new Date(startDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        return {
+            weekNumber: getISOWeekNumber(prevDate),
+            year: getWeekYear(prevDate),
+        };
+    };
+
+    const loadWeekAndFirstDayData = useCallback(async (weekInfo, selectedYear, loadToken) => {
+        if (!weekInfo) return;
+        const selectedWeekNum = Number(weekInfo.number);
+        const defaultDate = weekInfo.start;
+        const requestWeek = String(selectedWeekNum);
+        try {
+            const [expensesRes, paymentsRes, dailyRes, refundRes] = await Promise.all([
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${requestWeek}`, withBranchParams()),
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${requestWeek}`, withBranchParams()),
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${defaultDate}`, withBranchParams()),
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${defaultDate}`, withBranchParams()),
+            ]);
+            if (loadToken !== weekTableLoadTokenRef.current) return;
+
+            const filteredExpenses = expensesRes.data.filter((expense) => {
+                if (!isRowForActiveBranch(expense)) return false;
+                if (expense.status !== true) return false;
+                const wn = Number(expense.weekly_number);
+                if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                return getIsoYearFromRowDate(expense) === selectedYear;
+            });
+
+            const filteredPayments = paymentsRes.data.filter((payment) => {
+                if (!isRowForActiveBranch(payment)) return false;
+                if (payment.status !== true) return false;
+                const wn = Number(payment.weekly_number);
+                if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                if (getIsoYearFromRowDate(payment) !== selectedYear) return false;
+                return payment.type !== "Handover";
+            });
+
+            setExpenses(filteredExpenses);
+            setPayments(filteredPayments);
+            setSelectedDate(defaultDate);
+            setNewRefundReceived((prev) => ({ ...prev, date: defaultDate }));
+            setDailyExpenses(dailyRes.data);
+            setRefundPayments(refundRes.data);
+        } catch (error) {
+            console.error("Error loading week and daily data:", error);
+        }
+    }, [withBranchParams, isRowForActiveBranch]);
+
     useEffect(() => {
         const fetchWeeks = async () => {
             const selectedYear = parseInt(year, 10);
             const requestBranchId = activeBranchId;
             const requestYearNum = selectedYear;
             const requestKey = `${requestBranchId ?? "none"}-${requestYearNum}`;
+            const loadToken = ++weekTableLoadTokenRef.current;
             try {
                 const currentWeekNumber = getCurrentISOWeekNumber();
                 const currentWeekYear = getCurrentWeekYear();
 
-                // Fetch all payments to determine which weeks have data (branch-scoped rows only)
+                let branchPayments = [];
                 let weeksWithData = new Set();
                 try {
                     const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
-                    (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).forEach((payment) => {
-                        if (!isRowForActiveBranch(payment)) return;
+                    branchPayments = (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).filter(isRowForActiveBranch);
+                    branchPayments.forEach((payment) => {
                         if (payment?.status !== true) return;
                         const wn = Number(payment.weekly_number);
                         if (!Number.isFinite(wn)) return;
@@ -427,12 +515,10 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                     console.error('Error fetching payments for week filtering:', error);
                 }
 
-                // Ignore stale responses if branch/year changed while the request was in flight
                 if (requestBranchId !== activeBranchId || requestYearNum !== parseInt(year, 10)) {
                     return;
                 }
 
-                // Get all possible weeks for the year (1-53)
                 const allWeeks = [];
                 for (let weekNum = 1; weekNum <= 53; weekNum++) {
                     const weekInfo = getStartAndEndDateOfWeek(weekNum, selectedYear);
@@ -440,7 +526,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                     const weekYear = getWeekYear(weekStartDate);
                     const hasData = weeksWithData.has(weekNum);
                     const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
-                    // Only include weeks up to current week (no future weeks). Keep weeks that already have data.
                     if (hasData || (weekYear === selectedYear && isCurrentWeek)) {
                         allWeeks.push(weekInfo);
                     }
@@ -460,109 +545,87 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
 
                 setLastWeekWithData(lastWeekWithDataValue);
                 setWeeks(allWeeks);
+                setLastEditableWeek(computeLastEditableWeek(branchPayments));
 
-                setSelectedWeek((prev) => {
-                    if (allWeeks.length === 0 || defaultWeekNum == null) return "";
+                let weekToSelect = "";
+                if (allWeeks.length > 0 && defaultWeekNum != null) {
+                    weekToSelect = String(defaultWeekNum);
+                }
+
+                let resolvedWeekStr = weekToSelect;
+                if (weekToSelect) {
+                    const prev = selectedWeekRef.current;
                     const prevNum = prev !== "" && prev != null ? Number(prev) : NaN;
                     const prevInList = !Number.isNaN(prevNum) && allWeeks.some((w) => w.number === prevNum);
-                    if (contextChanged) return String(defaultWeekNum);
-                    if (!prev || prev === "" || !prevInList) return String(defaultWeekNum);
-                    return prev;
-                });
+                    if (!contextChanged && prev && prev !== "" && prevInList) {
+                        resolvedWeekStr = prev;
+                    }
+                } else {
+                    resolvedWeekStr = "";
+                }
+                setSelectedWeek(resolvedWeekStr);
+
+                const weekInfo = allWeeks.find((w) => w.number === Number(resolvedWeekStr));
+                if (weekInfo) {
+                    skipWeekChangeLoadRef.current = true;
+                    await loadWeekAndFirstDayData(weekInfo, selectedYear, loadToken);
+                }
             } catch (error) {
                 console.error('Error fetching active weeks:', error);
             }
         };
         fetchWeeks();
-    }, [year, activeBranchId, withBranchParams, isRowForActiveBranch]);
-    // Find the most recent week (across all years) that has data with status === true
+    }, [year, activeBranchId, withBranchParams, isRowForActiveBranch, loadWeekAndFirstDayData]);
+
     useEffect(() => {
-        const computeEditableWeek = async () => {
-            try {
-                const now = new Date();
-                const currentWeekNumber = getISOWeekNumber(now);
-                const currentWeekYear = getWeekYear(now);
-                const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
-                const data = (Array.isArray(paymentsResponse.data) ? paymentsResponse.data : []).filter(isRowForActiveBranch);
-                const hasCurrentWeekTrue = data.some((payment) => {
-                    if (payment?.status !== true) return false;
-                    const wn = Number(payment.weekly_number);
-                    if (!Number.isFinite(wn) || wn !== currentWeekNumber) return false;
-                    return getIsoYearFromRowDate(payment) === currentWeekYear;
-                });
-                if (hasCurrentWeekTrue) {
-                    setLastEditableWeek({ weekNumber: currentWeekNumber, year: currentWeekYear });
-                } else {
-                    const latest = getLatestStatusTrueWeekFromPayments(data);
-                    if (latest) {
-                        setLastEditableWeek(latest);
-                    } else {
-                        const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
-                        const prevDate = new Date(startDate);
-                        prevDate.setDate(prevDate.getDate() - 1);
-                        setLastEditableWeek({
-                            weekNumber: getISOWeekNumber(prevDate),
-                            year: getWeekYear(prevDate),
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error computing editable week:', error);
-                // Fallback to previous ISO week if request fails
-                const now = new Date();
-                const currentWeekNumber = getISOWeekNumber(now);
-                const currentWeekYear = getWeekYear(now);
-                const { startDate } = getStartAndEndDateOfISOWeek(currentWeekNumber, currentWeekYear);
-                const prevDate = new Date(startDate);
-                prevDate.setDate(prevDate.getDate() - 1);
-                setLastEditableWeek({
-                    weekNumber: getISOWeekNumber(prevDate),
-                    year: getWeekYear(prevDate),
-                });
-            }
-        };
-        computeEditableWeek();
-    }, [activeBranchId, withBranchParams, isRowForActiveBranch]); // Recompute when branch changes
-    useEffect(() => {
-        const fetchWeekData = async () => {
-            if (!selectedWeek) return;
-            try {
-                const [expensesRes, paymentsRes] = await Promise.all([
-                    axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                    axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
-                ]);
+        if (!selectedWeek) return;
+        if (skipWeekChangeLoadRef.current) {
+            skipWeekChangeLoadRef.current = false;
+            return;
+        }
+        const weekInfo = weeks.find((w) => w.number === Number(selectedWeek));
+        if (!weekInfo) return;
+        const loadToken = ++weekTableLoadTokenRef.current;
+        void loadWeekAndFirstDayData(weekInfo, parseInt(year, 10), loadToken);
+    }, [selectedWeek, year, weeks, loadWeekAndFirstDayData]);
 
-                const selectedYear = parseInt(year, 10);
-                const selectedWeekNum = Number(selectedWeek);
+    const refreshWeekTableData = useCallback(async () => {
+        if (!selectedWeek) return;
+        try {
+            const [expensesRes, paymentsRes] = await Promise.all([
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams()),
+            ]);
 
-                const filteredExpenses = expensesRes.data.filter((expense) => {
-                    if (!isRowForActiveBranch(expense)) return false;
-                    if (expense.status !== true) return false;
-                    const wn = Number(expense.weekly_number);
-                    if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
-                    return getIsoYearFromRowDate(expense) === selectedYear;
-                });
+            const selectedYear = parseInt(year, 10);
+            const selectedWeekNum = Number(selectedWeek);
 
-                const filteredPaymentsByYear = paymentsRes.data.filter((payment) => {
-                    if (!isRowForActiveBranch(payment)) return false;
-                    if (payment.status !== true) return false;
-                    const wn = Number(payment.weekly_number);
-                    if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
-                    return getIsoYearFromRowDate(payment) === selectedYear;
-                });
+            const filteredExpenses = expensesRes.data.filter((expense) => {
+                if (!isRowForActiveBranch(expense)) return false;
+                if (expense.status !== true) return false;
+                const wn = Number(expense.weekly_number);
+                if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                return getIsoYearFromRowDate(expense) === selectedYear;
+            });
 
-                const filteredPayments = filteredPaymentsByYear.filter(
-                    (payment) => payment.type !== "Handover"
-                );
+            const filteredPaymentsByYear = paymentsRes.data.filter((payment) => {
+                if (!isRowForActiveBranch(payment)) return false;
+                if (payment.status !== true) return false;
+                const wn = Number(payment.weekly_number);
+                if (!Number.isFinite(wn) || wn !== selectedWeekNum) return false;
+                return getIsoYearFromRowDate(payment) === selectedYear;
+            });
 
-                setExpenses(filteredExpenses);
-                setPayments(filteredPayments);
-            } catch (error) {
-                console.error("Error fetching weekly data:", error);
-            }
-        };
-        fetchWeekData();
-    }, [selectedWeek, year, activeBranchId, withBranchParams, isRowForActiveBranch]);
+            const filteredPayments = filteredPaymentsByYear.filter(
+                (payment) => payment.type !== "Handover"
+            );
+
+            setExpenses(filteredExpenses);
+            setPayments(filteredPayments);
+        } catch (error) {
+            console.error("Error fetching weekly data:", error);
+        }
+    }, [selectedWeek, year, withBranchParams, isRowForActiveBranch]);
     useEffect(() => {
         fetchLaboursList();
         fetchSites();
@@ -802,31 +865,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         return days;
     };
     const weekDays = getWeekDays();
-    useEffect(() => {
-        if (weekDays.length > 0) {
-            // Always set the first day of the selected week as default
-            const defaultDate = weekDays[0].toISOString().split("T")[0];
-            setSelectedDate(defaultDate);
-            setNewRefundReceived((prev) => ({ ...prev, date: defaultDate }));
-            // Fetch data for the first day of the week
-            const fetchDataForDate = async (dateStr) => {
-                try {
-                    const [dailyRes, refundRes] = await Promise.all([
-                        axios.get(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${dateStr}`, withBranchParams()),
-                        axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${dateStr}`, withBranchParams())
-                    ]);
-                    setDailyExpenses(dailyRes.data);
-                    setRefundPayments(refundRes.data);
-                } catch (error) {
-                    console.error("Error fetching data:", error);
-                    setDailyExpenses([]);
-                    setRefundPayments([]);
-                }
-            };
-
-            fetchDataForDate(defaultDate);
-        }
-    }, [currentWeek, withBranchParams]);
     const formatDate = (date) =>
         date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     const handleDateClick = async (dateStr) => {
@@ -846,10 +884,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
             setRefundPayments([]);
         }
     };
-    useEffect(() => {
-        if (!selectedDate) return;
-        handleDateClick(selectedDate);
-    }, [activeBranchId]);
     const customStyles = {
         control: (provided, state) => ({
             ...provided,
@@ -938,15 +972,35 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
             return next;
         });
     };
-    const refreshSelectedDateData = async () => {
+    const refreshSelectedDateData = useCallback(async () => {
         if (!selectedDate) return;
-        const [dailyRes, refundRes] = await Promise.all([
-            axios.get(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${selectedDate}`, withBranchParams()),
-            axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams()),
-        ]);
-        setDailyExpenses(dailyRes.data);
-        setRefundPayments(refundRes.data);
-    };
+        try {
+            const [dailyRes, refundRes] = await Promise.all([
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/daily-payments/date/${selectedDate}`, withBranchParams()),
+                axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams()),
+            ]);
+            setDailyExpenses(dailyRes.data);
+            setRefundPayments(refundRes.data);
+        } catch (error) {
+            console.error('Error refreshing daily table data:', error);
+        }
+    }, [selectedDate, withBranchParams]);
+    const refreshLiveTableData = useCallback(async () => {
+        await refreshWeekTableData();
+        await refreshSelectedDateData();
+    }, [refreshWeekTableData, refreshSelectedDateData]);
+    useLiveDataSync(
+        refreshLiveTableData,
+        Boolean(
+            editingDailyExpenseRowId ||
+            editingPaymentId ||
+            showPurposePopup ||
+            sendingToExpensesEntry ||
+            fileUploadPopup ||
+            showPopups ||
+            !isTabActive
+        )
+    );
     const getLastEntryNumber = async () => {
         try {
             const response = await axios.get("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
@@ -1340,6 +1394,22 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
         }
         if (selectQuantity.trim()) {
             if (!String(entry.quantity ?? '').toLowerCase().includes(selectQuantity.toLowerCase().trim())) return false;
+        }
+        if (!matchesWeeklyPaymentExpenseOverallSearch(entry, overallSearch, {
+            formatDateOnly,
+            getPartyName: (exp) =>
+                exp.vendor_id
+                    ? getVendorName(exp.vendor_id)
+                    : exp.contractor_id
+                        ? getContractorName(exp.contractor_id)
+                        : exp.employee_id
+                            ? getEmployeeName(exp.employee_id)
+                            : exp.labour_id
+                                ? laboursList.find(l => l.id === Number(exp.labour_id))?.label || ""
+                                : "",
+            getProjectName: (exp) => getSiteName(exp.project_id) || '',
+        })) {
+            return false;
         }
         return true;
     });
@@ -3200,7 +3270,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                         }),
                                         dropdownIndicator: (provided, state) => ({
                                             ...provided,
-                                            display: state.hasValue ? 'none' : 'flex',
+                                            display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
                                             color: '#000000',
                                             flexShrink: 0,
                                         }),
@@ -3425,7 +3495,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                         <EdbcTotalAmountFilter
                                                             columnId={EDBC_IDS.EDBC8}
                                                             totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
-                                                            placeholder={expensesDstCol8Label}
                                                         />
                                                         <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></th>
                                                         <th className="pl-[6px] w-[66px]"></th>
@@ -3449,7 +3518,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                 )}
                                                 {canEditSelectedWeek && (
                                                     <tr className="bg-white border-b border-gray-200 items-center justify-center">
-                                                        <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{sortedDailyExpenses.filter(row => row.date === selectedDate).length + 1}.</td>
+                                                        <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{dailyExpenses.length + 1}.</td>
                                                         <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
                                                             <div className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}>
                                                                 <Select
@@ -3459,7 +3528,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     isSearchable
                                                                     isClearable
                                                                     options={isChangeButtonActive ? combinedOptions : laboursList}
-                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                    styles={CASH_REGISTER_SELECT_STYLES}
                                                                     menuPortalTarget={document.body}
                                                                     value={
                                                                         isChangeButtonActive
@@ -3497,8 +3566,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                 />
                                                             </div>
                                                         </td>
-                                                        <td className="w-[30px] px-[6px] overflow-visible">
-                                                            <button type="button" onClick={handleChangeButtonClick}>
+                                                        <td className="w-[30px] px-[6px] overflow-visible flex items-center justify-center h-[38px]">
+                                                            <button type="button" onClick={handleChangeButtonClick} className="inline-flex items-center justify-center">
                                                                 <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} alt="Toggle name type" />
                                                             </button>
                                                         </td>
@@ -3519,7 +3588,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     placeholder={expensesDstCol3Label}
                                                                     isSearchable
                                                                     isClearable
-                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                    styles={CASH_REGISTER_SELECT_STYLES}
                                                                 />
                                                             </div>
                                                         </td>
@@ -3542,8 +3611,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                 />
                                                             </div>
                                                         </td>
-                                                        <td className=" p-0 overflow-visible items-center justify-center">
-                                                            <button onClick={() => setShowExtraAmount(prev => !prev)} type="button" className="inline-flex pl-[6px] h-4 w-4 shrink-0">
+                                                        <td className="p-0 overflow-visible flex items-center justify-center h-[38px]">
+                                                            <button onClick={() => setShowExtraAmount(prev => !prev)} type="button" className="inline-flex pl-[6px] items-center justify-center h-4 w-4 shrink-0">
                                                                 <img src={showExtraAmount ? ExtraFeildClose : ExtraFeild} className={`h-4 w-4 min-h-4 min-w-4 max-h-4 max-w-4 shrink-0 object-contain origin-center ${showExtraAmount ? 'scale-[1.375]' : ''}`} alt="Extra" />
                                                             </button>
                                                         </td>
@@ -3586,7 +3655,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     isSearchable
                                                                     isClearable
                                                                     menuPortalTarget={document.body}
-                                                                    styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                    styles={CASH_REGISTER_SELECT_STYLES}
                                                                 />
                                                             </div>
                                                         </td>
@@ -3619,20 +3688,21 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                             <tbody>
                                                 {sortedDailyExpenses
                                                     .filter(row => row.date === selectedDate)
+                                                    .reverse()
                                                     .map((row, index) => (
                                                         <EdbcTableBodyRow key={row.id}>
-                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{index + 1}</td>
+                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{dailyExpenses.length - index}</td>
                                                             <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
                                                                 <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center`}>
                                                                     {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
                                                                         <Select
                                                                             name="labour_id"
-                                                                            className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass || ''}
+                                                                            className="text-xs focus:outline-none w-full"
                                                                             placeholder={expensesDstCol4Label}
                                                                             isSearchable
                                                                             isClearable
                                                                             options={isChangeButtonActive ? combinedOptions : laboursList}
-                                                                            styles={customStyles}
+                                                                            styles={CASH_REGISTER_SELECT_STYLES}
                                                                             menuPortalTarget={document.body}
                                                                             value={
                                                                                 isChangeButtonActive
@@ -3681,8 +3751,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                             </td>
                                                             <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
                                                             <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
-                                                                <div className="w-[220px] h-[40px] flex items-center">
-                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
                                                                         <Select
                                                                             name="project"
                                                                             value={siteOptions.find(opt => opt.id === Number(editDailyExpenseData.project_id)) || null}
@@ -3694,39 +3764,49 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                             }}
                                                                             options={siteOptions}
                                                                             menuPortalTarget={document.body}
-                                                                            className="w-[220px]"
+                                                                            className="text-xs focus:outline-none w-full"
                                                                             placeholder={expensesDstCol3Label}
                                                                             isSearchable
                                                                             isClearable
-                                                                            styles={customStyles}
+                                                                            styles={CASH_REGISTER_SELECT_STYLES}
                                                                         />
-                                                                    ) : (
-                                                                        siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""
-                                                                    )}
-                                                                </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass || ''} h-[40px] flex items-center min-w-0`}>
+                                                                        <span
+                                                                            className="block w-full truncate whitespace-nowrap overflow-hidden"
+                                                                            title={siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
+                                                                        >
+                                                                            {siteOptions.find(opt => opt.id === Number(row.project_id))?.label || ""}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC8} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} relative group`}>
-                                                                <div className="flex items-center justify-end">
-                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
                                                                         <input
                                                                             type="number"
                                                                             name="amount"
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[90px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
                                                                             value={editDailyExpenseData.amount || ""}
                                                                             onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, amount: e.target.value }))}
                                                                         />
-                                                                    ) : (
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-end">
                                                                         <div className="h-[40px] flex flex-col justify-center leading-tight cursor-default text-right">
                                                                             <span>
                                                                                 {formatEdbcTotalAmountPlaceholder(Number((row.amount || 0) + (row.extra_amount || 0)))}
                                                                             </span>
-                                                                            <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                            <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
                                                                                 Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
                                                                                 Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
                                                                             </div>
                                                                         </div>
-                                                                    )}
-                                                                </div>
+                                                                    </div>
+                                                                )}
                                                             </td>
                                                             <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
                                                             <td className="pl-[6px] w-[66px] text-center">
@@ -3735,7 +3815,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                         <input
                                                                             type="number"
                                                                             name="extra_amount"
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
+                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner !w-[60px]`}
                                                                             placeholder="Extra"
                                                                             value={editDailyExpenseData.extra_amount || ""}
                                                                             onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, extra_amount: e.target.value }))}
@@ -3746,19 +3827,23 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                             <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
                                                                 <div className="w-[120px] h-[40px] flex items-center">
                                                                     {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
-                                                                        <select
-                                                                            name="type"
-                                                                            value={editDailyExpenseData.type}
-                                                                            onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, type: e.target.value }))}
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[120px] h-[40px] rounded-lg focus:outline-none"
-                                                                        >
-                                                                            <option value="">Select</option>
-                                                                            {(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type, index) => (
-                                                                                <option key={index} value={isChangeButtonActive ? type.category : type.type}>
-                                                                                    {isChangeButtonActive ? type.category : type.type}
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
+                                                                        <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
+                                                                            <Select
+                                                                                name="type"
+                                                                                className="text-xs focus:outline-none w-full"
+                                                                                value={editDailyExpenseData.type ? { value: editDailyExpenseData.type, label: editDailyExpenseData.type } : null}
+                                                                                onChange={(selectedOption) => setEditDailyExpenseData(prev => ({ ...prev, type: selectedOption ? selectedOption.value : '' }))}
+                                                                                options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
+                                                                                    value: isChangeButtonActive ? type.category : type.type,
+                                                                                    label: isChangeButtonActive ? type.category : type.type,
+                                                                                }))}
+                                                                                placeholder={expensesDstCol12Label}
+                                                                                isSearchable
+                                                                                isClearable
+                                                                                menuPortalTarget={document.body}
+                                                                                styles={CASH_REGISTER_SELECT_STYLES}
+                                                                            />
+                                                                        </div>
                                                                     ) : (
                                                                         row.type
                                                                     )}
@@ -3767,13 +3852,16 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                             <td id={EDBC_IDS.EDBC7} className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.tdClass}>
                                                                 <div className="w-[60px] h-[40px] flex items-center">
                                                                     {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
-                                                                        <input
-                                                                            type="number"
-                                                                            name="quantity"
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-1 w-[60px] h-[40px] rounded-lg focus:outline-none no-spinner"
-                                                                            value={editDailyExpenseData.quantity || ""}
-                                                                            onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
-                                                                        />
+                                                                        <div className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.filterWidthClass}>
+                                                                            <input
+                                                                                type="number"
+                                                                                name="quantity"
+                                                                                style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC7)?.inputClassName || ''} no-spinner`}
+                                                                                value={editDailyExpenseData.quantity || ""}
+                                                                                onChange={(e) => setEditDailyExpenseData(prev => ({ ...prev, quantity: e.target.value }))}
+                                                                            />
+                                                                        </div>
                                                                     ) : (
                                                                         row.quantity || "-"
                                                                     )}
@@ -3931,7 +4019,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                         <EdbcTotalAmountFilter
                                                             columnId={EDBC_IDS.EDBC8}
                                                             totalAmount={filteredRefundPayments.reduce((total, row) => total + Number(row.amount || 0), 0)}
-                                                            placeholder={refundDstCol8Label}
                                                             value={selectRefundAmount}
                                                             onChange={(e) => setSelectRefundAmount(e.target.value)}
                                                         />
@@ -3959,7 +4046,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                 onChange={handleRefundSelectChange}
                                                                 onKeyDown={handleKeyDown}
                                                                 options={isRefundChangeButtonActive ? combinedOptions : laboursList}
-                                                                styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                styles={CASH_REGISTER_SELECT_STYLES}
                                                                 menuPortalTarget={document.body}
                                                             />
                                                         </td>
@@ -4001,7 +4088,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                             {editingPaymentId === row.id && canEditSelectedWeek ? (
                                                                 <Select
                                                                     name="refund_party"
-                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass || ''}
+                                                                    className="text-xs focus:outline-none w-full"
                                                                     placeholder={refundDstCol4Label}
                                                                     isSearchable
                                                                     isClearable
@@ -4016,7 +4103,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                                     onChange={handleEditRefundLabourChange}
                                                                     options={refundSelectOptions}
                                                                     menuPortalTarget={document.body}
-                                                                    styles={customStyles}
+                                                                    styles={CASH_REGISTER_SELECT_STYLES}
                                                                 />
                                                             ) : (
                                                                 <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center overflow-hidden`}>
@@ -4041,17 +4128,20 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                                         </td>
                                                         <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
                                                             {editingPaymentId === row.id && canEditSelectedWeek ? (
-                                                                <input
-                                                                    type="number"
-                                                                    name="amount"
-                                                                    value={editRefundPaymentData.amount}
-                                                                    onChange={handleEditRefundChange}
-                                                                    className="border-2 border-[#BF9853] border-opacity-25 rounded-lg w-[90px] h-[40px] focus:outline-none no-spinner"
-                                                                    placeholder={refundDstCol8Label}
-                                                                    min="0"
-                                                                    step="any"
-                                                                    onWheel={(e) => e.preventDefault()}
-                                                                />
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                    <input
+                                                                        type="number"
+                                                                        name="amount"
+                                                                        value={editRefundPaymentData.amount}
+                                                                        onChange={handleEditRefundChange}
+                                                                        style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                        placeholder={refundDstCol8Label}
+                                                                        min="0"
+                                                                        step="any"
+                                                                        onWheel={(e) => e.preventDefault()}
+                                                                    />
+                                                                </div>
                                                             ) : (
                                                                 formatEdbcTotalAmountPlaceholder(row.amount)
                                                             )}
@@ -4128,7 +4218,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                         </div>
                     </div>
                     {showPopups && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]"
                             onKeyDown={(e) => {
                                 if (e.key === 'Escape') {
                                     setShowPopups(false);
@@ -4141,52 +4231,50 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                             }}
                             tabIndex={0}
                         >
-                            <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
-                                <label className="block mb-3 text-left">
-                                    <span className="font-semibold">Description</span>
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-[650px]">
+                                <label className="block text-left">
+                                    <span className="font-semibold block text-[18px] mb-[8px]">Description</span>
                                     {entryId ? (
                                         <div>
-                                            <input
-                                                type="text"
+                                            <textarea
                                                 name="description"
                                                 placeholder="Enter description"
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none"
+                                                rows={4}
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full lg:w-[616px] focus:outline-none resize-none whitespace-normal break-words"
                                                 value={description}
                                                 onChange={(e) => setDescription(e.target.value)}
-                                                maxLength={200}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
                                             />
-                                            <div className="text-xs text-gray-500 mt-1 text-right">
-                                                {description.length}/200 characters
-                                            </div>
                                         </div>
                                     ) : (
                                         <div>
                                             <textarea
                                                 name="description"
                                                 placeholder="Description"
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none h-24 resize-none"
+                                                rows={4}
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full lg:w-[616px] focus:outline-none resize-none whitespace-normal break-words"
                                                 value={description}
                                                 readOnly
                                             />
                                         </div>
                                     )}
                                 </label>
-                                <div className="flex justify-end gap-2">
+                                <div className="flex justify-end gap-[18px] mt-[18px]">
                                     <button
                                         onClick={() => {
                                             setShowPopups(false);
                                             setEntryId(null);
                                             setDescription("");
                                         }}
-                                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                        className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-md"
                                     >
-                                        Cancel
+                                        Close
                                     </button>
                                     {entryId && (
                                         <button
                                             onClick={handleUpdate}
                                             disabled={loading || !description.trim()}
-                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-lg hover:bg-[#A68A4A] disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-md hover:bg-[#BF9853] disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {loading ? 'Saving...' : 'Save'}
                                         </button>
@@ -4197,7 +4285,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                     )}
                     {fileUploadPopup && (
                         <div
-                            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                            className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center"
                             onKeyDown={(e) => {
                                 if (e.key === 'Escape') {
                                     setFileUploadPopup(false);
@@ -4224,48 +4312,85 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                     </div>
                                 )}
                                 <div className="mb-4">
-                                    <label className="block mb-2 text-sm font-medium">
-                                        Select PDF File
+                                    <label
+                                        htmlFor="daily-history-file-upload-input"
+                                        className="flex flex-col items-center justify-center w-full h-[120px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                                    >
+                                        <svg width="40" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M17 8L12 3L7 8" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M12 3V15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        <p className="text-[14px] font-medium text-[#E4572E] mt-[4px]">Click to Upload</p>
+                                        <p className="text-[10px] text-gray-400">Files will be compressed on upload</p>
                                     </label>
                                     <input
+                                        id="daily-history-file-upload-input"
                                         type="file"
                                         accept=".pdf"
                                         onChange={handleFileSelectInPopup}
-                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#BF9853] file:text-white hover:file:bg-[#A68A4A]"
+                                        className="hidden"
                                     />
                                     {selectedFileForPopup && (
-                                        <p className="mt-2 text-sm text-green-600">
-                                            Selected: {selectedFileForPopup.name}
-                                        </p>
+                                        <div className="mt-2">
+                                            <p className="text-[12px] font-medium text-black mb-[4px]">File Uploading</p>
+                                            <div className="bg-gray-50 rounded-lg p-[12px]">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-[12px] flex-1 min-w-0">
+                                                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[12px] font-medium text-black truncate">{selectedFileForPopup.name}</p>
+                                                            <p className="text-[10px] text-gray-500">{(selectedFileForPopup.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-[12px]">
+                                                        <button type="button" onClick={() => setSelectedFileForPopup(null)} className="text-red-500 hover:text-red-700">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                                <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        </button>
+                                                        <span className="text-[12px] font-semibold text-black w-[40px] text-right">100%</span>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div className="h-full w-full bg-[#BF9853] rounded-full" />
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                                <div className="flex justify-end gap-2">
+                                <div className="flex flex-col gap-3 mt-6 w-full">
+                                    <button
+                                        onClick={handleSaveFileFromPopup}
+                                        disabled={!selectedFileForPopup}
+                                        className={`w-full px-4 py-2 rounded-lg ${!selectedFileForPopup
+                                            ? 'bg-[#BF9853] opacity-50 cursor-not-allowed text-white'
+                                            : 'bg-[#BF9853] text-white'
+                                            }`}
+                                    >
+                                        Confirm
+                                    </button>
                                     <button
                                         onClick={() => {
                                             setFileUploadPopup(false);
                                             setCurrentFileRow(null);
                                             setSelectedFileForPopup(null);
                                         }}
-                                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                        className="w-full px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
                                     >
                                         Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSaveFileFromPopup}
-                                        disabled={!selectedFileForPopup}
-                                        className={`px-4 py-2 rounded-lg ${!selectedFileForPopup
-                                            ? 'bg-gray-400 cursor-not-allowed'
-                                            : 'bg-green-600 hover:bg-green-700'
-                                            } text-white`}
-                                    >
-                                        {currentFileRow?.file_url ? 'Update File' : 'Upload File'}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
                     {showWeeklyPaymentExpensesModal && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
                             <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
                                 <div className="flex justify-between items-center mt-4 ml-7 mr-7">
                                     <h2 className="text-xl font-bold">History</h2>
@@ -4311,7 +4436,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                         </div>
                     )}
                     {showWeeklyPaymentReceivedModal && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
                             <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
                                 <div className="flex justify-between items-center mt-4 ml-7 mr-7">
                                     <h2 className="text-xl font-bold">History</h2>
@@ -4439,10 +4564,13 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady }) => {
                                             clearIndicator: (provided) => ({
                                                 ...provided,
                                                 padding: '2px',
+                                                color: '#000000',
                                             }),
-                                            dropdownIndicator: (provided) => ({
+                                            dropdownIndicator: (provided, state) => ({
                                                 ...provided,
                                                 padding: '2px',
+                                                color: '#000000',
+                                                display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
                                             }),
                                             menuPortal: (provided) => ({
                                                 ...provided,

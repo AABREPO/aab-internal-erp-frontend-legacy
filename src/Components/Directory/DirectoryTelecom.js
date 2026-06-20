@@ -9,7 +9,7 @@ import filterIcon from '../Images/filter (3).png'
 const DirectoryTelecom = () => {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/demoAabuildersDash';
   const API_BASE_URL1 = process.env.REACT_APP_API_BASE_URL ?? 'https://backendaab.in/demoAabuilderDash';
-  const [activeTab, setActiveTab] = useState('clients');
+  const [activeTab, setActiveTab] = useState('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isInputsOpen, setIsInputsOpen] = useState(false);
   const [form, setForm] = useState({
@@ -32,9 +32,7 @@ const DirectoryTelecom = () => {
     vendor: '',
     service: '',
     doorNo: '',
-    shop: '',
     project: '',
-    tenant: '',
     status: '',
     date: ''
   });
@@ -52,6 +50,8 @@ const DirectoryTelecom = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [isFilterRowVisible, setIsFilterRowVisible] = useState(false);
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
   const [editingItem, setEditingItem] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [typeSearch, setTypeSearch] = useState('');
@@ -252,22 +252,255 @@ const DirectoryTelecom = () => {
     return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(numberValue);
   };
   const findProjectItemByValue = (value) => {
-    if (value === null || value === undefined) return undefined;
-    const stringValue = String(value);
+    if (value === null || value === undefined || String(value).trim() === '') return undefined;
+    const stringValue = String(value).trim();
     return projectItems.find((item) => {
-      const idMatch = item.id !== undefined && item.id !== null && String(item.id) === stringValue;
-      const siteNoMatch = item.siteNo !== undefined && item.siteNo !== null && String(item.siteNo) === stringValue;
-      return idMatch || siteNoMatch;
+      if (item.id != null && String(item.id) === stringValue) return true;
+      if (item.siteNo != null && String(item.siteNo) === stringValue) return true;
+      if (item.raw?.projectId != null && String(item.raw.projectId) === stringValue) return true;
+      if (item.raw?.id != null && String(item.raw.id) === stringValue) return true;
+      return false;
     });
+  };
+  const getProjectFilterKey = (projectId) => {
+    if (projectId === null || projectId === undefined || String(projectId).trim() === '') return '';
+    const project = findProjectItemByValue(projectId);
+    if (project?.id != null && String(project.id).trim() !== '') {
+      return String(project.id);
+    }
+    if (project?.siteNo != null && String(project.siteNo).trim() !== '') {
+      return String(project.siteNo);
+    }
+    return String(projectId).trim();
   };
   const getProjectName = (projectId) => {
     const project = findProjectItemByValue(projectId);
     return project?.name ?? '-';
   };
+  const getEntryProjectId = (item) => item?.project_id ?? item?.projectId ?? null;
+  const resolveListItemNameById = (items, id) => {
+    if (id == null || String(id).trim() === '') return '';
+    const match = items.find((item) => String(item.id) === String(id));
+    return match?.name ?? '';
+  };
+  const getListItemDisplayNameById = (items, id) => {
+    const name = resolveListItemNameById(items, id);
+    return name || '-';
+  };
+  const getServiceProviderName = (item) =>
+    getListItemDisplayNameById(networkItems, item?.service_provide_id ?? item?.serviceProvideId);
+  const getServiceTypeName = (item) =>
+    getListItemDisplayNameById(typeItems, item?.service_type_id ?? item?.serviceTypeId);
+  const getEntryServiceNumber = (item) => {
+    const raw = item?.service_number ?? item?.serviceNumber ?? item?.utilityTypeNumber ?? '';
+    return raw != null ? String(raw).trim() : '';
+  };
+  const resolveLatestPaymentForEntry = (item, paymentMap) => {
+    const serviceNumber = getEntryServiceNumber(item);
+    if (!serviceNumber) return null;
+    return paymentMap.get(serviceNumber) ?? null;
+  };
+  const resolveEntryPaymentDate = (item, paymentMap) => {
+    const latestPayment = resolveLatestPaymentForEntry(item, paymentMap);
+    const raw =
+      latestPayment?.date ??
+      latestPayment?.payment_date ??
+      latestPayment?.timestamp ??
+      item?.payment_date ??
+      item?.paymentDate ??
+      null;
+    return formatDateForInput(raw);
+  };
+  const toSortTimestamp = (value) => {
+    const date = toDateAtMidnight(value);
+    return date ? date.getTime() : null;
+  };
+  const getRemainDaysSortValue = (expiryDate) => {
+    if (!expiryDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = toDateAtMidnight(expiryDate);
+    if (!expiry) return null;
+    return Math.ceil((expiry.getTime() - today.getTime()) / DAY_IN_MS);
+  };
+  const getExpiredAgoSortValue = (expiryDate) => {
+    if (!expiryDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = toDateAtMidnight(expiryDate);
+    if (!expiry) return null;
+    const diffDays = Math.floor((today.getTime() - expiry.getTime()) / DAY_IN_MS);
+    return diffDays > 0 ? diffDays : null;
+  };
+  const getValiditySortValue = (validityValue, validityUnit) => {
+    const numeric = Number(validityValue);
+    if (!Number.isFinite(numeric)) return null;
+    const unit = String(validityUnit ?? '').trim().toLowerCase();
+    if (unit.includes('year')) return numeric * 365;
+    if (unit.includes('month')) return numeric * 30;
+    if (unit.includes('day')) return numeric;
+    return numeric;
+  };
+  const compareSortValues = (aValue, bValue, direction) => {
+    const aEmpty = aValue === null || aValue === undefined || aValue === '' || Number.isNaN(aValue);
+    const bEmpty = bValue === null || bValue === undefined || bValue === '' || Number.isNaN(bValue);
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+    }
+    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+    return 0;
+  };
+  const getTelecomEntryRowData = (item, paymentMap) => {
+    const latestPayment = resolveLatestPaymentForEntry(item, paymentMap);
+    const serviceNumber = getEntryServiceNumber(item);
+    const paymentDateRaw =
+      latestPayment?.date ??
+      latestPayment?.payment_date ??
+      item.payment_date ??
+      item.paymentDate ??
+      null;
+    const amountRaw =
+      latestPayment?.amount ??
+      item.amount ??
+      item.amount_value ??
+      item.amountValue ??
+      '';
+    const serviceStartRaw =
+      latestPayment?.serviceStartingDate ??
+      latestPayment?.service_starting_date ??
+      latestPayment?.serviceStarting ??
+      latestPayment?.service_starting ??
+      paymentDateRaw ??
+      item.service_starting_date ??
+      item.serviceStartingDate ??
+      item.service_starting ??
+      item.serviceStart ??
+      null;
+    const resolvedValidityValue =
+      latestPayment?.utility_validity_days ??
+      latestPayment?.utilityValidityDays ??
+      latestPayment?.validity ??
+      item.validity ??
+      item.validity_value ??
+      item.validityValue ??
+      '';
+    const resolvedValidityUnit =
+      latestPayment?.utility_validity_type ??
+      latestPayment?.utilityValidityType ??
+      latestPayment?.validity_type ??
+      latestPayment?.validityType ??
+      item.validity_type ??
+      item.validityType ??
+      '';
+    const explicitServiceEndFromExpense =
+      latestPayment?.service_end_date ??
+      latestPayment?.serviceEndDate ??
+      latestPayment?.service_end ??
+      latestPayment?.serviceEnd ??
+      null;
+    const explicitServiceEndFromDirectory =
+      item.service_end_date ??
+      item.serviceEndDate ??
+      item.service_end ??
+      item.serviceEnd ??
+      null;
+    const explicitServiceEnd = explicitServiceEndFromExpense || (!latestPayment ? explicitServiceEndFromDirectory : null);
+    const expiryDate = calculateExpiryDate(
+      serviceStartRaw,
+      resolvedValidityValue,
+      resolvedValidityUnit,
+      explicitServiceEnd
+    );
+    const computedServiceEnd = computeServiceEndDate(serviceStartRaw, resolvedValidityValue, resolvedValidityUnit);
+    const serviceEndForDisplay = explicitServiceEnd || computedServiceEnd || null;
+    const validityLabel =
+      resolvedValidityValue && resolvedValidityUnit
+        ? `${resolvedValidityValue} ${resolvedValidityUnit}`
+        : resolvedValidityValue || '-';
+    const projectCategory = getProjectCategory(getEntryProjectId(item));
+    return {
+      latestPayment,
+      serviceNumber,
+      paymentDateRaw,
+      amountRaw,
+      serviceStartRaw,
+      serviceEndForDisplay,
+      resolvedValidityValue,
+      resolvedValidityUnit,
+      validityLabel,
+      expiryDate,
+      projectCategory,
+      providerStyles: getProjectCategoryStyles(projectCategory),
+      projectName: getProjectName(getEntryProjectId(item)),
+      serviceProviderName: getServiceProviderName(item),
+      serviceTypeName: getServiceTypeName(item),
+      registeredPerson: item.registered_person ?? item.registeredPerson ?? '-',
+      assignedPerson: item.assigned_person ?? item.assignedPerson ?? '-'
+    };
+  };
+  const getTelecomEntrySortValue = (item, column, paymentMap) => {
+    const row = getTelecomEntryRowData(item, paymentMap);
+    switch (column) {
+      case 'project':
+        return row.projectName === '-' ? '' : row.projectName;
+      case 'serviceProvider':
+        return row.serviceProviderName === '-' ? '' : row.serviceProviderName;
+      case 'type':
+        return row.serviceTypeName === '-' ? '' : row.serviceTypeName;
+      case 'number':
+        return row.serviceNumber || '';
+      case 'paymentDate':
+        return toSortTimestamp(row.paymentDateRaw);
+      case 'serviceStart':
+        return toSortTimestamp(row.serviceStartRaw);
+      case 'serviceEnd':
+        return toSortTimestamp(row.serviceEndForDisplay);
+      case 'validity':
+        return getValiditySortValue(row.resolvedValidityValue, row.resolvedValidityUnit);
+      case 'amount':
+        return Number(row.amountRaw) || 0;
+      case 'expDate':
+        return toSortTimestamp(row.expiryDate);
+      case 'remainDays':
+        return getRemainDaysSortValue(row.expiryDate);
+      case 'expAgo':
+        return getExpiredAgoSortValue(row.expiryDate);
+      case 'registered':
+        return row.registeredPerson === '-' ? '' : row.registeredPerson;
+      case 'assigned':
+        return row.assignedPerson === '-' ? '' : row.assignedPerson;
+      default:
+        return null;
+    }
+  };
   const getProjectCategory = (projectId) => {
     const project = findProjectItemByValue(projectId);
     return project?.category ?? '';
   };
+  const normalizeFilterText = (value) =>
+    String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const isOwnProjectCategory = (category) => {
+    const normalized = normalizeFilterText(category);
+    return normalized.includes('own');
+  };
+  const isClientProjectCategory = (category) => {
+    const normalized = normalizeFilterText(category);
+    return normalized.includes('client') || normalized.includes('cliant');
+  };
+  const getEntryServiceProviderName = (item) =>
+    resolveListItemNameById(networkItems, item?.service_provide_id ?? item?.serviceProvideId) ||
+    item?.service_provider ||
+    item?.serviceProvider ||
+    '';
+  const getEntryServiceTypeName = (item) =>
+    resolveListItemNameById(typeItems, item?.service_type_id ?? item?.serviceTypeId) ||
+    item?.service_type ||
+    item?.serviceType ||
+    '';
   const getProjectCategoryStyles = (category) => {
     const normalized = (category ?? '').trim().toLowerCase();
     const isOwn = normalized.includes('own');
@@ -320,7 +553,7 @@ const DirectoryTelecom = () => {
   const categoryFilterOptions = useMemo(() => {
     const categories = new Set(
       telecomEntries.map((item) => {
-        const category = getProjectCategory(item.project_id);
+        const category = getProjectCategory(getEntryProjectId(item));
         return category ? category : null;
       }).filter(Boolean)
     );
@@ -336,52 +569,55 @@ const DirectoryTelecom = () => {
       label: status
     }));
   }, [telecomEntries]);
-  const filteredTelecomEntries = useMemo(() => {
-    return telecomEntries.filter((item) => {
-      const paymentDateValue = item.payment_date ?? item.paymentDate ?? '';
-      const paymentDateISO = paymentDateValue ? new Date(paymentDateValue).toISOString().slice(0, 10) : '';
-      const serviceProviderValue = (item.service_provider ?? item.serviceProvider ?? '').toLowerCase();
-      const serviceTypeValue = (item.service_type ?? item.serviceType ?? '').toLowerCase();
-      const serviceNumberValue = (item.service_number ?? item.serviceNumber ?? '').toLowerCase();
-      const assignedValue = (item.assigned_person ?? item.assignedPerson ?? '').toLowerCase();
-      const projectIdValue = item.project_id ?? item.projectId ?? null;
-      const projectCategoryValue = getProjectCategory(projectIdValue);
-      const entryStatus = getEntryStatus(item);
-      if (filters.project && String(filters.project) !== String(projectIdValue)) {
-        return false;
-      }
-      if (filters.date) {
-        if (paymentDateISO !== filters.date) {
-          return false;
-        }
-      }
-      if (filters.category && projectCategoryValue !== filters.category) {
-        return false;
-      }
-      if (filters.status && entryStatus !== filters.status) {
-        return false;
-      }
-      if (filters.vendor && !serviceProviderValue.includes(filters.vendor.toLowerCase())) {
-        return false;
-      }
-      if (filters.service && !serviceTypeValue.includes(filters.service.toLowerCase())) {
-        return false;
-      }
-      if (filters.tenant && !assignedValue.includes(filters.tenant.toLowerCase())) {
-        return false;
-      }
-      if (filters.doorNo && !serviceNumberValue.includes(filters.doorNo.toLowerCase())) {
-        return false;
-      }
-      if (filters.year) {
-        const paymentYear = paymentDateValue ? String(new Date(paymentDateValue).getFullYear()) : '';
-        if (paymentYear !== filters.year) {
-          return false;
-        }
-      }
-      return true;
+  const vendorFilterOptions = useMemo(() => {
+    const names = new Set();
+    telecomEntries.forEach((item) => {
+      const name = getEntryServiceProviderName(item);
+      if (name) names.add(name);
     });
-  }, [telecomEntries, filters, projectItems]);
+    networkItems.forEach((item) => {
+      if (item?.name) names.add(item.name);
+    });
+    return Array.from(names)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [networkItems, telecomEntries]);
+  const serviceFilterOptions = useMemo(() => {
+    const names = new Set();
+    telecomEntries.forEach((item) => {
+      const name = getEntryServiceTypeName(item);
+      if (name) names.add(name);
+    });
+    typeItems.forEach((item) => {
+      if (item?.name) names.add(item.name);
+    });
+    return Array.from(names)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [typeItems, telecomEntries]);
+  const doorNoFilterOptions = useMemo(() => {
+    const numbers = new Set();
+    telecomEntries.forEach((item) => {
+      const number = getEntryServiceNumber(item);
+      if (number) numbers.add(number);
+    });
+    return Array.from(numbers)
+      .sort((a, b) => a.localeCompare(b))
+      .map((number) => ({ value: number, label: number }));
+  }, [telecomEntries]);
+  const projectFilterOptions = useMemo(() => {
+    const optionMap = new Map();
+    telecomEntries.forEach((item) => {
+      const projectId = getEntryProjectId(item);
+      if (projectId == null || String(projectId).trim() === '') return;
+      const name = getProjectName(projectId);
+      if (!name || name === '-') return;
+      const key = getProjectFilterKey(projectId);
+      if (!key || optionMap.has(key)) return;
+      optionMap.set(key, { value: key, label: name });
+    });
+    return Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [telecomEntries, projectItems]);
   const latestTelecomPaymentByServiceNo = useMemo(() => {
     const map = new Map();
     const list = Array.isArray(telecomExpensePayments) ? telecomExpensePayments : [];
@@ -440,6 +676,100 @@ const DirectoryTelecom = () => {
     });
     return map;
   }, [telecomExpensePayments]);
+  const yearFilterOptions = useMemo(() => {
+    const years = new Set();
+    telecomEntries.forEach((item) => {
+      const paymentDateISO = resolveEntryPaymentDate(item, latestTelecomPaymentByServiceNo);
+      if (paymentDateISO) {
+        years.add(paymentDateISO.slice(0, 4));
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [telecomEntries, latestTelecomPaymentByServiceNo]);
+  const filteredTelecomEntries = useMemo(() => {
+    return telecomEntries.filter((item) => {
+      const paymentDateISO = resolveEntryPaymentDate(item, latestTelecomPaymentByServiceNo);
+      const serviceProviderValue = normalizeFilterText(getEntryServiceProviderName(item));
+      const serviceTypeValue = normalizeFilterText(getEntryServiceTypeName(item));
+      const serviceNumberValue = normalizeFilterText(getEntryServiceNumber(item));
+      const projectIdValue = getEntryProjectId(item);
+      const projectCategoryValue = getProjectCategory(projectIdValue);
+      const entryStatus = getEntryStatus(item);
+
+      if (!filters.project) {
+        if (activeTab === 'clients' && !isClientProjectCategory(projectCategoryValue)) {
+          return false;
+        }
+        if (activeTab === 'own' && !isOwnProjectCategory(projectCategoryValue)) {
+          return false;
+        }
+      }
+      if (filters.project) {
+        const entryProjectKey = getProjectFilterKey(projectIdValue);
+        if (!entryProjectKey || entryProjectKey !== String(filters.project)) {
+          return false;
+        }
+      }
+      if (filters.date) {
+        if (paymentDateISO !== filters.date) {
+          return false;
+        }
+      }
+      if (filters.category && projectCategoryValue !== filters.category) {
+        return false;
+      }
+      if (filters.status && entryStatus !== filters.status) {
+        return false;
+      }
+      if (filters.vendor && serviceProviderValue !== normalizeFilterText(filters.vendor)) {
+        return false;
+      }
+      if (filters.service && serviceTypeValue !== normalizeFilterText(filters.service)) {
+        return false;
+      }
+      if (filters.doorNo && serviceNumberValue !== normalizeFilterText(filters.doorNo)) {
+        return false;
+      }
+      if (filters.year) {
+        const paymentYear = paymentDateISO ? paymentDateISO.slice(0, 4) : '';
+        if (paymentYear !== filters.year) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [telecomEntries, filters, projectItems, networkItems, typeItems, latestTelecomPaymentByServiceNo, activeTab]);
+  const sortedTelecomEntries = useMemo(() => {
+    if (!sortColumn) return filteredTelecomEntries;
+    return [...filteredTelecomEntries].sort((a, b) =>
+      compareSortValues(
+        getTelecomEntrySortValue(a, sortColumn, latestTelecomPaymentByServiceNo),
+        getTelecomEntrySortValue(b, sortColumn, latestTelecomPaymentByServiceNo),
+        sortDirection
+      )
+    );
+  }, [filteredTelecomEntries, sortColumn, sortDirection, latestTelecomPaymentByServiceNo, networkItems, typeItems, projectItems]);
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+  const renderSortIndicator = (columnKey) => {
+    if (sortColumn !== columnKey) return null;
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
+  };
+  const renderSortableHeader = (columnKey, label, className = 'p-2') => (
+    <th
+      className={`${className} font-bold cursor-pointer hover:bg-gray-200 select-none`}
+      onClick={() => handleSort(columnKey)}
+    >
+      {label}
+      {renderSortIndicator(columnKey)}
+    </th>
+  );
   const filteredTypeItems = useMemo(() => {
     const term = typeSearch.trim().toLowerCase();
     if (!term) return typeItems;
@@ -500,8 +830,28 @@ const DirectoryTelecom = () => {
     return peopleNameOptions.find(option => option.value === form.assignedPerson) ?? null;
   }, [peopleNameOptions, form.assignedPerson]);
   const selectedProjectFilterOption = useMemo(
-    () => projectOptions.find(option => option.value === filters.project) ?? null,
-    [projectOptions, filters.project]
+    () => projectFilterOptions.find((option) => option.value === filters.project) ?? null,
+    [projectFilterOptions, filters.project]
+  );
+  const yearSelectOptions = useMemo(
+    () => yearFilterOptions.map((year) => ({ value: year, label: year })),
+    [yearFilterOptions]
+  );
+  const selectedYearFilterOption = useMemo(
+    () => yearSelectOptions.find((option) => option.value === filters.year) ?? null,
+    [yearSelectOptions, filters.year]
+  );
+  const selectedVendorFilterOption = useMemo(
+    () => vendorFilterOptions.find((option) => option.value === filters.vendor) ?? null,
+    [vendorFilterOptions, filters.vendor]
+  );
+  const selectedServiceFilterOption = useMemo(
+    () => serviceFilterOptions.find((option) => option.value === filters.service) ?? null,
+    [serviceFilterOptions, filters.service]
+  );
+  const selectedDoorNoFilterOption = useMemo(
+    () => doorNoFilterOptions.find((option) => option.value === filters.doorNo) ?? null,
+    [doorNoFilterOptions, filters.doorNo]
   );
   const selectStyles = useMemo(
     () => ({
@@ -544,9 +894,7 @@ const DirectoryTelecom = () => {
       vendor: '',
       service: '',
       doorNo: '',
-      shop: '',
       project: '',
-      tenant: '',
       status: '',
       date: ''
     });
@@ -868,6 +1216,18 @@ const DirectoryTelecom = () => {
     };
     saveItem();
   };
+  const resolveListItemId = (items, selectedName, fallbackId) => {
+    if (selectedName) {
+      const match = items.find((item) => item.name === selectedName);
+      if (match?.id != null) {
+        return String(match.id);
+      }
+    }
+    if (fallbackId != null && String(fallbackId).trim() !== '') {
+      return String(fallbackId);
+    }
+    return null;
+  };
   const handleCreateSubmit = async () => {
     const projectIdValue = resolveProjectIdForSave(form.project);
     const payload = {
@@ -876,6 +1236,21 @@ const DirectoryTelecom = () => {
       service_number: form.number || null,
       project_id: projectIdValue,
       purpose: form.purpose || null,
+      purpose_id: resolveListItemId(
+        categoryItems,
+        form.purpose,
+        editingEntry?.purpose_id ?? editingEntry?.purposeId
+      ),
+      service_type_id: resolveListItemId(
+        typeItems,
+        form.type,
+        editingEntry?.service_type_id ?? editingEntry?.serviceTypeId
+      ),
+      service_provide_id: resolveListItemId(
+        networkItems,
+        form.network,
+        editingEntry?.service_provide_id ?? editingEntry?.serviceProvideId
+      ),
       amount: form.amount ? Number(form.amount) : 0,
       payment_date: form.paymentDate || null,
       service_starting_date: form.serviceStart || null,
@@ -1105,11 +1480,11 @@ const DirectoryTelecom = () => {
           ? computeServiceEndDate(latestServiceStart, resolvedValidityValueForEdit, resolvedValidityUnitForEdit)
           : null;
       setForm({
-        type: entry.service_type ?? entry.serviceType ?? '',
-        network: entry.service_provider ?? entry.serviceProvider ?? '',
+        type: resolveListItemNameById(typeItems, entry.service_type_id ?? entry.serviceTypeId),
+        network: resolveListItemNameById(networkItems, entry.service_provide_id ?? entry.serviceProvideId),
         number: entry.service_number ?? entry.serviceNumber ?? '',
         project: projectRaw !== undefined && projectRaw !== null ? String(projectRaw) : '',
-        purpose: entry.purpose ?? '',
+        purpose: resolveListItemNameById(categoryItems, entry.purpose_id ?? entry.purposeId),
         amount:
           (latestPayment?.amount ?? '') !== ''
             ? String(latestPayment?.amount ?? '')
@@ -1136,95 +1511,71 @@ const DirectoryTelecom = () => {
   };
   return (
     <div className=" rounded-lg shadow-sm ">
-      <div className="bg-white lg:flex gap-3 p-4 ml-5 mr-5 rounded-md lg:h-[128px] text-left">
-        <div>
+      <div className="bg-white lg:flex flex-wrap gap-3 p-4 ml-5 mr-5 rounded-md text-left">
+        <div className="w-full md:w-48">
           <label className="block font-semibold mb-1">Year</label>
-          <select
-            value={filters.year}
-            onChange={(e) => handleFilterChange('year', e.target.value)}
-            className="h-11 w-full md:w-48 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 text-sm bg-white focus:outline-none appearance-none"
-          >
-            <option value="">Select Year</option>
-            <option>2024</option>
-            <option>2025</option>
-            <option>2026</option>
-          </select>
+          <Select
+            value={selectedYearFilterOption}
+            onChange={(option) => handleFilterChange('year', option?.value ?? '')}
+            options={yearSelectOptions}
+            styles={customStyles}
+            placeholder="Select Year"
+            isSearchable
+            isClearable
+            classNamePrefix="telecom-select"
+          />
         </div>
-        <div>
+        <div className="w-full md:w-48">
           <label className="block font-semibold mb-1">Vendor</label>
-          <select
-            value={filters.vendor}
-            onChange={(e) => handleFilterChange('vendor', e.target.value)}
-            className="h-11 w-full md:w-48 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 text-sm bg-white focus:outline-none appearance-none"
-          >
-            <option value="">Select Vendor</option>
-            <option>Jio</option>
-            <option>Airtel</option>
-            <option>BSNL</option>
-          </select>
+          <Select
+            value={selectedVendorFilterOption}
+            onChange={(option) => handleFilterChange('vendor', option?.value ?? '')}
+            options={vendorFilterOptions}
+            styles={customStyles}
+            placeholder="Select Vendor"
+            isSearchable
+            isClearable
+            classNamePrefix="telecom-select"
+          />
         </div>
-        <div>
+        <div className="w-full md:w-48">
           <label className="block font-semibold mb-1">Service</label>
-          <select
-            value={filters.service}
-            onChange={(e) => handleFilterChange('service', e.target.value)}
-            className="h-11 w-full md:w-48 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 text-sm bg-white focus:outline-none appearance-none"
-          >
-            <option value="">Select Service</option>
-            <option>DTH</option>
-            <option>Landline</option>
-            <option>Mobile</option>
-            <option>CCTV</option>
-          </select>
+          <Select
+            value={selectedServiceFilterOption}
+            onChange={(option) => handleFilterChange('service', option?.value ?? '')}
+            options={serviceFilterOptions}
+            styles={customStyles}
+            placeholder="Select Service"
+            isSearchable
+            isClearable
+            classNamePrefix="telecom-select"
+          />
         </div>
-        <div>
+        <div className="w-full md:w-48">
           <label className="block font-semibold mb-1">Door No</label>
-          <select
-            value={filters.doorNo}
-            onChange={(e) => handleFilterChange('doorNo', e.target.value)}
-            className="h-11 w-full md:w-48 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 text-sm bg-white focus:outline-none appearance-none"
-          >
-            <option value="">Select Door No</option>
-            <option>Office</option>
-            <option>Godown</option>
-          </select>
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Shop</label>
-          <select
-            value={filters.shop}
-            onChange={(e) => handleFilterChange('shop', e.target.value)}
-            className="h-11 w-full md:w-48 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 text-sm bg-white focus:outline-none appearance-none"
-          >
-            <option value="">Select Shop</option>
-            <option>AA Plot</option>
-            <option>Kambathupatti</option>
-          </select>
+          <Select
+            value={selectedDoorNoFilterOption}
+            onChange={(option) => handleFilterChange('doorNo', option?.value ?? '')}
+            options={doorNoFilterOptions}
+            styles={customStyles}
+            placeholder="Select Door No"
+            isSearchable
+            isClearable
+            classNamePrefix="telecom-select"
+          />
         </div>
         <div className="w-full md:w-48">
           <label className="block font-semibold mb-1">Project Name</label>
           <Select
             value={selectedProjectFilterOption}
             onChange={(option) => handleFilterChange('project', option?.value ?? '')}
-            options={projectOptions}
+            options={projectFilterOptions}
             styles={customStyles}
             placeholder="Select Project"
             isSearchable
             isClearable
             classNamePrefix="telecom-select"
           />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Tenant</label>
-          <select
-            value={filters.tenant}
-            onChange={(e) => handleFilterChange('tenant', e.target.value)}
-            className="h-11 w-full md:w-48 border-2 border-[#BF9853] border-opacity-30 rounded-lg px-3 text-sm bg-white focus:outline-none appearance-none"
-          >
-            <option value="">Select Tenant</option>
-            <option>Amir H</option>
-            <option>Jothi S</option>
-          </select>
         </div>
       </div>
       <div className="mt-4 overflow-x-auto bg-white p-4 ml-5 mr-5 rounded-md">
@@ -1233,10 +1584,26 @@ const DirectoryTelecom = () => {
             <button className="inline-flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-1 shadow-lg" onClick={() => setIsFilterRowVisible(prev => !prev)} >
               <img src={filterIcon} alt="filter" className="w-4 h-5" />
             </button>
-            <button className={'px-6 py-2 rounded font-semibold transition-colors border border-gray-300 hover:bg-gray-50'} >
+            <button
+              type="button"
+              className={`px-6 py-2 rounded font-semibold transition-colors border ${
+                activeTab === 'clients'
+                  ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('clients')}
+            >
               Clients Projects
             </button>
-            <button className={'px-6 py-2 rounded font-semibold transition-colors border border-gray-300 hover:bg-gray-50'} >
+            <button
+              type="button"
+              className={`px-6 py-2 rounded font-semibold transition-colors border ${
+                activeTab === 'own'
+                  ? 'bg-[#BF9853] text-white border-[#BF9853]'
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('own')}
+            >
               Own Projects
             </button>
           </div>
@@ -1249,8 +1616,15 @@ const DirectoryTelecom = () => {
           </div>
         </div>
         <div className="flex justify-between items-center mb-3 px-2">
-          {(filters.date || filters.project || filters.category || filters.status || filters.vendor || filters.service) && (
+          {(filters.year || filters.date || filters.project || filters.category || filters.status || filters.vendor || filters.service || filters.doorNo) && (
             <div className="flex flex-wrap gap-2 items-center">
+              {filters.year && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Year:</span>
+                  <span className="font-bold">{filters.year}</span>
+                  <button onClick={() => handleFilterChange('year', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
               {filters.date && (
                 <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
                   <span className="font-normal">Date:</span>
@@ -1261,7 +1635,7 @@ const DirectoryTelecom = () => {
               {filters.project && (
                 <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
                   <span className="font-normal">Project:</span>
-                  <span className="font-bold">{getProjectName(filters.project)}</span>
+                  <span className="font-bold">{selectedProjectFilterOption?.label ?? filters.project}</span>
                   <button onClick={() => handleFilterChange('project', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
                 </span>
               )}
@@ -1277,6 +1651,13 @@ const DirectoryTelecom = () => {
                   <span className="font-normal">Type:</span>
                   <span className="font-bold">{filters.service}</span>
                   <button onClick={() => handleFilterChange('service', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
+                </span>
+              )}
+              {filters.doorNo && (
+                <span className="inline-flex items-center gap-1 border text-[#BF9853] border-[#BF9853] rounded px-2 text-sm font-medium">
+                  <span className="font-normal">Number:</span>
+                  <span className="font-bold">{filters.doorNo}</span>
+                  <button onClick={() => handleFilterChange('doorNo', '')} className="text-[#BF9853] ml-1 text-lg leading-none">×</button>
                 </span>
               )}
               {filters.category && (
@@ -1306,20 +1687,20 @@ const DirectoryTelecom = () => {
             <thead>
               <tr className="bg-[#FAF6ED] text-left">
                 <th className="p-2 pl-3">Sl.No</th>
-                <th className="p-2">Projects</th>
-                <th className="p-2">Service Provider</th>
-                <th className="p-2">Type</th>
-                <th className="p-2">Number</th>
-                <th className="p-2">Payment Date</th>
-                <th className="p-2">Service Start</th>
-                <th className="p-2">Service End</th>
-                <th className="p-2">Validity</th>
-                <th className="p-2">Amount</th>
-                <th className="p-2">Exp Date</th>
-                <th className="p-2">Remain Days</th>
-                <th className="p-2">Exp Ago</th>
-                <th className="p-2">Registered</th>
-                <th className="p-2">Assigned</th>
+                {renderSortableHeader('project', 'Projects')}
+                {renderSortableHeader('serviceProvider', 'Service Provider')}
+                {renderSortableHeader('type', 'Type')}
+                {renderSortableHeader('number', 'Number')}
+                {renderSortableHeader('paymentDate', 'Payment Date')}
+                {renderSortableHeader('serviceStart', 'Service Start')}
+                {renderSortableHeader('serviceEnd', 'Service End')}
+                {renderSortableHeader('validity', 'Validity')}
+                {renderSortableHeader('amount', 'Amount')}
+                {renderSortableHeader('expDate', 'Exp Date')}
+                {renderSortableHeader('remainDays', 'Remain Days')}
+                {renderSortableHeader('expAgo', 'Exp Ago')}
+                {renderSortableHeader('registered', 'Registered')}
+                {renderSortableHeader('assigned', 'Assigned')}
                 <th className="p-2">Activity</th>
               </tr>
               {isFilterRowVisible && (
@@ -1329,7 +1710,7 @@ const DirectoryTelecom = () => {
                     <Select
                       value={selectedProjectFilterOption}
                       onChange={(option) => handleFilterChange('project', option?.value ?? '')}
-                      options={projectOptions}
+                      options={projectFilterOptions}
                       styles={customStyles}
                       placeholder="All projects"
                       isSearchable
@@ -1338,18 +1719,22 @@ const DirectoryTelecom = () => {
                     />
                   </th>
                   <th className="p-2">
-                    <input
-                      value={filters.vendor}
-                      onChange={(e) => handleFilterChange('vendor', e.target.value)}
+                    <Select
+                      value={filters.vendor ? { value: filters.vendor, label: filters.vendor } : null}
+                      onChange={(option) => handleFilterChange('vendor', option?.value ?? '')}
+                      options={vendorFilterOptions}
+                      styles={customStyles}
                       placeholder="Service provider..."
-                      className="w-full h-10 border border-[#BF9853]/40 rounded-md px-2 text-sm focus:outline-none"
+                      isSearchable
+                      isClearable
+                      classNamePrefix="telecom-select"
                     />
                   </th>
                   <th className="p-2">
                     <Select
                       value={filters.service ? { value: filters.service, label: filters.service } : null}
                       onChange={(option) => handleFilterChange('service', option?.value ?? '')}
-                      options={typeOptions}
+                      options={serviceFilterOptions}
                       styles={customStyles}
                       placeholder="Service type"
                       isSearchable
@@ -1358,11 +1743,15 @@ const DirectoryTelecom = () => {
                     />
                   </th>
                   <th className="p-2">
-                    <input
-                      value={filters.doorNo}
-                      onChange={(e) => handleFilterChange('doorNo', e.target.value)}
+                    <Select
+                      value={filters.doorNo ? { value: filters.doorNo, label: filters.doorNo } : null}
+                      onChange={(option) => handleFilterChange('doorNo', option?.value ?? '')}
+                      options={doorNoFilterOptions}
+                      styles={customStyles}
                       placeholder="Service number..."
-                      className="w-full h-10 border border-[#BF9853]/40 rounded-md px-2 text-sm focus:outline-none"
+                      isSearchable
+                      isClearable
+                      classNamePrefix="telecom-select"
                     />
                   </th>
                   <th className="p-2">
@@ -1390,14 +1779,7 @@ const DirectoryTelecom = () => {
                   </th>
                   <th className="p-2"></th>
                   <th className="p-2"></th>
-                  <th className="p-2">
-                    <input
-                      value={filters.tenant}
-                      onChange={(e) => handleFilterChange('tenant', e.target.value)}
-                      placeholder="Assigned person..."
-                      className="w-full h-10 border border-[#BF9853]/40 rounded-md px-2 text-sm focus:outline-none"
-                    />
-                  </th>
+                  <th className="p-2"></th>
                   <th className="p-2"></th>
                 </tr>
               )}
@@ -1423,104 +1805,35 @@ const DirectoryTelecom = () => {
                   <td colSpan={16} className="p-4 text-center text-gray-500">No telecom entries match the applied filters.</td>
                 </tr>
               )}
-              {!telecomLoading && !telecomError && filteredTelecomEntries.map((item, index) => {
-                const serviceNumber = item.service_number ?? item.serviceNumber ?? item.utilityTypeNumber ?? '';
-                const latestPayment = serviceNumber ? latestTelecomPaymentByServiceNo.get(String(serviceNumber).trim()) : null;
-                const paymentDateRaw =
-                  latestPayment?.date ??
-                  latestPayment?.payment_date ??
-                  item.payment_date ??
-                  item.paymentDate ??
-                  null;
-                const amountRaw =
-                  latestPayment?.amount ??
-                  item.amount ??
-                  item.amount_value ??
-                  item.amountValue ??
-                  '';
-                const serviceStartRaw =
-                  latestPayment?.serviceStartingDate ??
-                  latestPayment?.service_starting_date ??
-                  latestPayment?.serviceStarting ??
-                  latestPayment?.service_starting ??
-                  paymentDateRaw ??
-                  item.service_starting_date ??
-                  item.serviceStartingDate ??
-                  item.service_starting ??
-                  item.serviceStart ??
-                  null;
-                const resolvedValidityValue =
-                  latestPayment?.utility_validity_days ??
-                  latestPayment?.utilityValidityDays ??
-                  latestPayment?.validity ??
-                  item.validity ??
-                  item.validity_value ??
-                  item.validityValue ??
-                  '';
-                const resolvedValidityUnit =
-                  latestPayment?.utility_validity_type ??
-                  latestPayment?.utilityValidityType ??
-                  latestPayment?.validity_type ??
-                  latestPayment?.validityType ??
-                  item.validity_type ??
-                  item.validityType ??
-                  '';
-                const explicitServiceEndFromExpense =
-                  latestPayment?.service_end_date ??
-                  latestPayment?.serviceEndDate ??
-                  latestPayment?.service_end ??
-                  latestPayment?.serviceEnd ??
-                  null;
-                const explicitServiceEndFromDirectory =
-                  item.service_end_date ??
-                  item.serviceEndDate ??
-                  item.service_end ??
-                  item.serviceEnd ??
-                  null;
-                // If a new recharge exists (latestPayment), prefer computed end date.
-                // Directory end date may be stale and should not override latest recharge start+validity.
-                const explicitServiceEnd = explicitServiceEndFromExpense || (!latestPayment ? explicitServiceEndFromDirectory : null);
-                const expiry_date = calculateExpiryDate(
-                  serviceStartRaw,
-                  resolvedValidityValue,
-                  resolvedValidityUnit,
-                  explicitServiceEnd
-                );
-                const computedServiceEnd = computeServiceEndDate(serviceStartRaw, resolvedValidityValue, resolvedValidityUnit);
-                const serviceEndForDisplay = explicitServiceEnd || computedServiceEnd || null;
-                const validityLabel =
-                  resolvedValidityValue && resolvedValidityUnit
-                    ? `${resolvedValidityValue} ${resolvedValidityUnit}`
-                    : resolvedValidityValue || '-';
-                const projectCategory = getProjectCategory(item.project_id);
-                const providerStyles = getProjectCategoryStyles(projectCategory);
+              {!telecomLoading && !telecomError && sortedTelecomEntries.map((item, index) => {
+                const row = getTelecomEntryRowData(item, latestTelecomPaymentByServiceNo);
                 return (
                   <tr key={item.id ?? index} className="border-b last:border-b-0">
                     <td className="p-2 pl-3">{index + 1}</td>
-                    <td className="p-2">{getProjectName(item.project_id)}</td>
+                    <td className="p-2">{row.projectName}</td>
                     <td className="p-2">
                       <span
                         className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-semibold"
-                        style={providerStyles}
-                        title={projectCategory ? `Category: ${projectCategory}` : undefined}
+                        style={row.providerStyles}
+                        title={row.projectCategory ? `Category: ${row.projectCategory}` : undefined}
                       >
-                        {item.service_provider || '-'}
+                        {row.serviceProviderName}
                       </span>
                     </td>
                     <td className="p-2">
-                      <div className="font-semibold">{item.service_type || '-'}</div>
+                      <div className="font-semibold">{row.serviceTypeName}</div>
                     </td>
-                    <td className="p-2">{serviceNumber || '-'}</td>
-                    <td className="p-2">{formatDisplayDate(paymentDateRaw)}</td>
-                    <td className="p-2">{formatDisplayDate(serviceStartRaw)}</td>
-                    <td className="p-2">{formatDisplayDate(serviceEndForDisplay)}</td>
-                    <td className="p-2">{validityLabel}</td>
-                    <td className="p-2">{formatAmount(amountRaw)}</td>
-                    <td className="p-2">{formatDisplayDate(expiry_date)}</td>
-                    <td className="p-2">{calculateRemainingDays(expiry_date)}</td>
-                    <td className="p-2">{calculateExpiredAgo(expiry_date)}</td>
-                    <td className="p-2">{item.registered_person || '-'}</td>
-                    <td className="p-2">{item.assigned_person || '-'}</td>
+                    <td className="p-2">{row.serviceNumber || '-'}</td>
+                    <td className="p-2">{formatDisplayDate(row.paymentDateRaw)}</td>
+                    <td className="p-2">{formatDisplayDate(row.serviceStartRaw)}</td>
+                    <td className="p-2">{formatDisplayDate(row.serviceEndForDisplay)}</td>
+                    <td className="p-2">{row.validityLabel}</td>
+                    <td className="p-2">{formatAmount(row.amountRaw)}</td>
+                    <td className="p-2">{formatDisplayDate(row.expiryDate)}</td>
+                    <td className="p-2">{calculateRemainingDays(row.expiryDate)}</td>
+                    <td className="p-2">{calculateExpiredAgo(row.expiryDate)}</td>
+                    <td className="p-2">{row.registeredPerson}</td>
+                    <td className="p-2">{row.assignedPerson}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
                         <button className="p-1 rounded " title="Edit" onClick={() => openCreateModal(item)}>

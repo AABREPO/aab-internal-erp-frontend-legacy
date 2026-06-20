@@ -7,7 +7,7 @@ import HandoverPaymentsPage from './WeeklyPaymentHandover';
 import DailyPayment from './DailyPayment';
 import WeeklyPaymentAddInput from './WeeklyPaymentAddInput';
 import DailyHistory from './DailyHistory';
-import download from '../Images/file_download.png';
+import PdfIcon from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 const WHeading = ({ username, userRoles = [] }) => {
     const [activeTab, setActiveTab] = useState(
@@ -16,15 +16,23 @@ const WHeading = ({ username, userRoles = [] }) => {
     const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]));
     const [showExportDropdown, setShowExportDropdown] = useState(false);
     const weeklyHistoryExportActionsRef = useRef(null);
+    const weeklyPaymentExportActionsRef = useRef(null);
     const dailyHistoryExportActionsRef = useRef(null);
+    const dailyPaymentExportActionsRef = useRef(null);
     const exportDropdownRef = useRef(null);
     const exportMenuRef = useRef(null);
     const [exportMenuPosition, setExportMenuPosition] = useState(null);
     const handleExportActionsReady = useCallback((actions) => {
         weeklyHistoryExportActionsRef.current = actions;
     }, []);
+    const handleWeeklyPaymentExportActionsReady = useCallback((actions) => {
+        weeklyPaymentExportActionsRef.current = actions;
+    }, []);
     const handleDailyHistoryExportActionsReady = useCallback((actions) => {
         dailyHistoryExportActionsRef.current = actions;
+    }, []);
+    const handleDailyPaymentExportActionsReady = useCallback((actions) => {
+        dailyPaymentExportActionsRef.current = actions;
     }, []);
 
     useEffect(() => {
@@ -61,6 +69,7 @@ const WHeading = ({ username, userRoles = [] }) => {
             setExportMenuPosition({
                 top: rect.bottom + 4,
                 right: window.innerWidth - rect.right,
+                width: rect.width,
             });
         };
         updatePosition();
@@ -73,7 +82,7 @@ const WHeading = ({ username, userRoles = [] }) => {
     }, [showExportDropdown]);
 
     useEffect(() => {
-        if (activeTab !== 'weeklyhistory' && activeTab !== 'dailyhistory') {
+        if (activeTab !== 'weeklyhistory' && activeTab !== 'dailyhistory' && activeTab !== 'weeklypayment' && activeTab !== 'dailypayment') {
             setShowExportDropdown(false);
         }
     }, [activeTab]);
@@ -101,7 +110,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                         Input Data
                     </h2>
                 </div>
-                {(activeTab === 'weeklyhistory' || activeTab === 'dailyhistory') && (
+                {(activeTab === 'weeklyhistory' || activeTab === 'dailyhistory' || activeTab === 'weeklypayment' || activeTab === 'dailypayment') && (
                     <div className="relative shrink-0 ml-3 mb-2 z-[500]" ref={exportDropdownRef}>
                         <button
                             type="button"
@@ -116,8 +125,8 @@ const WHeading = ({ username, userRoles = [] }) => {
                         {showExportDropdown && exportMenuPosition && createPortal(
                             <div
                                 ref={exportMenuRef}
-                                className="fixed z-[9999] bg-white border border-[#D6D6D6] rounded-md shadow-lg py-1 min-w-[120px]"
-                                style={{ top: exportMenuPosition.top, right: exportMenuPosition.right }}
+                                className="fixed z-[9999] bg-white border border-[#D6D6D6] rounded-md shadow-lg py-1"
+                                style={{ top: exportMenuPosition.top, right: exportMenuPosition.right, width: exportMenuPosition.width }}
                             >
                                 <button
                                     type="button"
@@ -126,13 +135,17 @@ const WHeading = ({ username, userRoles = [] }) => {
                                         setShowExportDropdown(false);
                                         if (activeTab === 'dailyhistory') {
                                             dailyHistoryExportActionsRef.current?.generatePDF?.();
+                                        } else if (activeTab === 'dailypayment') {
+                                            dailyPaymentExportActionsRef.current?.generatePDF?.();
+                                        } else if (activeTab === 'weeklypayment') {
+                                            weeklyPaymentExportActionsRef.current?.generatePDF?.();
                                         } else {
                                             weeklyHistoryExportActionsRef.current?.generatePDF?.();
                                         }
                                     }}
                                 >
                                     PDF
-                                    <img className="w-6 h-5" src={download} alt="Download" />
+                                    <img className="w-4 h-4" src={PdfIcon} alt="Pdf" />
                                 </button>
                                 <button
                                     type="button"
@@ -156,22 +169,22 @@ const WHeading = ({ username, userRoles = [] }) => {
             <div className="content">
                 {visitedTabs.has('weeklypayment') && (
                     <div className={activeTab === 'weeklypayment' ? '' : 'hidden'}>
-                        <WeeklyPayment username={username} userRoles={userRoles} />
+                        <WeeklyPayment username={username} userRoles={userRoles} onExportActionsReady={handleWeeklyPaymentExportActionsReady} isTabActive={activeTab === 'weeklypayment'} />
                     </div>
                 )}
                 {visitedTabs.has('dailypayment') && (
                     <div className={activeTab === 'dailypayment' ? '' : 'hidden'}>
-                        <DailyPayment username={username} userRoles={userRoles} />
+                        <DailyPayment username={username} userRoles={userRoles} onExportActionsReady={handleDailyPaymentExportActionsReady} isTabActive={activeTab === 'dailypayment'} />
                     </div>
                 )}
                 {visitedTabs.has('dailyhistory') && (
                     <div className={activeTab === 'dailyhistory' ? '' : 'hidden'}>
-                        <DailyHistory username={username} userRoles={userRoles} onExportActionsReady={handleDailyHistoryExportActionsReady} />
+                        <DailyHistory username={username} userRoles={userRoles} onExportActionsReady={handleDailyHistoryExportActionsReady} isTabActive={activeTab === 'dailyhistory'} />
                     </div>
                 )}
                 {visitedTabs.has('weeklyhistory') && (
                     <div className={activeTab === 'weeklyhistory' ? '' : 'hidden'}>
-                        <History username={username} userRoles={userRoles} onExportActionsReady={handleExportActionsReady} />
+                        <History username={username} userRoles={userRoles} onExportActionsReady={handleExportActionsReady} isTabActive={activeTab === 'weeklyhistory'} />
                     </div>
                 )}
                 {visitedTabs.has('handoverpaymentspage') && (

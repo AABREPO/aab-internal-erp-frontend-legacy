@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Attach from '../Images/Attachfile.svg';
@@ -19,6 +19,10 @@ import {
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
+import {
+  buildStaffEditPayloadFromForm,
+  syncWeeklyPaymentBillsForStaffAdvancePortal,
+} from '../../utils/staffAdvanceWeeklyPaymentBill';
 
 const uploadAttachment = async (selectedFile, employeeName) => {
   if (!selectedFile) return null;
@@ -238,6 +242,38 @@ const InputField = ({
   </div>
 );
 
+const resolveUsername = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem('user') || '{}');
+    return (stored?.username || stored?.name || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+const buildFormStateFromHistoryPrefill = (prefill, fallbackDate) => {
+  if (!prefill) return null;
+
+  const selectedType =
+    prefill.selectedType || prefill.billDetails?.type || 'Advance';
+  const dateValue =
+    prefill.date ||
+    (prefill.billDetails?.date ? String(prefill.billDetails.date).split('T')[0] : '') ||
+    fallbackDate;
+
+  return {
+    selectedType,
+    date: dateValue,
+    empName: prefill.selectedPerson || null,
+    purpose: prefill.selectedPurpose || null,
+    transferPurpose: prefill.selectedTransferPurpose || null,
+    amountGivenInput: prefill.amountGivenInput ?? '',
+    transferAmount: prefill.transferAmount ?? '',
+    paymentMode: prefill.paymentMode ?? prefill.billDetails?.paymentMode ?? '',
+    description: prefill.description ?? '',
+  };
+};
+
 const convertDisplayDateToIso = (displayDate, fallbackDate) => {
   const parts = String(displayDate || '').split('/');
   if (parts.length !== 3) return fallbackDate;
@@ -245,8 +281,20 @@ const convertDisplayDateToIso = (displayDate, fallbackDate) => {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
 
-const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, paymentModeOptions = PAYMENT_MODE_OPTIONS, onSaved }) => {
+const Advance = ({
+  activeBranchId,
+  peopleOptions,
+  purposeOptions,
+  records,
+  paymentModeOptions = PAYMENT_MODE_OPTIONS,
+  onSaved,
+  initialFromHistory = null,
+  historyPrefillToken = 0,
+}) => {
   const [formData, setFormData] = useState(initialFormState);
+  const [editingId, setEditingId] = useState(null);
+  const [displayEntryNo, setDisplayEntryNo] = useState(null);
+  const editEntryRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
@@ -257,6 +305,27 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, payme
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState('');
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!historyPrefillToken || !initialFromHistory) return;
+
+    const nextFormState = buildFormStateFromHistoryPrefill(initialFromHistory, todayIso());
+    if (!nextFormState) return;
+
+    setFormData(nextFormState);
+    setEditingId(initialFromHistory.isEditMode ? initialFromHistory.editingId || null : null);
+    setDisplayEntryNo(
+      initialFromHistory.entryNo ??
+        initialFromHistory.billDetails?.entryNo ??
+        initialFromHistory.editEntry?.entry_no ??
+        null
+    );
+    editEntryRef.current = initialFromHistory.editEntry || null;
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [historyPrefillToken, initialFromHistory]);
 
   const entryNo = useMemo(() => {
     if (!records.length) return 1;
@@ -336,6 +405,9 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, payme
       ...initialFormState,
       date: todayIso()
     });
+    setEditingId(null);
+    setDisplayEntryNo(null);
+    editEntryRef.current = null;
     setSelectedFile(null);
     setTypeSearchQuery('');
     if (fileInputRef.current) {
@@ -395,7 +467,70 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, payme
 
     setIsSubmitting(true);
     try {
-      const fileUrl = await uploadAttachment(selectedFile, formData.empName?.label);
+      const fileUrl = selectedFile
+        ? await uploadAttachment(selectedFile, formData.empName?.label)
+        : editEntryRef.current?.file_url || null;
+
+      if (editingId) {
+        const editFormData = {
+          type: formData.selectedType,
+          date: formData.date,
+          employee_id: formData.empName?.type === 'Employee' ? formData.empName.id : '',
+          labour_id: formData.empName?.type === 'Labour' ? formData.empName.id : '',
+          from_purpose_id: formData.purpose?.id || null,
+          to_purpose_id:
+            formData.selectedType === 'Transfer' ? formData.transferPurpose?.id || null : null,
+          staff_payment_mode: formData.selectedType === 'Transfer' ? '' : formData.paymentMode,
+          amount:
+            formData.selectedType === 'Transfer'
+              ? parseNumber(formData.transferAmount)
+              : formData.selectedType === 'Advance'
+                ? parseNumber(formData.amountGivenInput)
+                : 0,
+          staff_refund_amount:
+            formData.selectedType === 'Refund' ? parseNumber(formData.amountGivenInput) : 0,
+          entryNo: displayEntryNo ?? editEntryRef.current?.entry_no ?? null,
+          description: formData.description,
+        };
+        const payload = {
+          ...(editEntryRef.current || {}),
+          ...buildStaffEditPayloadFromForm({ editFormData }),
+          file_url: fileUrl || editEntryRef.current?.file_url || '',
+        };
+        const username = resolveUsername();
+        const updateResponse = await fetch(
+          `https://backendaab.in/demoAabuildersDash/api/staff-advance/${editingId}?editedBy=${encodeURIComponent(username)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload),
+          }
+        );
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update staff advance');
+        }
+        try {
+          await syncWeeklyPaymentBillsForStaffAdvancePortal(editingId, payload, {
+            editedBy: username,
+            branchId:
+              editEntryRef.current?.branch_id ??
+              editEntryRef.current?.branchId ??
+              activeBranchId ??
+              null,
+          });
+        } catch (weeklyErr) {
+          console.error('Weekly payment bill sync failed after staff advance edit:', weeklyErr);
+        }
+        window.dispatchEvent(new Event('staffAdvanceUpdated'));
+        if (typeof onSaved === 'function') {
+          await onSaved();
+        }
+        resetForm();
+        window.alert('Staff advance updated successfully.');
+        return;
+      }
+
       const payload = {
         type: formData.selectedType,
         date: formData.date,
@@ -508,8 +643,9 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, payme
     }
   };
 
-  const actionLabel =
-    formData.selectedType === 'Refund'
+  const actionLabel = editingId
+    ? 'Update Record'
+    : formData.selectedType === 'Refund'
       ? 'Submit Refund'
       : formData.selectedType === 'Transfer'
         ? 'Submit Transfer'
@@ -613,7 +749,7 @@ const Advance = ({ activeBranchId, peopleOptions, purposeOptions, records, payme
               type="button"
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
-              # {entryNo}
+              # {displayEntryNo ?? entryNo}
             </button>
 
             <button

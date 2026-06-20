@@ -480,7 +480,20 @@ export const downloadCsv = (filename, headers, rows) => {
   URL.revokeObjectURL(url);
 };
 
-export const loadStaffAdvanceData = async (activeBranchId) => {
+export const matchesStaffAdvanceDateFilter = (entryDate, selectDate) => {
+  if (!selectDate) return true;
+  if (!entryDate) return false;
+  const [year, month, day] = selectDate.split('-');
+  const formattedSelectDate = `${parseInt(day, 10)}-${parseInt(month, 10)}-${year}`;
+  const entryDateObj = new Date(entryDate);
+  if (Number.isNaN(entryDateObj.getTime())) return false;
+  const formattedEntryDate = `${entryDateObj.getDate()}-${entryDateObj.getMonth() + 1}-${entryDateObj.getFullYear()}`;
+  return formattedEntryDate === formattedSelectDate;
+};
+
+export const isStaffAdvanceRecordLocked = (entry) => Boolean(entry?.not_allow_to_edit);
+
+export const loadStaffAdvanceData = async (activeBranchId, { applyBranchFilter = true } = {}) => {
   const [employeeResult, labourResult, purposeResult, recordResult] = await Promise.allSettled([
     fetch('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', {
       credentials: 'include',
@@ -509,10 +522,10 @@ export const loadStaffAdvanceData = async (activeBranchId) => {
   const normalizedEmployees = normalizeEmployees(Array.isArray(employees) ? employees : []);
   const normalizedLabours = normalizeLabours(Array.isArray(labours) ? labours : []);
   const normalizedPurposes = normalizePurposes(Array.isArray(purposes) ? purposes : []);
-  const filteredRecords = filterRecordsByBranch(
-    Array.isArray(records) ? records : [],
-    activeBranchId
-  );
+  const allRecords = Array.isArray(records) ? records : [];
+  const filteredRecords = applyBranchFilter
+    ? filterRecordsByBranch(allRecords, activeBranchId)
+    : allRecords;
 
   return {
     employees: normalizedEmployees,

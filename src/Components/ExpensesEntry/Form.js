@@ -1944,7 +1944,8 @@ const Form = ({
                     send_to_expenses_entry: false,
                     bill_copy_url: pdfUrl || '',
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: username,
+                    source: "Expenses Entry",
                 };
                 try {
                     const weeklyExpenseResponse = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-expenses/save", {
@@ -2276,7 +2277,8 @@ const Form = ({
                     transaction_number: paymentModalData.transactionNumber || null,
                     account_number: paymentModalData.accountNumber || null,
                     branch_id: activeBranchId,
-                    enteredBy: username,
+                    entered_by: username,
+                    source: "Expenses Entry",
                 };
                 const weeklyResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save', {
                     method: 'POST',

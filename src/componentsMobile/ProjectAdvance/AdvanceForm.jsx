@@ -1,24 +1,37 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import SelectVendorModal from '../PurchaseOrder/SelectVendorModal';
 import DatePickerModal from '../PurchaseOrder/DatePickerModal';
 import Attach from '../Images/Attachfile.svg';
 import CloseIcon from '../Images/Close F.svg'
 import { fetchUserModulePermissions } from '../utils/fetchUserModulePermissions';
 import {
-  fetchAdvancePortalListForMobile,
+  fetchAdvancePortalGetAll,
   fetchMaxEntryNoFromBranch,
-  computeAdvanceTotalsFromGetAll,
+  filterAdvanceRowsForSelection,
+  computeAdvanceTotalsFromRows,
 } from './advancePortalApi';
 import {
   postBankRegisterLogSave,
   bankRegisterLogSaveUrlMatchingRequest,
   isPaymentModeRequiringBankRegisterLog,
 } from '../../utils/bankRegisterLogBeforeWeeklyBill';
-import { resolveExpensesEntryIdAfterSave } from '../../utils/advancePortalWeeklyPaymentBill';
+import {
+  resolveExpensesEntryIdAfterSave,
+  syncWeeklyPaymentBillsForAdvancePortal,
+  isAdvanceOnlinePaymentModeForModal,
+  fetchAdvanceEditPaymentModalData,
+  syncExpensesEntryFromAdvancePortalEdit,
+  resolveAdvancePortalExpensesEntryId,
+  resolveFilesUploadResponseUrl,
+  syncVendorCarryForwardFromAdvancePortalEdit,
+  getAdvancePortalDisplayAmount,
+  resolveBillSettlementCategoryForAdvance,
+} from '../../utils/advancePortalWeeklyPaymentBill';
 import {
   ADVANCE_PORTAL_MODULE_NAME,
 } from '../../utils/paymentModeArrangement';
 import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
+import { isAdvancePortalAdmin } from '../../utils/advancePortalAdmin';
 
 /** Keeps dropdown mapping/render cheap on huge vendor/site lists. */
 const MAX_SELECT_OPTIONS = 500;
@@ -45,10 +58,12 @@ const AdvanceForm = ({
     }
   };
   const enteredBy = resolveEnteredBy();
+  const isAdmin = isAdvancePortalAdmin(enteredBy);
 
   // Resolve module permissions — defer until Advance tab is active (avoid work when tab is hidden).
   const [modulePermissions, setModulePermissions] = useState([]);
   const canCreate = modulePermissions.includes('Create');
+  const canEdit = modulePermissions.includes('Edit');
 
   const resolveActiveBranchId = () => {
     try {
@@ -108,6 +123,7 @@ const AdvanceForm = ({
   const [transferSiteId, setTransferSiteId] = useState('');
   const [entryNo, setEntryNo] = useState(1);
   const [advanceData, setAdvanceData] = useState([]);
+  const [isAdvanceFullLoading, setIsAdvanceFullLoading] = useState(false);
   const [overallAdvance, setOverallAdvance] = useState(0);
   const [selectedAdvanceFile, setSelectedAdvanceFile] = useState(null);
   const fileInputRef = useRef(null);
@@ -141,6 +157,13 @@ const AdvanceForm = ({
   const [duplicateMatchedExpenses, setDuplicateMatchedExpenses] = useState([]);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [pendingActionAfterIgnore, setPendingActionAfterIgnore] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editSourceRecord, setEditSourceRecord] = useState(null);
+  const [editOtherTransferRecord, setEditOtherTransferRecord] = useState(null);
+  const [existingFileUrl, setExistingFileUrl] = useState('');
+  const [editFormData, setEditFormData] = useState({});
+  const [discountAmount, setDiscountAmount] = useState('');
+  const pendingEditPayloadRef = useRef(null);
 
   /** First visit or branch change → reload advance list; same tab revisit → light refresh only. */
   const advanceStaggerBranchKeyRef = useRef(null);
@@ -317,7 +340,94 @@ const AdvanceForm = ({
     return today.toLocaleDateString('en-GB'); // DD/MM/YYYY
   };
 
-  // Session storage management
+  // Session storage management — prefill matches AdvanceDatabase.handleEditClick
+  const applyEditContext = useCallback(async (ctx) => {
+    if (!ctx?.isEditMode || !ctx.editingId) return;
+    const entry = ctx.editEntry || {};
+    const resolvedType = ctx.type || entry.type || 'Advance';
+
+    setEditingId(ctx.editingId);
+    setEditSourceRecord(entry);
+    setEditOtherTransferRecord(ctx.otherTransferRecord || null);
+
+    let category = entry.category || ctx.category || '';
+
+    const nextEditFormData = {
+      date: entry.date?.split('T')[0] || ctx.dateValue || '',
+      amount: entry.amount ?? '',
+      project_id: entry.project_id || '',
+      vendor_id: entry.vendor_id || '',
+      contractor_id: entry.contractor_id || '',
+      entry_no: entry.entry_no || '',
+      week_no: entry.week_no || '',
+      file_url: entry.file_url || ctx.file_url || '',
+      description: entry.description || '',
+      bill_amount: entry.bill_amount ?? '',
+      category,
+      discount_amount: entry.discount_amount ?? '',
+      type: resolvedType,
+      transfer_site_id: entry.transfer_site_id || '',
+      payment_mode: entry.payment_mode || '',
+      refund_amount: entry.refund_amount ?? '',
+      branch_id: entry.branch_id ?? entry.branchId,
+    };
+    setEditFormData(nextEditFormData);
+    setExistingFileUrl(nextEditFormData.file_url || '');
+    setSelectedType(resolvedType);
+    setDateValue(nextEditFormData.date);
+    setPaymentMode(nextEditFormData.payment_mode || '');
+    setDescription(nextEditFormData.description || '');
+    setTransferSiteId(nextEditFormData.transfer_site_id ? String(nextEditFormData.transfer_site_id) : '');
+    setBillAmount(nextEditFormData.bill_amount !== '' ? String(nextEditFormData.bill_amount) : '');
+    setDiscountAmount(
+      nextEditFormData.discount_amount !== '' && nextEditFormData.discount_amount != null
+        ? String(nextEditFormData.discount_amount)
+        : ''
+    );
+    if (resolvedType === 'Refund') {
+      setAdvanceAmount(
+        nextEditFormData.refund_amount !== '' ? String(nextEditFormData.refund_amount) : ''
+      );
+    } else {
+      setAdvanceAmount(nextEditFormData.amount !== '' ? String(nextEditFormData.amount) : '');
+    }
+    if (category) {
+      void ensureMasterDropdownsLoaded().then(() => {
+        setSelectedCategory({ id: null, value: category, label: category });
+      });
+    } else if (resolvedType === 'Bill Settlement') {
+      void resolveBillSettlementCategoryForAdvance(entry).then((resolved) => {
+        if (!resolved) return;
+        void ensureMasterDropdownsLoaded().then(() => {
+          setSelectedCategory({ id: null, value: resolved, label: resolved });
+          setEditFormData((prev) => ({ ...prev, category: resolved }));
+        });
+      });
+    }
+  }, [ensureMasterDropdownsLoaded]);
+
+  const clearEditMode = useCallback(() => {
+    setEditingId(null);
+    setEditSourceRecord(null);
+    setEditOtherTransferRecord(null);
+    setExistingFileUrl('');
+    pendingEditPayloadRef.current = null;
+    setAdvanceAmount('');
+    setBillAmount('');
+    setPaymentMode('');
+    setDescription('');
+    setSelectedCategory(null);
+    setDiscountAmount('');
+    setEditFormData({});
+    setTransferSiteId('');
+    setSelectedAdvanceFile(null);
+    setDateValue(new Date().toISOString().split('T')[0]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    sessionStorage.removeItem('advanceEditContext');
+    sessionStorage.removeItem('dateValue');
+    sessionStorage.removeItem('selectedCategory');
+  }, []);
+
   useEffect(() => {
     const savedselectedType = sessionStorage.getItem('selectedType');
     const savedContractorVendor = sessionStorage.getItem('selectedOption');
@@ -328,6 +438,9 @@ const AdvanceForm = ({
     const savedtransferSiteId = sessionStorage.getItem('transferSiteId');
     const savedpaymentMode = sessionStorage.getItem('paymentMode');
     const saveddescription = sessionStorage.getItem('description');
+    const savedDateValue = sessionStorage.getItem('dateValue');
+    const savedCategory = sessionStorage.getItem('selectedCategory');
+    const savedEditContext = sessionStorage.getItem('advanceEditContext');
     try {
       if (savedselectedType) setSelectedType(JSON.parse(savedselectedType));
       if (savedContractorVendor) setSelectedOption(JSON.parse(savedContractorVendor));
@@ -338,6 +451,16 @@ const AdvanceForm = ({
       if (savedtransferSiteId) setTransferSiteId(JSON.parse(savedtransferSiteId));
       if (savedpaymentMode) setPaymentMode(JSON.parse(savedpaymentMode));
       if (saveddescription) setDescription(JSON.parse(saveddescription));
+      if (savedDateValue) setDateValue(JSON.parse(savedDateValue));
+      if (savedCategory) {
+        const cat = JSON.parse(savedCategory);
+        const label = typeof cat === 'string' ? cat : cat?.label || '';
+        if (label) setSelectedCategory({ id: null, value: label, label });
+      }
+      if (savedEditContext) {
+        const ctx = JSON.parse(savedEditContext);
+        void applyEditContext(ctx);
+      }
     } catch (error) {
       console.error("Error parsing sessionStorage data:", error);
     }
@@ -357,6 +480,9 @@ const AdvanceForm = ({
     sessionStorage.removeItem('transferSiteId');
     sessionStorage.removeItem('paymentMode');
     sessionStorage.removeItem('description');
+    sessionStorage.removeItem('dateValue');
+    sessionStorage.removeItem('selectedCategory');
+    sessionStorage.removeItem('advanceEditContext');
   };
 
   useEffect(() => {
@@ -405,77 +531,80 @@ const AdvanceForm = ({
     return () => clearTimeout(t);
   }, [selectedType, eno]);
 
-  // Fetch advance data — paged / getLast150 only (not getAll)
-  const fetchAdvanceData = async () => {
+  const fetchAdvancePortalData = useCallback(async () => {
+    setIsAdvanceFullLoading(true);
     try {
-      const rows = await fetchAdvancePortalListForMobile(withBranchUrl);
-      setAdvanceData(rows);
-      const maxEntryNo = await fetchMaxEntryNoFromBranch(withBranchUrl);
+      const [fullRows, maxEntryNo] = await Promise.all([
+        fetchAdvancePortalGetAll(withBranchUrl),
+        fetchMaxEntryNoFromBranch(withBranchUrl),
+      ]);
+      setAdvanceData(fullRows);
       setEntryNo(maxEntryNo + 1);
     } catch (error) {
       console.error('Error fetching advance portal data:', error);
+    } finally {
+      setIsAdvanceFullLoading(false);
     }
-  };
+  }, [withBranchUrl]);
 
-  // Advance tab: only load paged advance rows (small JSON). Vendor/project/category lists load on first picker open.
+  // Advance tab: one getAll for list + totals (matches desktop). Vendor/project lists load on first picker open.
   useEffect(() => {
     if (!isAdvanceTabActive) return;
     advanceStaggerBranchKeyRef.current = String(activeBranchId ?? 'null');
     let cancelled = false;
     const t = setTimeout(() => {
-      if (!cancelled) fetchAdvanceData();
+      if (!cancelled) void fetchAdvancePortalData();
     }, 120);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [isAdvanceTabActive, activeBranchId]);
+  }, [isAdvanceTabActive, activeBranchId, fetchAdvancePortalData]);
 
-  // Apply initialFromHistory when user navigated from History – only set selection; use existing advanceData load
+  // Apply initialFromHistory when user navigated from History
   useEffect(() => {
     if (!initialFromHistory || !onConsumedInitialFromHistory) return;
-    const { selectedOption, selectedSite } = initialFromHistory;
-    if (selectedOption) setSelectedOption(selectedOption);
-    if (selectedSite) setSelectedSite(selectedSite);
+    const { selectedOption: opt, selectedSite: site, editContext } = initialFromHistory;
+    if (opt) setSelectedOption(opt);
+    if (site) setSelectedSite(site);
+    if (editContext?.isEditMode) {
+      void applyEditContext(editContext);
+    }
     onConsumedInitialFromHistory();
-  }, [initialFromHistory, onConsumedInitialFromHistory]);
+  }, [initialFromHistory, onConsumedInitialFromHistory, applyEditContext]);
 
-  // Vendor overall + project advance: match desktop AdvancePortal.js (full getAll), not paged advanceData.
-  const refreshTotalsFromServer = useCallback(async () => {
+  const filteredAdvanceEntries = useMemo(() => {
+    if (!selectedOption || !selectedSite) return [];
+    return filterAdvanceRowsForSelection(advanceData, selectedOption, selectedSite).sort(
+      (a, b) => (Number(b.entry_no) || 0) - (Number(a.entry_no) || 0)
+    );
+  }, [advanceData, selectedOption, selectedSite]);
+
+  // Totals from cached getAll — no extra network call when vendor/project changes.
+  useEffect(() => {
     if (!selectedOption) {
       setOverallAdvance(0);
       setProjectAdvance('');
       return;
     }
-    try {
-      const { overall, projectAmount } = await computeAdvanceTotalsFromGetAll(
-        withBranchUrl,
-        selectedOption,
-        selectedSite || null
-      );
-      setOverallAdvance(overall);
-      if (projectAmount !== null) {
-        setProjectAdvance(projectAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
-      } else {
-        setProjectAdvance('');
-      }
-    } catch (error) {
-      console.error('Error fetching advance totals:', error);
-      setOverallAdvance(0);
+    const { overall, projectAmount } = computeAdvanceTotalsFromRows(
+      advanceData,
+      selectedOption,
+      selectedSite || null
+    );
+    setOverallAdvance(overall);
+    if (projectAmount !== null) {
+      setProjectAdvance(projectAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    } else {
       setProjectAdvance('');
     }
-  }, [withBranchUrl, selectedOption, selectedSite]);
-
-  useEffect(() => {
-    void refreshTotalsFromServer();
-  }, [refreshTotalsFromServer]);
+  }, [advanceData, selectedOption, selectedSite]);
 
   // Combine vendor and contractor options
   useEffect(() => {
     setCombinedOptions([...vendorOptions, ...contractorOptions]);
   }, [vendorOptions, contractorOptions]);
 
-  // Handle contractor/vendor change — totals refresh via refreshTotalsFromServer (getAll parity with desktop).
   const handleChange = async (selected) => {
     setSelectedOption(selected);
     if (selected) {
@@ -495,15 +624,12 @@ const AdvanceForm = ({
     return numericValue.toLocaleString("en-IN", { maximumFractionDigits: 0 });
   };
 
-  // Handle amount change
-  const handleAmountChange = (e) => {
-    const rawValue = e.target.value.replace(/,/g, "");
-    if (!isNaN(rawValue)) {
-      setAdvanceAmount(rawValue);
-    }
+  const sanitizeNumberField = (value) => {
+    if (value === '' || value === null || value === undefined) return 0;
+    const numericValue = Number(value);
+    return Number.isNaN(numericValue) ? 0 : numericValue;
   };
 
-  // Get week number
   const getWeekNumber = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 1);
@@ -512,19 +638,84 @@ const AdvanceForm = ({
     return Math.floor(diff / oneWeek) + 1;
   };
 
-  // Validate form fields
+  const parseFormAmount = () => {
+    const raw = advanceAmount ? advanceAmount.toString().replace(/,/g, '').trim() : '';
+    return raw === '' ? 0 : parseFloat(raw) || 0;
+  };
+
+  const buildEditFormDataFromState = () => {
+    const rawAmount = parseFormAmount();
+    const rawBillAmount = parseFloat(String(billAmount).replace(/,/g, '')) || 0;
+    const rawDiscount =
+      discountAmount === '' || discountAmount == null ? '' : Number(String(discountAmount).replace(/,/g, ''));
+    const categoryLabel = selectedCategory?.label || editFormData.category || '';
+
+    const merged = {
+      ...editFormData,
+      date: dateValue,
+      type: selectedType,
+      description,
+      payment_mode: selectedType !== 'Transfer' ? paymentMode : '',
+      bill_amount: selectedType === 'Bill Settlement' ? rawBillAmount : editFormData.bill_amount,
+      category: categoryLabel,
+      discount_amount: rawDiscount !== '' && !Number.isNaN(rawDiscount) ? rawDiscount : editFormData.discount_amount,
+      file_url: existingFileUrl,
+      project_id: selectedSite?.id ?? editFormData.project_id,
+      transfer_site_id:
+        selectedType === 'Transfer' ? parseInt(transferSiteId, 10) || '' : editFormData.transfer_site_id,
+      vendor_id: selectedOption?.type === 'Vendor' ? selectedOption.id : editFormData.vendor_id,
+      contractor_id: selectedOption?.type === 'Contractor' ? selectedOption.id : editFormData.contractor_id,
+      entry_no: editFormData.entry_no ?? editSourceRecord?.entry_no ?? '',
+      week_no: editFormData.week_no ?? editSourceRecord?.week_no ?? getWeekNumber(),
+      branch_id: editFormData.branch_id ?? editSourceRecord?.branch_id ?? editSourceRecord?.branchId ?? activeBranchId,
+    };
+
+    if (selectedType === 'Refund') {
+      merged.amount = '';
+      merged.refund_amount = rawAmount;
+    } else {
+      merged.refund_amount = selectedType === 'Advance' || selectedType === 'Bill Settlement' ? '' : editFormData.refund_amount;
+      merged.amount = rawAmount;
+    }
+
+    return merged;
+  };
+
+  // Handle amount change — Refund uses refund_amount (same as AdvanceDatabase handleAmountChange)
+  const handleAmountChange = (e) => {
+    const rawValue = e.target.value.replace(/,/g, "");
+    if (!isNaN(rawValue)) {
+      const numericValue = rawValue === "" ? "" : Number(rawValue);
+      setAdvanceAmount(rawValue);
+      if (editingId) {
+        setEditFormData((prev) => {
+          if (selectedType === 'Refund') {
+            return { ...prev, refund_amount: numericValue, amount: '' };
+          }
+          return { ...prev, amount: numericValue, refund_amount: '' };
+        });
+      }
+    }
+  };
+
+  // Validate form fields — AdvanceDatabase edit modal has no field validation before save
   const validateFormFields = () => {
+    if (editingId) return true;
     if (selectedType === 'Advance' || selectedType === 'Refund') {
       if (!selectedOption || !selectedSite || !advanceAmount || !paymentMode) {
         alert("Please fill Necessary details");
         return false;
       }
     } else if (selectedType === 'Bill Settlement') {
-      if (!selectedOption || !selectedSite || !billAmount || !selectedCategory) {
+      if (!selectedOption || !selectedSite || !billAmount) {
         alert("Please fill Necessary details");
         return false;
       }
-      if (!selectedAdvanceFile) {
+      if (!editingId && !selectedCategory) {
+        alert("Please fill Necessary details");
+        return false;
+      }
+      if (!selectedAdvanceFile && !existingFileUrl) {
         alert("Please attach the bill file for Bill Settlement");
         return false;
       }
@@ -848,6 +1039,8 @@ const AdvanceForm = ({
         );
         await saveAdvancePortal(payload);
       }
+      setEntryNo(nextEntryNo);
+      setIsSubmitting(false);
       alert('Advance saved successfully!');
       window.dispatchEvent(new CustomEvent('advanceUpdated'));
       setAdvanceAmount('');
@@ -859,12 +1052,298 @@ const AdvanceForm = ({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      setEntryNo(nextEntryNo);
-      await fetchAdvanceData();
-      await refreshTotalsFromServer();
+      void fetchAdvancePortalData();
     } catch (error) {
       console.error('Error submitting data:', error);
       alert('Failed to save data!');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const setAllowToEdit = async (id, allow) => {
+    try {
+      const res = await fetch(`https://backendaab.in/demoAabuildersDash/api/advance_portal/allow/${id}?allow=${allow}`, {
+        method: 'PUT',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        console.error('Failed to update allowToEdit');
+      }
+    } catch (error) {
+      console.error('Error updating allowToEdit:', error);
+    }
+  };
+
+  const submitAdvanceEdit = async (modalPaymentData = null) => {
+    if (!editingId) return;
+    if (!canEdit) {
+      alert("You don't have permission to edit Advance entries.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const currentEntry = editSourceRecord || advanceData.find((e) => e.advancePortalId === editingId);
+      if (currentEntry?.not_allow_to_edit) {
+        alert('Editing is not allowed for this record. Please request permission to edit.');
+        return;
+      }
+      let fileUrl = existingFileUrl || '';
+      if (selectedAdvanceFile) {
+        const formData = new FormData();
+        const now = new Date();
+        const timestamp = now
+          .toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          })
+          .replace(',', '')
+          .replace(/\s/g, '-');
+        const finalName = `${timestamp} ${selectedSite?.sNo || ''} ${selectedOption?.label || ''}`;
+        formData.append('files', selectedAdvanceFile);
+        formData.append('folder', 'FileUpload / Advance_Portal');
+        formData.append('fileName', finalName);
+        const uploadResponse = await fetch('https://backendaab.in/demoAabuildersDash/api/files/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadResponse.ok) throw new Error('Upload failed');
+        const uploadResult = await uploadResponse.json();
+        fileUrl = resolveFilesUploadResponseUrl(uploadResult);
+        if (!fileUrl) throw new Error('Upload succeeded but no file URL was returned');
+        setExistingFileUrl(fileUrl);
+        setSelectedAdvanceFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+
+      const mergedEditFormData = buildEditFormDataFromState();
+      if (modalPaymentData) {
+        mergedEditFormData.date = modalPaymentData.date || mergedEditFormData.date;
+        mergedEditFormData.payment_mode = modalPaymentData.paymentMode || mergedEditFormData.payment_mode;
+        if (selectedType === 'Refund') {
+          mergedEditFormData.refund_amount = parseFloat(modalPaymentData.amount) || mergedEditFormData.refund_amount;
+        } else if (selectedType !== 'Transfer') {
+          mergedEditFormData.amount = parseFloat(modalPaymentData.amount) || mergedEditFormData.amount;
+        }
+      }
+
+      const buildPayload = (overrides = {}, typeOverride) => {
+        const payload = {
+          ...mergedEditFormData,
+          ...overrides,
+          file_url: fileUrl,
+          branch_id: mergedEditFormData.branch_id ?? currentEntry?.branch_id ?? currentEntry?.branchId ?? activeBranchId,
+        };
+        if (selectedOption) {
+          if (selectedOption.type === 'Vendor') {
+            payload.vendor_id = selectedOption.id;
+            payload.contractor_id = '';
+          } else if (selectedOption.type === 'Contractor') {
+            payload.contractor_id = selectedOption.id;
+            payload.vendor_id = '';
+          }
+        }
+        const type = typeOverride || payload.type;
+        switch (type) {
+          case 'Advance':
+            payload.bill_amount = '';
+            payload.refund_amount = '';
+            break;
+          case 'Refund':
+            payload.bill_amount = '';
+            payload.amount = '';
+            break;
+          case 'Transfer':
+            payload.bill_amount = '';
+            payload.refund_amount = '';
+            payload.payment_mode = '';
+            break;
+          case 'Bill Settlement':
+            payload.refund_amount = '';
+            break;
+          default:
+            break;
+        }
+        payload.amount = sanitizeNumberField(payload.amount);
+        payload.bill_amount = sanitizeNumberField(payload.bill_amount);
+        payload.discount_amount = sanitizeNumberField(payload.discount_amount);
+        payload.refund_amount = sanitizeNumberField(payload.refund_amount);
+        payload.project_id = sanitizeNumberField(payload.project_id);
+        payload.transfer_site_id = sanitizeNumberField(payload.transfer_site_id);
+        payload.vendor_id = sanitizeNumberField(payload.vendor_id);
+        payload.contractor_id = sanitizeNumberField(payload.contractor_id);
+        payload.week_no = sanitizeNumberField(payload.week_no);
+        payload.entry_no = sanitizeNumberField(payload.entry_no);
+        return payload;
+      };
+
+      const updateRecord = async (id, payload, paymentData = null) => {
+        const res = await fetch(
+          `https://backendaab.in/demoAabuildersDash/api/advance_portal/edit/${id}?editedBy=${enteredBy}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload),
+          }
+        );
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || 'Failed to update record');
+        }
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          await res.json();
+        } else {
+          await res.text();
+        }
+        const sourceRecord =
+          id === editingId
+            ? currentEntry
+            : advanceData.find((e) => e.advancePortalId === id) || editOtherTransferRecord;
+        const expensesEntryId = resolveAdvancePortalExpensesEntryId(sourceRecord);
+        try {
+          await syncWeeklyPaymentBillsForAdvancePortal(id, payload, {
+            editedBy: enteredBy,
+            branchId: activeBranchId,
+            modalPaymentData: paymentData,
+            expensesEntryId,
+          });
+        } catch (weeklyErr) {
+          console.error('Weekly payment bill sync failed after advance edit:', weeklyErr);
+        }
+        if (expensesEntryId) {
+          try {
+            await syncExpensesEntryFromAdvancePortalEdit(expensesEntryId, payload, {
+              editedBy: enteredBy,
+              siteOptions,
+              selectedOption,
+              branchId: activeBranchId,
+            });
+          } catch (expenseErr) {
+            console.error('Linked expense sync failed after advance edit:', expenseErr);
+          }
+        }
+        if (sourceRecord) {
+          try {
+            await syncVendorCarryForwardFromAdvancePortalEdit(sourceRecord, payload);
+          } catch (carryForwardErr) {
+            console.error('Linked vendor carry forward sync failed after advance edit:', carryForwardErr);
+          }
+        }
+      };
+
+      const finishEditSuccess = async () => {
+        const idToLock = editingId;
+        pendingEditPayloadRef.current = null;
+        setShowPaymentDetailsBottomSheet(false);
+        setPaymentModalData({
+          date: '',
+          amount: '',
+          paymentMode: '',
+          chequeNo: '',
+          chequeDate: '',
+          transactionNumber: '',
+          accountNumber: '',
+        });
+        setAdvanceAmount('');
+        setDescription('');
+        setPaymentMode('');
+        setBillAmount('');
+        setSelectedAdvanceFile(null);
+        setSelectedCategory(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        clearEditMode();
+        setIsSubmitting(false);
+        alert('Updated successfully!');
+        window.dispatchEvent(new CustomEvent('advanceUpdated'));
+        if (idToLock) {
+          void setAllowToEdit(idToLock, false);
+        }
+        void fetchAdvancePortalData();
+      };
+
+      if (selectedType === 'Transfer') {
+        const entryNo = mergedEditFormData.entry_no;
+        const sameEntryRows = advanceData.filter((r) => String(r.entry_no) === String(entryNo));
+        const editedRecord =
+          sameEntryRows.find((r) => String(r.advancePortalId) === String(editingId)) || currentEntry;
+        const otherRecord =
+          sameEntryRows.find((r) => String(r.advancePortalId) !== String(editingId)) ||
+          editOtherTransferRecord;
+
+        if (editedRecord && otherRecord) {
+          const editedAmount = parseFloat(mergedEditFormData.amount) || 0;
+          const updatedEdited = buildPayload(
+            {
+              ...mergedEditFormData,
+              transfer_site_id: parseInt(transferSiteId, 10),
+              amount: editedAmount,
+            },
+            'Transfer'
+          );
+          const updatedOther = buildPayload(
+            {
+              ...otherRecord,
+              project_id: parseInt(transferSiteId, 10),
+              transfer_site_id: editedRecord.project_id,
+              amount: -editedAmount,
+            },
+            'Transfer'
+          );
+          await Promise.all([
+            updateRecord(editedRecord.advancePortalId, updatedEdited),
+            updateRecord(otherRecord.advancePortalId, updatedOther),
+          ]);
+          await Promise.all([
+            setAllowToEdit(editedRecord.advancePortalId, false),
+            setAllowToEdit(otherRecord.advancePortalId, false),
+          ]);
+        } else {
+          const fallbackPayload = buildPayload({}, 'Transfer');
+          await updateRecord(editingId, fallbackPayload);
+          await setAllowToEdit(editingId, false);
+        }
+        await finishEditSuccess();
+        return;
+      }
+
+      if (modalPaymentData && pendingEditPayloadRef.current?.payload) {
+        const payload = { ...pendingEditPayloadRef.current.payload, file_url: fileUrl };
+        await updateRecord(editingId, payload, modalPaymentData);
+        await finishEditSuccess();
+        return;
+      }
+
+      const payload = buildPayload();
+      if (isAdvanceOnlinePaymentModeForModal(payload.payment_mode) && !modalPaymentData) {
+        pendingEditPayloadRef.current = { payload };
+        await ensureAccountDetailsLoaded();
+        const prefilled = await fetchAdvanceEditPaymentModalData(editingId, accountDetails);
+        setPaymentModalData({
+          date: dateValue,
+          amount: String(getAdvancePortalDisplayAmount(payload) || parseFormAmount()),
+          paymentMode: payload.payment_mode,
+          chequeNo: prefilled.chequeNo || '',
+          chequeDate: prefilled.chequeDate || '',
+          transactionNumber: prefilled.transactionNumber || '',
+          accountNumber: prefilled.accountNumber || '',
+        });
+        setShowPaymentDetailsBottomSheet(true);
+        return;
+      }
+
+      const paymentData = modalPaymentData || null;
+      await updateRecord(editingId, payload, paymentData);
+      await finishEditSuccess();
+    } catch (error) {
+      console.error('Error updating advance:', error);
+      alert(error?.message || 'Failed to update data!');
     } finally {
       setIsSubmitting(false);
     }
@@ -878,6 +1357,11 @@ const AdvanceForm = ({
   };
 
   const proceedWithPayAdvance = async () => {
+    if (editingId) {
+      await submitAdvanceEdit();
+      return;
+    }
+
     if (requiresPaymentDetailsSheet()) {
       await ensureAccountDetailsLoaded();
       setPaymentModalData({
@@ -902,8 +1386,17 @@ const AdvanceForm = ({
   const handlePayAdvance = async () => {
     if (!validateFormFields()) return;
 
+    if (!editingId && !canCreate) {
+      alert("You don't have permission to create new Advance entries.");
+      return;
+    }
+    if (editingId && !canEdit) {
+      alert("You don't have permission to edit Advance entries.");
+      return;
+    }
+
     // Duplicate check for Advance and Bill Settlement (they create expense entries)
-    if (selectedType === 'Advance' || selectedType === 'Bill Settlement') {
+    if (!editingId && (selectedType === 'Advance' || selectedType === 'Bill Settlement')) {
       const checkAmount = selectedType === 'Bill Settlement' ? (parseFloat(billAmount) || 0) : (parseFloat(advanceAmount.toString().replace(/,/g, '')) || 0);
       setCheckingDuplicate(true);
       try {
@@ -952,11 +1445,22 @@ const AdvanceForm = ({
       alert('Please enter cheque number and date.');
       return;
     }
-    if (selectedType === 'Bill Settlement' && !selectedAdvanceFile) {
+
+    if (editingId) {
+      setIsSubmitting(true);
+      try {
+        await submitAdvanceEdit(paymentModalData);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (!editingId && selectedType === 'Bill Settlement' && !selectedAdvanceFile) {
       alert('Please attach the bill file for Bill Settlement');
       return;
     }
-    if (selectedType === 'Bill Settlement' && !selectedCategory) {
+    if (!editingId && selectedType === 'Bill Settlement' && !selectedCategory) {
       alert('Please select a category for Bill Settlement');
       return;
     }
@@ -1082,6 +1586,9 @@ const AdvanceForm = ({
       });
       if (!weeklyResponse.ok) throw new Error('Failed to save weekly payment bills data');
 
+      setIsSubmitting(false);
+      setShowPaymentDetailsBottomSheet(false);
+      setPaymentModalData({ date: '', amount: '', paymentMode: '', chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
       alert('Advance saved successfully and added to Weekly Payment Bills!');
       window.dispatchEvent(new CustomEvent('advanceUpdated'));
       setAdvanceAmount('');
@@ -1092,10 +1599,7 @@ const AdvanceForm = ({
       setSelectedCategory(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setEntryNo(nextEntryNo);
-      setShowPaymentDetailsBottomSheet(false);
-      setPaymentModalData({ date: '', amount: '', paymentMode: '', chequeNo: '', chequeDate: '', transactionNumber: '', accountNumber: '' });
-      await fetchAdvanceData();
-      await refreshTotalsFromServer();
+      void fetchAdvancePortalData();
     } catch (error) {
       console.error('Error submitting payment details:', error);
       alert(error?.message || 'Failed to save data!');
@@ -1115,6 +1619,7 @@ const AdvanceForm = ({
 
   // Get button label
   const getButtonLabel = () => {
+    if (editingId) return 'Save';
     switch (selectedType) {
       case 'Advance':
         return 'Pay Advance';
@@ -1129,8 +1634,9 @@ const AdvanceForm = ({
     }
   };
 
-  // Check if all required fields are filled (except description)
+  // Check if all required fields are filled (except description) — edit mode matches AdvanceDatabase (no gating)
   const areAllRequiredFieldsFilled = () => {
+    if (editingId) return true;
     if (!selectedType) return false;
 
     if (selectedType === 'Advance' || selectedType === 'Refund') {
@@ -1166,9 +1672,11 @@ const AdvanceForm = ({
 
   // Handle date confirmation from DatePickerModal
   const handleDateConfirm = (dateString) => {
-    // dateString is in DD/MM/YYYY format from DatePickerModal
     const convertedDate = convertToDateValue(dateString);
     setDateValue(convertedDate);
+    if (editingId) {
+      setEditFormData((prev) => ({ ...prev, date: convertedDate }));
+    }
   };
 
   // Handle cheque date confirmation from DatePickerModal (Payment Details bottom sheet)
@@ -1192,7 +1700,7 @@ const AdvanceForm = ({
               type="button"
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
-              # {entryNo}
+              # {editingId ? (editSourceRecord?.entry_no ?? entryNo) : entryNo}
             </button>
             <button
               type="button"
@@ -1313,6 +1821,12 @@ const AdvanceForm = ({
                     const rawValue = e.target.value.replace(/,/g, "");
                     if (!isNaN(rawValue)) {
                       setBillAmount(rawValue);
+                      if (editingId) {
+                        setEditFormData((prev) => ({
+                          ...prev,
+                          bill_amount: rawValue === '' ? '' : Number(rawValue),
+                        }));
+                      }
                     }
                   }}
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
@@ -1342,16 +1856,19 @@ const AdvanceForm = ({
                   className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                   style={{
                     boxSizing: 'border-box',
-                    color: selectedCategory ? '#000' : '#9E9E9E'
+                    color: (selectedCategory || editFormData.category) ? '#000' : '#9E9E9E'
                   }}
                 >
-                  {selectedCategory ? selectedCategory.label : 'Select'}
-                  {selectedCategory ? (
+                  {selectedCategory?.label || editFormData.category || 'Select'}
+                  {(selectedCategory || editFormData.category) ? (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedCategory(null);
+                        if (editingId) {
+                          setEditFormData((prev) => ({ ...prev, category: '' }));
+                        }
                       }}
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                     >
@@ -1365,6 +1882,38 @@ const AdvanceForm = ({
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+          {/* Discount — Bill Settlement (same as AdvanceDatabase edit modal) */}
+          {selectedType === 'Bill Settlement' && (
+            <div className="">
+              <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">
+                Discount
+              </p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formatWithCommas(discountAmount)}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/,/g, '');
+                    if (rawValue === '' || !isNaN(rawValue)) {
+                      setDiscountAmount(rawValue);
+                      if (editingId) {
+                        setEditFormData((prev) => ({
+                          ...prev,
+                          discount_amount: rawValue === '' ? '' : Number(rawValue),
+                        }));
+                      }
+                    }
+                  }}
+                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[12px] text-[12px] font-medium bg-white focus:outline-none"
+                  style={{
+                    boxSizing: 'border-box',
+                    color: discountAmount ? '#000' : '#9E9E9E',
+                  }}
+                  placeholder="Enter discount"
+                />
               </div>
             </div>
           )}
@@ -1529,6 +2078,11 @@ const AdvanceForm = ({
               {selectedAdvanceFile.name}
             </span>
           )}
+          {!selectedAdvanceFile && existingFileUrl && (
+            <span className="text-[11px] font-medium text-[#666] break-words min-w-0 flex-1">
+              Existing file attached
+            </span>
+          )}
         </div>
         {/* Pay Advance Button */}
         <button
@@ -1539,52 +2093,34 @@ const AdvanceForm = ({
             : 'bg-[#D9D9D9] text-black'
             }`}
         >
-          {checkingDuplicate ? 'Checking...' : isSubmitting ? 'Submitting...' : getButtonLabel()}
+          {checkingDuplicate ? 'Checking...' : isSubmitting ? (editingId ? 'Saving...' : 'Submitting...') : getButtonLabel()}
         </button>
       </div>
 
       {/* Advance Records - only this section scrolls */}
       <div className="mt-3 w-full flex-1 min-h-0 flex flex-col">
-        {!selectedOption || !selectedSite ? (
+        {isAdvanceFullLoading ? (
+          <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
+            <p className="text-[12px] font-medium text-[#9E9E9E]">Loading advance records...</p>
+          </div>
+        ) : !selectedOption || !selectedSite ? (
           <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
             <p className="text-[12px] font-medium text-[#9E9E9E]">
               Please select a contractor/vendor and project to view advance records.
             </p>
           </div>
-        ) : (() => {
-          const vid = selectedOption?.id != null ? Number(selectedOption.id) : null;
-          const pid = selectedSite?.id != null ? Number(selectedSite.id) : null;
-          const filteredEntries = advanceData
-            .filter(entry => {
-              const isMatchingVendor =
-                selectedOption?.type === 'Vendor'
-                  ? Number(entry.vendor_id) === vid
-                  : selectedOption?.type === 'Contractor'
-                    ? Number(entry.contractor_id) === vid
-                    : false;
-              const isForCurrentProject = Number(entry.project_id) === pid;
-              return isMatchingVendor && isForCurrentProject;
-            })
-            .sort((a, b) => {
-              const entryNoA = a.entry_no || 0;
-              const entryNoB = b.entry_no || 0;
-              return entryNoB - entryNoA;
-            });
-          if (filteredEntries.length === 0) {
-            return (
-              <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
-                <p className="text-[12px] font-medium text-[#9E9E9E]">
-                  No records found for the selected contractor/vendor and project.
-                </p>
-              </div>
-            );
-          }
-          return (
-            <div
-              className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
-            >
-              {filteredEntries.map((entry, index) => {
+        ) : filteredAdvanceEntries.length === 0 ? (
+          <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
+            <p className="text-[12px] font-medium text-[#9E9E9E]">
+              No records found for the selected contractor/vendor and project.
+            </p>
+          </div>
+        ) : (
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+          >
+            {filteredAdvanceEntries.map((entry, index) => {
                 const {
                   date,
                   amount,
@@ -1689,9 +2225,8 @@ const AdvanceForm = ({
                   </div>
                 );
               })}
-            </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
 
       {/* Select Type Modal */}
@@ -1814,6 +2349,9 @@ const AdvanceForm = ({
         onClose={() => setShowPaymentModeModal(false)}
         onSelect={(value) => {
           setPaymentMode(value);
+          if (editingId) {
+            setEditFormData((prev) => ({ ...prev, payment_mode: value }));
+          }
           setShowPaymentModeModal(false);
         }}
         selectedValue={paymentMode}
@@ -1830,10 +2368,13 @@ const AdvanceForm = ({
           const selected = categoryOptions.find(opt => opt.label === value);
           if (selected) {
             setSelectedCategory(selected);
+            if (editingId) {
+              setEditFormData((prev) => ({ ...prev, category: selected.label }));
+            }
           }
           setShowCategoryModal(false);
         }}
-        selectedValue={selectedCategory ? selectedCategory.label : ''}
+        selectedValue={selectedCategory?.label || editFormData.category || ''}
         options={categoryOptions.map(opt => opt.label)}
         fieldName="Category"
         showStarIcon={false}
@@ -2050,7 +2591,7 @@ const AdvanceForm = ({
                 disabled={isSubmitting}
                 className="flex-1 h-[40px] rounded text-[14px] font-semibold text-white bg-black disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Saving...' : 'Submit'}
+                {isSubmitting ? 'Saving...' : editingId ? 'Save' : 'Submit'}
               </button>
             </div>
           </div>

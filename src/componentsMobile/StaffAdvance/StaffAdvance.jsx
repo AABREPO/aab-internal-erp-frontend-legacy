@@ -42,6 +42,8 @@ const StaffAdvance = ({ user, onLogout }) => {
     return savedTab || 'advance';
   });
   const [loadedTabs, setLoadedTabs] = useState(() => new Set([activeTab]));
+  const [initialFromHistory, setInitialFromHistory] = useState(null);
+  const [historyPrefillToken, setHistoryPrefillToken] = useState(0);
   const [activeBranchId, setActiveBranchId] = useState(() => resolveActiveBranchId(user));
   const [dataState, setDataState] = useState({
     isLoading: true,
@@ -163,10 +165,26 @@ const StaffAdvance = ({ user, onLogout }) => {
             records={dataState.records}
             paymentModeOptions={paymentModeOptions}
             onSaved={refreshData}
+            initialFromHistory={initialFromHistory}
+            historyPrefillToken={historyPrefillToken}
           />
         );
       case 'history':
-        return <History {...sharedProps} />;
+        return (
+          <History
+            user={user}
+            onPersonClick={(data) => {
+              setInitialFromHistory(data);
+              setHistoryPrefillToken((token) => token + 1);
+              setLoadedTabs((previousTabs) => {
+                const nextTabs = new Set(previousTabs);
+                nextTabs.add('advance');
+                return nextTabs;
+              });
+              setActiveTab('advance');
+            }}
+          />
+        );
       case 'report':
         return <Report {...sharedProps} />;
       case 'summary':
@@ -176,9 +194,7 @@ const StaffAdvance = ({ user, onLogout }) => {
     }
   };
 
-  const content = dataState.isLoading ? (
-    <LoadingState />
-  ) : dataState.error ? (
+  const content = dataState.error ? (
     <ErrorState message={dataState.error} onRetry={refreshData} />
   ) : (
     TAB_IDS.map((tabId) => {
@@ -189,7 +205,11 @@ const StaffAdvance = ({ user, onLogout }) => {
           key={tabId}
           className={activeTab === tabId ? 'block h-full' : 'hidden h-full'}
         >
-          {renderTab(tabId)}
+          {tabId === 'advance' && dataState.isLoading && historyPrefillToken === 0 ? (
+            <LoadingState />
+          ) : (
+            renderTab(tabId)
+          )}
         </div>
       );
     })

@@ -17,6 +17,52 @@ export function getExpenseSummaryType(type) {
     return type;
 }
 
+/** Group weekly-payment expenses by type for the top summary row (count + total per type). */
+export function buildWeeklyPaymentExpenseTypeSummary(expenses = [], weeklyTypes = []) {
+    const summaryMap = {};
+    (expenses || []).forEach((expense) => {
+        if (!expense?.type || !(Number(expense.amount) > 0)) return;
+        const summaryType = getExpenseSummaryType(expense.type);
+        if (!summaryMap[summaryType]) {
+            summaryMap[summaryType] = { count: 0, total: 0 };
+        }
+        summaryMap[summaryType].count += 1;
+        summaryMap[summaryType].total += Number(expense.amount) || 0;
+    });
+    UTILITY_BILL_TYPES.forEach((utilityType) => {
+        delete summaryMap[utilityType];
+    });
+    const hasSummaryData = (entry) => entry && (entry.count > 0 || entry.total > 0);
+    const fixedTypes = weeklyTypes.map((typeObj) => typeObj.type).filter(Boolean);
+    const seen = new Set();
+    const items = [];
+    fixedTypes.forEach((type) => {
+        const entry = summaryMap[type];
+        if (!hasSummaryData(entry)) return;
+        seen.add(type);
+        items.push({ type, count: entry.count, total: entry.total });
+    });
+    if (!seen.has(UTILITY_BILLS_SUMMARY_TYPE) && hasSummaryData(summaryMap[UTILITY_BILLS_SUMMARY_TYPE])) {
+        const entry = summaryMap[UTILITY_BILLS_SUMMARY_TYPE];
+        items.push({
+            type: UTILITY_BILLS_SUMMARY_TYPE,
+            count: entry.count,
+            total: entry.total,
+        });
+        seen.add(UTILITY_BILLS_SUMMARY_TYPE);
+    }
+    Object.entries(summaryMap).forEach(([type, entry]) => {
+        if (seen.has(type) || !hasSummaryData(entry)) return;
+        items.push({ type, count: entry.count, total: entry.total });
+    });
+    const positiveExpenses = (expenses || []).filter((expense) => Number(expense.amount) > 0);
+    return {
+        items,
+        totalCount: positiveExpenses.length,
+        totalAmount: positiveExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0),
+    };
+}
+
 const SALARY_ADVANCE_PURPOSE = 'salary advance';
 const WAGE_ADVANCE_PURPOSE = 'wage advance';
 

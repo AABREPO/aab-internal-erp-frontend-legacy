@@ -100,11 +100,56 @@ export async function fetchAdvancePortalGetAll(withBranchUrl) {
   return Array.isArray(json) ? json : [];
 }
 
-function rowAdvanceNet(row) {
-  const amount = parseFloat(row.amount) || 0;
-  const billAmount = parseFloat(row.bill_amount) || 0;
-  const refundAmount = parseFloat(row.refund_amount) || 0;
-  return amount - billAmount - refundAmount;
+/** Matches desktop AdvancePortal.js balance rules (bill minus discount). */
+export function getNetBillAmount(entry) {
+  const bill = parseFloat(entry?.bill_amount) || 0;
+  const discount = parseFloat(entry?.discount_amount) || 0;
+  return bill - discount;
+}
+
+export function computeAdvanceBalanceDelta(entry) {
+  const amount = parseFloat(entry?.amount) || 0;
+  const refund = parseFloat(entry?.refund_amount) || 0;
+  return amount - getNetBillAmount(entry) - refund;
+}
+
+export function matchesAdvanceVendorOrContractor(entry, selected) {
+  if (!selected || selected.id == null) return false;
+  const vid = Number(selected.id);
+  if (selected.type === 'Vendor') return Number(entry.vendor_id) === vid;
+  if (selected.type === 'Contractor') return Number(entry.contractor_id) === vid;
+  return false;
+}
+
+/** Rows for selected vendor/contractor + project (full history, not paged subset). */
+export function filterAdvanceRowsForSelection(data, selectedOption, selectedSite) {
+  if (!Array.isArray(data) || !selectedOption || !selectedSite) return [];
+  const pid = Number(selectedSite.id);
+  return data.filter((entry) => {
+    if (!matchesAdvanceVendorOrContractor(entry, selectedOption)) return false;
+    return Number(entry.project_id) === pid;
+  });
+}
+
+/**
+ * Vendor/contractor overall and optional project total from an in-memory list.
+ * @returns {{ overall: number, projectAmount: number | null }} projectAmount is null when project omitted.
+ */
+export function computeAdvanceTotalsFromRows(data, selected, project) {
+  if (!selected || !Array.isArray(data)) return { overall: 0, projectAmount: null };
+  const pid = project ? Number(project.id) : null;
+  let overall = 0;
+  let projectSum = pid !== null ? 0 : null;
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    if (!matchesAdvanceVendorOrContractor(item, selected)) continue;
+    const net = computeAdvanceBalanceDelta(item);
+    overall += net;
+    if (pid !== null && Number(item.project_id) === pid) {
+      projectSum += net;
+    }
+  }
+  return { overall, projectAmount: projectSum };
 }
 
 /**
@@ -112,25 +157,6 @@ function rowAdvanceNet(row) {
  * @returns {{ overall: number, projectAmount: number | null }} projectAmount is null when project omitted.
  */
 export async function computeAdvanceTotalsFromGetAll(withBranchUrl, selected, project) {
-  if (!selected) return { overall: 0, projectAmount: null };
   const data = await fetchAdvancePortalGetAll(withBranchUrl);
-  const vid = Number(selected.id);
-  const isVendor = selected.type === "Vendor";
-  const pid = project ? Number(project.id) : null;
-  let overall = 0;
-  let projectSum = pid !== null ? 0 : null;
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i];
-    const vendorMatch = isVendor
-      ? Number(item.vendor_id) === vid
-      : Number(item.contractor_id) === vid;
-    if (!vendorMatch) continue;
-    const net = rowAdvanceNet(item);
-    overall += net;
-    if (pid !== null && Number(item.project_id) === pid) {
-      projectSum += net;
-    }
-    if (i > 0 && i % 2000 === 0) await new Promise((r) => setTimeout(r, 0));
-  }
-  return { overall, projectAmount: projectSum };
+  return computeAdvanceTotalsFromRows(data, selected, project);
 }

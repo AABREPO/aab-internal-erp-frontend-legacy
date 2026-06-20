@@ -418,6 +418,92 @@ export function sortEdbcExpenses(rows, sortField, sortDirection, resolvers = {})
     });
 }
 
+/** Sort weekly-payment expense rows — pair with useEdbcTableSort / EdbcColumnHeader on Cash Register pages. */
+export function sortWeeklyPaymentExpenseRows(rows, sortField, sortDirection, resolvers = {}) {
+    if (!sortField || !Array.isArray(rows)) return rows;
+    const { getPartyName = () => '', getProjectName = () => '' } = resolvers;
+    return [...rows].sort((a, b) => {
+        let aValue;
+        let bValue;
+        switch (sortField) {
+            case 'date':
+                aValue = new Date(a.date);
+                bValue = new Date(b.date);
+                break;
+            case 'vendor':
+                aValue = String(getPartyName(a) ?? '').toLowerCase();
+                bValue = String(getPartyName(b) ?? '').toLowerCase();
+                break;
+            case 'siteName':
+                aValue = String(getProjectName(a) ?? '').toLowerCase();
+                bValue = String(getProjectName(b) ?? '').toLowerCase();
+                break;
+            case 'accountType':
+                aValue = String(a.type ?? '').toLowerCase();
+                bValue = String(b.type ?? '').toLowerCase();
+                break;
+            case 'amount':
+                aValue = Number(a.amount) || 0;
+                bValue = Number(b.amount) || 0;
+                break;
+            default:
+                return 0;
+        }
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+/** Sort weekly-payment received rows — EDBC-12 uses accountType but rows store `type`. */
+export function sortWeeklyPaymentPaymentRows(rows, sortField, sortDirection) {
+    if (!sortField || !Array.isArray(rows)) return rows;
+    return [...rows].sort((a, b) => {
+        let aValue;
+        let bValue;
+        switch (sortField) {
+            case 'date':
+                aValue = new Date(a.date);
+                bValue = new Date(b.date);
+                break;
+            case 'accountType':
+                aValue = String(a.type ?? '').toLowerCase();
+                bValue = String(b.type ?? '').toLowerCase();
+                break;
+            case 'amount':
+                aValue = Number(a.amount) || 0;
+                bValue = Number(b.amount) || 0;
+                break;
+            default:
+                return 0;
+        }
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+/** Overall search for weekly-payment expense tables (Cash Register pages). */
+export function matchesWeeklyPaymentExpenseOverallSearch(entry, query, resolvers = {}) {
+    const q = String(query || '').toLowerCase().trim();
+    if (!q) return true;
+    const {
+        formatDateOnly = (value) => String(value ?? ''),
+        getPartyName = () => '',
+        getProjectName = () => '',
+    } = resolvers;
+    const searchable = [
+        entry?.date ? formatDateOnly(entry.date) : '',
+        getPartyName(entry),
+        getProjectName(entry),
+        entry?.type,
+        entry?.amount,
+    ]
+        .map((value) => String(value ?? '').toLowerCase())
+        .join(' ');
+    return searchable.includes(q);
+}
+
 const applyEdbc2WidthClass = (className, columnWidthClass) => {
     if (!columnWidthClass || columnWidthClass === EDBC2_COLUMN_W) return className;
     return className
@@ -746,7 +832,7 @@ export const EdbcTimestampFilter = ({
 };
 
 /** EDBC-2 date filter — `placeholder` should match the column heading on that page. */
-export const EdbcDateFilter = ({ placeholder, value, onChange, columnWidthClass = '' }) => {
+export const EdbcDateFilter = ({ placeholder, value, onChange, columnWidthClass = '', calendarPortal = true }) => {
     const filterWidthClass = columnWidthClass || EDBC_CONFIG[EDBC_IDS.EDBC2].filterWidthClass;
     return (
     <th className={EDBC_CONFIG[EDBC_IDS.EDBC2].filterThClass}>
@@ -756,6 +842,7 @@ export const EdbcDateFilter = ({ placeholder, value, onChange, columnWidthClass 
                 onChange={onChange}
                 placeholder={placeholder}
                 alwaysOpenBelow
+                calendarPortal={calendarPortal}
                 controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
                 className={`${DATE_FILTER_FIELD_CLASS} ${value ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
             />

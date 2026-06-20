@@ -33,43 +33,36 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
                 setLoading(false);
             }
         };
-
         fetchTelecomData();
     }, []);
 
     useEffect(() => {
         let filtered = telecomData;
-
         if (filters.siteName) {
             filtered = filtered.filter(item =>
                 item.siteName && item.siteName.toLowerCase().includes(filters.siteName.toLowerCase())
             );
         }
-
         if (filters.vendor) {
             filtered = filtered.filter(item =>
                 item.vendor && item.vendor.toLowerCase().includes(filters.vendor.toLowerCase())
             );
         }
-
         if (filters.utilityTypeNumber) {
             filtered = filtered.filter(item =>
                 item.utilityTypeNumber && item.utilityTypeNumber.toLowerCase().includes(filters.utilityTypeNumber.toLowerCase())
             );
         }
-
         if (filters.contractor) {
             filtered = filtered.filter(item =>
                 item.contractor && item.contractor.toLowerCase().includes(filters.contractor.toLowerCase())
             );
         }
-
         if (filters.paymentMode) {
             filtered = filtered.filter(item =>
                 item.paymentMode && item.paymentMode.toLowerCase().includes(filters.paymentMode.toLowerCase())
             );
         }
-
         setFilteredData(filtered);
     }, [filters, telecomData]);
 
@@ -82,7 +75,6 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
 
     const formatTimestamp = (timestamp) => {
         if (!timestamp) return '-';
-
         try {
             const date = new Date(timestamp);
             const formattedDate = date.toLocaleDateString('en-GB', {
@@ -95,7 +87,6 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
                 minute: '2-digit',
                 hour12: true
             });
-
             return `${formattedDate} ${formattedTime}`;
         } catch {
             return '-';
@@ -104,7 +95,6 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
 
     const formatDate = (dateValue) => {
         if (!dateValue) return '-';
-
         try {
             return new Date(dateValue).toLocaleDateString('en-GB');
         } catch {
@@ -116,13 +106,10 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
         if (value === null || value === undefined || value === '') {
             return '₹0';
         }
-
         const amountNumber = Number(value);
-
         if (Number.isFinite(amountNumber)) {
             return `₹${amountNumber.toLocaleString()}`;
         }
-
         return `₹${value}`;
     };
 
@@ -130,26 +117,21 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
         if (value === null || value === undefined || value === '') {
             return 0;
         }
-
         const amountNumber = Number(value);
-
         if (Number.isFinite(amountNumber)) {
             return amountNumber;
         }
-
         return value;
     };
 
     const formatUtilityMonth = (utilityForTheMonth) => {
         if (!utilityForTheMonth) return '-';
-
         try {
             const [year, month] = utilityForTheMonth.split('-');
             const monthNames = [
                 'January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'
             ];
-
             const monthIndex = parseInt(month, 10) - 1;
             if (monthIndex >= 0 && monthIndex < 12) {
                 return `${monthNames[monthIndex]} ${year}`;
@@ -162,11 +144,9 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
 
     const handleExportPDF = () => {
         if (!filteredData.length) return;
-
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(14);
         doc.text('Telecom Expenses', 14, 20);
-
         const tableColumn = [
             'Sl.No',
             'Timestamp',
@@ -182,7 +162,6 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
             'ENo',
             'Bill Copy'
         ];
-
         const tableRows = filteredData.map((item, index) => [
             index + 1,
             formatTimestamp(item.timestamp),
@@ -198,7 +177,6 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
             item.eno || '-',
             item.billCopy ? 'Available' : '-'
         ]);
-
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
@@ -206,13 +184,11 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
             styles: { fontSize: 8 },
             headStyles: { fillColor: [191, 152, 83] }
         });
-
         doc.save('TelecomExpenses.pdf');
     };
 
     const handleExportExcel = () => {
         if (!filteredData.length) return;
-
         const worksheetData = filteredData.map((item, index) => ({
             'Sl.No': index + 1,
             Timestamp: formatTimestamp(item.timestamp),
@@ -228,7 +204,6 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
             ENo: item.eno || '-',
             'Bill Copy URL': item.billCopy || '-'
         }));
-
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'TelecomExpenses');
@@ -347,40 +322,29 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
                             />
                         </div>
                         <div className="flex items-end">
-                            <button
-                                onClick={clearFilters}
-                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                            >
+                            <button onClick={clearFilters} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors" >
                                 Clear Filters
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div className="bg-white rounded-md ml-5 mr-5 p-6">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-800">Telecom Expenses</h3>
                     <div className="flex items-center gap-4 text-sm text-black">
-                        <button
-                            type="button"
-                            onClick={handleExportPDF}
-                            disabled={!filteredData.length}
+                        <button type="button" onClick={handleExportPDF} disabled={!filteredData.length}
                             className="flex items-center font-semibold gap-2 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
                         >
                             Export PDF
                         </button>
-                        <button
-                            type="button"
-                            onClick={handleExportExcel}
-                            disabled={!filteredData.length}
+                        <button type="button" onClick={handleExportExcel} disabled={!filteredData.length}
                             className="flex items-center font-semibold gap-2 hover:text-green-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-current"
                         >
                             Export Excel
                         </button>
                     </div>
                 </div>
-
                 <div className="border-l-8 border-l-[#BF9853] rounded-lg">
                     <div className="overflow-x-auto">
                         <table className="w-full border-collapse">
@@ -441,10 +405,7 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
                                             <td className="px-4 py-2">{item.eno || '-'}</td>
                                             <td className="px-4 py-2">
                                                 {item.billCopy ? (
-                                                    <button
-                                                        onClick={() => window.open(item.billCopy, '_blank')}
-                                                        className="text-blue-600 hover:text-blue-800 underline text-sm"
-                                                    >
+                                                    <button onClick={() => window.open(item.billCopy, '_blank')} className="text-blue-600 hover:text-blue-800 underline text-sm">
                                                         View Bill
                                                     </button>
                                                 ) : (
@@ -462,6 +423,4 @@ const TelecomDatabase = ({ username, userRoles = [] }) => {
         </div>
     );
 };
-
 export default TelecomDatabase;
-

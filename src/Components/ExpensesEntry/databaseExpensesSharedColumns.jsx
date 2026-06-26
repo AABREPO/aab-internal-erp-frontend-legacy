@@ -39,6 +39,8 @@ export const EDBC_IDS = {
     EDBC19: 'EDBC-19',
     EDBC20: 'EDBC-20',
     EDBC21: 'EDBC-21',
+    EDBC22: 'EDBC-22',
+    EDBC23: 'EDBC-23',
 };
 
 const EDBC1_COLUMN_W = 'w-[168px]';
@@ -53,9 +55,12 @@ const EDBC3_FILTER_W = 'w-[298px]';
 const EDBC4_COLUMN_W = 'w-[218px]';
 const EDBC5_COLUMN_W = 'w-[218px]';
 const EDBC6_COLUMN_W = 'w-[218px]';
-const EDBC7_COLUMN_W = 'w-[98px]';
+const EDBC7_COLUMN_W = 'w-[88px]';
 const EDBC8_HEADER_W = 'w-[120px]';
 const EDBC8_BODY_W = 'w-[98px]';
+const EDBC22_HEADER_W = 'w-[80px]';
+const EDBC22_BODY_W = 'w-[80px]';
+export const EDBC22_COLUMN_WIDTH_CLASS = EDBC22_HEADER_W;
 const EDBC9_COLUMN_W = 'w-[198px]';
 const EDBC9_FILTER_W = 'w-[198px]';
 const EDBC10_COLUMN_W = 'w-[158px]';
@@ -70,6 +75,8 @@ const EDBC18_COLUMN_W = 'w-[120px]';
 const EDBC19_COLUMN_W = 'w-[70px]';
 const EDBC20_COLUMN_W = 'w-[70px]';
 const EDBC21_COLUMN_W = 'w-[70px]';
+const EDBC22_COLUMN_W = 'w-[80px]';
+const EDBC23_COLUMN_W = 'w-[158px]';
 
 const EDBC_TEXT_INPUT_CLASS =
     'box-border rounded-lg border-2 border-[rgba(191,152,83,0.2)] bg-white text-[14px] font-normal text-black placeholder:text-[#A6A5A6] outline-none hover:border-[rgba(191,152,83,0.4)] focus:border-[rgba(191,152,83,0.4)] focus:shadow-[0_0_0_1px_rgba(191,152,83,0.4)]';
@@ -114,6 +121,46 @@ export const EDBC_TABLE_BODY_ROW_CLASS = `odd:bg-white even:bg-[#FAF6ED] text-[1
 /** First/last visible column edge padding — apply on the shared table element in Table.js. */
 export const EDBC_TABLE_EDGE_TABLE_CLASS =
     '[&_thead_tr>th:first-child]:!pl-[12px] [&_tbody_tr>td:first-child]:!pl-[12px] [&_thead_tr>th:last-child]:!pr-[12px] [&_tbody_tr>td:last-child]:!pr-[12px] [&_thead_tr>th:first-child>div]:!pl-0 [&_thead_tr>th#EDBC-2:first-child]:!w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!w-[130px] [&_thead>tr:first-child>th#EDBC-17]:!pr-[9px] [&_tbody_tr>td#EDBC-17]:!pr-[9px] [&_thead_tr:nth-child(2)>th#EDBC-17]:!pr-0 [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!min-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div]:!max-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!min-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!max-w-[120px] [&_thead_tr:nth-child(2)>th#EDBC-17>div>div]:!box-border';
+
+/** Locks EDBC-8 to shared header/body widths on table-fixed cash-register layouts. */
+export const EDBC8_COLUMN_LOCK_TABLE_CLASS =
+    '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_td#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_td#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_td#EDBC-8]:!overflow-hidden';
+
+/** Narrow spacer between Associate and Project Name (change-type toggle column). */
+export const EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS =
+    'edbc-crg-change-col w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible';
+
+/** Cash Register daily expenses: extra-field (+) button column. */
+export const EDBC_CASH_REGISTER_EXTRA_FIELD_BUTTON_COLUMN_CLASS =
+    'edbc-crg-extra-field-btn-col w-[20px] min-w-[20px] max-w-[20px] p-0 overflow-visible';
+
+/** Cash Register daily expenses: description (notes) column. */
+export const EDBC_CASH_REGISTER_DESCRIPTION_COLUMN_CLASS =
+    'edbc-crg-description-col w-[30px] min-w-[30px] max-w-[30px] px-[6px] overflow-visible';
+
+/** Cash Register daily expenses: extra amount column (between extra button and quantity). */
+export const EDBC_CASH_REGISTER_EXTRA_AMOUNT_COLUMN_CLASS =
+    'edbc-crg-extra-amount-col pl-[6px] w-[66px] min-w-[66px] max-w-[66px]';
+
+/** Locks cash-register daily expenses column widths on table-fixed layouts. */
+export const EDBC_CASH_REGISTER_DAILY_TABLE_LOCK_TABLE_CLASS =
+    '[&_th.edbc-crg-change-col]:!w-[30px] [&_th.edbc-crg-change-col]:!min-w-[30px] [&_th.edbc-crg-change-col]:!max-w-[30px] [&_td.edbc-crg-change-col]:!w-[30px] [&_td.edbc-crg-change-col]:!min-w-[30px] [&_td.edbc-crg-change-col]:!max-w-[30px] [&_th.edbc-crg-extra-field-btn-col]:!w-[20px] [&_th.edbc-crg-extra-field-btn-col]:!min-w-[20px] [&_th.edbc-crg-extra-field-btn-col]:!max-w-[20px] [&_td.edbc-crg-extra-field-btn-col]:!w-[20px] [&_td.edbc-crg-extra-field-btn-col]:!min-w-[20px] [&_td.edbc-crg-extra-field-btn-col]:!max-w-[20px] [&_th.edbc-crg-description-col]:!w-[30px] [&_th.edbc-crg-description-col]:!min-w-[30px] [&_th.edbc-crg-description-col]:!max-w-[30px] [&_td.edbc-crg-description-col]:!w-[30px] [&_td.edbc-crg-description-col]:!min-w-[30px] [&_td.edbc-crg-description-col]:!max-w-[30px] [&_th.edbc-crg-extra-amount-col]:!w-[66px] [&_th.edbc-crg-extra-amount-col]:!min-w-[66px] [&_th.edbc-crg-extra-amount-col]:!max-w-[66px] [&_td.edbc-crg-extra-amount-col]:!w-[66px] [&_td.edbc-crg-extra-amount-col]:!min-w-[66px] [&_td.edbc-crg-extra-amount-col]:!max-w-[66px] [&_th#EDBC-21]:!w-[70px] [&_td#EDBC-21]:!w-[70px] [&_th#EDBC-21]:!min-w-[70px] [&_td#EDBC-21]:!min-w-[70px] [&_th#EDBC-21]:!max-w-[70px] [&_td#EDBC-21]:!max-w-[70px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-12]:!w-[158px] [&_td#EDBC-12]:!w-[158px] [&_th#EDBC-12]:!min-w-[158px] [&_td#EDBC-12]:!min-w-[158px] [&_th#EDBC-12]:!max-w-[158px] [&_td#EDBC-12]:!max-w-[158px] [&_th#EDBC-7]:!w-[88px] [&_td#EDBC-7]:!w-[88px] [&_th#EDBC-7]:!min-w-[88px] [&_td#EDBC-7]:!min-w-[88px] [&_th#EDBC-7]:!max-w-[88px] [&_td#EDBC-7]:!max-w-[88px]';
+
+/** Cash Register refund table: portal badge column (header). */
+export const EDBC_CASH_REGISTER_REFUND_PORTAL_HEADER_COLUMN_CLASS =
+    'edbc-crg-refund-portal-header-col px-[2px] w-[100px] min-w-[100px] max-w-[100px] overflow-visible';
+
+/** Cash Register refund table: portal badge column (filter row). */
+export const EDBC_CASH_REGISTER_REFUND_PORTAL_FILTER_COLUMN_CLASS =
+    'edbc-crg-refund-portal-filter-col px-[2px] w-[60px] min-w-[60px] max-w-[60px] overflow-visible';
+
+/** Cash Register refund table: portal badge / change-button column (entry + body). */
+export const EDBC_CASH_REGISTER_REFUND_PORTAL_BODY_COLUMN_CLASS =
+    'edbc-crg-refund-portal-body-col pl-[6px] w-[100px] min-w-[100px] max-w-[100px] overflow-visible';
+
+/** Locks cash-register daily refund table column widths on table-fixed layouts. */
+export const EDBC_CASH_REGISTER_DAILY_REFUND_TABLE_LOCK_TABLE_CLASS =
+    '[&_th.edbc-crg-refund-portal-header-col]:!w-[100px] [&_th.edbc-crg-refund-portal-header-col]:!min-w-[100px] [&_th.edbc-crg-refund-portal-header-col]:!max-w-[100px] [&_th.edbc-crg-refund-portal-filter-col]:!w-[60px] [&_th.edbc-crg-refund-portal-filter-col]:!min-w-[60px] [&_th.edbc-crg-refund-portal-filter-col]:!max-w-[60px] [&_td.edbc-crg-refund-portal-body-col]:!w-[100px] [&_td.edbc-crg-refund-portal-body-col]:!min-w-[100px] [&_td.edbc-crg-refund-portal-body-col]:!max-w-[100px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-22]:!w-[80px] [&_td#EDBC-22]:!w-[80px] [&_th#EDBC-22]:!min-w-[80px] [&_td#EDBC-22]:!min-w-[80px] [&_th#EDBC-22]:!max-w-[80px] [&_td#EDBC-22]:!max-w-[80px] [&_thead_tr>th:nth-last-child(2)]:!w-[86px] [&_thead_tr>th:nth-last-child(2)]:!min-w-[86px] [&_thead_tr>th:nth-last-child(2)]:!max-w-[86px] [&_tbody_tr>td:nth-last-child(2)]:!w-[86px] [&_tbody_tr>td:nth-last-child(2)]:!min-w-[86px] [&_tbody_tr>td:nth-last-child(2)]:!max-w-[86px] [&_thead_tr>th:nth-last-child(2)]:!overflow-hidden [&_tbody_tr>td:nth-last-child(2)]:!overflow-hidden';
 
 /**
  * Column layout per DST id.
@@ -195,6 +242,16 @@ const EDBC_CONFIG = {
         tdClass: `pl-[1px] pr-[9px] ${EDBC8_BODY_W} text-right`,
         bodyCellKey: 'amount',
         inputClassName: `${EDBC8_HEADER_W} ${EDBC_TEXT_INPUT_CLASS} px-2 text-right`,
+    },
+    [EDBC_IDS.EDBC22]: {
+        sortField: 'amount',
+        columnWidthClass: EDBC22_HEADER_W,
+        filterWidthClass: EDBC22_HEADER_W,
+        headerClass: `pl-[1px] pr-[9px] ${EDBC22_HEADER_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
+        filterThClass: 'pr-[9px]',
+        tdClass: `pl-[1px] pr-[9px] ${EDBC22_BODY_W} text-right`,
+        bodyCellKey: 'amount',
+        inputClassName: `${EDBC22_HEADER_W} ${EDBC_TEXT_INPUT_CLASS} px-2 text-right`,
     },
     [EDBC_IDS.EDBC9]: {
         sortField: 'comments',
@@ -313,6 +370,16 @@ const EDBC_CONFIG = {
         filterThClass: '',
         tdClass: `pl-[12px] pr-[1px] ${EDBC21_COLUMN_W} text-left`,
         bodyCellKey: 'S.No',
+    },
+    [EDBC_IDS.EDBC23]: {
+        sortField: 'utilityTypeNumber',
+        columnWidthClass: EDBC23_COLUMN_W,
+        filterWidthClass: EDBC23_COLUMN_W,
+        headerClass: `pl-[1px] pr-[9px] ${EDBC23_COLUMN_W} font-bold text-right cursor-pointer hover:bg-gray-200 select-none`,
+        filterThClass: 'pl-[1px] pr-[9px]',
+        tdClass: `pl-[1px] pr-[9px] ${EDBC23_COLUMN_W} text-right`,
+        bodyCellKey: 'Service Number',
+        inputClassName: `${EDBC23_COLUMN_W} ${EDBC_TEXT_INPUT_CLASS} px-2 text-right`,
     },
 };
 
@@ -1235,6 +1302,7 @@ export const EdbcSelectFilter = ({
                 placeholder={placeholder}
                 menuPlacement="bottom"
                 noOptionsMessage={() => null}
+                isClearable={false}
                 styles={styles}
             />
         </th>
@@ -1278,16 +1346,26 @@ export const matchesEdbcAmountFilter = (amount, filterText) => {
     return amountStr.includes(q);
 };
 
-/** EDBC-8 amount filter — total shown as placeholder when empty. */
+/** EDBC-8 / EDBC-22 amount filter — total shown as placeholder when empty. */
 export const EdbcTotalAmountFilter = ({ columnId, totalAmount, value, onChange, placeholder }) => {
     const config = EDBC_CONFIG[columnId];
     if (!config) return null;
+    const handleChange = (e) => {
+        if (!onChange) return;
+        const sanitized = e.target.value.replace(/[^\d.,]/g, '');
+        if (sanitized === e.target.value) {
+            onChange(e);
+            return;
+        }
+        onChange({ ...e, target: { ...e.target, value: sanitized } });
+    };
     return (
         <th id={columnId} className={config.filterThClass}>
             <input
                 type="text"
+                inputMode="decimal"
                 value={value}
-                onChange={onChange}
+                onChange={handleChange}
                 placeholder={placeholder ?? formatEdbcTotalAmountPlaceholder(totalAmount)}
                 style={EDBC_FILTER_CONTROL_BOX_STYLE}
                 className={config.inputClassName}

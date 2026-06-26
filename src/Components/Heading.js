@@ -85,18 +85,6 @@ const Heading = ({ username, userRoles = [] }) => {
                         >
                             Database
                         </ModuleHeadingTab>
-                        <ModuleHeadingTab
-                            active={activeTab === 'log'}
-                            onClick={() => handleTabChange('log')}
-                        >
-                            Log
-                        </ModuleHeadingTab>
-                        <ModuleHeadingTab
-                            active={activeTab === 'addInput'}
-                            onClick={() => handleTabChange('addInput')}
-                        >
-                            Input Data
-                        </ModuleHeadingTab>
                     </>
                 )}
                 <ModuleHeadingTab
@@ -117,6 +105,22 @@ const Heading = ({ username, userRoles = [] }) => {
                 >
                     Daily Upload
                 </ModuleHeadingTab>
+                {isAdminExpense && (
+                    <>
+                        <ModuleHeadingTab
+                            active={activeTab === 'addInput'}
+                            onClick={() => handleTabChange('addInput')}
+                        >
+                            Input Data
+                        </ModuleHeadingTab>
+                        <ModuleHeadingTab
+                            active={activeTab === 'log'}
+                            onClick={() => handleTabChange('log')}
+                        >
+                            Log
+                        </ModuleHeadingTab>
+                    </>
+                )}
             </ModuleHeadingBar>
             <div className="content">
                 {visitedTabs.has('expense-entry') && (

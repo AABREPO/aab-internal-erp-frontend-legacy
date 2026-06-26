@@ -1680,7 +1680,7 @@ const LoanForm = () => {
 
           return (
             <div
-              className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y space-y-2 pb-2 [&::-webkit-scrollbar]:hidden"
+              className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y pb-2 [&::-webkit-scrollbar]:hidden"
               style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
             >
               {filteredEntries.map((entry, index) => {
@@ -1713,7 +1713,6 @@ const LoanForm = () => {
           );
         })()}
       </div>
-
       {/* Select Type Modal */}
       {showTypeModal && (
         <div

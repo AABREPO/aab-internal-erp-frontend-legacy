@@ -16,28 +16,22 @@ import {
   isDateWithinRange,
   parseNumber
 } from './staffAdvanceHelpers';
-
 const TYPE_FILTER_OPTIONS = ['Advance', 'Refund', 'Transfer'];
-
 const SearchIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
     <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
   </svg>
 );
-
 const TypePickerModal = ({ isOpen, value, searchQuery, onSearchChange, onClose, onSelect }) => {
   if (!isOpen) return null;
-
   const filteredTypes = TYPE_FILTER_OPTIONS.filter((option) =>
     option.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
-      onClick={onClose}
-      style={{ fontFamily: "'Manrope', sans-serif" }}
+      onClick={onClose} style={{ fontFamily: "'Manrope', sans-serif" }}
     >
       <div
         className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
@@ -49,7 +43,6 @@ const TypePickerModal = ({ isOpen, value, searchQuery, onSearchChange, onClose, 
             <img src={CloseIcon} alt="Close" className="w-[11px] h-[11px]" />
           </button>
         </div>
-
         <div className="px-[24px] pt-[4px] pb-[6px]">
           <div className="relative">
             <input
@@ -65,20 +58,15 @@ const TypePickerModal = ({ isOpen, value, searchQuery, onSearchChange, onClose, 
             </div>
           </div>
         </div>
-
-        <div
-          className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
+        <div className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <div className="shadow-md rounded-lg overflow-hidden">
             {filteredTypes.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => onSelect(option)}
-                className={`w-full px-[16px] flex items-center gap-3 transition-colors ${
-                  value === option ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
-                }`}
+                className={`w-full px-[16px] flex items-center gap-3 transition-colors ${value === option ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                  }`}
                 style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
               >
                 <p className="text-[12px] font-medium text-black text-left">{option}</p>
@@ -95,14 +83,12 @@ const TypePickerModal = ({ isOpen, value, searchQuery, onSearchChange, onClose, 
     </div>
   );
 };
-
 const toLocalDateString = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-
 const parseLocalDate = (dateValue) => {
   const parts = String(dateValue || '').split('-');
   if (parts.length !== 3) return null;
@@ -110,23 +96,19 @@ const parseLocalDate = (dateValue) => {
   const date = new Date(year, month - 1, day);
   return Number.isNaN(date.getTime()) ? null : date;
 };
-
 const formatDateToDDMMYYYY = (date) => {
   if (!date || Number.isNaN(date.getTime())) return '';
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 };
-
 const getTypeCode = (type) => {
   if (type === 'Refund') return 'RF';
   if (type === 'Transfer') return 'TF';
   return 'AD';
 };
-
 const RecordCard = ({ record, peopleOptions, purposeOptions }) => {
   const amount =
     record.type === 'Refund' ? -parseNumber(record.staff_refund_amount) : parseNumber(record.amount);
   const amountColor = amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]';
-
   return (
     <div className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]">
       <div className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out">
@@ -142,7 +124,6 @@ const RecordCard = ({ record, peopleOptions, purposeOptions }) => {
               {formatDateDisplay(record.date)}
             </p>
           </div>
-
           <div className="shrink-0 text-right">
             <span className="inline-flex rounded-full bg-[#E7F4FD] px-[8px] py-[2px] text-[10px] font-medium text-[#336EA8]">
               {record.staff_payment_mode || record.type || 'Mode'}
@@ -161,7 +142,6 @@ const RecordCard = ({ record, peopleOptions, purposeOptions }) => {
     </div>
   );
 };
-
 const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = PAYMENT_MODE_OPTIONS }) => {
   const currentWeek = useMemo(() => getCurrentWeekRange(), []);
   const [startDate, setStartDate] = useState(toLocalDateString(currentWeek.start));
@@ -181,10 +161,8 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
   const [calendarView, setCalendarView] = useState(() => currentWeek.start);
   const [rangeStart, setRangeStart] = useState(() => currentWeek.start);
   const [rangeEnd, setRangeEnd] = useState(() => currentWeek.end);
-
   const filteredRecords = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-
     return [...records]
       .filter((record) => {
         if (startDate && endDate && !isDateWithinRange(record.date, startDate, endDate)) return false;
@@ -197,9 +175,7 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
         ) {
           return false;
         }
-
         if (!query) return true;
-
         const personName = getPersonName(record, peopleOptions).toLowerCase();
         const purposeName = getPurposeName(
           record.from_purpose_id ?? record.purpose_id,
@@ -207,7 +183,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
         ).toLowerCase();
         const description = String(record.description || '').toLowerCase();
         const entryNo = String(getEntryNumber(record)).toLowerCase();
-
         return (
           personName.includes(query) ||
           purposeName.includes(query) ||
@@ -228,7 +203,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
     startDate,
     typeFilter
   ]);
-
   const totalAdvance = useMemo(
     () =>
       filteredRecords.reduce((sum, record) => {
@@ -237,7 +211,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
       }, 0),
     [filteredRecords]
   );
-
   const dateRangeDisplayText = useMemo(() => {
     const from = parseLocalDate(startDate);
     const to = parseLocalDate(endDate);
@@ -245,7 +218,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
     const [firstDate, secondDate] = from <= to ? [from, to] : [to, from];
     return `${formatDateToDDMMYYYY(firstDate)} - ${formatDateToDDMMYYYY(secondDate)}`;
   }, [endDate, startDate]);
-
   const openDateRangeModal = () => {
     const start = parseLocalDate(startDate) || currentWeek.start;
     const end = parseLocalDate(endDate) || currentWeek.end;
@@ -254,7 +226,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
     setCalendarView(start);
     setShowDateRangeModal(true);
   };
-
   const applyDateRange = () => {
     if (!rangeStart || !rangeEnd) return;
     const [firstDate, secondDate] = rangeStart <= rangeEnd ? [rangeStart, rangeEnd] : [rangeEnd, rangeStart];
@@ -262,7 +233,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
     setEndDate(toLocalDateString(secondDate));
     setShowDateRangeModal(false);
   };
-
   const handleDownload = () => {
     downloadCsv(
       `staff-advance-report-${new Date().toISOString().split('T')[0]}.csv`,
@@ -270,12 +240,8 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
       createCsvRows(filteredRecords, peopleOptions, purposeOptions)
     );
   };
-
   return (
-    <div
-      className="relative w-full bg-white max-w-[360px] flex flex-col scrollbar-none overflow-hidden"
-      style={{ fontFamily: "'Manrope', sans-serif" }}
-    >
+    <div className="relative w-full bg-white max-w-[360px] flex flex-col scrollbar-none overflow-hidden" style={{ fontFamily: "'Manrope', sans-serif" }}>
       <TypePickerModal
         isOpen={showTypeModal}
         value={typeFilter}
@@ -291,7 +257,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
           setTypeSearchQuery('');
         }}
       />
-
       <SelectVendorModal
         isOpen={showPaymentModeModal}
         onClose={() => setShowPaymentModeModal(false)}
@@ -304,7 +269,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
         fieldName="Payment Mode"
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showPersonModal}
         onClose={() => setShowPersonModal(false)}
@@ -317,7 +281,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
         fieldName="Employee"
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showPurposeModal}
         onClose={() => setShowPurposeModal(false)}
@@ -330,32 +293,22 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
         fieldName="Purpose"
         showStarIcon={false}
       />
-
-        <div className="mb-[8px] flex items-center justify-between border-b border-gray-200 pb-[6px]">
-  
-  {/* LEFT SIDE */}
-  <div className="flex items-center gap-[8px]">
-    <button
-      type="button"
-      className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
-    >
-      #{currentWeek.label}
-    </button>
-  </div>
-
-  {/* RIGHT SIDE */}
-  <div>
-    <button
-      type="button"
-      onClick={() => setShowTypeModal(true)}
-      className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
-    >
-      {typeFilter || 'Type'}
-    </button>
-  </div>
-
-</div>
-
+      <div className="mb-[8px] flex items-center justify-between border-b border-gray-200 pb-[6px]">
+        {/* LEFT SIDE */}
+        <div className="flex items-center gap-[8px]">
+          <button type="button" className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent">
+            #{currentWeek.label}
+          </button>
+        </div>
+        {/* RIGHT SIDE */}
+        <div>
+          <button type="button" onClick={() => setShowTypeModal(true)}
+            className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
+          >
+            {typeFilter || 'Type'}
+          </button>
+        </div>
+      </div>
       <div className="flex gap-[8px] items-center">
         <div className="flex-1">
           <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Date Range</p>
@@ -378,7 +331,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
             </span>
           </div>
         </div>
-
         <div className="flex-1">
           <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Payment Mode</p>
           <div className="relative">
@@ -410,7 +362,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
           </div>
         </div>
       </div>
-
       <div className="mt-2">
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -428,7 +379,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
           />
         </div>
       </div>
-
       <div className="mt-[8px] pb-[8px] flex items-center justify-between flex-wrap gap-[8px]">
         <div className="flex items-center gap-[8px] min-w-0">
           <button
@@ -441,7 +391,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
               <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">Filter</span>
             ) : null}
           </button>
-
           <div
             className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -460,7 +409,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
                 </button>
               </div>
             ) : null}
-
             {purposeFilter ? (
               <div className="flex items-center gap-[6px] border px-[10px] py-[6px] rounded-full flex-shrink-0">
                 <span className="text-[11px] font-medium text-black">Purpose</span>
@@ -477,7 +425,6 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
             ) : null}
           </div>
         </div>
-
         <div className="flex items-center gap-[8px]">
           {personFilter || purposeFilter ? (
             <button
@@ -496,10 +443,9 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
           </div>
         </div>
       </div>
-
       <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide max-h-[calc(100vh-240px-90px)] pb-[105px]">
         {filteredRecords.length ? (
-          <div className="space-y-[8px]">
+          <div >
             {filteredRecords.map((record) => (
               <RecordCard
                 key={`${record.id}-${record.date}`}
@@ -617,13 +563,12 @@ const Report = ({ records, peopleOptions, purposeOptions, paymentModeOptions = P
                           setRangeEnd(date);
                         }
                       }}
-                      className={`h-9 rounded text-[13px] font-medium ${
-                        highlight
+                      className={`h-9 rounded text-[13px] font-medium ${highlight
                           ? 'bg-black text-white'
                           : inRange
                             ? 'bg-gray-200 text-black'
                             : 'text-black hover:bg-gray-100'
-                      }`}
+                        }`}
                     >
                       {date.getDate()}
                     </button>

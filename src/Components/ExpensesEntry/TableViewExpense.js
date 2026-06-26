@@ -18,6 +18,7 @@ import {
     isExpenseEntryNonCashPaymentMode,
     buildExpenseEntryWeeklyBillSavePayload,
     saveExpenseEntryWeeklyPaymentBill,
+    syncWeeklyExpensesForExpensesEntryEdit,
 } from '../../utils/expensesEntryWeeklyPaymentBill';
 import CustomDateField from './CustomDateField';
 import CustomMonthField from './CustomMonthField';
@@ -67,6 +68,7 @@ const TABLE_VIEW_EXPENSE_FIELDS = {
     machineName: 'Machine Name',
     machineId: 'Machine ID',
     accountType: 'A/C Type',
+    serviceNumber: 'Service Number',
     mode: 'Mode',
     sourceFrom: 'Source From',
     branch: 'Branch',
@@ -383,6 +385,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
     const [selectedQuantity, setSelectedQuantity] = useState('');
     const [selectedAmount, setSelectedAmount] = useState('');
     const [selectedDescription, setSelectedDescription] = useState('');
+    const [selectedServiceNumber, setSelectedServiceNumber] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -1205,6 +1208,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                 (selectedDescription.trim()
                     ? String(expense.comments ?? '').toLowerCase().includes(selectedDescription.toLowerCase().trim())
                     : true) &&
+                (selectedServiceNumber.trim()
+                    ? String(expense.utilityTypeNumber ?? expense.utility_type_number ?? '').toLowerCase().includes(selectedServiceNumber.toLowerCase().trim())
+                    : true) &&
                 (selectedBillArrival
                     ? expenseBillArrivalToInput(expense) === selectedBillArrival
                     : true)
@@ -1230,6 +1236,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             selectedQuantity.trim(),
             selectedAmount.trim(),
             selectedDescription.trim(),
+            selectedServiceNumber.trim(),
         ].some(Boolean) || overallSearch.trim();
         setExportFilteredExpenses(anyFilterApplied ? filtered : []);
         const getOptions = (data, key) =>
@@ -1298,6 +1305,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         selectedQuantity,
         selectedAmount,
         selectedDescription,
+        selectedServiceNumber,
         overallSearch,
         expenses,
         machineToolsIdToLabel,
@@ -1541,6 +1549,18 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                 throw weeklyErr;
             }
         }
+
+        if (expensesEntryId) {
+            try {
+                await syncWeeklyExpensesForExpensesEntryEdit(expensesEntryId, updatedFormData, {
+                    editedBy: username,
+                    existingWeeklyBills,
+                });
+            } catch (weeklyExpenseErr) {
+                console.error('Weekly expenses sync error:', weeklyExpenseErr);
+                throw weeklyExpenseErr;
+            }
+        }
     };
     const handlePaymentModalSubmit = async () => {
         if (!paymentModalData.accountNumber) {
@@ -1623,6 +1643,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         } else if (sortField === 'billArrivalDate') {
             aValue = String(a.billArrivalDate ?? a.bill_arrival_date ?? '').trim().slice(0, 10);
             bValue = String(b.billArrivalDate ?? b.bill_arrival_date ?? '').trim().slice(0, 10);
+        } else if (sortField === 'utilityTypeNumber') {
+            aValue = String(a.utilityTypeNumber ?? a.utility_type_number ?? '').toLowerCase();
+            bValue = String(b.utilityTypeNumber ?? b.utility_type_number ?? '').toLowerCase();
         } else if (sortField === 'quantity' || sortField === 'amount') {
             aValue = Number(aValue) || 0;
             bValue = Number(bValue) || 0;
@@ -1954,6 +1977,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         setSelectedQuantity('');
         setSelectedAmount('');
         setSelectedDescription('');
+        setSelectedServiceNumber('');
         setOverallSearch('');
         setFilteredExpenses(expenses);
         setCurrentPage(1);
@@ -2034,6 +2058,8 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
             setSelectedAmount,
             selectedDescription,
             setSelectedDescription,
+            selectedServiceNumber,
+            setSelectedServiceNumber,
             sortField,
             sortDirection,
             handleSort,
@@ -2101,6 +2127,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
         selectedQuantity,
         selectedAmount,
         selectedDescription,
+        selectedServiceNumber,
         sortField,
         sortDirection,
         startDate,
@@ -2140,7 +2167,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                 Loading latest expenses...
                             </div>
                         ) : null}
-                        <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || selectedEno || selectedBillArrival || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim()
+                        <div className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || selectedEno || selectedBillArrival || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedServiceNumber.trim()
                             ? 'flex-col sm:flex-row sm:justify-between' : 'flex-row justify-between items-center'} mb-[12px] gap-[6px]`}>
                             <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
                                 <EdbcFilterToggleButton
@@ -2174,7 +2201,7 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                         });
                                     }}
                                 />
-                                {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || selectedEno || selectedBillArrival || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim()) && (
+                                {(selectedSiteName || selectedVendor || selectedContractor || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || selectedEno || selectedBillArrival || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedServiceNumber.trim()) && (
                                     <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                                         {startDate && endDate ? (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] w-fit max-w-full min-w-0 overflow-hidden">
@@ -2249,6 +2276,13 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                                 <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.accountType}: </span>
                                                 <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedAccountType}</span>
                                                 <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectedServiceNumber.trim() && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#BF9853] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-semibold shrink-0 whitespace-nowrap">{TABLE_VIEW_EXPENSE_FIELDS.serviceNumber}: </span>
+                                                <span className="font-semibold text-[14px] text-[#000000] truncate min-w-0">{selectedServiceNumber}</span>
+                                                <button onClick={() => setSelectedServiceNumber('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
                                         <EdbcPaymentModeFilterChip
@@ -2327,8 +2361,9 @@ const TableViewExpense = ({ username, userRoles = [], isActive = true }) => {
                                     <Table
                                         showTimestampColumn={false}
                                         showActivityColumn
+                                        showServiceNumberColumn
                                         editOnlyActivityColumn
-                                        tableClassName="min-w-[2638px]"
+                                        tableClassName="min-w-[2836px]"
                                     />
                                 </TableProvider>
                             </div>

@@ -14,7 +14,6 @@ import {
   getPurposeName,
   isStaffAdvanceRecordLocked,
   loadStaffAdvanceData,
-  matchesStaffAdvanceDateFilter,
   parseNumber,
   resolveActiveBranchId,
 } from './staffAdvanceHelpers';
@@ -22,7 +21,6 @@ import { STAFF_ADVANCE_MODULE_NAME } from '../../utils/paymentModeArrangement';
 import { usePaymentModeSelectOptionsForModule } from '../../utils/usePaymentModeArrangement';
 import {
   clearStaffAdvanceRecordsOnDelete,
-  getStaffAdvanceDisplayAmount,
 } from '../../utils/staffAdvanceWeeklyPaymentBill';
 import { formatWeeklyBillDeleteMessage } from '../../utils/advancePortalWeeklyPaymentBill';
 
@@ -34,7 +32,6 @@ const History = ({ onPersonClick, user } = {}) => {
   const [staffData, setStaffData] = useState([]);
   const [peopleOptions, setPeopleOptions] = useState([]);
   const [purposeOptions, setPurposeOptions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   const [modulePermissions, setModulePermissions] = useState([]);
   useEffect(() => {
@@ -77,13 +74,10 @@ const History = ({ onPersonClick, user } = {}) => {
   const [personFilter, setPersonFilter] = useState('');
   const [entryNoFilter, setEntryNoFilter] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('');
-  const [transferToFilter, setTransferToFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
   const [paymentModeFilter, setPaymentModeFilter] = useState('');
   const [showPersonModal, setShowPersonModal] = useState(false);
   const [showEntryNoModal, setShowEntryNoModal] = useState(false);
   const [showPurposeModal, setShowPurposeModal] = useState(false);
-  const [showTransferToModal, setShowTransferToModal] = useState(false);
   const [showPaymentModeModal, setShowPaymentModeModal] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [selectedDescription, setSelectedDescription] = useState('');
@@ -120,7 +114,6 @@ const History = ({ onPersonClick, user } = {}) => {
   }, [editDeleteExpandedId]);
 
   const loadStaffData = useCallback(async () => {
-    setIsLoading(true);
     try {
       const data = await loadStaffAdvanceData(activeBranchId, { applyBranchFilter: false });
       setStaffData(data.records || []);
@@ -129,8 +122,6 @@ const History = ({ onPersonClick, user } = {}) => {
     } catch (error) {
       console.error('Error loading staff advance history:', error);
       setStaffData([]);
-    } finally {
-      setIsLoading(false);
     }
   }, [activeBranchId]);
 
@@ -191,7 +182,12 @@ const History = ({ onPersonClick, user } = {}) => {
           entry.type === 'Transfer' && entry.to_purpose_id
             ? getPurposeName(entry.to_purpose_id, purposeOptions)
             : '';
-        const displayAmount = parseNumber(getStaffAdvanceDisplayAmount(entry));
+        let amount = 0;
+        if (entry.type === 'Refund') {
+          amount = -(parseNumber(entry.staff_refund_amount) || 0);
+        } else {
+          amount = parseNumber(entry.amount) || 0;
+        }
         const recordDate = entry.date || '';
         const recordTimestamp = entry.timestamp || entry.created_at || entry.date || '';
         const entryNo = entry.entry_no || 0;
@@ -216,8 +212,7 @@ const History = ({ onPersonClick, user } = {}) => {
           timestamp: recordTimestamp,
           type: entry.type || 'Advance',
           paymentMode: entry.staff_payment_mode || '',
-          displayAmount,
-          isRefund: entry.type === 'Refund',
+          amount,
           entry,
         };
       })
@@ -228,9 +223,6 @@ const History = ({ onPersonClick, user } = {}) => {
 
   const filtered = useMemo(() => {
     let result = transformed;
-    if (dateFilter) {
-      result = result.filter((item) => matchesStaffAdvanceDateFilter(item.entry?.date, dateFilter));
-    }
     if (typeFilter) {
       result = result.filter((item) => (item.type || '').toLowerCase() === typeFilter.toLowerCase());
     }
@@ -247,43 +239,13 @@ const History = ({ onPersonClick, user } = {}) => {
         (item) => (item.purposeName || '').toLowerCase() === purposeFilter.toLowerCase()
       );
     }
-    if (transferToFilter) {
-      result = result.filter(
-        (item) => (item.transferPurposeName || '').toLowerCase() === transferToFilter.toLowerCase()
-      );
-    }
     if (paymentModeFilter) {
       result = result.filter(
         (item) => (item.paymentMode || '').toLowerCase() === paymentModeFilter.toLowerCase()
       );
     }
     return result;
-  }, [
-    transformed,
-    dateFilter,
-    typeFilter,
-    personFilter,
-    entryNoFilter,
-    purposeFilter,
-    transferToFilter,
-    paymentModeFilter,
-  ]);
-
-  const filteredSummary = useMemo(() => {
-    const advanceTotal = filtered
-      .filter((item) => item.type === 'Advance')
-      .reduce((acc, item) => acc + parseNumber(item.entry?.amount), 0);
-    const transferTotal = filtered
-      .filter((item) => item.type === 'Transfer')
-      .reduce((acc, item) => {
-        const amount = parseNumber(item.entry?.amount);
-        return acc + (amount > 0 ? amount : 0);
-      }, 0);
-    const refundTotal = filtered
-      .filter((item) => item.type === 'Refund')
-      .reduce((acc, item) => acc + parseNumber(item.entry?.staff_refund_amount), 0);
-    return { advanceTotal, transferTotal, refundTotal };
-  }, [filtered]);
+  }, [transformed, typeFilter, personFilter, entryNoFilter, purposeFilter, paymentModeFilter]);
 
   const getPaymentModeBadgeClass = (mode) => {
     if (!mode || mode === '') return 'bg-gray-100 text-gray-600';
@@ -340,7 +302,7 @@ const History = ({ onPersonClick, user } = {}) => {
       selectedPurpose,
       billDetails: {
         ref: item.ref,
-        amount: item.displayAmount,
+        amount: item.amount,
         paymentMode: item.paymentMode,
         timestamp: item.timestamp,
         type: item.type,
@@ -735,41 +697,51 @@ const History = ({ onPersonClick, user } = {}) => {
     () => [...new Set(purposeOptions.map((opt) => opt.label))].filter(Boolean),
     [purposeOptions]
   );
-  const transferToFilterOptions = useMemo(
-    () =>
-      [...new Set(transformed.map((item) => item.transferPurposeName).filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [transformed]
-  );
 
-  const hasActiveFilters =
-    personFilter ||
-    entryNoFilter ||
-    purposeFilter ||
-    transferToFilter ||
-    dateFilter ||
-    paymentModeFilter;
+  const hasActiveFilters = !!(personFilter || entryNoFilter || purposeFilter || paymentModeFilter);
 
-  if (isLoading) {
-    return (
-      <div
-        className="flex h-full items-center justify-center bg-white px-[20px] text-center text-[12px] font-semibold text-[#8A8A8A]"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
-      >
-        Loading history...
+  const renderFilterPicker = (label, value, onOpen, onClear) => (
+    <div>
+      <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">{label}</p>
+      <div className="relative">
+        <div
+          onClick={onOpen}
+          className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
+          style={{ boxSizing: 'border-box', color: value ? '#000' : '#9E9E9E' }}
+        >
+          {value || 'Select'}
+          {value ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
+            </button>
+          ) : (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L6 6L11 1" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          )}
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div
-      className="relative w-full bg-white max-w-[360px] flex flex-col scrollbar-none overflow-hidden px-[12px]"
+      className="relative w-full bg-white max-w-[360px] flex flex-col flex-1 min-h-0 overflow-hidden scrollbar-none"
       style={{ fontFamily: "'Manrope', sans-serif" }}
     >
-      <div className="pt-[10px]">
+      <div>
         <div className="flex-shrink-0 flex mb-[8px] items-center border-b border-[#E0E0E0] justify-between pb-[10px]">
-          <div className="flex items-center gap-[4px] flex-shrink-0">
+          <div />
+          <div className="flex items-center gap-[4px]">
             <button
               type="button"
               onClick={() => setShowTypeModal(true)}
@@ -777,7 +749,7 @@ const History = ({ onPersonClick, user } = {}) => {
             >
               {typeFilter || 'Type'}
             </button>
-            {typeFilter ? (
+            {typeFilter && (
               <button
                 type="button"
                 onClick={() => setTypeFilter('')}
@@ -785,11 +757,10 @@ const History = ({ onPersonClick, user } = {}) => {
               >
                 <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
               </button>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
-
       <div className="flex-shrink-0">
         <div className="flex items-center justify-between gap-[20px]">
           <div className="flex items-center gap-[4px] min-w-0">
@@ -799,85 +770,88 @@ const History = ({ onPersonClick, user } = {}) => {
               className="flex items-center gap-[4px] px-[6px] py-[2px] flex-shrink-0"
             >
               <img src={Filter} alt="Filter" className="w-[11px] h-[11px]" />
-              {!(hasActiveFilters) ? (
-                <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">Filter</span>
-              ) : null}
+              {!(typeFilter || personFilter || entryNoFilter || purposeFilter || paymentModeFilter) && (
+                <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">
+                  Filter
+                </span>
+              )}
             </button>
             <div
               className="flex items-center gap-[4px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              {dateFilter ? (
-                <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
-                  <span className="text-[11px] font-medium text-black">Date</span>
-                  <button type="button" onClick={() => setDateFilter('')} className="w-4 h-4 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></svg>
-                  </button>
-                </div>
-              ) : null}
-              {personFilter ? (
+              {personFilter && (
                 <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Employee</span>
-                  <button type="button" onClick={() => setPersonFilter('')} className="w-4 h-4 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                  <button
+                    onClick={() => setPersonFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 </div>
-              ) : null}
-              {entryNoFilter ? (
+              )}
+              {entryNoFilter && (
                 <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Entry. No</span>
-                  <button type="button" onClick={() => setEntryNoFilter('')} className="w-4 h-4 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                  <button
+                    onClick={() => setEntryNoFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 </div>
-              ) : null}
-              {purposeFilter ? (
+              )}
+              {purposeFilter && (
                 <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Purpose</span>
-                  <button type="button" onClick={() => setPurposeFilter('')} className="w-4 h-4 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                  <button
+                    onClick={() => setPurposeFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 </div>
-              ) : null}
-              {transferToFilter ? (
-                <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
-                  <span className="text-[11px] font-medium text-black">Transfer To</span>
-                  <button type="button" onClick={() => setTransferToFilter('')} className="w-4 h-4 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></svg>
-                  </button>
-                </div>
-              ) : null}
-              {paymentModeFilter ? (
+              )}
+              {paymentModeFilter && (
                 <div className="flex items-center border px-[6px] py-[2px] rounded-full flex-shrink-0">
                   <span className="text-[11px] font-medium text-black">Mode</span>
-                  <button type="button" onClick={() => setPaymentModeFilter('')} className="w-4 h-4 flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                  <button
+                    onClick={() => setPaymentModeFilter('')}
+                    className="w-4 h-4 flex items-center justify-center hover:bg-gray-300 rounded-full transition-colors"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M7 3L3 7M3 3L7 7" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
-          {hasActiveFilters ? (
+          {hasActiveFilters && (
             <button
-              type="button"
               onClick={() => {
                 setPersonFilter('');
                 setEntryNoFilter('');
                 setPurposeFilter('');
-                setTransferToFilter('');
-                setDateFilter('');
                 setPaymentModeFilter('');
               }}
               className="text-[13px] font-semibold hover:text-black transition-colors flex-shrink-0 text-[#9E9E9E]"
             >
               x
             </button>
-          ) : null}
+          )}
         </div>
       </div>
-
       <div
-        className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide mt-1 max-h-[calc(100vh-160px-80px)] pb-[105px]"
+        className="flex-1 min-h-0 overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide mt-1 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onClick={() => {
           setUploadExpandedId(null);
           setEditDeleteExpandedId(null);
@@ -903,338 +877,431 @@ const History = ({ onPersonClick, user } = {}) => {
               className="hidden"
               onChange={handleFileChange}
             />
-            <div className="space-y-[8px]">
-              {filtered.map((item) => {
-                const swipeState = swipeStates[item.id];
-                const isUploadExpanded = uploadExpandedId === item.id;
-                const isEditDeleteExpanded = editDeleteExpandedId === item.id;
-                const isLocked = isStaffAdvanceRecordLocked(item.entry);
-                const swipeActionWidth = 110;
-                let swipeOffset = 0;
-                if (swipeState?.isSwiping) {
-                  const dx = swipeState.currentX - swipeState.startX;
-                  if (dx < 0) {
-                    swipeOffset = isUploadExpanded ? Math.max(0, 48 + dx) : Math.max(-swipeActionWidth, dx);
-                  } else {
-                    swipeOffset = isEditDeleteExpanded
-                      ? Math.max(-swipeActionWidth, Math.min(0, -swipeActionWidth + dx))
-                      : Math.min(48, dx);
-                  }
-                } else if (isEditDeleteExpanded) {
-                  swipeOffset = -swipeActionWidth;
-                } else if (isUploadExpanded) {
-                  swipeOffset = 48;
+            {filtered.map((item) => {
+              const swipeState = swipeStates[item.id];
+              const isUploadExpanded = uploadExpandedId === item.id;
+              const isEditDeleteExpanded = editDeleteExpandedId === item.id;
+              const isLocked = isStaffAdvanceRecordLocked(item.entry);
+              const swipeActionWidth = 110;
+              let swipeOffset = 0;
+              if (swipeState?.isSwiping) {
+                const dx = swipeState.currentX - swipeState.startX;
+                if (dx < 0) {
+                  swipeOffset = isUploadExpanded ? Math.max(0, 48 + dx) : Math.max(-swipeActionWidth, dx);
+                } else {
+                  swipeOffset = isEditDeleteExpanded
+                    ? Math.max(-swipeActionWidth, Math.min(0, -swipeActionWidth + dx))
+                    : Math.min(48, dx);
                 }
+              } else if (isEditDeleteExpanded) {
+                swipeOffset = -swipeActionWidth;
+              } else if (isUploadExpanded) {
+                swipeOffset = 48;
+              }
 
-                return (
+              return (
+                <div
+                  key={item.id}
+                  className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
+                  style={{
+                    height: '95px',
+                    userSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                    WebkitUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                  }}
+                >
                   <div
-                    key={item.id}
-                    className="relative overflow-hidden shadow-lg border border-[#E0E0E0] border-opacity-30 bg-[#F8F8F8] rounded-[8px] min-w-[330px]"
+                    className="absolute left-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
                     style={{
-                      height: '95px',
-                      userSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      opacity: (isUploadExpanded || (swipeState && swipeState.isSwiping && swipeOffset > 20)) ? 1 : 0,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isUploadExpanded ? 'auto' : 'none',
                     }}
                   >
-                    <div
-                      className="absolute left-0 top-0 flex gap-[8px] flex-shrink-0 z-0"
-                      style={{
-                        opacity: isUploadExpanded || (swipeState?.isSwiping && swipeOffset > 20) ? 1 : 0,
-                        pointerEvents: isUploadExpanded ? 'auto' : 'none',
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUploadClick(item);
                       }}
+                      disabled={!!uploadingForId || isLocked}
+                      className="w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center hover:bg-[#a88645] transition-colors shadow-sm disabled:opacity-60"
+                      title="Upload file"
                     >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUploadClick(item);
-                        }}
-                        disabled={!!uploadingForId || isLocked || !canEdit}
-                        className={`w-[48px] h-[95px] bg-[#BF9853] rounded-[6px] flex items-center justify-center hover:bg-[#a88645] transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <img src={UploadFile} alt="Upload" className="w-[18px] h-[18px]" />
-                      </button>
-                    </div>
-                    <div
-                      className="absolute right-0 top-0 flex gap-[8px] flex-shrink-0 z-0"
-                      style={{
-                        opacity: isEditDeleteExpanded || (swipeState?.isSwiping && swipeOffset < -20) ? 1 : 0,
-                        transform: swipeOffset < 0
-                          ? `translateX(${Math.max(0, swipeActionWidth + swipeOffset)}px)`
-                          : `translateX(${swipeActionWidth}px)`,
-                        pointerEvents: isEditDeleteExpanded ? 'auto' : 'none',
+                      <img src={UploadFile} alt="Upload File" className="w-[18px] h-[18px]" />
+                    </button>
+                  </div>
+                  <div
+                    className="absolute right-0 top-[0px] flex gap-[8px] flex-shrink-0 z-0"
+                    style={{
+                      opacity: (isEditDeleteExpanded || (swipeState && swipeState.isSwiping && swipeOffset < -20)) ? 1 : 0,
+                      transform: swipeOffset < 0
+                        ? `translateX(${Math.max(0, swipeActionWidth + swipeOffset)}px)`
+                        : `translateX(${swipeActionWidth}px)`,
+                      transition: 'opacity 0.2s ease-out',
+                      pointerEvents: isEditDeleteExpanded ? 'auto' : 'none',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(item);
                       }}
+                      disabled={!canEdit || isLocked}
+                      className={`w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center gap-[6px] hover:bg-[#22a882] transition-colors shadow-sm ${
+                        !canEdit || isLocked ? 'opacity-50 cursor-not-allowed hover:bg-[#007233]' : ''
+                      }`}
+                      title="Edit"
                     >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(item);
-                        }}
-                        disabled={!canEdit || isLocked}
-                        className={`w-[48px] h-[95px] bg-[#007233] rounded-[6px] flex items-center justify-center hover:bg-[#22a882] transition-colors shadow-sm ${!canEdit || isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          requestDelete(item);
-                        }}
-                        disabled={!canDelete || isLocked}
-                        className={`w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center hover:bg-[#cc4d26] transition-colors shadow-sm ${!canDelete || isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
-                      </button>
-                    </div>
-                    <div
-                      ref={(el) => {
-                        if (el) cardRefs.current[item.id] = el;
-                        else delete cardRefs.current[item.id];
+                      <img src={Edit} alt="Edit" className="w-[18px] h-[18px]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestDelete(item);
                       }}
-                      className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out"
-                      style={{
-                        transform: `translateX(${swipeOffset}px)`,
-                        touchAction: 'pan-y',
-                        transition: swipeState?.isSwiping ? 'none' : 'transform 0.3s ease-out',
-                      }}
+                      disabled={!canDelete || isLocked}
+                      className={`w-[48px] h-[95px] bg-[#E4572E] flex rounded-[6px] items-center justify-center gap-[6px] hover:bg-[#cc4d26] transition-colors shadow-sm ${
+                        !canDelete || isLocked ? 'opacity-50 cursor-not-allowed hover:bg-[#E4572E]' : ''
+                      }`}
+                      title="Delete"
                     >
-                      <div className="flex flex-col gap-[2px]">
-                        <div className="flex items-center justify-between">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
+                      <img src={Delete} alt="Delete" className="w-[18px] h-[18px]" />
+                    </button>
+                  </div>
+                  <div
+                    ref={(el) => {
+                      if (el) cardRefs.current[item.id] = el;
+                      else delete cardRefs.current[item.id];
+                    }}
+                    className="flex-1 bg-white rounded-[8px] h-full px-[12px] py-[12px] transition-all duration-300 ease-out"
+                    style={{
+                      transform: `translateX(${swipeOffset}px)`,
+                      touchAction: 'pan-y',
+                      userSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      WebkitUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      MozUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      msUserSelect: swipeState?.isSwiping ? 'none' : 'auto',
+                      willChange: 'transform',
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                      transition: swipeState?.isSwiping ? 'none' : 'transform 0.3s ease-out',
+                    }}
+                    onClick={(e) => {
+                      if (!isUploadExpanded) e.stopPropagation();
+                    }}
+                  >
+                    <div className="flex flex-col gap-[2px]">
+                      <div className="flex items-center justify-between">
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            const desc = item.entry?.description || '';
+                            if (desc) {
+                              setSelectedDescription(desc);
+                              setShowDescriptionModal(true);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
                               const desc = item.entry?.description || '';
                               if (desc) {
                                 setSelectedDescription(desc);
                                 setShowDescriptionModal(true);
                               }
-                            }}
-                            className={`text-[12px] font-semibold text-black leading-snug ${item.entry?.description ? 'cursor-pointer hover:underline' : ''}`}
+                            }
+                          }}
+                          className={`text-[12px] font-semibold text-black leading-snug ${item.entry?.description ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                          {item.ref}
+                        </span>
+                        <span
+                          className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium flex items-center gap-[4px] ${getPaymentModeBadgeClass(
+                            item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')
+                          )}`}
+                        >
+                          {item.type === 'Transfer' && !item.paymentMode ? 'Online' : (item.paymentMode || '')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        {onPersonClick ? (
+                          <button
+                            type="button"
+                            onClick={() => onPersonClick(buildPersonClickPayload(item))}
+                            className="text-[12px] font-semibold text-black leading-snug break-words text-left cursor-pointer hover:underline focus:outline-none focus:underline"
+                            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                           >
-                            {item.ref}
-                          </span>
-                          <span
-                            className={`px-[8px] py-[2px] rounded-full text-[10px] font-medium ${getPaymentModeBadgeClass(item.paymentMode)}`}
+                            {item.personName || 'N/A'}
+                          </button>
+                        ) : (
+                          <p
+                            className="text-[12px] font-semibold text-black leading-snug break-words"
+                            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                           >
-                            {item.paymentMode || '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          {onPersonClick ? (
-                            <button
-                              type="button"
-                              onClick={() => onPersonClick(buildPersonClickPayload(item))}
-                              className="text-[12px] font-semibold text-black leading-snug break-words text-left cursor-pointer hover:underline focus:outline-none"
-                            >
-                              {item.personName || 'N/A'}
-                            </button>
-                          ) : (
-                            <p className="text-[12px] font-semibold text-black leading-snug break-words">
-                              {item.personName || 'N/A'}
-                            </p>
-                          )}
-                          <span />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-medium text-[#777777] leading-snug break-words">
-                            {item.purposeName || 'N/A'}
+                            {item.personName || 'N/A'}
                           </p>
-                          {item.entry?.file_url ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(item.entry.file_url, '_blank', 'noopener,noreferrer');
-                              }}
-                              className={`text-[12px] font-semibold leading-snug cursor-pointer hover:underline ${item.isRefund ? 'text-[#E4572E]' : 'text-[#007233]'}`}
-                            >
-                              {item.displayAmount
-                                ? `₹${item.displayAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-                                : '—'}
-                            </button>
-                          ) : (
-                            <p className={`text-[12px] font-semibold leading-snug ${item.isRefund ? 'text-[#E4572E]' : 'text-[#007233]'}`}>
-                              {item.displayAmount
-                                ? `₹${item.displayAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-                                : '—'}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] leading-normal min-w-0 flex-1 flex items-center flex-wrap gap-x-[4px]">
-                            <span className="font-bold text-black">
-                              {formatRelativeDateLabel(item.recordDate || item.recordTimestamp)}
-                            </span>
-                            {(() => {
-                              const { dateTime } = formatDateTimeParts(item.recordTimestamp);
-                              return dateTime ? (
-                                <span className="font-semibold text-[#9E9E9E]"> • {dateTime}</span>
-                              ) : null;
-                            })()}
+                        )}
+                        <span />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p
+                          className="text-[11px] font-medium text-[#777777] leading-snug break-words"
+                          style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                        >
+                          {item.purposeName || 'N/A'}
+                        </p>
+                        {item.entry?.file_url ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(item.entry.file_url, '_blank', 'noopener,noreferrer');
+                            }}
+                            className={`text-[12px] font-semibold block leading-snug cursor-pointer hover:underline focus:outline-none focus:underline ${item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}
+                          >
+                            {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
+                          </button>
+                        ) : (
+                          <p
+                            className={`text-[12px] font-semibold block leading-snug ${item.amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}
+                          >
+                            {item.amount < 0 ? '-' : ''}₹{Math.abs(item.amount).toLocaleString('en-IN')}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] leading-normal min-w-0 flex-1 flex items-center flex-wrap gap-x-[4px]">
+                          <span className="font-bold text-black">
+                            {formatRelativeDateLabel(item.recordDate || item.recordTimestamp)}
                           </span>
-                          {item.type === 'Transfer' && item.transferPurposeName ? (
-                            <p className="text-[10px] font-semibold leading-snug text-[#007233]">
-                              {item.transferPurposeName}
-                            </p>
-                          ) : null}
-                        </div>
+                          {(() => {
+                            const { dateTime } = formatDateTimeParts(item.recordTimestamp);
+                            return dateTime ? (
+                              <span className="font-semibold text-[#9E9E9E]"> • {dateTime}</span>
+                            ) : null;
+                          })()}
+                        </span>
+                        {item.type === 'Transfer' && item.transferPurposeName ? (
+                          <p className={`text-[10px] font-semibold leading-snug ${item.amount < 0 ? 'text-[#BF9853]' : 'text-[#007233]'}`}>
+                            {item.transferPurposeName}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </>
         )}
       </div>
 
-      {showUploadConfirmModal ? (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-[16px]" onClick={() => setShowUploadConfirmModal(false)}>
-          <div className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[16px] font-semibold text-black text-center mb-4">Upload file for this entry?</p>
+      {showUploadConfirmModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-[16px]"
+          onClick={() => setShowUploadConfirmModal(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[16px] font-semibold text-black text-center mb-4">
+              Upload file for this entry?
+            </p>
             <div className="flex gap-[12px]">
-              <button type="button" onClick={() => setShowUploadConfirmModal(false)} className="flex-1 py-[10px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.2)] rounded-[8px]">Cancel</button>
-              <button type="button" onClick={handleUploadConfirm} className="flex-1 py-[10px] text-[14px] font-semibold text-white bg-[#BF9853] rounded-[8px]">Upload</button>
+              <button
+                type="button"
+                onClick={() => setShowUploadConfirmModal(false)}
+                className="flex-1 py-[10px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.2)] rounded-[8px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadConfirm}
+                className="flex-1 py-[10px] text-[14px] font-semibold text-white bg-[#BF9853] rounded-[8px]"
+              >
+                Upload
+              </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       <DeleteConfirmModal isOpen={showDeleteConfirmModal} onCancel={cancelDelete} onConfirm={confirmDelete} />
 
-      {uploadStatus === 'uploading' ? (
-        <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-[16px]">
+      {uploadStatus === 'uploading' && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-[16px]"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
           <div className="bg-white rounded-[12px] p-[24px] flex flex-col items-center gap-[16px] min-w-[200px]">
             <div className="w-10 h-10 border-2 border-[#BF9853] border-t-transparent rounded-full animate-spin" />
             <p className="text-[14px] font-medium text-black">Uploading and updating...</p>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {uploadStatus === 'completed' ? (
-        <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-[16px] pointer-events-none">
+      {uploadStatus === 'completed' && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-[16px] pointer-events-none"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
           <div className="bg-white rounded-[12px] px-[24px] py-[16px] flex items-center gap-[12px] shadow-lg">
+            <div className="w-8 h-8 rounded-full bg-[#2E7D32] flex items-center justify-center flex-shrink-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
             <p className="text-[14px] font-semibold text-black">Upload file completed</p>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {showTypeModal ? (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]" onClick={() => { setShowTypeModal(false); setTypeSearchQuery(''); }}>
-          <div className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+      {showTypeModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-[16px]"
+          onClick={() => {
+            setShowTypeModal(false);
+            setTypeSearchQuery('');
+          }}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[360px] mx-auto rounded-t-[20px] -translate-y-[22px] rounded-b-[20px] shadow-lg flex flex-col transform max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center px-[24px] pt-[20px]">
               <p className="text-[16px] font-semibold text-black">Select Type</p>
-              <button type="button" onClick={() => { setShowTypeModal(false); setTypeSearchQuery(''); }}>
-                <img src={CloseIcon} alt="Close" className="w-[11px] h-[11px]" />
+              <button
+                onClick={() => {
+                  setShowTypeModal(false);
+                  setTypeSearchQuery('');
+                }}
+                className="text-red-500 text-[20px] font-semibold hover:opacity-80 transition-opacity"
+              >
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L10 10M10 1L1 10" stroke="#e4572e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
             </div>
             <div className="px-[24px] pt-[4px] pb-[6px]">
-              <input
-                type="text"
-                value={typeSearchQuery}
-                onChange={(e) => setTypeSearchQuery(e.target.value)}
-                placeholder="Search"
-                className="w-full h-[32px] pl-[12px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium"
-                autoFocus
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={typeSearchQuery}
+                  onChange={(e) => setTypeSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="w-full h-[32px] pl-[40px] pr-[16px] border border-[rgba(0,0,0,0.16)] rounded-[8px] text-[12px] font-medium text-black placeholder:text-[#9E9E9E] bg-white focus:outline-none"
+                  autoFocus
+                />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#747474" strokeWidth="1.5" />
+                    <path d="M9.5 9.5L12 12" stroke="#747474" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh]">
-              {TYPE_FILTER_OPTIONS.filter((type) => type.toLowerCase().includes(typeSearchQuery.toLowerCase())).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => {
-                    setTypeFilter(type);
-                    setShowTypeModal(false);
-                    setTypeSearchQuery('');
-                  }}
-                  className={`w-full px-[16px] flex items-center transition-colors ${typeFilter === type ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'}`}
-                  style={{ minHeight: '44px' }}
-                >
-                  <p className="text-[12px] font-medium text-black text-left">{type}</p>
-                </button>
-              ))}
+            <div
+              className="flex-1 overflow-y-auto mb-[8px] px-[24px] min-h-[65vh] [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <div className="shadow-md rounded-lg overflow-hidden">
+                {TYPE_FILTER_OPTIONS.filter((type) =>
+                  type.toLowerCase().includes(typeSearchQuery.toLowerCase())
+                ).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter(type);
+                      setShowTypeModal(false);
+                      setTypeSearchQuery('');
+                    }}
+                    className={`w-full px-[16px] flex items-center gap-3 transition-colors ${
+                      typeFilter === type ? 'bg-[#FFF9E6]' : 'hover:bg-[#F5F5F5]'
+                    }`}
+                    style={{ minHeight: '44px', maxHeight: '44px', height: '44px' }}
+                  >
+                    <p className="text-[12px] font-medium text-black text-left">{type}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {showFilterModal ? (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40" onClick={() => setShowFilterModal(false)}>
-          <div className="bg-white rounded-t-2xl w-full p-[16px] h-[280px] relative" onClick={(e) => e.stopPropagation()}>
+      {showFilterModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40"
+          onClick={() => setShowFilterModal(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full p-[16px] h-[220px] relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-2">
               <p className="text-[16px] font-semibold text-black">Select Filters</p>
-              <button type="button" onClick={() => setShowFilterModal(false)} className="w-6 h-6 flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M15 5L5 15M5 5L15 15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" /></svg>
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(false)}
+                className="w-6 h-6 flex items-center justify-center"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15 5L5 15M5 5L15 15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
             </div>
             <div className="grid grid-cols-[2fr_1fr] gap-[16px] mb-3">
-              <div>
-                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Date</p>
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium bg-white"
-                />
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Entry. No</p>
-                <div onClick={() => setShowEntryNoModal(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium bg-white flex items-center cursor-pointer" style={{ color: entryNoFilter ? '#000' : '#9E9E9E' }}>
-                  {entryNoFilter || 'Select'}
-                </div>
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Employee</p>
-                <div onClick={() => setShowPersonModal(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium bg-white flex items-center cursor-pointer" style={{ color: personFilter ? '#000' : '#9E9E9E' }}>
-                  {personFilter || 'Select'}
-                </div>
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Mode</p>
-                <div onClick={() => setShowPaymentModeModal(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium bg-white flex items-center cursor-pointer" style={{ color: paymentModeFilter ? '#000' : '#9E9E9E' }}>
-                  {paymentModeFilter || 'Select'}
-                </div>
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Purpose</p>
-                <div onClick={() => setShowPurposeModal(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium bg-white flex items-center cursor-pointer" style={{ color: purposeFilter ? '#000' : '#9E9E9E' }}>
-                  {purposeFilter || 'Select'}
-                </div>
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Transfer To</p>
-                <div onClick={() => setShowTransferToModal(true)} className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] text-[12px] font-medium bg-white flex items-center cursor-pointer" style={{ color: transferToFilter ? '#000' : '#9E9E9E' }}>
-                  {transferToFilter || 'Select'}
-                </div>
-              </div>
+              {renderFilterPicker('Employee', personFilter, () => setShowPersonModal(true), () => setPersonFilter(''))}
+              {renderFilterPicker('Entry. No', entryNoFilter, () => setShowEntryNoModal(true), () => setEntryNoFilter(''))}
+              {renderFilterPicker('Purpose', purposeFilter, () => setShowPurposeModal(true), () => setPurposeFilter(''))}
+              {renderFilterPicker('Mode', paymentModeFilter, () => setShowPaymentModeModal(true), () => setPaymentModeFilter(''))}
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       <SelectVendorModal isOpen={showPersonModal} onClose={() => setShowPersonModal(false)} onSelect={(value) => { setPersonFilter(value); setShowPersonModal(false); }} selectedValue={personFilter} options={personFilterOptions} fieldName="Employee" showStarIcon={false} zIndex={10000} />
       <SelectVendorModal isOpen={showEntryNoModal} onClose={() => setShowEntryNoModal(false)} onSelect={(value) => { setEntryNoFilter(value); setShowEntryNoModal(false); }} selectedValue={entryNoFilter} options={[...new Set(transformed.map((item) => String(item.entry.entry_no || '')))].filter(Boolean).sort((a, b) => Number(b) - Number(a))} fieldName="Entry. No" showStarIcon={false} zIndex={10000} />
       <SelectVendorModal isOpen={showPurposeModal} onClose={() => setShowPurposeModal(false)} onSelect={(value) => { setPurposeFilter(value); setShowPurposeModal(false); }} selectedValue={purposeFilter} options={purposeFilterOptions} fieldName="Purpose" showStarIcon={false} zIndex={10000} />
-      <SelectVendorModal isOpen={showTransferToModal} onClose={() => setShowTransferToModal(false)} onSelect={(value) => { setTransferToFilter(value); setShowTransferToModal(false); }} selectedValue={transferToFilter} options={transferToFilterOptions} fieldName="Transfer To" showStarIcon={false} zIndex={10000} />
       <SelectVendorModal isOpen={showPaymentModeModal} onClose={() => setShowPaymentModeModal(false)} onSelect={(value) => { setPaymentModeFilter(value); setShowPaymentModeModal(false); }} selectedValue={paymentModeFilter} options={paymentModeFilterOptions} fieldName="Mode" showStarIcon={false} zIndex={10000} />
 
-      {showDescriptionModal ? (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-[16px]" onClick={() => setShowDescriptionModal(false)}>
-          <div className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] relative" onClick={(e) => e.stopPropagation()}>
+      {showDescriptionModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-[16px]"
+          onClick={() => setShowDescriptionModal(false)}
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
+          <div
+            className="bg-white w-full max-w-[320px] rounded-[12px] p-[20px] relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-center mb-4">
               <img src={Pen} alt="Pen" className="w-[74px] h-[74px]" />
             </div>
             <h3 className="text-[18px] font-bold text-gray-500 text-center mb-4">Description!</h3>
-            <p className="text-[11px] font-medium text-black text-center mb-6 leading-relaxed">{selectedDescription}</p>
+            <p className="text-[11px] font-medium text-black text-center mb-6 leading-relaxed">
+              {selectedDescription}
+            </p>
             <div className="flex justify-center">
-              <button type="button" onClick={() => setShowDescriptionModal(false)} className="px-[32px] py-[8px] bg-black text-white text-[14px] font-semibold rounded-[8px]">Okay</button>
+              <button
+                type="button"
+                onClick={() => setShowDescriptionModal(false)}
+                className="px-[32px] py-[8px] bg-black text-white text-[14px] font-semibold rounded-[8px] hover:opacity-90 transition-opacity"
+              >
+                Okay
+              </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 };

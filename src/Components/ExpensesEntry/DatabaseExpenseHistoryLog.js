@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
-import Reload from '../Images/Clear.svg';
-import Search from '../Images/Searchnew.svg';
+import {
+    EdbcTableToolbarRightActions,
+    EDBC_TABLE_EDGE_TABLE_CLASS,
+    EDBC_IDS,
+    EdbcColumnHeader,
+    EdbcTableHeaderRow,
+    EdbcTableBodyRow,
+    getEdbcColumnConfig,
+    useEdbcExpandedCells,
+} from './databaseExpensesSharedColumns';
 
 const GET_FORM_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form/get_form';
 /** Bulk audit log — single response (see ExpensesController GET /expenses_form/get/full_history). */
 const FULL_HISTORY_URL = 'https://backendaab.in/demoAabuilderDash/expenses_form/get/full_history';
 
 const formatLogTimestamp = (dateString) => {
-    if (!dateString) return '—';
+    if (!dateString) return '';
     const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return String(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -23,13 +31,19 @@ const formatLogTimestamp = (dateString) => {
 };
 
 const formatInr = (value) => {
-    if (value === null || value === undefined || value === '') return '—';
+    if (value === null || value === undefined || value === '') return '';
     const n = Number(value);
     if (Number.isNaN(n)) return String(value);
     return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const isEmptyValue = (value) => value === null || value === undefined || value === '';
+
+const formatDisplayValue = (value, mode = 'text') => {
+    if (isEmptyValue(value)) return '';
+    if (mode === 'amount') return formatInr(value);
+    return String(value).trim();
+};
 
 const valuesEqual = (oldVal, newVal, mode = 'text') => {
     if (isEmptyValue(oldVal) && isEmptyValue(newVal)) return true;
@@ -38,13 +52,14 @@ const valuesEqual = (oldVal, newVal, mode = 'text') => {
         const newNum = Number(newVal);
         if (!Number.isNaN(oldNum) && !Number.isNaN(newNum)) return oldNum === newNum;
     }
-    const o = isEmptyValue(oldVal) ? '—' : String(oldVal).trim();
-    const n = isEmptyValue(newVal) ? '—' : String(newVal).trim();
+    const o = isEmptyValue(oldVal) ? '' : String(oldVal).trim();
+    const n = isEmptyValue(newVal) ? '' : String(newVal).trim();
     return o === n;
 };
 
 const renderSiteChangeCell = (value) => {
-    const text = value == null || value === '' ? '—' : String(value);
+    const text = value == null || value === '' ? '' : String(value);
+    if (!text) return null;
     const arrow = ' → ';
     if (text.includes(arrow)) {
         const arrowIdx = text.indexOf(arrow);
@@ -71,19 +86,56 @@ const renderSiteChangeCell = (value) => {
 };
 
 const formatPair = (oldVal, newVal, mode = 'text') => {
+    const oldDisplay = formatDisplayValue(oldVal, mode);
+    const newDisplay = formatDisplayValue(newVal, mode);
     if (valuesEqual(oldVal, newVal, mode)) {
-        if (mode === 'amount') {
-            if (isEmptyValue(oldVal) && isEmptyValue(newVal)) return '—';
-            return formatInr(newVal ?? oldVal);
-        }
-        return isEmptyValue(newVal) ? '—' : String(newVal);
+        return newDisplay || oldDisplay || '';
     }
-    if (mode === 'amount') {
-        return `${formatInr(oldVal)} → ${formatInr(newVal)}`;
+    if (!oldDisplay && !newDisplay) return '';
+    if (!oldDisplay) return newDisplay;
+    if (!newDisplay) return oldDisplay;
+    return `${oldDisplay} → ${newDisplay}`;
+};
+
+const getNameById = (id, options) => {
+    if (id === null || id === undefined || id === '' || String(id) === '0') return '';
+    const found = options.find((opt) => String(opt.id) === String(id));
+    return found ? found.label : '';
+};
+
+const formatNamePairFromIds = (oldId, newId, options, oldNameFallback = '', newNameFallback = '') => {
+    const oldName = getNameById(oldId, options) || (isEmptyValue(oldNameFallback) ? '' : String(oldNameFallback));
+    const newName = getNameById(newId, options) || (isEmptyValue(newNameFallback) ? '' : String(newNameFallback));
+    return formatPair(oldName, newName, 'text');
+};
+
+const pickUtilityTypeNumber = (audit, side) => {
+    if (side === 'old') {
+        return (
+            pick(audit, 'oldUtilityTypeNumber', 'old_utility_type_number') ??
+            pick(audit, 'oldUtilityTypeNo', 'old_utility_type_no')
+        );
     }
-    const o = isEmptyValue(oldVal) ? '—' : String(oldVal);
-    const n = isEmptyValue(newVal) ? '—' : String(newVal);
-    return `${o} → ${n}`;
+    return (
+        pick(audit, 'newUtilityTypeNumber', 'new_utility_type_number') ??
+        pick(audit, 'newUtilityTypeNo', 'new_utility_type_no')
+    );
+};
+
+const fetchLookupOptions = async (url, mapItem) => {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data) ? data.map(mapItem) : [];
+    } catch (error) {
+        console.error(`Lookup fetch failed (${url})`, error);
+        return [];
+    }
 };
 
 const resolveActiveBranchId = () => {
@@ -98,31 +150,87 @@ const resolveActiveBranchId = () => {
     }
 };
 
+const fmtAuditDate = (raw) => {
+    if (raw == null || raw === '') return '';
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('en-GB');
+};
+
 /** Normalize audit row from entity JSON (camelCase or snake_case). */
 const pick = (row, camel, snake) => row[camel] ?? row[snake];
 
-const mapAuditToDisplayRow = (audit, idx, enoByExpenseId) => {
+const resolveStaffDisplay = (audit, side, employeeOptions, labourOptions) => {
+    const isOld = side === 'old';
+    const labourId = pick(
+        audit,
+        isOld ? 'oldLabourId' : 'newLabourId',
+        isOld ? 'old_labour_id' : 'new_labour_id'
+    );
+    const employeeId = pick(
+        audit,
+        isOld ? 'oldEmployeeId' : 'newEmployeeId',
+        isOld ? 'old_employee_id' : 'new_employee_id'
+    );
+    const labourFallback = pick(audit, isOld ? 'oldLabour' : 'newLabour', isOld ? 'old_labour' : 'new_labour');
+    const employeeFallback = pick(audit, isOld ? 'oldEmployee' : 'newEmployee', isOld ? 'old_employee' : 'new_employee');
+    return (
+        getNameById(labourId, labourOptions) ||
+        getNameById(employeeId, employeeOptions) ||
+        (isEmptyValue(labourFallback) ? '' : String(labourFallback)) ||
+        (isEmptyValue(employeeFallback) ? '' : String(employeeFallback))
+    );
+};
+
+const AuditChangeEdbcHeader = ({ columnId, label, headerId = columnId }) => {
+    const config = getEdbcColumnConfig(columnId);
+    if (!config) return null;
+    const headerClass = config.headerClass
+        .replace(/\bcursor-pointer\b/g, '')
+        .replace(/\bhover:bg-gray-200\b/g, '')
+        .replace(/\bselect-none\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const alignClass = headerClass.includes('text-right')
+        ? 'items-end'
+        : headerClass.includes('text-center')
+            ? 'items-center'
+            : 'items-start';
+    return (
+        <th id={headerId} className={headerClass}>
+            <div className={`flex flex-col leading-[1.15] py-[2px] ${alignClass}`}>
+                <span>{label}</span>
+                <span className="text-[12px] font-semibold">(old → new)</span>
+            </div>
+        </th>
+    );
+};
+
+const HISTORY_COLUMN_COUNT = 22;
+
+const mapAuditToDisplayRow = (audit, idx, enoByExpenseId, lookups = {}) => {
+    const {
+        vendorOptions = [],
+        contractorOptions = [],
+        employeeOptions = [],
+        labourOptions = [],
+        branchOptions = [],
+    } = lookups;
     const expenseId = pick(audit, 'expenseId', 'expense_id');
     const auditRowId = audit.id;
     const editedDate = pick(audit, 'editedDate', 'edited_date');
-    const editedBy = pick(audit, 'editedBy', 'edited_by') ?? '—';
+    const editedBy = pick(audit, 'editedBy', 'edited_by') ?? '';
     const eidStr = expenseId != null ? String(expenseId) : '';
-    const eno = eidStr && enoByExpenseId.has(eidStr) ? enoByExpenseId.get(eidStr) : '—';
+    const eno = eidStr && enoByExpenseId.has(eidStr) ? enoByExpenseId.get(eidStr) : '';
 
     const oldDateRaw = pick(audit, 'oldDate', 'old_date');
     const newDateRaw = pick(audit, 'newDate', 'new_date');
-    const fmtEntryDate = (raw) => {
-        if (raw == null || raw === '') return '';
-        const d = new Date(raw);
-        return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleDateString('en-GB');
-    };
 
     const oc = pick(audit, 'oldComments', 'old_comments');
     const nc = pick(audit, 'newComments', 'new_comments');
     const commentsSnippet = (() => {
         const ocs = oc != null ? String(oc) : '';
         const ncs = nc != null ? String(nc) : '';
-        if (!ocs && !ncs) return '—';
+        if (!ocs && !ncs) return '';
         const trimSnippet = (s) => `${s.slice(0, 40)}${s.length > 40 ? '…' : ''}`;
         if (ocs === ncs) return trimSnippet(ncs);
         return `${trimSnippet(ocs)} → ${trimSnippet(ncs)}`;
@@ -130,25 +238,74 @@ const mapAuditToDisplayRow = (audit, idx, enoByExpenseId) => {
 
     return {
         key: auditRowId != null ? `audit-${auditRowId}` : `audit-${eidStr}-${idx}-${editedDate || ''}-${editedBy}`,
-        expenseId: expenseId ?? '—',
+        expenseId: expenseId ?? '',
         eno,
         editedDate,
         editedBy,
-        accountType:
-            pick(audit, 'newAccountType', 'new_account_type') ??
-            pick(audit, 'oldAccountType', 'old_account_type') ??
-            '—',
-        amountChange: formatPair(pick(audit, 'oldAmount', 'old_amount'), pick(audit, 'newAmount', 'new_amount'), 'amount'),
+        dateChange: formatPair(fmtAuditDate(oldDateRaw), fmtAuditDate(newDateRaw), 'text'),
         siteChange: formatPair(pick(audit, 'oldSiteName', 'old_site_name'), pick(audit, 'newSiteName', 'new_site_name'), 'text'),
-        dateChange: formatPair(fmtEntryDate(oldDateRaw), fmtEntryDate(newDateRaw), 'text'),
-        categoryChange: formatPair(pick(audit, 'oldCategory', 'old_category'), pick(audit, 'newCategory', 'new_category'), 'text'),
-        vendorChange: formatPair(pick(audit, 'oldVendor', 'old_vendor'), pick(audit, 'newVendor', 'new_vendor'), 'text'),
-        contractorChange: formatPair(
+        vendorChange: formatNamePairFromIds(
+            pick(audit, 'oldVendorId', 'old_vendor_id'),
+            pick(audit, 'newVendorId', 'new_vendor_id'),
+            vendorOptions,
+            pick(audit, 'oldVendor', 'old_vendor'),
+            pick(audit, 'newVendor', 'new_vendor')
+        ),
+        contractorChange: formatNamePairFromIds(
+            pick(audit, 'oldContractorId', 'old_contractor_id'),
+            pick(audit, 'newContractorId', 'new_contractor_id'),
+            contractorOptions,
             pick(audit, 'oldContractor', 'old_contractor'),
-            pick(audit, 'newContractor', 'new_contractor'),
+            pick(audit, 'newContractor', 'new_contractor')
+        ),
+        staffChange: formatPair(
+            resolveStaffDisplay(audit, 'old', employeeOptions, labourOptions),
+            resolveStaffDisplay(audit, 'new', employeeOptions, labourOptions),
             'text'
         ),
+        quantityChange: formatPair(pick(audit, 'oldQuantity', 'old_quantity'), pick(audit, 'newQuantity', 'new_quantity'), 'text'),
+        amountChange: formatPair(pick(audit, 'oldAmount', 'old_amount'), pick(audit, 'newAmount', 'new_amount'), 'amount'),
         commentsSnippet,
+        categoryChange: formatPair(pick(audit, 'oldCategory', 'old_category'), pick(audit, 'newCategory', 'new_category'), 'text'),
+        machineToolsChange: formatPair(
+            pick(audit, 'oldMachineTools', 'old_machine_tools'),
+            pick(audit, 'newMachineTools', 'new_machine_tools'),
+            'text'
+        ),
+        accountTypeChange: formatPair(
+            pick(audit, 'oldAccountType', 'old_account_type'),
+            pick(audit, 'newAccountType', 'new_account_type'),
+            'text'
+        ),
+        utilityTypeChange: formatPair(
+            pick(audit, 'oldUtilityType', 'old_utility_type'),
+            pick(audit, 'newUtilityType', 'new_utility_type'),
+            'text'
+        ),
+        serviceNumberChange: formatPair(pickUtilityTypeNumber(audit, 'old'), pickUtilityTypeNumber(audit, 'new'), 'text'),
+        paymentModeChange: formatPair(
+            pick(audit, 'oldPaymentMode', 'old_payment_mode'),
+            pick(audit, 'newPaymentMode', 'new_payment_mode'),
+            'text'
+        ),
+        sourceChange: formatPair(pick(audit, 'oldSource', 'old_source'), pick(audit, 'newSource', 'new_source'), 'text'),
+        branchChange: formatNamePairFromIds(
+            pick(audit, 'oldBranchId', 'old_branch_id'),
+            pick(audit, 'newBranchId', 'new_branch_id'),
+            branchOptions,
+            pick(audit, 'oldBranchName', 'old_branch_name'),
+            pick(audit, 'newBranchName', 'new_branch_name')
+        ),
+        enteredByChange: formatPair(
+            pick(audit, 'oldEnteredBy', 'old_entered_by'),
+            pick(audit, 'newEnteredBy', 'new_entered_by'),
+            'text'
+        ),
+        billArrivalChange: formatPair(
+            fmtAuditDate(pick(audit, 'oldBillArrivalDate', 'old_bill_arrival_date')),
+            fmtAuditDate(pick(audit, 'newBillArrivalDate', 'new_bill_arrival_date')),
+            'text'
+        ),
     };
 };
 
@@ -160,18 +317,14 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [logRows, setLogRows] = useState([]);
-    const [search, setSearch] = useState('');
+    const [overallSearch, setOverallSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
-    const [expandedCells, setExpandedCells] = useState({});
+    const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
     const scrollRef = useRef(null);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
-
-    const toggleExpandedCell = (key) => {
-        setExpandedCells((prev) => ({ ...prev, [key]: !prev[key] }));
-    };
 
     useEffect(() => {
         const syncBranch = () => setActiveBranchId(resolveActiveBranchId());
@@ -186,9 +339,37 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
         setLogRows([]);
         try {
             const formParams = activeBranchId ? { branchId: activeBranchId } : {};
-            const [historyRes, formRes] = await Promise.all([
+            const [
+                historyRes,
+                formRes,
+                vendorOptions,
+                contractorOptions,
+                employeeOptions,
+                labourOptions,
+                branchOptions,
+            ] = await Promise.all([
                 axios.get(FULL_HISTORY_URL),
                 axios.get(GET_FORM_URL, { params: formParams }),
+                fetchLookupOptions('https://backendaab.in/demoAabuilderDash/api/vendor_Names/getAll', (item) => ({
+                    id: item.id,
+                    label: item.vendorName,
+                })),
+                fetchLookupOptions('https://backendaab.in/demoAabuilderDash/api/contractor_Names/getAll', (item) => ({
+                    id: item.id,
+                    label: item.contractorName,
+                })),
+                fetchLookupOptions('https://backendaab.in/demoAabuildersDash/api/employee_details/getAll', (item) => ({
+                    id: item.id,
+                    label: item.employee_name,
+                })),
+                fetchLookupOptions('https://backendaab.in/demoAabuildersDash/api/labours-details/getAll', (item) => ({
+                    id: item.id,
+                    label: item.labour_name,
+                })),
+                fetchLookupOptions('https://backendaab.in/demoAabuildersDash/api/branch/getAll', (item) => ({
+                    id: item.id,
+                    label: item.branch,
+                })),
             ]);
 
             const allAudits = Array.isArray(historyRes.data) ? historyRes.data : [];
@@ -200,7 +381,7 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                 if (!e || e.id == null) return;
                 const idStr = String(e.id);
                 allowedExpenseIds.add(idStr);
-                const eno = e.eno ?? e.eNo ?? e.ENo ?? '—';
+                const eno = e.eno ?? e.eNo ?? e.ENo ?? '';
                 enoByExpenseId.set(idStr, eno);
             });
 
@@ -211,7 +392,15 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                 return allowedExpenseIds.has(String(eid));
             });
 
-            const flat = scopedAudits.map((audit, idx) => mapAuditToDisplayRow(audit, idx, enoByExpenseId));
+            const flat = scopedAudits.map((audit, idx) =>
+                mapAuditToDisplayRow(audit, idx, enoByExpenseId, {
+                    vendorOptions,
+                    contractorOptions,
+                    employeeOptions,
+                    labourOptions,
+                branchOptions,
+                })
+            );
             flat.sort((a, b) => {
                 const ta = a.editedDate ? new Date(a.editedDate).getTime() : 0;
                 const tb = b.editedDate ? new Date(b.editedDate).getTime() : 0;
@@ -226,32 +415,49 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
         }
     }, [activeBranchId]);
 
+    const clearFilters = useCallback(() => {
+        setOverallSearch('');
+        setCurrentPage(1);
+        void loadHistory();
+    }, [loadHistory]);
+
     useEffect(() => {
         if (!isActive) return;
         void loadHistory();
     }, [isActive, activeBranchId, loadHistory]);
 
     const filteredRows = useMemo(() => {
-        const q = search.trim().toLowerCase();
+        const q = overallSearch.trim().toLowerCase();
         if (!q) return logRows;
         return logRows.filter((row) => {
             const blob = [
                 row.editedBy,
                 String(row.eno),
-                row.accountType,
+                row.dateChange,
                 row.siteChange,
-                row.amountChange,
-                row.categoryChange,
                 row.vendorChange,
                 row.contractorChange,
+                row.staffChange,
+                row.quantityChange,
+                row.amountChange,
                 row.commentsSnippet,
+                row.categoryChange,
+                row.machineToolsChange,
+                row.accountTypeChange,
+                row.utilityTypeChange,
+                row.serviceNumberChange,
+                row.paymentModeChange,
+                row.sourceChange,
+                row.branchChange,
+                row.enteredByChange,
+                row.billArrivalChange,
                 String(row.expenseId),
             ]
                 .join(' ')
                 .toLowerCase();
             return blob.includes(q);
         });
-    }, [logRows, search]);
+    }, [logRows, overallSearch]);
 
     const totalPages = Math.max(1, Math.ceil(filteredRows.length / itemsPerPage));
     const page = Math.min(currentPage, totalPages);
@@ -260,7 +466,7 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, itemsPerPage, logRows.length]);
+    }, [overallSearch, itemsPerPage, logRows.length]);
 
     const handleMouseDown = (e) => {
         if (!scrollRef.current) return;
@@ -289,39 +495,50 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
 
     const endIndex = Math.min(startIdx + itemsPerPage, filteredRows.length);
 
+    const renderAuditCell = (rowId, field, value, elementId, textAlignClass = '', styleColumnId = elementId) => {
+        const config = getEdbcColumnConfig(styleColumnId);
+        const display = value == null ? '' : String(value);
+        const cellKey = `${rowId}-${field}`;
+        return (
+            <td id={elementId} className={`${config?.tdClass || ''} ${textAlignClass}`.trim()}>
+                <span
+                    onClick={() => toggleExpandedCell(cellKey)}
+                    className={`block w-full cursor-pointer ${expandedCells[cellKey] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'} ${textAlignClass}`}
+                    title={display}
+                >
+                    {display}
+                </span>
+            </td>
+        );
+    };
+
+    const editedByHeaderClass = (getEdbcColumnConfig(EDBC_IDS.EDBC16)?.headerClass || '')
+        .replace(/\bcursor-pointer\b/g, '')
+        .replace(/\bhover:bg-gray-200\b/g, '')
+        .replace(/\bselect-none\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const expenseIdHeaderClass = (getEdbcColumnConfig(EDBC_IDS.EDBC17)?.headerClass || '')
+        .replace(/\bcursor-pointer\b/g, '')
+        .replace(/\bhover:bg-gray-200\b/g, '')
+        .replace(/\bselect-none\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
     return (
         <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED]">
             <div className="px-[18px] pt-[18px] pb-[18px] flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
                 <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
-                    <div className="flex flex-row justify-between items-center mb-[12px] gap-[6px]">
-                        <h1 className="text-[18px] font-bold text-left text-[#202020]">Database history log</h1>
-                        <div className="flex items-end gap-[6px]">
-                            {loading && (
-                                <span className="text-sm text-gray-600 pb-1">Loading…</span>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => void loadHistory()}
-                                disabled={loading}
-                                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center disabled:opacity-50"
-                            >
-                                <img className="w-full h-full" src={Reload} alt="Reload" />
-                            </button>
-                            <div className="w-[286px] min-w-[286px] translate-y-[2px] shrink-0 h-[34px] border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1">
-                                <input
-                                    type="text"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search Transactions..."
-                                    className="h-full w-full border-0 p-0 text-[14px] text-[#000000] bg-transparent outline-none"
-                                />
-                                <img src={Search} alt="Search" className="w-[16px] h-[16px] pointer-events-none" />
-                            </div>
-                        </div>
+                    <div className="text-left flex flex-row justify-between items-center mb-[12px] gap-[6px]">
+                        <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden" />
+                        <EdbcTableToolbarRightActions
+                            onClearFilters={clearFilters}
+                            overallSearch={overallSearch}
+                            onOverallSearchChange={setOverallSearch}
+                            clearButtonType="button"
+                        />
                     </div>
-
                     {error && <div className="mb-3 text-sm text-red-600 text-left">{error}</div>}
-
                     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div
                             ref={scrollRef}
@@ -331,32 +548,38 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                         >
-                            <table className="table-fixed w-full min-w-[1920px] border-collapse">
+                            <table className={`table-fixed w-full border-collapse ${EDBC_TABLE_EDGE_TABLE_CLASS} min-w-[1920px]`}>
                                 <thead className="sticky top-0 z-10 bg-white">
-                                    <tr className="bg-[#FAF6ED] h-[40px] text-[16px] font-bold text-center">
-                                        <th className="pl-[12px] w-[50px] font-bold text-left">#</th>
-                                        <th className="pl-[1px] pr-[1px] w-[168px] font-bold text-left">Edited (log time)</th>
-                                        <th className="pl-[1px] pr-[1px] w-[120px] font-bold text-left">Edited by</th>
-                                        <th className="pl-[1px] pr-[1px] w-[80px] font-bold text-right">E.No</th>
-                                        <th className="pl-[1px] pr-[12px] w-[120px] font-bold text-right">Expense id</th>
-                                        <th className="pl-[4px] pr-[1px] w-[298px] font-bold text-left">Site (old → new)</th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">A/C type</th>
-                                        <th className="pl-[1px] pr-[12px] w-[158px] font-bold text-right">Amount (old → new)</th>
-                                        <th className="pl-[4px] pr-[1px] w-[170px] font-bold text-left">Entry date (old → new)</th>
-                                        <th className="pl-[1px] pr-[1px] w-[158px] font-bold text-left">Category (old → new)</th>
-                                        <th className="pl-[9px] pr-[12px] w-[248px] font-bold text-left">Comments (trimmed)</th>
-                                    </tr>
+                                    <EdbcTableHeaderRow>
+                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Edited Time" />
+                                        <th id="audit-expense-id" className={expenseIdHeaderClass}>Expense id</th>
+                                        <th id="audit-edited-by" className={editedByHeaderClass}>Edited by</th>
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC4} label="Vendor Name" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC5} label="Contractor Name" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC6} label="Staff Name" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC7} label="Quantity" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC9} label="Description" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC10} label="Category" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC12} label="A/C Type" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC10} headerId="audit-utility-type" label="Utility Type" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC22} label="Service Number" />
+                                        <AuditChangeEdbcHeader columnId={EDBC_IDS.EDBC13} label="Mode" />
+                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC17} label="Entry No" />
+                                    </EdbcTableHeaderRow>
                                 </thead>
                                 <tbody>
                                     {loading && logRows.length === 0 ? (
                                         <tr>
-                                            <td colSpan={11} className="px-4 py-8 text-center text-[14px] text-gray-500">
+                                            <td colSpan={HISTORY_COLUMN_COUNT} className="px-4 py-8 text-center text-[14px] text-gray-500">
                                                 Loading expense audit log…
                                             </td>
                                         </tr>
                                     ) : filteredRows.length === 0 ? (
                                         <tr>
-                                            <td colSpan={11} className="px-4 py-8 text-center text-[14px] text-gray-500">
+                                            <td colSpan={HISTORY_COLUMN_COUNT} className="px-4 py-8 text-center text-[14px] text-gray-500">
                                                 {logRows.length === 0
                                                     ? 'No audit entries returned for current branch (edits may not be logged yet).'
                                                     : 'No rows match your search.'}
@@ -365,49 +588,29 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                                     ) : (
                                         pageRows.map((row, i) => {
                                             const rowId = row.key || `${startIdx + i}`;
-                                            const cell = (field, value, className = 'text-left') => (
-                                                <span
-                                                    onClick={() => toggleExpandedCell(`${rowId}-${field}`)}
-                                                    className={`block w-full cursor-pointer ${expandedCells[`${rowId}-${field}`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'} ${className}`}
-                                                    title={value}
-                                                >
-                                                    {value}
-                                                </span>
-                                            );
+                                            const projectTdClass = getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass || '';
                                             return (
-                                                <tr key={row.key} className="odd:bg-white even:bg-[#FAF6ED] text-[14px] font-semibold min-h-[40px]">
-                                                    <td className="pl-[12px] w-[50px] text-left">{startIdx + i + 1}</td>
-                                                    <td className="pl-[1px] pr-[1px] w-[168px] text-left">
-                                                        {cell('editedDate', formatLogTimestamp(row.editedDate))}
-                                                    </td>
-                                                    <td className="pl-[1px] pr-[1px] w-[120px] text-left">
-                                                        {cell('editedBy', row.editedBy)}
-                                                    </td>
-                                                    <td className="pl-[1px] pr-[1px] w-[80px] text-right">
-                                                        {cell('eno', String(row.eno), 'text-right')}
-                                                    </td>
-                                                    <td className="pl-[1px] pr-[12px] w-[120px] text-right text-gray-600">
-                                                        {cell('expenseId', String(row.expenseId), 'text-right')}
-                                                    </td>
-                                                    <td className="pl-[4px] pr-[1px] w-[298px] text-left align-top py-1">
+                                                <EdbcTableBodyRow key={row.key}>
+                                                    {renderAuditCell(rowId, 'editedDate', formatLogTimestamp(row.editedDate), EDBC_IDS.EDBC1)}
+                                                    {renderAuditCell(rowId, 'expenseId', String(row.expenseId), 'audit-expense-id', 'text-right text-gray-600', EDBC_IDS.EDBC17)}
+                                                    {renderAuditCell(rowId, 'editedBy', row.editedBy, 'audit-edited-by', '', EDBC_IDS.EDBC16)}
+                                                    {renderAuditCell(rowId, 'dateChange', row.dateChange, EDBC_IDS.EDBC2)}
+                                                    <td id={EDBC_IDS.EDBC3} className={`${projectTdClass} align-top py-1`}>
                                                         {renderSiteChangeCell(row.siteChange)}
                                                     </td>
-                                                    <td className="pl-[1px] pr-[1px] w-[158px] text-left">
-                                                        {cell('accountType', row.accountType)}
-                                                    </td>
-                                                    <td className="pl-[1px] pr-[12px] w-[120px] text-right">
-                                                        {cell('amountChange', row.amountChange, 'text-right')}
-                                                    </td>
-                                                    <td className="pl-[4px] pr-[1px] w-[170px] text-left">
-                                                        {cell('dateChange', row.dateChange)}
-                                                    </td>
-                                                    <td className="pl-[1px] pr-[1px] w-[158px] text-left">
-                                                        {cell('categoryChange', row.categoryChange)}
-                                                    </td>
-                                                    <td className="pl-[9px] pr-[12px] w-[248px] text-left text-gray-700">
-                                                        {cell('commentsSnippet', row.commentsSnippet)}
-                                                    </td>
-                                                </tr>
+                                                    {renderAuditCell(rowId, 'vendorChange', row.vendorChange, EDBC_IDS.EDBC4)}
+                                                    {renderAuditCell(rowId, 'contractorChange', row.contractorChange, EDBC_IDS.EDBC5)}
+                                                    {renderAuditCell(rowId, 'staffChange', row.staffChange, EDBC_IDS.EDBC6)}
+                                                    {renderAuditCell(rowId, 'quantityChange', row.quantityChange, EDBC_IDS.EDBC7)}
+                                                    {renderAuditCell(rowId, 'amountChange', row.amountChange, EDBC_IDS.EDBC8, 'text-right')}
+                                                    {renderAuditCell(rowId, 'commentsSnippet', row.commentsSnippet, EDBC_IDS.EDBC9)}
+                                                    {renderAuditCell(rowId, 'categoryChange', row.categoryChange, EDBC_IDS.EDBC10)}
+                                                    {renderAuditCell(rowId, 'accountTypeChange', row.accountTypeChange, EDBC_IDS.EDBC12)}
+                                                    {renderAuditCell(rowId, 'utilityTypeChange', row.utilityTypeChange, 'audit-utility-type', '', EDBC_IDS.EDBC10)}
+                                                    {renderAuditCell(rowId, 'serviceNumberChange', row.serviceNumberChange, EDBC_IDS.EDBC22, 'text-right')}
+                                                    {renderAuditCell(rowId, 'paymentModeChange', row.paymentModeChange, EDBC_IDS.EDBC13)}
+                                                    {renderAuditCell(rowId, 'eno', String(row.eno), EDBC_IDS.EDBC17, 'text-right')}
+                                                </EdbcTableBodyRow>
                                             );
                                         })
                                     )}
@@ -426,11 +629,18 @@ const DatabaseExpenseHistoryLog = ({ username: _username, userRoles: _userRoles 
                                     }}
                                     className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#BF9853]"
                                 >
-                                    {[25, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((n) => (
-                                        <option key={n} value={n}>
-                                            {n}
-                                        </option>
-                                    ))}
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={200}>200</option>
+                                    <option value={300}>300</option>
+                                    <option value={400}>400</option>
+                                    <option value={500}>500</option>
+                                    <option value={600}>600</option>
+                                    <option value={700}>700</option>
+                                    <option value={800}>800</option>
+                                    <option value={900}>900</option>
+                                    <option value={1000}>1000</option>
                                 </select>
                             </div>
                             <div className="flex items-center space-x-2">

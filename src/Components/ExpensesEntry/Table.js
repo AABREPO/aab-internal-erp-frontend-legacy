@@ -283,6 +283,8 @@ export function buildTableViewExpenseTableContext({
     setSelectedAmount = noop,
     selectedDescription = '',
     setSelectedDescription = noop,
+    selectedServiceNumber = '',
+    setSelectedServiceNumber = noop,
     sortField,
     sortDirection,
     handleSort,
@@ -371,6 +373,8 @@ export function buildTableViewExpenseTableContext({
         setSelectedAmount,
         selectedDescription,
         setSelectedDescription,
+        selectedServiceNumber,
+        setSelectedServiceNumber,
         categoryOptions,
         selectedCategory,
         setSelectedCategory,
@@ -417,6 +421,7 @@ export function buildTableViewExpenseTableContext({
 export function Table({
     showActivityColumn = true,
     showTimestampColumn = true,
+    showServiceNumberColumn = false,
     tableClassName = '',
     activityColumnLabel,
     editOnlyActivityColumn = false,
@@ -465,6 +470,8 @@ export function Table({
         setSelectedAmount = noop,
         selectedDescription,
         setSelectedDescription,
+        selectedServiceNumber = '',
+        setSelectedServiceNumber = noop,
         categoryOptions,
         selectedCategory,
         setSelectedCategory,
@@ -524,6 +531,7 @@ export function Table({
     const dstCol10Label = fieldLabels.category ?? 'Category';
     const dstCol11Label = fieldLabels.machineTools ?? 'Machine Tools';
     const dstCol12Label = fieldLabels.accountType ?? 'A/C Type';
+    const dstCol23Label = fieldLabels.serviceNumber ?? 'Service Number';
     const dstCol13Label = fieldLabels.mode ?? 'Mode';
     const dstCol14Label = fieldLabels.sourceFrom ?? 'Source From';
     const dstCol15Label = fieldLabels.branch ?? 'Branch';
@@ -605,6 +613,13 @@ export function Table({
                         label={dstCol12Label}
                         {...edbcSortProps}
                     />
+                    {showServiceNumberColumn && (
+                        <EdbcColumnHeader
+                            columnId={EDBC_IDS.EDBC23}
+                            label={dstCol23Label}
+                            {...edbcSortProps}
+                        />
+                    )}
                     <EdbcColumnHeader
                         columnId={EDBC_IDS.EDBC13}
                         label={dstCol13Label}
@@ -782,6 +797,14 @@ export function Table({
                             onChange={setSelectedAccountType}
                             selectStyles={customStyles}
                         />
+                        {showServiceNumberColumn && (
+                            <EdbcTextInputFilter
+                                columnId={EDBC_IDS.EDBC23}
+                                placeholder={dstCol23Label}
+                                value={selectedServiceNumber}
+                                onChange={(e) => setSelectedServiceNumber(e.target.value)}
+                            />
+                        )}
                         {setSelectedPaymentModes !== noop ? (
                             <EdbcPaymentModeFilter
                                 columnId={EDBC_IDS.EDBC13}
@@ -965,6 +988,17 @@ export function Table({
                             onToggleExpanded={toggleExpandedCell}
                             getDisplayValue={(row) => row.accountType}
                         />
+                        {showServiceNumberColumn && (
+                            <EdbcExpandableBodyCell
+                                columnId={EDBC_IDS.EDBC23}
+                                expense={expense}
+                                rowIndex={index}
+                                expandedCells={expandedCells}
+                                onToggleExpanded={toggleExpandedCell}
+                                textAlignClass="text-right"
+                                getDisplayValue={(row) => row.utilityTypeNumber ?? row.utility_type_number ?? ''}
+                            />
+                        )}
                         <EdbcExpandableBodyCell
                             columnId={EDBC_IDS.EDBC13}
                             expense={expense}

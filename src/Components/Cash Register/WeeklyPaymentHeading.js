@@ -3,27 +3,42 @@ import { createPortal } from 'react-dom';
 import '../Heading.css';
 import WeeklyPayment from './WeeklyPayment';
 import History from './WeeklyPaymentHistory';
-import HandoverPaymentsPage from './WeeklyPaymentHandover';
 import DailyPayment from './DailyPayment';
 import WeeklyPaymentAddInput from './WeeklyPaymentAddInput';
 import DailyHistory from './DailyHistory';
 import PdfIcon from '../Images/pdf.png';
 import XL from '../Images/sheets.png';
 const WHeading = ({ username, userRoles = [] }) => {
-    const [activeTab, setActiveTab] = useState(
-        localStorage.getItem('activePaintTab') || 'claimpaymentsummary'
-    );
+    const [activeTab, setActiveTab] = useState(() => {
+        const savedTab = localStorage.getItem('activePaintTab');
+        const validTabs = ['weeklypayment', 'dailypayment', 'weeklyhistory', 'dailyhistory', 'weeklypaymentaddinput'];
+        return validTabs.includes(savedTab) ? savedTab : 'weeklypayment';
+    });
     const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]));
     const [showExportDropdown, setShowExportDropdown] = useState(false);
     const weeklyHistoryExportActionsRef = useRef(null);
+    const weeklyHistoryHandoverActionsRef = useRef(null);
+    const weeklyPaymentClosureActionsRef = useRef(null);
     const weeklyPaymentExportActionsRef = useRef(null);
     const dailyHistoryExportActionsRef = useRef(null);
     const dailyPaymentExportActionsRef = useRef(null);
     const exportDropdownRef = useRef(null);
     const exportMenuRef = useRef(null);
+    const tabsScrollRef = useRef(null);
+    const isTabsDragging = useRef(false);
+    const tabsDidDrag = useRef(false);
+    const tabsDragStart = useRef({ x: 0, scrollLeft: 0 });
     const [exportMenuPosition, setExportMenuPosition] = useState(null);
+    const [closureButtonDisabled, setClosureButtonDisabled] = useState(true);
     const handleExportActionsReady = useCallback((actions) => {
         weeklyHistoryExportActionsRef.current = actions;
+    }, []);
+    const handleHandoverActionsReady = useCallback((actions) => {
+        weeklyHistoryHandoverActionsRef.current = actions;
+    }, []);
+    const handleClosureActionsReady = useCallback((actions) => {
+        weeklyPaymentClosureActionsRef.current = actions;
+        setClosureButtonDisabled(actions ? Boolean(actions.isClosureDisabled) : true);
     }, []);
     const handleWeeklyPaymentExportActionsReady = useCallback((actions) => {
         weeklyPaymentExportActionsRef.current = actions;
@@ -87,31 +102,133 @@ const WHeading = ({ username, userRoles = [] }) => {
         }
     }, [activeTab]);
 
+    const handleTabsMouseDown = (e) => {
+        if (!tabsScrollRef.current) return;
+        if (e.target.closest('button, a, input, select, textarea')) return;
+        if (e.button !== 0) return;
+        isTabsDragging.current = true;
+        tabsDidDrag.current = false;
+        tabsDragStart.current = {
+            x: e.clientX,
+            scrollLeft: tabsScrollRef.current.scrollLeft,
+        };
+        tabsScrollRef.current.style.cursor = 'grabbing';
+        tabsScrollRef.current.style.userSelect = 'none';
+    };
+
+    const handleTabsMouseMove = (e) => {
+        if (!isTabsDragging.current || !tabsScrollRef.current) return;
+        const dx = e.clientX - tabsDragStart.current.x;
+        if (Math.abs(dx) > 5) {
+            tabsDidDrag.current = true;
+        }
+        tabsScrollRef.current.scrollLeft = tabsDragStart.current.scrollLeft - dx;
+    };
+
+    const handleTabsMouseUp = () => {
+        if (!tabsScrollRef.current) return;
+        isTabsDragging.current = false;
+        tabsScrollRef.current.style.cursor = '';
+        tabsScrollRef.current.style.userSelect = '';
+    };
+
+    const handleTabsTouchStart = (e) => {
+        if (!tabsScrollRef.current) return;
+        if (e.target.closest('button, a, input, select, textarea')) return;
+        isTabsDragging.current = true;
+        tabsDidDrag.current = false;
+        tabsDragStart.current = {
+            x: e.touches[0].clientX,
+            scrollLeft: tabsScrollRef.current.scrollLeft,
+        };
+        tabsScrollRef.current.style.userSelect = 'none';
+    };
+
+    const handleTabsTouchEnd = () => {
+        if (!tabsScrollRef.current) return;
+        isTabsDragging.current = false;
+        tabsScrollRef.current.style.userSelect = '';
+    };
+
+    const handleTabClick = (tab) => {
+        if (tabsDidDrag.current) {
+            tabsDidDrag.current = false;
+            return;
+        }
+        setActiveTab(tab);
+    };
+
+    useEffect(() => {
+        const el = tabsScrollRef.current;
+        if (!el) return;
+        const handleTabsTouchMove = (e) => {
+            if (!isTabsDragging.current || !tabsScrollRef.current) return;
+            const dx = e.touches[0].clientX - tabsDragStart.current.x;
+            if (Math.abs(dx) > 5) {
+                tabsDidDrag.current = true;
+            }
+            if (tabsDidDrag.current) {
+                e.preventDefault();
+                tabsScrollRef.current.scrollLeft = tabsDragStart.current.scrollLeft - dx;
+            }
+        };
+        el.addEventListener('touchmove', handleTabsTouchMove, { passive: false });
+        return () => el.removeEventListener('touchmove', handleTabsTouchMove);
+    }, []);
+
     return (
         <div className="bg-[#FAF6ED]">
-            <div className="topbar-title expense-entry-tabs w-full max-w-full flex items-center justify-between overflow-x-auto overflow-y-visible no-scrollbar">
-                <div className="flex items-center min-w-0 overflow-x-auto no-scrollbar">
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'weeklypayment' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypayment')}>
+            <div className="topbar-title expense-entry-tabs w-full max-w-full flex items-center overflow-hidden">
+                <div
+                    ref={tabsScrollRef}
+                    className="flex flex-1 min-w-0 items-center flex-nowrap overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab touch-pan-x"
+                    onMouseDown={handleTabsMouseDown}
+                    onMouseMove={handleTabsMouseMove}
+                    onMouseUp={handleTabsMouseUp}
+                    onMouseLeave={handleTabsMouseUp}
+                    onTouchStart={handleTabsTouchStart}
+                    onTouchEnd={handleTabsTouchEnd}
+                    onTouchCancel={handleTabsTouchEnd}
+                >
+                    <h2 className={`link whitespace-nowrap shrink-0 ${activeTab === 'weeklypayment' ? 'active' : ''}`} onClick={() => handleTabClick('weeklypayment')}>
                         Weekly Payment
                     </h2>
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'dailypayment' ? 'active' : ''}`} onClick={() => setActiveTab('dailypayment')}>
+                    <h2 className={`link whitespace-nowrap shrink-0 ${activeTab === 'dailypayment' ? 'active' : ''}`} onClick={() => handleTabClick('dailypayment')}>
                         Daily Payment
                     </h2>
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'weeklyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('weeklyhistory')}>
+                    <h2 className={`link whitespace-nowrap shrink-0 ${activeTab === 'weeklyhistory' ? 'active' : ''}`} onClick={() => handleTabClick('weeklyhistory')}>
                        Weekly History
                     </h2>
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'dailyhistory' ? 'active' : ''}`} onClick={() => setActiveTab('dailyhistory')}>
+                    <h2 className={`link whitespace-nowrap shrink-0 ${activeTab === 'dailyhistory' ? 'active' : ''}`} onClick={() => handleTabClick('dailyhistory')}>
                         Daily History
                     </h2>
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'handoverpaymentspage' ? 'active' : ''}`} onClick={() => setActiveTab('handoverpaymentspage')} >
-                        Handover
-                    </h2>
-                    <h2 className={`link whitespace-nowrap ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`} onClick={() => setActiveTab('weeklypaymentaddinput')} >
+                    <h2 className={`link whitespace-nowrap shrink-0 ${activeTab === 'weeklypaymentaddinput' ? 'active' : ''}`} onClick={() => handleTabClick('weeklypaymentaddinput')} >
                         Input Data
                     </h2>
                 </div>
                 {(activeTab === 'weeklyhistory' || activeTab === 'dailyhistory' || activeTab === 'weeklypayment' || activeTab === 'dailypayment') && (
-                    <div className="relative shrink-0 ml-3 mb-2 z-[500]" ref={exportDropdownRef}>
+                    <div className="flex items-center gap-2 shrink-0 ml-3 mb-2 z-[500]">
+                        {activeTab === 'weeklypayment' && (
+                            <button
+                                type="button"
+                                className="font-semibold text-sm cursor-pointer shrink-0 border border-[#BF9853] rounded-md px-3 py-1.5 bg-[#BF9853] text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                onClick={() => weeklyPaymentClosureActionsRef.current?.openClosure?.()}
+                                disabled={closureButtonDisabled}
+                                title={closureButtonDisabled ? "Select a branch first" : "Closure"}
+                            >
+                                Closure
+                            </button>
+                        )}
+                        {activeTab === 'weeklyhistory' && (
+                            <button
+                                type="button"
+                                className="font-semibold text-sm cursor-pointer shrink-0 border border-[#BF9853] rounded-md px-3 py-1.5 bg-[#BF9853] text-white"
+                                onClick={() => weeklyHistoryHandoverActionsRef.current?.openHandover?.()}
+                            >
+                                Handover
+                            </button>
+                        )}
+                    <div className="relative shrink-0" ref={exportDropdownRef}>
                         <button
                             type="button"
                             className="font-semibold text-sm cursor-pointer flex items-center gap-1 shrink-0 border border-[#D6D6D6] rounded-md px-3 py-1.5 bg-white"
@@ -149,7 +266,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                                 </button>
                                 <button
                                     type="button"
-                                    className="w-full font-semibold text-sm cursor-pointer flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50 text-[#007233]"
+                                    className="w-full font-semibold text-sm cursor-pointer flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50 text-black"
                                     onClick={() => {
                                         setShowExportDropdown(false);
                                         if (activeTab === 'dailyhistory') {
@@ -164,12 +281,13 @@ const WHeading = ({ username, userRoles = [] }) => {
                             document.body
                         )}
                     </div>
+                    </div>
                 )}
             </div>
-            <div className="content">
+            <div className="content flex flex-col min-h-0 overflow-hidden">
                 {visitedTabs.has('weeklypayment') && (
                     <div className={activeTab === 'weeklypayment' ? '' : 'hidden'}>
-                        <WeeklyPayment username={username} userRoles={userRoles} onExportActionsReady={handleWeeklyPaymentExportActionsReady} isTabActive={activeTab === 'weeklypayment'} />
+                        <WeeklyPayment username={username} userRoles={userRoles} onExportActionsReady={handleWeeklyPaymentExportActionsReady} onClosureActionsReady={handleClosureActionsReady} isTabActive={activeTab === 'weeklypayment'} />
                     </div>
                 )}
                 {visitedTabs.has('dailypayment') && (
@@ -184,12 +302,7 @@ const WHeading = ({ username, userRoles = [] }) => {
                 )}
                 {visitedTabs.has('weeklyhistory') && (
                     <div className={activeTab === 'weeklyhistory' ? '' : 'hidden'}>
-                        <History username={username} userRoles={userRoles} onExportActionsReady={handleExportActionsReady} isTabActive={activeTab === 'weeklyhistory'} />
-                    </div>
-                )}
-                {visitedTabs.has('handoverpaymentspage') && (
-                    <div className={activeTab === 'handoverpaymentspage' ? '' : 'hidden'}>
-                        <HandoverPaymentsPage username={username} userRoles={userRoles} />
+                        <History username={username} userRoles={userRoles} onExportActionsReady={handleExportActionsReady} onHandoverActionsReady={handleHandoverActionsReady} isTabActive={activeTab === 'weeklyhistory'} />
                     </div>
                 )}
                 {visitedTabs.has('weeklypaymentaddinput') && (

@@ -34,6 +34,35 @@ import {
   toExpenseLocalDateStr,
 } from '../../utils/expensesFormPrefetch';
 import AdvancePortalEditPaymentModal from './AdvancePortalEditPaymentModal';
+import CustomDateField from '../ExpensesEntry/CustomDateField';
+const ADVANCE_PORTAL_SELECT_CLASS =
+  'custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_READONLY_INPUT_CLASS =
+  'border-2 border-[#BF9853] rounded-lg px-[8px] w-[300px] h-[40px] focus:outline-none border-opacity-[0.20] bg-[#ededed] text-[14px] font-semibold';
+const ADVANCE_PORTAL_TEXTAREA_CLASS =
+  'border-2 border-[#BF9853] rounded-md px-[8px] lg:w-[616px] w-[300px] h-[60px] focus:outline-none border-opacity-[0.20] resize-none text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500';
+const ADVANCE_PORTAL_LABEL_CLASS = 'text-md font-semibold mb-[8px] block';
+const ADVANCE_PORTAL_FORM_FIELDS = {
+  selectType: 'Select Type',
+  date: 'Date',
+  contractorVendor: 'Contractor/Vendor',
+  overallAdvance: 'Overall Advance',
+  projectName: 'Project Name',
+  fromProjectName: 'From Project Name',
+  toProjectName: 'To Project Name',
+  projectAdvance: 'Project Advance',
+  billAmount: 'Bill Amount',
+  category: 'Category',
+  discount: 'Discount',
+  amountGiven: 'Amount Given',
+  transferAmount: 'Transfer Amount',
+  refundAmount: 'Refund Amount',
+  paymentMode: 'Payment Mode',
+  description: 'Description',
+  attachFile: 'Attach file',
+};
 const advancePortalReadonlyFieldClass =
   'min-h-[45px] border-2 border-[#BF9853] border-opacity-20 rounded-lg bg-[#FAF6ED] px-3 flex items-center text-sm font-medium text-[#202020]';
 const AdvancePortalReadonlyField = ({ value, className = '' }) => (
@@ -149,6 +178,11 @@ const AdvancePortal = ({
   const [overallAdvance, setOverallAdvance] = useState(0);
   const [selectedAdvanceFile, setSelectedAdvanceFile] = useState(null);
   const fileInputRef = useRef(null);
+  const leftFormColRef = useRef(null);
+  const descriptionSectionRef = useRef(null);
+  const advanceHeaderRef = useRef(null);
+  const [sideTableAreaHeight, setSideTableAreaHeight] = useState(null);
+  const [sideTableContentHeight, setSideTableContentHeight] = useState(null);
   const [billAmount, setBillAmount] = useState('');
   const [discountAmount, setDiscountAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -593,17 +627,50 @@ const AdvancePortal = ({
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
+      fontFamily: 'Manrope',
       borderWidth: '2px',
-      lineHeight: '20px',
-      fontSize: '14px',
-      height: '45px',
       borderRadius: '8px',
-      borderColor: state.isFocused ? 'rgba(191, 152, 83, 0.3)' : 'rgba(191, 152, 83, 0.3)',
-      boxShadow: state.isFocused ? '0 0 0 1px rgba(191, 152, 83, 0.3)' : 'none',
+      minHeight: '40px',
+      height: '40px',
+      flexWrap: 'nowrap',
+      borderColor: state.isFocused
+        ? 'rgba(191, 152, 83, 1)'
+        : 'rgba(191, 152, 83, 0.2)',
+      boxShadow: state.isFocused
+        ? '0 0 0 1px rgba(101, 102, 53, 0.2)'
+        : 'none',
+      '&:hover': {
+        borderColor: 'rgba(191, 152, 83, 0.2)',
+      },
     }),
-    clearIndicator: (provided) => ({
+    valueContainer: (provided, state) => ({
       ...provided,
-      cursor: 'pointer',
+      flex: '1 1 0%',
+      minWidth: 0,
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      paddingLeft: '12px',
+      paddingRight: state.hasValue ? '2px' : provided.paddingRight,
+      paddingTop: 0,
+      paddingBottom: 0,
+      height: '36px',
+      alignItems: 'center',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      color: 'black',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
     }),
     menu: (provided) => ({
       ...provided,
@@ -616,39 +683,77 @@ const AdvancePortal = ({
     }),
     menuList: (provided) => ({
       ...provided,
+      paddingTop: 0,
+      paddingBottom: 0,
       maxHeight: '250px',
       overflowY: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': {
+        display: 'none',
+      },
     }),
-    singleValue: (provided) => ({
+    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorsContainer: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      flex: '0 0 auto',
+      paddingLeft: '0',
     }),
-    option: (provided, state) => ({
+    dropdownIndicator: (provided, state) => ({
       ...provided,
-      fontWeight: '500',
-      backgroundColor: state.isSelected
-        ? 'rgba(191, 152, 83, 0.3)'
-        : state.isFocused
-          ? 'rgba(191, 152, 83, 0.1)'
-          : 'white',
-      color: 'black',
-      textAlign: 'left',
+      display: state.hasValue ? 'none' : 'flex',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
     }),
-    input: (provided) => ({
+    clearIndicator: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: 'black',
-      textAlign: 'left',
+      cursor: 'pointer',
+      color: '#000000',
+      flexShrink: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: '4px',
+      paddingRight: '4px',
     }),
     placeholder: (provided) => ({
       ...provided,
-      fontWeight: '500',
-      color: '#999',
+      fontWeight: 'normal',
+      fontSize: '14px',
+      color: '#6b7280',
+      margin: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
       textAlign: 'left',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+      position: 'absolute',
     }),
-    indicatorSeparator: () => ({ display: 'none' }),
+    option: (provided, state) => ({
+      ...provided,
+      minHeight: 36,
+      height: 'auto',
+      paddingTop: 6,
+      paddingBottom: 6,
+      whiteSpace: 'normal',
+      display: 'flex',
+      alignItems: 'center',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      WebkitTapHighlightColor: '#FAF6ED',
+      backgroundColor: state.isSelected
+        ? '#BF9853'
+        : state.isFocused
+          ? '#FAF6ED'
+          : provided.backgroundColor,
+      color: state.isSelected ? '#FFFFFF' : provided.color,
+      ':active': {
+        backgroundColor: state.isSelected ? '#BF9853' : '#FAF6ED',
+      },
+    }),
   };
   const fetchAdvanceData = async () => {
     try {
@@ -1334,6 +1439,43 @@ const AdvancePortal = ({
     const outstanding = totalAmount - totalRefund - totalBill;
     setTotalOutstanding(outstanding);
   }, [advanceData]);
+  useEffect(() => {
+    if (embedded) return undefined;
+    const syncSideTableHeights = () => {
+      if (window.innerWidth < 1280) {
+        setSideTableAreaHeight(null);
+        setSideTableContentHeight(null);
+        return;
+      }
+      const leftEl = leftFormColRef.current;
+      const descriptionEl = descriptionSectionRef.current;
+      if (!leftEl || !descriptionEl) return;
+      const leftTop = leftEl.getBoundingClientRect().top;
+      const descriptionBottom = descriptionEl.getBoundingClientRect().bottom;
+      const alignHeight = Math.round(descriptionBottom - leftTop);
+      if (alignHeight > 0) {
+        setSideTableAreaHeight(alignHeight);
+        setSideTableContentHeight(alignHeight);
+      }
+    };
+    const scheduleSync = () => {
+      requestAnimationFrame(() => requestAnimationFrame(syncSideTableHeights));
+    };
+    scheduleSync();
+    const leftEl = leftFormColRef.current;
+    if (!leftEl) return undefined;
+    const ro = new ResizeObserver(scheduleSync);
+    ro.observe(leftEl);
+    const descriptionEl = descriptionSectionRef.current;
+    if (descriptionEl) ro.observe(descriptionEl);
+    const headerEl = advanceHeaderRef.current;
+    if (headerEl) ro.observe(headerEl);
+    window.addEventListener('resize', scheduleSync);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', scheduleSync);
+    };
+  }, [embedded, selectedType]);
   const formatNumber = (num) => {
     if (!num) return '';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1812,29 +1954,31 @@ const AdvancePortal = ({
             <div className='flex flex-wrap gap-[10px] w-full'>
               <div>
                 <label className='block mb-[8px] font-semibold text-sm sm:text-base'>From Date</label>
-                <input
-                  type='date'
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className='w-full max-w-[150px] h-[40px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-2 py-1 focus:outline-none text-sm'
-                />
+                <div className='w-[150px]'>
+                  <CustomDateField
+                    value={fromDate}
+                    onChange={setFromDate}
+                    placeholder="From Date"
+                    className="w-[150px] [&>div]:!w-[150px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                    controlHeightPx={40}
+                    alwaysOpenBelow
+                    anchor="right"
+                  />
+                </div>
               </div>
               <div>
                 <label className='block mb-[8px] font-semibold text-sm sm:text-base'>To Date</label>
-                <input
-                  type='date'
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className='w-full max-w-[150px] h-[40px] border-2 border-[#BF9853] border-opacity-25 rounded-lg px-2 py-1 focus:outline-none text-sm'
-                />
-              </div>
-              <div>
-                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Amount Given</label>
-                <input
-                  readOnly
-                  value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm'
-                />
+                <div className='w-[150px]'>
+                  <CustomDateField
+                    value={toDate}
+                    onChange={setToDate}
+                    placeholder="To Date"
+                    className="w-[150px] [&>div]:!w-[150px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                    controlHeightPx={40}
+                    alwaysOpenBelow
+                    anchor="right"
+                  />
+                </div>
               </div>
               <div>
                 <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Payment Mode</label>
@@ -1842,12 +1986,26 @@ const AdvancePortal = ({
                   options={finalPaymentModeOptions}
                   value={filteredPaymentMode ? { value: filteredPaymentMode, label: filteredPaymentMode } : null}
                   onChange={(selected) => setFilteredPaymentMode(selected ? selected.value : '')}
-                  placeholder="Select"
+                  placeholder="Payment Mode"
                   isSearchable
                   isClearable
                   menuPortalTarget={document.body}
-                  styles={customStyles}
-                  className='w-full min-w-[150px] rounded-lg focus:outline-none'
+                  styles={{
+                    ...customStyles,
+                    placeholder: (provided) => ({
+                      ...customStyles.placeholder(provided),
+                      color: '#A6A5A6',
+                    }),
+                  }}
+                  className='lg:w-[150px] rounded-lg focus:outline-none '
+                />
+              </div>
+              <div>
+                <label className='block mb-[8px] font-semibold text-sm sm:text-base'>Amount Given</label>
+                <input
+                  readOnly
+                  value={filteredAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  className='lg:w-[150px] h-[40px] border border-[#00000029] rounded-lg bg-[#ededed] focus:outline-none p-2 text-sm'
                 />
               </div>
               <div>
@@ -1856,7 +2014,7 @@ const AdvancePortal = ({
                   readOnly
                   type='text'
                   value={todayAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='w-[144px] h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm'
+                  className='lg:w-[150px] h-[40px] border border-[#00000029] rounded-lg bg-[#ededed] focus:outline-none p-2 text-sm'
                 />
               </div>
               <div>
@@ -1865,28 +2023,21 @@ const AdvancePortal = ({
                   readOnly
                   type='text'
                   value={totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  className='w-[144px] h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2 text-sm'
-                />
-              </div>
-              <div className="flex items-end">
-                <input
-                  readOnly
-                  value={projectAdvance}
-                  className="border-2 w-[112px] p-2 border-[#E4572E] text-[#E4572E] font-bold border-opacity-10 rounded h-[33px] bg-[#F2F2F2] focus:outline-none text-xs"
+                  className='lg:w-[150px] h-[40px] border border-[#00000029] rounded-lg bg-[#ededed] focus:outline-none p-2 text-sm'
                 />
               </div>
             </div>
           </div>
         <div className='w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col'>
             <div className='xl:flex flex-1 min-h-0 xl:min-w-0 px- gap-[18px]'>
-              <div className='shrink-0 xl:w-fit'>
+              <div className='shrink-0 xl:w-fit' ref={leftFormColRef}>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-left'>
-                  <div className='space-y-1 flex items-center max-w-[300px]'>
-                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base xl:w-40 w-20'>Select Type</label>
+                  <div className='text-left max-w-[300px]'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.selectType}<span className="text-[#E4572E]">*</span></label>
                     {lockTypePrefill ? (
                       <AdvancePortalReadonlyField
                         value={selectedType}
-                        className="w-full max-w-[330px]"
+                        className="w-[300px]"
                       />
                     ) : (
                     <Select
@@ -1903,85 +2054,93 @@ const AdvancePortal = ({
                         setAdvanceAmount('');
                         setBillAmount('');
                       }}
-                      placeholder="Select Type..."
+                      placeholder={ADVANCE_PORTAL_FORM_FIELDS.selectType}
                       isSearchable
                       isClearable
                       styles={customStyles}
-                      className='w-full max-w-[330px] rounded-lg focus:outline-none'
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
                     />
                     )}
                   </div>
-                  <div className='space-y-1 flex gap-3 items-center'>
-                    <label className='font-semibold text-[#E4572E] text-sm sm:text-base'>Date</label>
-                    <input
-                      type='date'
-                      placeholder='dd-mm-yyyy'
-                      value={dateValue}
-                      onChange={(e) => setDateValue(e.target.value)}
-                      className='w-full max-w-[330px] h-[45px] border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
-                    />
+                  <div className='text-left'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.date}<span className="text-[#E4572E]">*</span></label>
+                    <div className="expense-entry-form-date w-[300px]">
+                      <CustomDateField
+                        value={dateValue}
+                        onChange={setDateValue}
+                        placeholder={ADVANCE_PORTAL_FORM_FIELDS.date}
+                        className="w-full text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
+                        controlHeightPx={40}
+                        alwaysOpenBelow
+                        anchor="right"
+                      />
+                    </div>
                   </div>
-                  <div className='space-y-1'>
-                    <label className='font-semibold block text-sm sm:text-base'>Contractor/Vendor<span className="text-red-500">*</span></label>
+                  <div className='text-left'>
+                    <div className='flex justify-between mb-[8px]'>
+                      <label className="text-md font-semibold block">{ADVANCE_PORTAL_FORM_FIELDS.contractorVendor}<span className="text-[#E4572E]">*</span></label>
+                      {selectedOption?.type && <span className="text-[14px] text-[#E4572E] font-semibold block mt-0.5">{selectedOption.type}</span>}
+                    </div>
                     <Select
                       options={combinedOptions}
                       value={selectedOption}
                       onChange={handleChange}
-                      className='w-full rounded-lg focus:outline-none'
+                      placeholder={ADVANCE_PORTAL_FORM_FIELDS.contractorVendor}
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
                       isClearable
                       isSearchable
                       styles={customStyles}
                     />
                   </div>
-                  <div className='space-y-1'>
-                    <label className='font-semibold block text-sm sm:text-base'>Overall Advance</label>
+                  <div className='text-left'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.overallAdvance}</label>
                     <input
                       value={overallAdvance.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                       disabled
-                      className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none text-sm'
+                      className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
                     />
                   </div>
-                  <div className='space-y-1'>
-                    <label className='font-semibold block text-sm sm:text-base'>Project Name<span className="text-red-500">*</span></label>
+                  <div className='text-left'>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{selectedType === 'Transfer' ? ADVANCE_PORTAL_FORM_FIELDS.fromProjectName : ADVANCE_PORTAL_FORM_FIELDS.projectName}<span className="text-[#E4572E]">*</span></label>
                     <Select
                       options={sortedSiteOptions || []}
-                      placeholder="Select a site..."
+                      placeholder={selectedType === 'Transfer' ? ADVANCE_PORTAL_FORM_FIELDS.fromProjectName : ADVANCE_PORTAL_FORM_FIELDS.projectName}
                       isSearchable={true}
                       value={selectedSite}
                       onChange={handleProjectChange}
                       styles={customStyles}
                       isClearable
-                      className='w-full rounded-lg focus:outline-none'
+                      className={ADVANCE_PORTAL_SELECT_CLASS}
                     />
                   </div>
                   {selectedType !== 'Bill Settlement' && (
-                    <div className='space-y-1'>
-                      <label className='font-semibold block text-sm sm:text-base'>Project Advance</label>
+                    <div className='text-left'>
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.projectAdvance}</label>
                       <input
                         value={projectAdvance}
                         readOnly
                         onChange={(e) => setProjectAdvance(e.target.value)}
-                        className='w-full h-[45px] px-2 py-1 rounded-lg bg-[#F2F2F2] focus:outline-none text-sm'
+                        className={ADVANCE_PORTAL_READONLY_INPUT_CLASS}
                       />
                     </div>
                   )}
                   {selectedType === 'Bill Settlement' && (
-                    <div className='space-y-1'>
-                      <label className='font-semibold block text-sm sm:text-base'>Bill Amount<span className="text-red-500">*</span></label>
+                    <div className='text-left'>
+                      <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.billAmount}<span className="text-[#E4572E]">*</span></label>
                       <input
                         type="text"
                         inputMode="decimal"
                         value={formatWithCommas(billAmount)}
                         onChange={handleBillAmountChange}
-                        className='w-full h-[45px] no-spinner px-2 py-1 rounded-lg border-2 border-[#BF9853] border-opacity-30 focus:outline-none text-sm'
+                        className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner`}
                       />
                     </div>
                   )}
                   {selectedType === 'Bill Settlement' && (
                     <div className="col-span-1 sm:col-span-2">
                       <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="space-y-1 flex-1">
-                          <label className='font-semibold block text-sm sm:text-base'>Category<span className="text-red-500">*</span></label>
+                        <div className="text-left flex-1">
+                          <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.category}<span className="text-[#E4572E]">*</span></label>
                           <Select
                             options={categoryOptions}
                             value={selectedCategory}
@@ -1989,16 +2148,16 @@ const AdvancePortal = ({
                             styles={customStyles}
                             isClearable
                             isSearchable
-                            placeholder="Select a category..."
-                            className='w-full rounded-lg focus:outline-none'
+                            placeholder={ADVANCE_PORTAL_FORM_FIELDS.category}
+                            className={ADVANCE_PORTAL_SELECT_CLASS}
                           />
                         </div>
-                        <div className="space-y-1 flex-1">
-                          <label className='font-semibold block text-sm sm:text-base'>Discount</label>
+                        <div className="text-left flex-1">
+                          <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.discount}<span className="text-[#E4572E]">*</span></label>
                           <input
                             value={formatWithCommas(discountAmount)}
                             onChange={handleDiscountChange}
-                            className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                            className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner`}
                           />
                         </div>
                       </div>
@@ -2006,76 +2165,76 @@ const AdvancePortal = ({
                   )}
                   <div className="col-span-1 sm:col-span-2">
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="space-y-1 flex-1">
-                        <label className='font-semibold block text-sm sm:text-base'>
+                      <div className="text-left flex-1">
+                        <label className={ADVANCE_PORTAL_LABEL_CLASS}>
                           {selectedType === 'Transfer'
-                            ? 'Transfer Amount'
+                            ? ADVANCE_PORTAL_FORM_FIELDS.transferAmount
                             : selectedType === 'Refund'
-                              ? 'Refund Amount'
-                              : 'Amount Given'}<span className="text-red-500">*</span>
+                              ? ADVANCE_PORTAL_FORM_FIELDS.refundAmount
+                              : ADVANCE_PORTAL_FORM_FIELDS.amountGiven}<span className="text-[#E4572E]">*</span>
                         </label>
                         <input
                           value={formatWithCommas(advanceAmount)}
                           onChange={handleAmountChange}
-                          className='w-full h-[45px] no-spinner border-2 border-[#BF9853] border-opacity-30 px-2 py-1 rounded-lg focus:outline-none text-sm'
+                          className={`${ADVANCE_PORTAL_INPUT_CLASS} no-spinner hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
                         />
                       </div>
-                      <div className="space-y-1 flex-1">
+                      <div className="text-left flex-1">
                         {selectedType === 'Transfer' ? (
                           <>
-                            <label className='font-semibold block text-sm sm:text-base'>Project Name</label>
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.toProjectName}<span className="text-[#E4572E]">*</span></label>
                             <Select
                               options={sortedSiteOptions}
-                              placeholder="Select a site..."
+                              placeholder={ADVANCE_PORTAL_FORM_FIELDS.toProjectName}
                               isSearchable
                               value={sortedSiteOptions.find(option => option.id === parseInt(transferSiteId)) || null}
                               onChange={(selected) => setTransferSiteId(selected ? selected.id : '')}
                               styles={customStyles}
                               isClearable
                               menuPortalTarget={document.body}
-                              className='w-full rounded-lg focus:outline-none'
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
                             />
                           </>
                         ) : (
                           <>
-                            <label className='font-semibold block text-sm sm:text-base'>Payment Mode</label>
+                            <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.paymentMode}<span className="text-[#E4572E]">*</span></label>
                             <Select
                               options={finalPaymentModeOptions}
                               value={paymentMode ? { value: paymentMode, label: paymentMode } : null}
                               onChange={(selected) => setPaymentMode(selected ? selected.value : '')}
-                              placeholder="Select"
+                              placeholder={ADVANCE_PORTAL_FORM_FIELDS.paymentMode}
                               isSearchable
                               isClearable
                               styles={customStyles}
-                              className='w-full rounded-lg focus:outline-none'
+                              className={ADVANCE_PORTAL_SELECT_CLASS}
                             />
                           </>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className='col-span-1 sm:col-span-2 space-y-1'>
-                    <label className='font-semibold block text-sm sm:text-base'>Description</label>
+                  <div className='col-span-1 sm:col-span-2 text-left' ref={descriptionSectionRef}>
+                    <label className={ADVANCE_PORTAL_LABEL_CLASS}>{ADVANCE_PORTAL_FORM_FIELDS.description}</label>
                     <textarea
                       rows={2}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Type your text here..."
-                      className='w-full h-[45px] border-2 border-[#BF9853] border-opacity-30 font-medium px-2 py-2 rounded-lg focus:outline-none text-sm'>
-                    </textarea>
+                      placeholder={ADVANCE_PORTAL_FORM_FIELDS.description}
+                      className={`${ADVANCE_PORTAL_TEXTAREA_CLASS} hover:!border-[rgba(191,152,83,0.2)] focus:!border-[rgba(191,152,83,1)]`}
+                    />
                   </div>
                   <div className='col-span-1 sm:col-span-2 min-w-0 overflow-hidden'>
-                    <div className="flex flex-row items-center gap-2 mb-2 min-w-0 w-full overflow-hidden">
-                      <div className='flex items-center shrink-0'>
-                        <label htmlFor="fileInput" className="cursor-pointer flex items-center text-orange-600 text-sm whitespace-nowrap">
-                          <img className='w-5 h-4 mr-1' alt='' src={Attach}></img>
-                          Attach file
+                    <div className="flex items-start justify-between lg:w-[616px] w-[300px] gap-2 flex-wrap mb-2 min-w-0">
+                      <div className='flex shrink-0'>
+                        <label htmlFor="fileInput" className="cursor-pointer flex items-center gap-[6px] text-orange-600">
+                          <img className='w-[15px] h-[16px]' alt='' src={Attach}></img>
+                          <span className="text-[14px] font-semibold">{ADVANCE_PORTAL_FORM_FIELDS.attachFile}</span>
                         </label>
                         <input type="file" id="fileInput" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                       </div>
                       {selectedAdvanceFile && (
                         <span
-                          className="text-gray-600 text-sm truncate min-w-0 flex-1"
+                          className="text-gray-600 text-[12px] break-words min-w-0 text-right"
                           title={selectedAdvanceFile.name}
                         >
                           {selectedAdvanceFile.name}
@@ -2099,14 +2258,29 @@ const AdvancePortal = ({
                   </div>
                 </div>
               </div>
-              <div className="min-w-0 flex-1 overflow-x-auto">
-                <SideTable
-                  advanceData={advanceData}
-                  selectedOption={selectedOption}
-                  siteOptions={siteOptions}
-                  selectedSite={selectedSite}
-                  onEditClick={handleEditClick}
-                />
+              <div
+                className={`min-w-0 flex-1 flex flex-col ${sideTableAreaHeight != null ? 'h-full' : 'overflow-x-auto'}`}
+                style={sideTableAreaHeight != null ? { height: `${sideTableAreaHeight}px` } : undefined}
+              >
+                <div
+                  className={`expense-form-side-table-host min-h-0 overflow-hidden ${sideTableContentHeight != null ? 'flex-1 min-h-0' : ''}`}
+                  style={
+                    sideTableContentHeight != null
+                      ? { height: `${sideTableContentHeight}px` }
+                      : undefined
+                  }
+                >
+                  <SideTable
+                    advanceData={advanceData}
+                    selectedOption={selectedOption}
+                    siteOptions={siteOptions}
+                    selectedSite={selectedSite}
+                    onEditClick={handleEditClick}
+                    hideDiscountAndActivity
+                    projectAdvance={projectAdvance}
+                    advanceHeaderRef={advanceHeaderRef}
+                  />
+                </div>
               </div>
             </div>
           </div>

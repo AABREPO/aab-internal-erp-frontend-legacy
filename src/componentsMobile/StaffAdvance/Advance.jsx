@@ -10,6 +10,7 @@ import {
   formatCurrency,
   formatDateDisplay,
   getEntryNumber,
+  getPurposeName,
   parseNumber,
   todayIso,
   withBranchUrl
@@ -382,13 +383,59 @@ const Advance = ({
     }, 0);
   }, [formData.empName, formData.purpose, records]);
 
+  const filteredStaffEntries = useMemo(() => {
+    if (!formData.empName || !formData.purpose) return [];
+
+    return records
+      .filter((record) => {
+        const matchesEmployee =
+          formData.empName.type === 'Employee'
+            ? String(record.employee_id ?? '') === String(formData.empName.id) ||
+              record.employee_name === formData.empName.value ||
+              record.emp_name === formData.empName.value
+            : String(record.labour_id ?? '') === String(formData.empName.id) ||
+              record.labour_name === formData.empName.value;
+
+        const matchesPurpose =
+          String(record.from_purpose_id ?? record.purpose_id ?? '') === String(formData.purpose.id) ||
+          record.purpose === formData.purpose.value;
+
+        return matchesEmployee && matchesPurpose;
+      })
+      .sort(
+        (a, b) =>
+          (Number(b.entry_no ?? b.entryNo) || 0) - (Number(a.entry_no ?? a.entryNo) || 0)
+      );
+  }, [formData.empName, formData.purpose, records]);
+
+  const getStaffTypeCode = (type) => {
+    switch (type) {
+      case 'Refund':
+        return 'RF';
+      case 'Transfer':
+        return 'TF';
+      case 'Advance':
+        return 'AD';
+      default:
+        return '';
+    }
+  };
+
+  const getTransferPurposeLabel = (record) => {
+    if (record.type !== 'Transfer') return null;
+    const amount = parseNumber(record.amount);
+    if (amount < 0) {
+      return `Transfer To ${getPurposeName(record.to_purpose_id, purposeOptions)}`;
+    }
+    return `Transfer From ${getPurposeName(record.from_purpose_id ?? record.purpose_id, purposeOptions)}`;
+  };
+
   const handleInputChange = (field, value) => {
     setFormData((previousState) => ({
       ...previousState,
       [field]: value
     }));
   };
-
   const handleTypeChange = (selectedType) => {
     setFormData((previousState) => ({
       ...previousState,
@@ -399,7 +446,6 @@ const Advance = ({
       transferPurpose: selectedType === 'Transfer' ? previousState.transferPurpose : null
     }));
   };
-
   const resetForm = () => {
     setFormData({
       ...initialFormState,
@@ -414,18 +460,15 @@ const Advance = ({
       fileInputRef.current.value = '';
     }
   };
-
   const validate = () => {
     if (!formData.selectedType || !formData.date || !formData.empName) {
       window.alert('Please fill Type, Date and Employee Name.');
       return false;
     }
-
     if (!formData.purpose) {
       window.alert('Please select a purpose.');
       return false;
     }
-
     if (formData.selectedType === 'Transfer') {
       if (!formData.transferPurpose || !formData.transferAmount) {
         window.alert('Please fill transfer purpose and transfer amount.');
@@ -433,44 +476,35 @@ const Advance = ({
       }
       return true;
     }
-
     if (!formData.amountGivenInput) {
       window.alert('Please enter the amount.');
       return false;
     }
-
     if (formData.selectedType === 'Advance' && !formData.paymentMode) {
       window.alert('Please select payment mode.');
       return false;
     }
-
     return true;
   };
-
   const isFormReady = () => {
     if (!formData.selectedType || !formData.date || !formData.empName || !formData.purpose) {
       return false;
     }
-
     if (formData.selectedType === 'Transfer') {
       return Boolean(formData.transferPurpose && formData.transferAmount);
     }
-
     if (!formData.amountGivenInput) return false;
     if (formData.selectedType === 'Advance' && !formData.paymentMode) return false;
     return true;
   };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validate()) return;
-
     setIsSubmitting(true);
     try {
       const fileUrl = selectedFile
         ? await uploadAttachment(selectedFile, formData.empName?.label)
         : editEntryRef.current?.file_url || null;
-
       if (editingId) {
         const editFormData = {
           type: formData.selectedType,
@@ -530,7 +564,6 @@ const Advance = ({
         window.alert('Staff advance updated successfully.');
         return;
       }
-
       const payload = {
         type: formData.selectedType,
         date: formData.date,
@@ -553,7 +586,6 @@ const Advance = ({
         weekNo: 0,
         branch_id: activeBranchId
       };
-
       const staffAdvanceSaveUrl = withBranchUrl(
         'https://backendaab.in/demoAabuildersDash/api/staff-advance/save',
         activeBranchId
@@ -572,19 +604,15 @@ const Advance = ({
           }
         );
       }
-
       const saveResponse = await fetch(staffAdvanceSaveUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
       if (!saveResponse.ok) {
         throw new Error('Failed to save staff advance');
       }
-
       const savedRecord = await saveResponse.json();
-
       if (
         (formData.selectedType === 'Advance' || formData.selectedType === 'Refund') &&
         DIGITAL_PAYMENT_MODES.includes(formData.paymentMode)
@@ -628,7 +656,6 @@ const Advance = ({
           console.error('Weekly payment bill save failed:', weeklyPaymentError);
         }
       }
-
       window.dispatchEvent(new Event('staffAdvanceUpdated'));
       if (typeof onSaved === 'function') {
         await onSaved();
@@ -642,7 +669,6 @@ const Advance = ({
       setIsSubmitting(false);
     }
   };
-
   const actionLabel = editingId
     ? 'Update Record'
     : formData.selectedType === 'Refund'
@@ -650,12 +676,8 @@ const Advance = ({
       : formData.selectedType === 'Transfer'
         ? 'Submit Transfer'
         : 'Pay Advance';
-
   return (
-    <div
-      className="h-full overflow-y-auto bg-white pb-[24px]"
-      style={{ fontFamily: "'Manrope', sans-serif" }}
-    >
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full bg-white" style={{ fontFamily: "'Manrope', sans-serif" }} >
       <TypePickerModal
         isOpen={showTypeModal}
         selectedType={formData.selectedType}
@@ -671,7 +693,6 @@ const Advance = ({
           setTypeSearchQuery('');
         }}
       />
-
       <DatePickerModal
         isOpen={showDatePicker}
         onClose={() => setShowDatePicker(false)}
@@ -680,7 +701,6 @@ const Advance = ({
         }
         initialDate={formatDateDisplay(formData.date)}
       />
-
       <SelectVendorModal
         isOpen={showEmployeeModal}
         onClose={() => setShowEmployeeModal(false)}
@@ -696,7 +716,6 @@ const Advance = ({
         fieldName="Employee Name"
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showPurposeModal}
         onClose={() => setShowPurposeModal(false)}
@@ -712,7 +731,6 @@ const Advance = ({
         fieldName={formData.selectedType === 'Transfer' ? 'Purpose From' : 'Purpose'}
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showTransferPurposeModal}
         onClose={() => setShowTransferPurposeModal(false)}
@@ -728,7 +746,6 @@ const Advance = ({
         fieldName="Purpose To"
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showPaymentModeModal}
         onClose={() => setShowPaymentModeModal(false)}
@@ -741,37 +758,28 @@ const Advance = ({
         fieldName="Payment Mode"
         showStarIcon={false}
       />
-
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex-shrink-0">
         <div className="mb-[8px] flex items-center justify-between border-b border-gray-200 pb-[6px]">
           <div className="flex items-center gap-[4px]">
-            <button
-              type="button"
+            <button type="button"
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
               # {displayEntryNo ?? entryNo}
             </button>
-
-            <button
-              type="button"
-              onClick={() => setShowDatePicker(true)}
+            <button type="button" onClick={() => setShowDatePicker(true)}
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
               {formatDateDisplay(formData.date)}
             </button>
           </div>
-
           <div>
-            <button
-              type="button"
-              onClick={() => setShowTypeModal(true)}
+            <button type="button" onClick={() => setShowTypeModal(true)}
               className="text-[12px] font-semibold text-black leading-normal cursor-pointer hover:underline p-0 border-0 bg-transparent"
             >
               {formData.selectedType || 'Select Type'}
             </button>
           </div>
         </div>
-
         <div className="space-y-[6px]">
           <PickerField
             label="Employee Name"
@@ -781,7 +789,6 @@ const Advance = ({
             onClick={() => setShowEmployeeModal(true)}
             onClear={() => handleInputChange('empName', null)}
           />
-
           <PickerField
             label={formData.selectedType === 'Transfer' ? 'Purpose From' : 'Purpose'}
             required
@@ -790,7 +797,6 @@ const Advance = ({
             onClick={() => setShowPurposeModal(true)}
             onClear={() => handleInputChange('purpose', null)}
           />
-
           {formData.selectedType === 'Transfer' ? (
             <>
               <PickerField
@@ -800,7 +806,6 @@ const Advance = ({
                 onClick={() => setShowTransferPurposeModal(true)}
                 onClear={() => handleInputChange('transferPurpose', null)}
               />
-
               <InputField
                 label="Transfer Amount"
                 required
@@ -820,7 +825,6 @@ const Advance = ({
                 placeholder="Enter Amount"
                 inputMode="decimal"
               />
-
               <div className="flex-1">
                 <PickerField
                   label="Payment Mode"
@@ -832,7 +836,6 @@ const Advance = ({
               </div>
             </div>
           )}
-
           <div>
             <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Description</p>
             <textarea
@@ -847,7 +850,6 @@ const Advance = ({
             />
           </div>
         </div>
-
         <div className="flex flex-wrap items-center gap-x-[8px] mb-1 mt-[8px] gap-y-[4px] w-full max-w-[328px]">
           <input
             type="file"
@@ -857,10 +859,7 @@ const Advance = ({
             onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
             accept="image/*,.pdf,.doc,.docx"
           />
-          <label
-            htmlFor="staffAdvanceFileInput"
-            className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0"
-          >
+          <label htmlFor="staffAdvanceFileInput" className="cursor-pointer flex items-center gap-[2px] text-orange-600 hover:text-orange-700 active:opacity-80 flex-shrink-0">
             <img className="w-4 h-3" alt="Attach" src={Attach} />
             <span className="text-[12px] font-medium underline">Attach File</span>
           </label>
@@ -870,7 +869,6 @@ const Advance = ({
             </span>
           ) : null}
         </div>
-
         <button
           type="submit"
           disabled={isSubmitting || !isFormReady()}
@@ -880,8 +878,81 @@ const Advance = ({
           {isSubmitting ? 'Submitting...' : actionLabel}
         </button>
       </form>
+      <div className="mt-3 w-full flex-1 min-h-0 flex flex-col">
+        {!formData.empName || !formData.purpose ? (
+          <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
+            <p className="text-[12px] font-medium text-[#9E9E9E]">
+              Please select an employee and purpose to view advance records.
+            </p>
+          </div>
+        ) : filteredStaffEntries.length === 0 ? (
+          <div className="bg-white border border-[#E0E0E0] rounded-[8px] px-[16px] py-[24px] text-center">
+            <p className="text-[12px] font-medium text-[#9E9E9E]">
+              No records found for the selected employee and purpose.
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+          >
+            {filteredStaffEntries.map((record, index) => {
+              const typeCode = getStaffTypeCode(record.type);
+              const formattedDate = formatDateDisplay(record.date);
+              const entryNoLabel = getEntryNumber(record);
+              const transactionId = `${typeCode} - ${formattedDate} - ${entryNoLabel}`;
+              const transferLabel = getTransferPurposeLabel(record);
+              const paymentMode = record.staff_payment_mode || '';
+              const amount = parseNumber(record.amount);
+              const refundAmount = parseNumber(record.staff_refund_amount);
+              return (
+                <div key={record.staffAdvancePortalId || record.id || `${transactionId}-${index}`}
+                  className="bg-white border border-[#E0E0E0] border-opacity-30 rounded-[8px] px-[12px] py-[8px] shadow-lg flex justify-between items-start gap-[8px]"
+                >
+                  <div className="flex flex-col gap-[4px] flex-1 min-w-0">
+                    <p className="text-[12px] font-semibold text-black">{transactionId}</p>
+                    {transferLabel ? (
+                      <p className="text-[12px] font-medium text-black">{transferLabel}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col items-end gap-[4px] flex-shrink-0">
+                    {(paymentMode || record.type === 'Transfer') && (
+                      <span
+                        className={`inline-block text-[10px] font-medium pl-[8px] pr-[8px] rounded-full ${
+                          record.type === 'Transfer'
+                            ? 'bg-[#FFF3E0] text-black'
+                            : 'bg-[#FFF3E0] text-[#E4572E]'
+                        }`}
+                      >
+                        {record.type === 'Transfer' && !paymentMode ? 'Online' : paymentMode}
+                      </span>
+                    )}
+                    {record.type === 'Refund' && (
+                      <span className="text-[12px] font-semibold text-[#E4572E]">
+                        -₹{Math.abs(refundAmount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {record.type === 'Transfer' && (
+                      <span
+                        className={`text-[12px] font-semibold ${amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}
+                      >
+                        {amount < 0 ? '-' : ''}₹{Math.abs(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {record.type === 'Advance' && (
+                      <span
+                        className={`text-[12px] font-semibold ${amount < 0 ? 'text-[#E4572E]' : 'text-[#007233]'}`}
+                      >
+                        ₹{amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
-
 export default Advance;

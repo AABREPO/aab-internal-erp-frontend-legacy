@@ -26,6 +26,7 @@ import {
     isExpenseEntryNonCashPaymentMode,
     buildExpenseEntryWeeklyBillSavePayload,
     saveExpenseEntryWeeklyPaymentBill,
+    syncWeeklyExpensesForExpensesEntryEdit,
 } from '../../utils/expensesEntryWeeklyPaymentBill';
 import {
     clearLinkedAdvancePortalForExpenseDelete,
@@ -48,6 +49,10 @@ import {
     saveEdbcPaymentModeFilterToStorage,
     EdbcFilterToggleButton,
     EdbcTableToolbarRightActions,
+    EDBC_IDS,
+    EdbcColumnHeader,
+    EdbcTableHeaderRow,
+    getEdbcColumnConfig,
 } from './databaseExpensesSharedColumns';
 import { useExpensesListLoader } from './expensesListStore';
 import { uploadExpensesEntryBillCopy } from './expensesBillCopyUpload';
@@ -414,6 +419,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
     const [selectedQuantity, setSelectedQuantity] = useState('');
     const [selectedAmount, setSelectedAmount] = useState('');
     const [selectedDescription, setSelectedDescription] = useState('');
+    const [selectedServiceNumber, setSelectedServiceNumber] = useState('');
     const [selectedBillArrival, setSelectedBillArrival] = useState('');
     const [showBillArrivalCalendar, setShowBillArrivalCalendar] = useState(false);
     const [billArrivalCalendarPos, setBillArrivalCalendarPos] = useState({ top: 0, left: 0 });
@@ -1285,6 +1291,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 (selectedDescription.trim()
                     ? String(expense.comments ?? '').toLowerCase().includes(selectedDescription.toLowerCase().trim())
                     : true) &&
+                (selectedServiceNumber.trim()
+                    ? String(expense.utilityTypeNumber ?? expense.utility_type_number ?? '').toLowerCase().includes(selectedServiceNumber.toLowerCase().trim())
+                    : true) &&
                 (selectedBillArrival
                     ? expenseBillArrivalToInput(expense) === selectedBillArrival
                     : true)
@@ -1413,7 +1422,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         uniqueEno.unshift(BLANK_VALUE);
         setEnoOptions(uniqueEno);
 
-    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions, expenseEntryPaymentModeOrder]);
+    }, [selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools, selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType, startDate, endDate, timestampStartDate, timestampEndDate, selectedEno, selectedStaff, selectedQuantity, selectedAmount, selectedDescription, selectedServiceNumber, selectedBillArrival, overallSearch, expenses, machineToolsIdToLabel, branchOptions, expenseEntryPaymentModeOrder]);
     useEffect(() => {
         if (filterScrollResetSkipRef.current) {
             filterScrollResetSkipRef.current = false;
@@ -1430,7 +1439,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         selectedSiteName, selectedVendor, selectedContractor, selectedCategory, selectedMachineTools,
         selectedSource, selectedPaymentModes, selectedBranch, selectedEnteredBy, selectedAccountType,
         startDate, endDate, timestampStartDate, timestampEndDate, selectedEno,
-        selectedStaff, selectedBillArrival, selectedQuantity, selectedAmount, selectedDescription,
+        selectedStaff, selectedBillArrival, selectedQuantity, selectedAmount, selectedDescription, selectedServiceNumber,
     ]);
     const handleChange = (e) => {
         const { name, type, value, files } = e.target;
@@ -1637,6 +1646,18 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                 console.error('Weekly payment bills delete error:', weeklyErr);
             }
         }
+
+        if (expensesEntryId) {
+            try {
+                await syncWeeklyExpensesForExpensesEntryEdit(expensesEntryId, updatedFormData, {
+                    editedBy: username,
+                    existingWeeklyBills,
+                });
+            } catch (weeklyExpenseErr) {
+                console.error('Weekly expenses sync error:', weeklyExpenseErr);
+                throw weeklyExpenseErr;
+            }
+        }
     };
     const handlePaymentModalSubmit = async () => {
         if (!paymentModalData.accountNumber) {
@@ -1727,6 +1748,9 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         } else if (sortField === 'billArrivalDate') {
             aValue = String(getExpenseBillArrivalRaw(a) || '').slice(0, 10);
             bValue = String(getExpenseBillArrivalRaw(b) || '').slice(0, 10);
+        } else if (sortField === 'utilityTypeNumber') {
+            aValue = String(a.utilityTypeNumber ?? a.utility_type_number ?? '').toLowerCase();
+            bValue = String(b.utilityTypeNumber ?? b.utility_type_number ?? '').toLowerCase();
         } else if (sortField === 'quantity' || sortField === 'amount') {
             aValue = Number(aValue) || 0;
             bValue = Number(bValue) || 0;
@@ -2146,6 +2170,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
         setSelectedQuantity('');
         setSelectedAmount('');
         setSelectedDescription('');
+        setSelectedServiceNumber('');
         setSelectedBillArrival('');
         setOverallSearch('');
         setFilteredExpenses(expenses);
@@ -2294,7 +2319,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                     ) : null}
                     <div className="w-full pt-[18px] px-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden">
                         <div
-                            className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
+                            className={`text-left flex ${selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedServiceNumber.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno
                                 ? 'flex-col sm:flex-row sm:justify-between'
                                 : 'flex-row justify-between items-center'
                                 } mb-[12px] gap-[6px]`}>
@@ -2330,7 +2355,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                         });
                                     }}
                                 />
-                                {(selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
+                                {(selectedSiteName || selectedVendor || selectedContractor || selectedStaff || selectedQuantity.trim() || selectedAmount.trim() || selectedDescription.trim() || selectedServiceNumber.trim() || selectedBillArrival || selectedCategory || selectedAccountType || selectedMachineTools || hasEdbcPaymentModeFilter(selectedPaymentModes) || selectedSource || selectedBranch || selectedEnteredBy || startDate || endDate || timestampStartDate || timestampEndDate || selectedEno) && (
                                     <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
                                         {timestampStartDate && (
                                             <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-[16px] font-medium w-fit max-w-full min-w-0 overflow-hidden">
@@ -2428,6 +2453,13 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                                 <button onClick={() => setSelectedAccountType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
                                             </span>
                                         )}
+                                        {selectedServiceNumber.trim() && (
+                                            <span className="inline-flex flex-nowrap items-center gap-1 whitespace-nowrap border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit max-w-full min-w-0 overflow-hidden">
+                                                <span className="font-medium text-[#BF9853] shrink-0 whitespace-nowrap">Service Number: </span>
+                                                <span className="font-semibold text-[14px] truncate min-w-0">{selectedServiceNumber}</span>
+                                                <button onClick={() => setSelectedServiceNumber('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
                                         <EdbcPaymentModeFilterChip
                                             fieldLabel="Mode"
                                             selectedModes={selectedPaymentModes}
@@ -2501,6 +2533,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 onMouseUp={handleMouseUp}
                                 onMouseLeave={handleMouseUp}>
                                 <TableProvider value={{
+                                    fieldLabels: { serviceNumber: 'Service Number' },
                                     currentItems, showFilters, filterRowRef, totalAmount, sortField, sortDirection, handleSort,
                                     timestampStartDate, setTimestampStartDate, timestampEndDate, setTimestampEndDate,
                                     showDateRangePicker, setShowDateRangePicker,
@@ -2515,7 +2548,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                     setSelectedDate: () => {},
                                     siteOptions, selectedSiteName, setSelectedSiteName, vendorOptions, selectedVendor, setSelectedVendor,
                                     contractorOptions, selectedContractor, setSelectedContractor, staffOptions, selectedStaff, setSelectedStaff,
-                                    selectedQuantity, setSelectedQuantity, selectedAmount, setSelectedAmount, selectedDescription, setSelectedDescription,
+                                    selectedQuantity, setSelectedQuantity, selectedAmount, setSelectedAmount, selectedDescription, setSelectedDescription, selectedServiceNumber, setSelectedServiceNumber,
                                     categoryOptions, selectedCategory, setSelectedCategory, accountTypeOptions, selectedAccountType, setSelectedAccountType,
                                     machineToolsOptions, selectedMachineTools, setSelectedMachineTools, paymentModeFilterOptions, selectedPaymentModes, setSelectedPaymentModes,
                                     sourceOptions, selectedSource, setSelectedSource,
@@ -2525,7 +2558,7 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                     formatDate, formatDateOnly, getDisplaySiteName, getDisplayVendorName, getDisplayContractorName, getDisplayStaffName,
                                     getMachineToolsItemIdDisplay, getBranchName, formatBillArrivalDisplay, handleEditClick, handleDelete, fetchAuditDetails, username,
                                 }}>
-                                    <Table showActivityColumn />
+                                    <Table showActivityColumn showServiceNumberColumn />
                                 </TableProvider>
                             </div>
                             <div className="flex shrink-0 items-center justify-between mt-4 px-4 py-3 bg-white border-t border-gray-200">
@@ -3534,6 +3567,10 @@ const DatabaseExpenses = ({ username, userRoles = [], isActive = true }) => {
                                 onClose={() => setShowModal(false)}
                                 audits={audits}
                                 resolveMachineToolsDisplay={getMachineToolsItemIdDisplay}
+                                vendorOptions={vendorOption}
+                                contractorOptions={contractorOption}
+                                employeeOptions={employeeOptions}
+                                labourOptions={laboursList}
                             />
                         </div>
                     </div>
@@ -3585,24 +3622,55 @@ const formatDate = (dateString) => {
     hours = hours ? String(hours).padStart(2, '0') : '12';
     return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 };
-const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay }) => {
+const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay, vendorOptions = [], contractorOptions = [], employeeOptions = [], labourOptions = [] }) => {
     if (!show) return null;
-    const fields = [
-        { key: "Date", label: "Date" },
-        { key: "AccountType", label: "Account Type" },
-        { key: "SiteName", label: "Site Name" },
-        { key: "Vendor", label: "Vendor" },
-        { key: "Contractor", label: "Contractor" },
-        { key: "Category", label: "Category" },
-        { key: "Quantity", label: "Quantity" },
-        { key: "Comments", label: "Comments" },
-        { key: "Amount", label: "Amount" },
-        { key: "MachineTools", label: "Machine Tools" },
-        { key: "BillCopy", label: "Bill Copy" },
+    const auditDataFields = [
+        { key: 'Date', columnId: EDBC_IDS.EDBC2 },
+        { key: 'SiteName', columnId: EDBC_IDS.EDBC3 },
+        { key: 'Quantity', columnId: EDBC_IDS.EDBC7 },
+        { key: 'Amount', columnId: EDBC_IDS.EDBC8 },
+        { key: 'Comments', columnId: EDBC_IDS.EDBC9 },
+        { key: 'Category', columnId: EDBC_IDS.EDBC10 },
+        { key: 'AccountType', columnId: EDBC_IDS.EDBC12 },
+        { key: 'BillCopy', columnId: null },
     ];
-    const formatDate = (dateString) => {
+    const pickAudit = (audit, camel, snake) => audit[camel] ?? audit[snake];
+    const normalizeAuditId = (id) => {
+        if (id == null || String(id).trim() === '' || String(id) === '0') return null;
+        return id;
+    };
+    const getNameById = (id, options) => {
+        if (id == null || id === '' || String(id) === '0') return '';
+        const found = options.find((opt) => String(opt.id) === String(id) || String(opt.value) === String(id));
+        return found ? (found.label || found.value || '') : '';
+    };
+    const getAssociateFromAudit = (audit, side) => {
+        const isOld = side === 'old';
+        const vendorId = normalizeAuditId(pickAudit(audit, isOld ? 'oldVendorId' : 'newVendorId', isOld ? 'old_vendor_id' : 'new_vendor_id'));
+        const contractorId = normalizeAuditId(pickAudit(audit, isOld ? 'oldContractorId' : 'newContractorId', isOld ? 'old_contractor_id' : 'new_contractor_id'));
+        const employeeId = normalizeAuditId(pickAudit(audit, isOld ? 'oldEmployeeId' : 'newEmployeeId', isOld ? 'old_employee_id' : 'new_employee_id'));
+        const labourId = normalizeAuditId(pickAudit(audit, isOld ? 'oldLabourId' : 'newLabourId', isOld ? 'old_labour_id' : 'new_labour_id'));
+        const vendorName = pickAudit(audit, isOld ? 'oldVendor' : 'newVendor', isOld ? 'old_vendor' : 'new_vendor');
+        const contractorName = pickAudit(audit, isOld ? 'oldContractor' : 'newContractor', isOld ? 'old_contractor' : 'new_contractor');
+        if (vendorId) {
+            return { name: getNameById(vendorId, vendorOptions) || vendorName || '-', type: 'Vendor' };
+        }
+        if (contractorId) {
+            return { name: getNameById(contractorId, contractorOptions) || contractorName || '-', type: 'Contractor' };
+        }
+        if (labourId) {
+            return { name: getNameById(labourId, labourOptions) || '-', type: 'Labour' };
+        }
+        if (employeeId) {
+            return { name: getNameById(employeeId, employeeOptions) || '-', type: 'Employee' };
+        }
+        if (vendorName) return { name: vendorName, type: 'Vendor' };
+        if (contractorName) return { name: contractorName, type: 'Contractor' };
+        return { name: '-', type: '-' };
+    };
+    const formatTimestamp = (dateString) => {
+        if (!dateString) return '-';
         const date = new Date(dateString);
-        date.setMinutes(date.getMinutes());
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
@@ -3613,13 +3681,57 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay }) => {
         hours = hours ? String(hours).padStart(2, '0') : '12';
         return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
     };
-    const columnWidths = [
-        "210px", "150px", "180px", "160px", "160px", "140px",
-        "120px", "200px", "130px", "180px", "150px"
-    ];
+    const formatFieldDisplay = (key, value) => {
+        if (key.toLowerCase().includes('amount')) {
+            return value && !isNaN(value) ? Number(value).toLocaleString('en-IN') : '-';
+        }
+        if (key === 'Date') {
+            return value ? new Date(value).toLocaleDateString('en-GB') : '-';
+        }
+        return value ?? '-';
+    };
+    const getFieldChanged = (key, oldVal, rawNewVal) => {
+        if (key === 'Amount') {
+            return String(oldVal ?? '') !== String(rawNewVal ?? '');
+        }
+        const oldDisplay = formatFieldDisplay(key, oldVal);
+        const newDisplay = formatFieldDisplay(key, rawNewVal);
+        return oldDisplay !== newDisplay;
+    };
+    const renderFieldCell = (audit, { key, columnId }, side) => {
+        const isNew = side === 'new';
+        const oldVal = audit[`old${key}`];
+        const rawNewVal = audit[`new${key}`];
+        const rawVal = isNew ? rawNewVal : oldVal;
+        const displayValue = formatFieldDisplay(key, rawVal);
+        const tdClass = columnId ? getEdbcColumnConfig(columnId)?.tdClass : '';
+        const billCopyClass = key === 'BillCopy' ? 'border text-sm text-center' : '';
+        const className = ['border text-sm', tdClass, billCopyClass].filter(Boolean).join(' ');
+        if (!isNew) {
+            return (
+                <td key={key} id={columnId || undefined} style={key === 'BillCopy' ? { width: '300px' } : undefined} className={className}>
+                    {displayValue}
+                </td>
+            );
+        }
+        const changed = getFieldChanged(key, oldVal, rawNewVal);
+        return (
+            <td
+                key={key}
+                id={columnId || undefined}
+                style={key === 'BillCopy' ? { width: '300px' } : undefined}
+                className={`${className} ${changed ? 'bg-[#BF9853] text-black font-bold' : ''}`}
+            >
+                {displayValue}
+            </td>
+        );
+    };
+    const edbc1TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass || '';
+    const edbc4TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass || '';
+    const edbc12TdClass = getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass || '';
     return (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1400px] mx-4 p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-md shadow-lg p-4">
                 <div className="flex justify-between items-center mt-4 ml-7 mr-7">
                     <h2 className="text-xl font-bold">History</h2>
                     <button onClick={onClose}>
@@ -3627,87 +3739,76 @@ const AuditModal = ({ show, onClose, audits, resolveMachineToolsDisplay }) => {
                     </button>
                 </div>
                 <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
-                    <table className="table-fixed min-w-full bg-white">
+                    <table className="table-fixed min-w-full bg-white border-collapse">
                         <thead className="bg-[#FAF6ED]">
-                            <tr>
-                                <th style={{ width: '130px' }} className="border-b py-2 px-2 text-left text-base font-bold whitespace-nowrap">Time Stamp</th>
-                                <th style={{ width: '120px' }} className="border-b py-2 px-2 text-left text-base font-bold whitespace-nowrap">Edited By</th>
-                                <th style={{ width: '210px' }} className="border-b py-2 px-8 text-left text-base font-bold whitespace-nowrap">Date</th>
-                                <th style={{ width: '150px' }} className="border-b py-2 px-2 text-center text-base font-bold whitespace-nowrap">Account Type</th>
-                                <th style={{ width: '180px' }} className="border-b py-2 px-12 text-center text-base font-bold whitespace-nowrap">Site Name</th>
-                                <th style={{ width: '160px' }} className="border-b py-2 px-10 text-center text-base font-bold whitespace-nowrap">Vendor</th>
-                                <th style={{ width: '160px' }} className="border-b py-2 px-10 text-center text-base font-bold whitespace-nowrap">Contractor</th>
-                                <th style={{ width: '140px' }} className="border-b py-2 px-2 text-center text-base font-bold whitespace-nowrap">Category</th>
-                                <th style={{ width: '120px' }} className="border-b py-2 px-2 text-center text-base font-bold whitespace-nowrap">Quantity</th>
-                                <th style={{ width: '200px' }} className="border-b py-2 px-2 text-center text-base font-bold whitespace-nowrap">Comments</th>
-                                <th style={{ width: '130px' }} className="border-b py-2 px-2 text-center text-base font-bold whitespace-nowrap">Amount</th>
-                                <th style={{ width: '180px' }} className="border-b py-2 px-2 text-center text-base font-bold whitespace-nowrap">Machine Tools</th>
-                                <th style={{ width: '300px' }} className="border-b py-2 px-14 text-center text-base font-bold whitespace-nowrap">Bill Copy</th>
-                            </tr>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label="Project Name" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC7} label="Quantity" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC9} label="Discription" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC10} label="Category" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="A/C Type" />
+                                <th style={{ width: '300px' }} className="border-b py-2 px-4 text-center text-base font-bold whitespace-nowrap">Bill Copy</th>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
                         </thead>
                         <tbody>
-                            {audits.map((audit, index) => (
-                                <React.Fragment key={index}>
-                                    <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
-                                            {formatDate(audit.editedDate)}
-                                        </td>
-                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
-                                            {audit.editedBy}
-                                        </td>
-                                        {fields.map(({ key }, i) => {
-                                            let value = audit[`old${key}`];
-                                            if (key.toLowerCase().includes("amount")) {
-                                                value = value && !isNaN(value) ? Number(value).toLocaleString("en-IN") : "-";
-                                            }
-                                            if (key.toLowerCase().includes("date")) {
-                                                value = value ? new Date(value).toLocaleDateString("en-GB") : "-";
-                                            }
-                                            if (key === "MachineTools" && resolveMachineToolsDisplay && value != null && value !== "") {
-                                                value = resolveMachineToolsDisplay(value);
-                                            }
-                                            return (
-                                                <td key={key} style={{ width: columnWidths[i] }} className="border text-sm text-center">
-                                                    {value ?? "-"}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                    <tr className="odd:bg-white even:bg-[#FAF6ED]">
-                                        <td style={{ width: '130px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
-                                            {formatDate(audit.editedDate)}
-                                        </td>
-                                        <td style={{ width: '120px' }} className="border pl-2 text-sm text-left whitespace-nowrap">
-                                            {audit.editedBy}
-                                        </td>
-                                        {fields.map(({ key }, i) => {
-                                            const oldVal = audit[`old${key}`];
-                                            const rawNewVal = audit[`new${key}`];
-                                            let value = rawNewVal;
-                                            if (key.toLowerCase().includes("amount")) {
-                                                value = value && !isNaN(value) ? Number(value).toLocaleString("en-IN") : "-";
-                                            }
-                                            if (key.toLowerCase().includes("date")) {
-                                                value = value ? new Date(value).toLocaleDateString("en-GB") : "-";
-                                            }
-                                            let displayValue = value;
-                                            if (key === "MachineTools" && resolveMachineToolsDisplay && rawNewVal != null && rawNewVal !== "") {
-                                                displayValue = resolveMachineToolsDisplay(rawNewVal);
-                                            }
-                                            const changed = key === "MachineTools"
-                                                ? String(oldVal ?? "") !== String(rawNewVal ?? "")
-                                                : oldVal !== value;
-                                            return (
-                                                <td key={key} style={{ width: columnWidths[i] }}
-                                                    className={`border text-sm text-center ${changed ? "bg-[#BF9853] text-black font-bold" : ""}`}
-                                                >
-                                                    {displayValue ?? "-"}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                </React.Fragment>
-                            ))}
+                            {audits.map((audit, index) => {
+                                const oldAssociate = getAssociateFromAudit(audit, 'old');
+                                const newAssociate = getAssociateFromAudit(audit, 'new');
+                                const associateChanged = oldAssociate.name !== newAssociate.name;
+                                const associateTypeChanged = oldAssociate.type !== newAssociate.type;
+                                const editedBy = pickAudit(audit, 'editedBy', 'edited_by') ?? '-';
+                                const editedDate = pickAudit(audit, 'editedDate', 'edited_date');
+                                return (
+                                    <React.Fragment key={index}>
+                                        <tr className="odd:bg-white even:bg-[#FAF6ED]">
+                                            <td id={EDBC_IDS.EDBC1} className={`border text-sm whitespace-nowrap ${edbc1TdClass}`}>
+                                                {formatTimestamp(editedDate)}
+                                            </td>
+                                            {auditDataFields.slice(0, 2).map((field) => renderFieldCell(audit, field, 'old'))}
+                                            <td id={EDBC_IDS.EDBC4} className={`border text-sm ${edbc4TdClass}`}>
+                                                {oldAssociate.name}
+                                            </td>
+                                            <td id={EDBC_IDS.EDBC12} className={`border text-sm ${edbc12TdClass}`}>
+                                                {oldAssociate.type}
+                                            </td>
+                                            {auditDataFields.slice(2).map((field) => renderFieldCell(audit, field, 'old'))}
+                                            <td className={`border text-sm ${edbc12TdClass}`}>
+                                                {editedBy}
+                                            </td>
+                                        </tr>
+                                        <tr className="odd:bg-white even:bg-[#FAF6ED]">
+                                            <td id={EDBC_IDS.EDBC1} className={`border text-sm whitespace-nowrap ${edbc1TdClass}`}>
+                                                {formatTimestamp(editedDate)}
+                                            </td>
+                                            {auditDataFields.slice(0, 2).map((field) => renderFieldCell(audit, field, 'new'))}
+                                            <td
+                                                id={EDBC_IDS.EDBC4}
+                                                title={associateChanged ? `Previous: ${oldAssociate.name} → Current: ${newAssociate.name}` : ''}
+                                                className={`border text-sm ${edbc4TdClass} ${associateChanged ? 'bg-[#BF9853] text-black font-bold' : ''}`}
+                                            >
+                                                {newAssociate.name}
+                                            </td>
+                                            <td
+                                                id={EDBC_IDS.EDBC12}
+                                                title={associateTypeChanged ? `Previous: ${oldAssociate.type} → Current: ${newAssociate.type}` : ''}
+                                                className={`border text-sm ${edbc12TdClass} ${associateTypeChanged ? 'bg-[#BF9853] text-black font-bold' : ''}`}
+                                            >
+                                                {newAssociate.type}
+                                            </td>
+                                            {auditDataFields.slice(2).map((field) => renderFieldCell(audit, field, 'new'))}
+                                            <td className={`border text-sm ${edbc12TdClass}`}>
+                                                {editedBy}
+                                            </td>
+                                        </tr>
+                                    </React.Fragment>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

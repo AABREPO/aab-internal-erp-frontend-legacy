@@ -214,6 +214,7 @@ const Form = ({
     disableWeeklyExpensesSave = false,
     lockUtilityPrefillFields = false,
     lockAccountTypePrefill = false,
+    lockClaimPaymentModeCash = false,
 }) => {
     const predefinedSiteOptions = [
         { value: "Mason Advance", label: "Mason Advance", id: 1, sNo: "1" },
@@ -751,6 +752,14 @@ const Form = ({
     }, [selectedAccountType, billPaymentsCashRegisterPrefill]);
 
     const lockAccountTypeDisplay = lockUtilityPrefillFields || lockAccountTypePrefill || billPaymentsCashRegisterPrefill;
+    const lockClaimPaymentModeDisplay =
+        lockClaimPaymentModeCash && selectedAccountType === 'Claim Payment';
+
+    useEffect(() => {
+        if (lockClaimPaymentModeDisplay) {
+            setPaymentMode('Cash');
+        }
+    }, [lockClaimPaymentModeDisplay]);
 
     useEffect(() => {
         if (!lockUtilityPrefillFields) return;
@@ -980,6 +989,9 @@ const Form = ({
                     }
                     if (prefillData.date) setDate(prefillData.date);
                     if (prefillData.amount != null && prefillData.amount !== '') setAmount(String(prefillData.amount));
+                    if (lockClaimPaymentModeCash) {
+                        setPaymentMode('Cash');
+                    }
                     // Prefill party + category (same behavior as Bill Payments)
                     let didApplyParty = false;
                     if (needVendor) {
@@ -2669,6 +2681,9 @@ const Form = ({
                                 {(selectedAccountType === 'Claim Payment' || selectedAccountType === 'Utility Bills' || selectedAccountType === 'Sundry Payment') ? (
                                     <div className='text-left'>
                                         <label className="text-md font-semibold mb-[8px] block">{EXPENSE_FORM_FIELDS.paymentMode}<span className="text-[#E4572E]">*</span></label>
+                                        {lockClaimPaymentModeDisplay ? (
+                                            <UtilityHubReadonlyField value="Cash" className="w-[300px]" />
+                                        ) : (
                                         <Select
                                             options={selectablePaymentModeOptions.map((mode) => ({
                                                 value: mode.modeOfPayment,
@@ -2683,6 +2698,7 @@ const Form = ({
                                             styles={customStyles}
                                             className="custom-select rounded-lg w-[300px] h-[40px] text-[14px] font-semibold placeholder:text-[14px] placeholder:font-normal placeholder:text-gray-500"
                                         />
+                                        )}
                                     </div>
                                 ) : usesBillArrivalDate(selectedAccountType) ? (
                                     <div className='text-left'>

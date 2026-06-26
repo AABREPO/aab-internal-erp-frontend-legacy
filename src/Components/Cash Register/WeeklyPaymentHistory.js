@@ -51,6 +51,7 @@ import {
     EdbcTableHeaderRow,
     EdbcTableToolbarRightActions,
     EdbcTotalAmountFilter,
+    formatEdbcTotalAmountPlaceholder,
     getEdbcColumnConfig,
     matchesEdbcAmountFilter,
     matchesWeeklyPaymentExpenseOverallSearch,
@@ -60,6 +61,7 @@ import {
     useEdbcTableSort,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { useLiveDataSync } from '../../utils/useLiveDataSync';
+import { HandoverPaymentsModal } from './WeeklyPaymentHandover';
 
 const ENTRY_ROW_SELECT_CLASS_NAMES = {
     menuList: () => 'no-scrollbar',
@@ -87,7 +89,19 @@ const CASH_REGISTER_SELECT_STYLES = {
 const WEEKLY_SUMMARY_FILE_API = 'https://backendaab.in/demoAabuildersDash/api/weekly_summary';
 
 const WEEKLY_PAYMENT_EDBC8_TABLE_CLASS =
-    '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_td#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_td#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_td#EDBC-8]:!overflow-hidden';
+    '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_tbody_td#EDBC-8]:!w-[98px] [&_tbody_td#EDBC-8]:!max-w-[98px] [&_tbody_td#EDBC-8]:!overflow-hidden';
+
+const WEEKLY_PAYMENT_EXPENSES_TABLE_LOCK_TABLE_CLASS =
+    '[&_th#EDBC-21]:!w-[70px] [&_td#EDBC-21]:!w-[70px] [&_th#EDBC-21]:!min-w-[70px] [&_td#EDBC-21]:!min-w-[70px] [&_th#EDBC-21]:!max-w-[70px] [&_td#EDBC-21]:!max-w-[70px] [&_th#EDBC-2]:!w-[120px] [&_td#EDBC-2]:!w-[120px] [&_th#EDBC-2]:!min-w-[120px] [&_td#EDBC-2]:!min-w-[120px] [&_th#EDBC-2]:!max-w-[120px] [&_td#EDBC-2]:!max-w-[120px] [&_th#EDBC-4]:!w-[218px] [&_td#EDBC-4]:!w-[218px] [&_th#EDBC-4]:!min-w-[218px] [&_td#EDBC-4]:!min-w-[218px] [&_th#EDBC-4]:!max-w-[218px] [&_td#EDBC-4]:!max-w-[218px] [&_th#EDBC-3]:!w-[298px] [&_td#EDBC-3]:!w-[298px] [&_th#EDBC-3]:!min-w-[298px] [&_td#EDBC-3]:!min-w-[298px] [&_th#EDBC-3]:!max-w-[298px] [&_td#EDBC-3]:!max-w-[298px] [&_th#EDBC-12]:!w-[158px] [&_td#EDBC-12]:!w-[158px] [&_th#EDBC-12]:!min-w-[158px] [&_td#EDBC-12]:!min-w-[158px] [&_th#EDBC-12]:!max-w-[158px] [&_td#EDBC-12]:!max-w-[158px] [&_thead_tr>th:nth-child(4)]:!w-[30px] [&_thead_tr>th:nth-child(4)]:!min-w-[30px] [&_thead_tr>th:nth-child(4)]:!max-w-[30px] [&_tbody_tr>td:nth-child(4)]:!w-[30px] [&_tbody_tr>td:nth-child(4)]:!min-w-[30px] [&_tbody_tr>td:nth-child(4)]:!max-w-[30px] [&_thead_tr:nth-child(2)>th:nth-child(4)]:!w-[30px] [&_thead_tr:nth-child(2)>th:nth-child(4)]:!min-w-[30px] [&_thead_tr:nth-child(2)>th:nth-child(4)]:!max-w-[30px] [&_thead_tr>th:nth-last-child(2)]:!w-[70px] [&_thead_tr>th:nth-last-child(2)]:!min-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!max-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!min-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!max-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!overflow-hidden [&_tbody_tr>td:nth-last-child(2)]:!overflow-hidden';
+
+const WEEKLY_PAYMENT_INCOME_TABLE_LOCK_TABLE_CLASS =
+    '[&_thead_tr>th#EDBC-2:first-child]:!w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!min-w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!min-w-[130px] [&_thead_tr>th#EDBC-2:first-child]:!max-w-[130px] [&_tbody_tr>td#EDBC-2:first-child]:!max-w-[130px] [&_th#EDBC-12]:!w-[158px] [&_td#EDBC-12]:!w-[158px] [&_th#EDBC-12]:!min-w-[158px] [&_td#EDBC-12]:!min-w-[158px] [&_th#EDBC-12]:!max-w-[158px] [&_td#EDBC-12]:!max-w-[158px] [&_thead_tr>th:nth-last-child(2)]:!w-[70px] [&_thead_tr>th:nth-last-child(2)]:!min-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!max-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!min-w-[70px] [&_tbody_tr>td:nth-last-child(2)]:!max-w-[70px] [&_thead_tr>th:nth-last-child(2)]:!overflow-hidden [&_tbody_tr>td:nth-last-child(2)]:!overflow-hidden';
+
+const WEEKLY_PAYMENT_EXPENSES_TABLE_FIXED_WIDTH_CLASS = 'w-full xl:w-[1246px] xl:min-w-[1246px]';
+const WEEKLY_PAYMENT_INCOME_TABLE_FIXED_WIDTH_CLASS = 'w-[490px] min-w-[490px]';
+
+const WEEKLY_PAYMENT_INCOME_TBODY_TABLE_LOCK_TABLE_CLASS =
+    WEEKLY_PAYMENT_INCOME_TABLE_LOCK_TABLE_CLASS.replace(/\[&_td#/g, '[&_tbody_td#');
 
 const formatWeeklyPaymentAmountDisplay = (amount) =>
     `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -107,7 +121,7 @@ function cleanUrl(url) {
     }
     return cleanedUrl;
 }
-const History = ({ username, userRoles = [], viewMode = 'default', onExportActionsReady, isTabActive = true }) => {
+const History = ({ username, userRoles = [], viewMode = 'default', onExportActionsReady, onHandoverActionsReady, isTabActive = true }) => {
     const resolveEnteredBy = () => {
         const propUsername = typeof username === 'string' ? username.trim() : '';
         if (propUsername) return propUsername;
@@ -215,6 +229,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
     const [weeklyPaymentExpensesAudits, setWeeklyPaymentExpensesAudits] = useState([]);
     const [showWeeklyPaymentReceivedModal, setShowWeeklyPaymentReceivedModal] = useState(false);
     const [weeklyPaymentReceivedAudits, setWeeklyPaymentReceivedAudits] = useState([]);
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
     // Get the current week year (ISO 8601) - may differ from calendar year for weeks spanning year boundaries
     const getCurrentWeekYear = () => {
         const d = new Date();
@@ -235,6 +250,10 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         const id = found.id;
         return id !== undefined && id !== null && !Number.isNaN(Number(id)) ? Number(id) : null;
     }, [weeklyTypes]);
+    const isWeeklyExpenseTypeMatched = useCallback(
+        (typeLabel) => getWeeklyExpenseTypeId(typeLabel) !== null,
+        [getWeeklyExpenseTypeId]
+    );
     const getWeeklyReceivedTypeId = useCallback((receivedLabel) => {
         if (receivedLabel === null || receivedLabel === undefined || String(receivedLabel).trim() === "") return null;
         const found = weeklyReceivedTypes.find((t) => t && t.received_type === receivedLabel);
@@ -333,6 +352,72 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         }
     }, [selectedWeek, year]);
     const [removedBillCopyRows, setRemovedBillCopyRows] = useState({});
+    const REMOVED_BILL_COPY_STORAGE_KEY = 'cashRegister_removedBillCopyIds';
+    const isRestorableRemovedBillCopy = (row) => {
+        if (!row) return false;
+        if (
+            row.removed_bill_copy_url ??
+            row.removedBillCopyUrl ??
+            row.stored_bill_copy_url ??
+            row.storedBillCopyUrl ??
+            row.backup_bill_copy_url ??
+            row.backupBillCopyUrl
+        ) {
+            return true;
+        }
+        return row.bill_copy_url_removed === true || row.billCopyUrlRemoved === true;
+    };
+    const buildRemovedBillCopyRowsMap = (expensesList) => {
+        const map = {};
+        const expenses = expensesList || [];
+        expenses.forEach((exp) => {
+            if (exp?.id != null && !exp.bill_copy_url && isRestorableRemovedBillCopy(exp)) {
+                map[exp.id] = true;
+            }
+        });
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_BILL_COPY_STORAGE_KEY) || '[]');
+            const ids = Array.isArray(stored) ? stored : [];
+            const nextStored = [];
+            ids.forEach((id) => {
+                const row = expenses.find((e) => String(e.id) === String(id));
+                if (!row) {
+                    nextStored.push(Number(id));
+                    return;
+                }
+                if (!row.bill_copy_url) {
+                    map[row.id] = true;
+                    nextStored.push(Number(id));
+                }
+            });
+            localStorage.setItem(REMOVED_BILL_COPY_STORAGE_KEY, JSON.stringify(nextStored));
+        } catch {
+            // ignore
+        }
+        return map;
+    };
+    const persistRemovedBillCopyId = (id) => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_BILL_COPY_STORAGE_KEY) || '[]');
+            const ids = Array.isArray(stored) ? stored : [];
+            if (!ids.some((x) => String(x) === String(id))) {
+                localStorage.setItem(REMOVED_BILL_COPY_STORAGE_KEY, JSON.stringify([...ids, Number(id)]));
+            }
+        } catch {
+            // ignore
+        }
+    };
+    const clearPersistedRemovedBillCopyId = (id) => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_BILL_COPY_STORAGE_KEY) || '[]');
+            localStorage.setItem(
+                REMOVED_BILL_COPY_STORAGE_KEY,
+                JSON.stringify((Array.isArray(stored) ? stored : []).filter((x) => String(x) !== String(id)))
+            );
+        } catch {
+            // ignore
+        }
+    };
     const [showCategoryPopup, setShowCategoryPopup] = useState(false);
     const [categoryOptions, setCategoryOptions] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
@@ -345,6 +430,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [popup, setPopup] = useState({ show: false, message: "", type: "", dateStr: "", editRowId: null, editField: null, editIndex: null, originalDate: "" });
     const [showPopups, setShowPopups] = useState(false);
+    const [isDescriptionEditing, setIsDescriptionEditing] = useState(false);
     const [currentRow, setCurrentRow] = useState(null);
     const [portalDescriptions, setPortalDescriptions] = useState({});
     const [editFormData, setEditFormData] = useState({
@@ -362,7 +448,11 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         description: "",
     });
     const scrollRef = useRef(null);
+    const filterRowRef = useRef(null);
+    const filterNudgeUsedRef = useRef(false);
     const paymentsScrollRef = useRef(null);
+    const paymentsFilterRowRef = useRef(null);
+    const paymentsFilterNudgeUsedRef = useRef(false);
     const expensesFilterChipsRef = useRef(null);
     const paymentsFilterChipsRef = useRef(null);
     const isDragging = useRef(false);
@@ -484,6 +574,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
     const [selectContractororVendorName, setSelectContractororVendorName] = useState('');
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
+    const [selectExpenseAmount, setSelectExpenseAmount] = useState('');
     const { sortField: expensesSortField, sortDirection: expensesSortDirection, sortProps: expensesSortProps } = useEdbcTableSort();
     const { sortField: paymentsSortField, sortDirection: paymentsSortDirection, sortProps: paymentsSortProps } = useEdbcTableSort();
     function getStartAndEndDateOfWeek(weekNumber, year) {
@@ -912,6 +1003,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                 delete next[currentFileRow.id];
                 return next;
             });
+            clearPersistedRemovedBillCopyId(currentFileRow.id);
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
@@ -1085,6 +1177,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                 prev.map((exp) => (exp.id === row.id ? { ...exp, bill_copy_url: null } : exp))
             );
             setRemovedBillCopyRows((prev) => ({ ...prev, [row.id]: true }));
+            persistRemovedBillCopyId(row.id);
             setPopup({
                 show: true,
                 message: "Bill file removed successfully!",
@@ -1126,6 +1219,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                 delete next[row.id];
                 return next;
             });
+            clearPersistedRemovedBillCopyId(row.id);
             setPopup({
                 show: true,
                 message: "Bill file restored successfully!",
@@ -1426,10 +1520,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
             const requestYearNum = selectedYear;
             const requestKey = `${requestBranchId ?? "none"}-${requestYearNum}`;
             try {
-                const currentWeekNumber = getCurrentISOWeekNumber();
-                const currentWeekYear = getCurrentWeekYear();
-
-                // Fetch all payments to determine which weeks have data (branch-scoped rows only)
+                // Fetch all payments to determine which weeks have status-true data (branch-scoped rows only)
                 let weeksWithData = new Set();
                 try {
                     const paymentsResponse = await axios.get('https://backendaab.in/demoAabuildersDash/api/payments-received/getAll', withBranchParams());
@@ -1452,20 +1543,10 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                     return;
                 }
 
-                // Get all possible weeks for the year (1-53)
                 const allWeeks = [];
-                for (let weekNum = 1; weekNum <= 53; weekNum++) {
-                    const weekInfo = getStartAndEndDateOfWeek(weekNum, selectedYear);
-                    const weekStartDate = new Date(weekInfo.start);
-                    const weekEndDate = new Date(weekInfo.end);
-                    const weekYear = getWeekYear(weekStartDate);
-                    const hasData = weeksWithData.has(weekNum);
-                    const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
-                    // Only include weeks up to current week (no future weeks). Keep weeks that already have data.
-                    if (hasData || (weekYear === selectedYear && isCurrentWeek)) {
-                        allWeeks.push(weekInfo);
-                    }
-                }
+                weeksWithData.forEach((weekNum) => {
+                    allWeeks.push(getStartAndEndDateOfWeek(weekNum, selectedYear));
+                });
 
                 allWeeks.sort((a, b) => b.number - a.number);
 
@@ -1590,6 +1671,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
             if (fetchToken !== weekFetchTokenRef.current) return [];
 
             setExpenses(filteredExpenses);
+            setRemovedBillCopyRows(buildRemovedBillCopyRowsMap(filteredExpenses));
             setPayments(filteredPayments);
             await fetchWeeklyPaymentBills();
 
@@ -1701,6 +1783,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         setSelectContractororVendorName('');
         setSelectProjectName('');
         setSelectType('');
+        setSelectExpenseAmount('');
         setOverallSearch('');
     };
     const clearPaymentsFilters = () => {
@@ -1755,6 +1838,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         if (selectType) {
             if (snapshot.type?.toLowerCase() !== selectType.toLowerCase()) return false;
         }
+        if (selectExpenseAmount && !matchesEdbcAmountFilter(snapshot.amount, selectExpenseAmount)) return false;
         if (!matchesWeeklyPaymentExpenseOverallSearch(snapshot, overallSearch, {
             formatDateOnly,
             getPartyName: (entry) => {
@@ -3312,6 +3396,10 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                 ...prev,
                 description: data.description,
             }));
+            setPortalDescriptions((prev) => ({
+                ...prev,
+                [id]: data.description,
+            }));
             return data;
         } catch (error) {
             console.error("❌ Error updating description:", error);
@@ -3718,6 +3806,12 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
         onExportActionsReady({ generatePDF });
         return () => onExportActionsReady(null);
     }, [onExportActionsReady, isExpensesEntryUploadOnly, generatePDF]);
+
+    useEffect(() => {
+        if (!onHandoverActionsReady || isExpensesEntryUploadOnly) return;
+        onHandoverActionsReady({ openHandover: () => setShowHandoverModal(true) });
+        return () => onHandoverActionsReady(null);
+    }, [onHandoverActionsReady, isExpensesEntryUploadOnly]);
     const expensesDstCol21Label = 'S.No';
     const expensesDstCol2Label = 'Date';
     const expensesDstCol4Label = 'Associate';
@@ -3727,7 +3821,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
     const expensesDstCol8Label = 'Amount';
     const expensesDstCol20FileLabel = 'File';
     const expensesDstCol20ActivityLabel = 'Activity';
-    const expensesAssociateLabel = isClientToggleActive ? expensesDstCol4ClientLabel : expensesDstCol4Label;
+    const expensesAssociateEntryPlaceholder = isClientToggleActive ? expensesDstCol4ClientLabel : 'Con/Ven/Emp';
     const paymentsDstCol2Label = 'Date';
     const paymentsDstCol8Label = 'Amount';
     const paymentsDstCol12Label = 'Type';
@@ -3737,7 +3831,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
             <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
                 <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
                     <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
-                        <div className="flex flex-wrap items-center justify-between text-left">
+                        <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
                             {(() => {
                                 const entryCheckLikeSelectStyles = {
                                     control: (provided, state) => ({
@@ -3830,7 +3924,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                     menuList: () => 'no-scrollbar scrollbar-none',
                                     valueContainer: () => '!flex-nowrap !overflow-hidden',
                                     placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
-                                    singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                    singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis !font-semibold',
                                 };
                                 const formatWeekOptionDate = (date) =>
                                     date.toLocaleDateString("en-GB", {
@@ -3872,68 +3966,77 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                 styles={entryCheckLikeSelectStyles}
                                             />
                                         </div>
+                                        {isExpensesEntryUploadOnly && (
+                                            <div className="min-w-0">
+                                                <label className="block font-semibold mb-[8px]">Weekly Balance</label>
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={`₹${Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                    className="min-w-0 w-[150px] h-[40px] px-3 text-[#000000] text-left text-[14px] font-semibold bg-[#ededed] border-2 border-[rgba(191,152,83,0.2)] rounded-lg bg-transparent focus:outline-none"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })()}
-                            {!isExpensesEntryUploadOnly && (
-                                <div className="flex items-center space-x-3 flex-wrap justify-end pl-[18px] pr-[18px]">
-                                    {!selectedWeek && (
-                                        <span className="text-xs text-gray-500">Select a week</span>
-                                    )}
-                                    <div
-                                        className="rounded-md px-4 py-[8px] text-sm shrink-0"
-                                        style={{
-                                            backgroundColor: '#FFFDF9',
-                                            backgroundImage: [
-                                                'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
-                                                'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
-                                                'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
-                                                'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
-                                            ].join(', '),
-                                            backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
-                                            backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
-                                            backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
-                                        }}
-                                    >
-                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
-                                            <span className="flex shrink-0 w-[76px] text-black font-semibold">
-                                                <span>Income</span>
-                                                <span className="ml-auto">:</span>
-                                            </span>
-                                            <span className="font-semibold" style={{ color: "#E4572E" }}>
-                                                ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
-                                            <span className="flex shrink-0 w-[76px] text-black font-semibold">
-                                                <span>Expenses</span>
-                                                <span className="ml-auto">:</span>
-                                            </span>
-                                            <span className="font-semibold" style={{ color: "#E4572E" }}>
-                                                ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-[14px] gap-6 py-0.5">
-                                            <span className="flex shrink-0 w-[76px] text-black font-semibold">
-                                                <span>Balance</span>
-                                                <span className="ml-auto">:</span>
-                                            </span>
-                                            <span className="font-semibold" style={{ color: "#E4572E" }}>
-                                                ₹{(
-                                                    payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
-                                                    filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
-                                                ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
+                            <div className="flex items-center flex-wrap justify-end pr-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
+                                {!selectedWeek && (
+                                    <span className="text-xs text-gray-500">Select a week</span>
+                                )}
+                                <div
+                                    className="rounded-md px-4 py-[8px] text-sm shrink-0"
+                                    style={{
+                                        backgroundColor: '#FFFDF9',
+                                        backgroundImage: [
+                                            'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(90deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                            'repeating-linear-gradient(0deg, #E4572E66 0 3px, transparent 3px 6px)',
+                                        ].join(', '),
+                                        backgroundSize: '100% 1px, 100% 1px, 1px 100%, 1px 100%',
+                                        backgroundPosition: '0 0, 0 100%, 0 0, 100% 0',
+                                        backgroundRepeat: 'repeat-x, repeat-x, repeat-y, repeat-y',
+                                    }}
+                                >
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Income</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Expenses</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-[14px] gap-6 py-0.5">
+                                        <span className="flex shrink-0 w-[76px] text-black font-semibold">
+                                            <span>Balance</span>
+                                            <span className="ml-auto">:</span>
+                                        </span>
+                                        <span className="font-semibold" style={{ color: "#E4572E" }}>
+                                            ₹{(
+                                                payments.reduce((total, row) => total + Number(row.amount || 0), 0) -
+                                                filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)
+                                            ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                     <div className={isExpensesEntryUploadOnly
-                        ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden'
-                        : 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden'}>
-                        {!isExpensesEntryUploadOnly && nextWeekDiscountInfo && (
+                        ? 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none'
+                        : 'w-full pt-[18px] px-[18px] pb-[18px] bg-white rounded-[6px] flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none'}>
+                        {nextWeekDiscountInfo && (
                             <div className="flex justify-end mb-4 -mr-6 -mt-7">
                                 <h2 className="font-semibold text-base">
                                     Discount :{" "}
@@ -3946,82 +4049,136 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                 </h2>
                             </div>
                         )}
-                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden">
-                            <div className={`flex flex-col min-h-0 overflow-hidden h-full ${isExpensesEntryUploadOnly ? 'w-full min-w-0 flex-1' : 'min-w-[1240] max-w-[1240] shrink-0'}`}>
+                        <div className="flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
+                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none max-xl:shrink-0 xl:min-w-[1240] xl:max-w-[1240] xl:shrink-0 xl:h-full xl:flex-none xl:w-auto">
                                 <div className="flex justify-between items-center mb-[8px] shrink-0">
                                     <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                         ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </h1>
                                 </div>
-                                <div className="flex flex-col flex-1 min-h-0 w-fit max-w-full overflow-hidden">
-                                <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
-                                    <div className="shrink-0 flex items-center z-[2] bg-white">
-                                        <EdbcFilterToggleButton onClick={() => setShowFilters(!showFilters)} />
-                                    </div>
-                                    <div
-                                        ref={expensesFilterChipsRef}
-                                        className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar cursor-grab"
+                                <div className="flex flex-col w-full max-w-full overflow-hidden xl:w-fit xl:flex-1 xl:min-h-0 max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
+                                    <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                        <div className="shrink-0 flex items-center z-[2] bg-white">
+                                            <EdbcFilterToggleButton
+                                                onClick={() => {
+                                                    const willOpen = !showFilters;
+                                                    const scroller = scrollRef.current;
+                                                    if (willOpen) {
+                                                        setShowFilters(true);
+                                                        if (!scroller) return;
+                                                        if (scroller.scrollTop <= 0) return;
+                                                        if (filterNudgeUsedRef.current) return;
+                                                        filterNudgeUsedRef.current = true;
+                                                        requestAnimationFrame(() => {
+                                                            requestAnimationFrame(() => {
+                                                                const h = filterRowRef.current?.offsetHeight || 0;
+                                                                if (h > 0) {
+                                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                                }
+                                                            });
+                                                        });
+                                                        return;
+                                                    }
+                                                    const h = filterRowRef.current?.offsetHeight || 0;
+                                                    setShowFilters(false);
+                                                    if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                                    filterNudgeUsedRef.current = false;
+                                                    requestAnimationFrame(() => {
+                                                        requestAnimationFrame(() => {
+                                                            scroller.scrollTop = scroller.scrollTop + h;
+                                                        });
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                        <div
+                                            ref={expensesFilterChipsRef}
+                                            className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
                                             onMouseDown={(e) => handleMouseDown(e, expensesFilterChipsRef, true)}
                                             onMouseMove={(e) => handleMouseMove(e, expensesFilterChipsRef, true)}
                                             onMouseUp={() => handleMouseUp(expensesFilterChipsRef)}
                                             onMouseLeave={() => handleMouseUp(expensesFilterChipsRef)}
                                         >
-                                        {selectDate && (
-                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Date: </span>
-                                                <span className="font-semibold text-[14px]">{formatDateOnly(selectDate)}</span>
-                                                <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                            </span>
-                                        )}
-                                        {selectContractororVendorName && (
-                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Associate: </span>
-                                                <span className="font-semibold text-[14px]">{selectContractororVendorName}</span>
-                                                <button onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
-                                        {selectProjectName && (
-                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Project Name: </span>
-                                                <span className="font-semibold text-[14px]">{selectProjectName}</span>
-                                                <button onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
-                                        {selectType && (
-                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
-                                                <span className="font-medium text-[#BF9853]">Type: </span>
-                                                <span className="font-semibold text-[14px]">{selectType}</span>
-                                                <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                            </span>
-                                        )}
+                                            {selectDate && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Date: </span>
+                                                    <span className="font-semibold text-[14px]">{formatDateOnly(selectDate)}</span>
+                                                    <button onClick={() => setSelectDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                </span>
+                                            )}
+                                            {selectContractororVendorName && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Associate: </span>
+                                                    <span className="font-semibold text-[14px]">{selectContractororVendorName}</span>
+                                                    <button onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectProjectName && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Project Name: </span>
+                                                    <span className="font-semibold text-[14px]">{selectProjectName}</span>
+                                                    <button onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectType && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">Type: </span>
+                                                    <span className="font-semibold text-[14px]">{selectType}</span>
+                                                    <button onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectExpenseAmount.trim() && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">{expensesDstCol8Label}: </span>
+                                                    <span className="font-semibold text-[14px]">{selectExpenseAmount}</span>
+                                                    <button type="button" onClick={() => setSelectExpenseAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
                                         </div>
-                                    <EdbcTableToolbarRightActions
-                                        onClearFilters={clearFilters}
-                                        overallSearch={overallSearch}
-                                        onOverallSearchChange={setOverallSearch}
-                                        wrapperClassName="flex items-center gap-[6px] shrink-0 z-[2] bg-white pl-[4px]"
-                                        searchWrapperClassName="h-[34px] w-[286px] shrink-0 min-w-0 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1"
-                                    />
-                                </div>
-                                <div className="flex flex-col flex-1 min-h-0 w-fit max-w-full rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                                    <div
-                                        ref={scrollRef}
-                                        className={isExpensesEntryUploadOnly
-                                            ? 'w-fit max-w-full rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] flex-1 min-h-0 overflow-auto select-none scrollbar-none no-scrollbar'
-                                            : 'w-fit max-w-full flex-1 min-h-0 overflow-auto no-scrollbar'}
-                                        onMouseDown={(e) => handleMouseDown(e, scrollRef)}
-                                        onMouseMove={(e) => handleMouseMove(e, scrollRef)}
-                                        onMouseUp={() => handleMouseUp(scrollRef)}
-                                        onMouseLeave={() => handleMouseUp(scrollRef)}
-                                    >
-                                        {isExpensesEntryUploadOnly ? (
-                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
+                                        <EdbcTableToolbarRightActions
+                                            onClearFilters={clearFilters}
+                                            overallSearch={overallSearch}
+                                            onOverallSearchChange={setOverallSearch}
+                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
+                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                        />
+                                    </div>
+                                    <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden xl:w-fit xl:flex xl:flex-col max-xl:flex-none max-xl:min-h-[330px]">
+                                        <div
+                                            ref={scrollRef}
+                                            className="w-full flex-1 min-h-0 h-full overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none xl:w-fit xl:max-w-full xl:overflow-auto max-xl:min-h-[330px] max-xl:flex-none"
+                                            onWheel={() => { filterNudgeUsedRef.current = false; }}
+                                            onMouseDown={(e) => handleMouseDown(e, scrollRef)}
+                                            onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                            onMouseUp={() => handleMouseUp(scrollRef)}
+                                            onMouseLeave={() => handleMouseUp(scrollRef)}
+                                        >
+
+                                            <table className={`border-collapse text-left ${WEEKLY_PAYMENT_EXPENSES_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS} ${WEEKLY_PAYMENT_EXPENSES_TABLE_LOCK_TABLE_CLASS}`}>
+                                                <colgroup>
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '120px' }} />
+                                                    <col style={{ width: '218px' }} />
+                                                    <col style={{ width: '30px' }} />
+                                                    <col style={{ width: '298px' }} />
+                                                    <col style={{ width: '158px' }} />
+                                                    <col style={{ width: '120px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '12px' }} />
+                                                </colgroup>
                                                 <thead className="sticky top-0 z-10 bg-white">
                                                     <EdbcTableHeaderRow>
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={expensesDstCol2Label} {...expensesSortProps} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={expensesDstCol4Label} {...expensesSortProps} />
+                                                        <EdbcColumnHeader
+                                                            columnId={EDBC_IDS.EDBC4}
+                                                            label={expensesDstCol4Label}
+                                                            {...expensesSortProps}
+                                                        />
+                                                        <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible" aria-hidden="true"></th>
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} {...expensesSortProps} />
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} {...expensesSortProps} />
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} {...expensesSortProps} />
@@ -4032,10 +4189,11 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             aria-hidden="true"
                                                         />
                                                         <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20ActivityLabel} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label={expensesDstCol20ActivityLabel} />
+                                                        <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
                                                     </EdbcTableHeaderRow>
                                                     {showFilters && (
-                                                        <EdbcTableFilterRow>
+                                                        <EdbcTableFilterRow ref={filterRowRef}>
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
                                                             <EdbcDateFilter
                                                                 placeholder={expensesDstCol2Label}
@@ -4050,182 +4208,12 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                 onChange={setSelectContractororVendorName}
                                                                 selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                             />
-                                                            <EdbcProjectNameFilter
-                                                                placeholder={expensesDstCol3Label}
-                                                                options={projectFilterOptions}
-                                                                value={selectProjectName}
-                                                                onChange={setSelectProjectName}
-                                                                isClearable
-                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                            />
-                                                            <EdbcSelectFilter
-                                                                columnId={EDBC_IDS.EDBC12}
-                                                                placeholder={expensesDstCol12Label}
-                                                                options={weeklyTypes.map((type) => ({ value: type.type, label: type.type }))}
-                                                                value={selectType}
-                                                                onChange={setSelectType}
-                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                            />
-                                                            <EdbcTotalAmountFilter
-                                                                columnId={EDBC_IDS.EDBC8}
-                                                                totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
-                                                            />
-                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                                        </EdbcTableFilterRow>
-                                                    )}
-                                                </thead>
-                                                <tbody>
-                                                    {sortedExpenses.map((row, index) => (
-                                                        <EdbcTableBodyRow key={row.id}>
-                                                            <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
-                                                                {filteredExpenses.length - index}
-                                                            </td>
-                                                            <EdbcDateBodyCell
-                                                                expense={row}
-                                                                rowIndex={index}
-                                                                expandedCells={expandedCells}
-                                                                onToggleExpanded={toggleExpandedCell}
-                                                                formatValue={formatDateOnly}
-                                                            />
-                                                            <EdbcExpandableBodyCell
-                                                                columnId={EDBC_IDS.EDBC4}
-                                                                expense={row}
-                                                                rowIndex={index}
-                                                                expandedCells={expandedCells}
-                                                                onToggleExpanded={toggleExpandedCell}
-                                                                getDisplayValue={getPartyDisplayName}
-                                                            />
-                                                            <EdbcProjectNameBodyCell
-                                                                expense={row}
-                                                                rowIndex={index}
-                                                                expandedCells={expandedCells}
-                                                                onToggleExpanded={toggleExpandedCell}
-                                                                getDisplayValue={(entry) => siteOptions.find(opt => opt.id === Number(entry.project_id))?.label || ''}
-                                                            />
-                                                            <EdbcExpandableBodyCell
-                                                                columnId={EDBC_IDS.EDBC12}
-                                                                expense={row}
-                                                                rowIndex={index}
-                                                                expandedCells={expandedCells}
-                                                                onToggleExpanded={toggleExpandedCell}
-                                                                getDisplayValue={(entry) => entry.type}
-                                                            />
-                                                            <EdbcExpandableBodyCell
-                                                                columnId={EDBC_IDS.EDBC8}
-                                                                expense={row}
-                                                                rowIndex={index}
-                                                                expandedCells={expandedCells}
-                                                                onToggleExpanded={toggleExpandedCell}
-                                                                textAlignClass="text-right"
-                                                                getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
-                                                            />
-                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                <div className="flex w-full items-center justify-center">
-                                                                    <span className="inline-flex items-center gap-1">
-                                                                        {row.bill_copy_url ? (
-                                                                            <>
-                                                                                <a
-                                                                                    href={cleanUrl(row.bill_copy_url)}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer"
-                                                                                    title="View File"
-                                                                                >
-                                                                                    <img src={file} className="w-4 h-4" alt="Open File" />
-                                                                                </a>
-                                                                                {canEditDelete ? (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                                        className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[#E4572E] text-[22px] font-bold leading-none hover:bg-[#fff1ee] p-0 border-0 bg-transparent"
-                                                                                        title="Remove File"
-                                                                                    >
-                                                                                        ×
-                                                                                    </button>
-                                                                                ) : (
-                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0" aria-hidden="true" />
-                                                                                )}
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleFileUploadClick(row)}
-                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer p-0 border-0 bg-transparent"
-                                                                                    title="Upload File"
-                                                                                >
-                                                                                    <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
-                                                                                </button>
-                                                                                {canEditDelete && removedBillCopyRows[row.id] ? (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                                        className="inline-flex shrink-0 rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
-                                                                                        title="Restore Removed File"
-                                                                                    >
-                                                                                        Restore
-                                                                                    </button>
-                                                                                ) : null}
-                                                                            </>
-                                                                        )}
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
-                                                        </EdbcTableBodyRow>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        ) : (
-                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
-                                                <thead className="sticky top-0 z-10 bg-white">
-                                                    <EdbcTableHeaderRow>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={expensesDstCol2Label} {...expensesSortProps} />
-                                                        <EdbcColumnHeader
-                                                            columnId={EDBC_IDS.EDBC4}
-                                                            label={expensesAssociateLabel}
-                                                            {...expensesSortProps}
-                                                        />
-                                                        <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible" aria-hidden="true"></th>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} {...expensesSortProps} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} {...expensesSortProps} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} {...expensesSortProps} />
-                                                        <th
-                                                            id={EDBC_IDS.EDBC20}
-                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.headerClass || ''}`.replace(/\bcursor-pointer\b/g, '').replace(/\bhover:bg-gray-200\b/g, '').replace(/\bselect-none\b/g, '').replace(/\s+/g, ' ').trim() + ' !pr-0'}
-                                                            style={{ paddingRight: 0 }}
-                                                            aria-hidden="true"
-                                                        />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20ActivityLabel} />
-                                                    </EdbcTableHeaderRow>
-                                                    {showFilters && (
-                                                        <EdbcTableFilterRow>
-                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
-                                                            <EdbcDateFilter
-                                                                placeholder={expensesDstCol2Label}
-                                                                value={selectDate}
-                                                                onChange={setSelectDate}
-                                                            />
-                                                            <EdbcSelectFilter
-                                                                columnId={EDBC_IDS.EDBC4}
-                                                                placeholder={expensesAssociateLabel}
-                                                                options={contractorVendorFilterOptions}
-                                                                value={selectContractororVendorName}
-                                                                onChange={setSelectContractororVendorName}
-                                                                selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                            />
                                                             <th className="w-[30px] min-w-[30px] max-w-[30px] p-0 overflow-visible"></th>
                                                             <EdbcProjectNameFilter
                                                                 placeholder={expensesDstCol3Label}
                                                                 options={projectFilterOptions}
                                                                 value={selectProjectName}
                                                                 onChange={setSelectProjectName}
-                                                                isClearable
                                                                 selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                             />
                                                             <EdbcSelectFilter
@@ -4239,14 +4227,17 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             <EdbcTotalAmountFilter
                                                                 columnId={EDBC_IDS.EDBC8}
                                                                 totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                                value={selectExpenseAmount}
+                                                                onChange={(e) => setSelectExpenseAmount(e.target.value)}
                                                             />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                                                             <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                                                            <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
                                                         </EdbcTableFilterRow>
                                                     )}
-                                                    {!isExpensesEntryUploadOnly && canEditSelectedWeek ? (
-                                                        <tr className="bg-white border-b-2 border-gray-200">
+                                                    {canEditSelectedWeek ? (
+                                                        <tr className="bg-white border-b-2 border-gray-200 h-[40px] max-h-[40px] [&>td]:!py-0 overflow-hidden">
                                                             <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>
                                                                 {filteredExpenses.length + 1}.
                                                             </td>
@@ -4407,7 +4398,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                             }
                                                                         }}
                                                                         options={isClientToggleActive ? clientOptions : combinedOptions}
-                                                                        placeholder={expensesAssociateLabel}
+                                                                        placeholder={expensesAssociateEntryPlaceholder}
                                                                         isSearchable
                                                                         isClearable
                                                                         menuPortalTarget={document.body}
@@ -4536,7 +4527,8 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
                                                             <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
-                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td id={EDBC_IDS.EDBC19} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
                                                         </tr>
                                                     ) : null}
                                                 </thead>
@@ -4799,7 +4791,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             )}
                                                             <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}>
                                                                 <div className="flex items-center w-[70px] gap-[20px]">
-                                                                    {row.type !== "Daily" ? (
+                                                                    {row.type !== "Daily" && isWeeklyExpenseTypeMatched(row.type) ? (
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => {
@@ -4835,13 +4827,15 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                                                         );
                                                                                         if (!res.ok) throw new Error("Failed to fetch advance portal data");
                                                                                         const data = await res.json();
-                                                                                        description = data.description || "";
+                                                                                        description = (data.description || "").trim();
+                                                                                        setPortalDescriptions((prev) => ({ ...prev, [row.advance_portal_id]: description !== "" ? description : undefined }));
                                                                                     } catch (error) {
                                                                                         console.error("Error fetching advance portal data:", error);
                                                                                     }
                                                                                 }
                                                                                 setEditFormData((prev) => ({ ...prev, description }));
                                                                                 setCurrentRow(row);
+                                                                                setIsDescriptionEditing(false);
                                                                                 setShowPopups(true);
                                                                             }}
                                                                         >
@@ -4856,574 +4850,659 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                                 <div className="flex w-full items-center justify-center">
-                                                                    <span className="inline-flex items-center gap-1">
+                                                                    <span className="inline-flex items-center gap-[4px]">
                                                                         {row.bill_copy_url ? (
                                                                             <>
                                                                                 <a
                                                                                     href={cleanUrl(row.bill_copy_url)}
                                                                                     target="_blank"
                                                                                     rel="noopener noreferrer"
-                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer"
+                                                                                    className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center cursor-pointer"
                                                                                     title="View File"
                                                                                 >
-                                                                                    <img src={file} className="w-4 h-4" alt="Open File" />
+                                                                                    <img src={file} className="" alt="Open File" />
                                                                                 </a>
-                                                                                {canEditDelete ? (
+                                                                                {canEditDelete && isWeeklyExpenseTypeMatched(row.type) ? (
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={() => handleRemoveBillCopyUrl(row)}
-                                                                                        className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full p-0 border-0 bg-transparent"
+                                                                                        className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
                                                                                         title="Remove File"
                                                                                     >
-                                                                                        <img src={FileRemover} className="w-2 h-2" alt="Remove File" />
-                                                                                    </button>
-                                                                                ) : (
-                                                                                    <span className="inline-flex h-[22px] w-[22px] shrink-0" aria-hidden="true" />
-                                                                                )}
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleFileUploadClick(row)}
-                                                                                    className="inline-flex shrink-0 h-4 w-4 items-center justify-center cursor-pointer p-0 border-0 bg-transparent"
-                                                                                    title="Upload File"
-                                                                                >
-                                                                                    <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
-                                                                                </button>
-                                                                                {canEditDelete && removedBillCopyRows[row.id] ? (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
-                                                                                        className="inline-flex shrink-0 rounded-md border border-[#007233] px-2 py-[1px] text-[10px] font-semibold text-[#007233] hover:bg-[#e9f8f0]"
-                                                                                        title="Restore Removed File"
-                                                                                    >
-                                                                                        Restore
+                                                                                        <img src={FileRemover} className="" alt="Remove File" />
                                                                                     </button>
                                                                                 ) : null}
                                                                             </>
+                                                                        ) : (
+                                                                            <span className="inline-flex items-center gap-2">
+                                                                                {isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleFileUploadClick(row)}
+                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer"
+                                                                                        title="Upload File"
+                                                                                    >
+                                                                                        <img src={fileUpload} className="w-4 h-4 opacity-70 hover:opacity-100" alt="Upload File" />
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        disabled
+                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center opacity-40 cursor-not-allowed"
+                                                                                        title="Upload File"
+                                                                                    >
+                                                                                        <img src={fileUpload} className="w-4 h-4 opacity-70" alt="Upload File" />
+                                                                                    </button>
+                                                                                )}
+                                                                                {canEditDelete && isWeeklyExpenseTypeMatched(row.type) && removedBillCopyRows[row.id] ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRestoreBillCopyUrl(row)}
+                                                                                        className="inline-flex shrink-0"
+                                                                                        title="Restore Removed File"
+                                                                                    >
+                                                                                        <img src={restore} alt="" className="w-4 h-4" />
+                                                                                    </button>
+                                                                                ) : null}
+                                                                            </span>
                                                                         )}
                                                                     </span>
                                                                 </div>
                                                             </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                {canEditSelectedWeek && (
-                                                                    <>
-                                                                        {editingRowId === row.id ? (
-                                                                            <button type="button" onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg p-0 leading-none">
-                                                                                ✓
-                                                                            </button>
-                                                                        ) : (
-                                                                            row.type === "Daily" ? (
-                                                                                <button type="button" disabled className="rounded-full transition duration-200 p-0 leading-none opacity-40 cursor-not-allowed">
-                                                                                    <img className="w-5 h-4 block" src={Edit} alt="Edit Disabled" />
-                                                                                </button>
+                                                            <td id={EDBC_IDS.EDBC19} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                <div className="flex gap-1 justify-center">
+                                                                    {canEditSelectedWeek && (
+                                                                        <>
+                                                                            {editingRowId === row.id ? (
+                                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                    <button type="button" onClick={() => saveEditedExpense(row)} className="text-green-600 font-bold text-lg p-0 leading-none">
+                                                                                        ✓
+                                                                                    </button>
+                                                                                </span>
                                                                             ) : (
-                                                                                <button type="button" className="rounded-full transition duration-200 p-0 leading-none">
-                                                                                    <img
-                                                                                        src={Edit}
-                                                                                        onClick={() => {
+                                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                    {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                        <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Edit} alt="Edit Disabled" />
+                                                                                    ) : (
+                                                                                        <button type="button" onClick={() => {
                                                                                             setEditingRowId(row.id);
                                                                                             setEditingOriginalRow({ ...row });
-                                                                                        }}
-                                                                                        alt="Edit"
-                                                                                        className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                                    />
-                                                                                </button>
-                                                                            )
-                                                                        )}
-                                                                        {row.type === "Daily" ? (
-                                                                            <button type="button" disabled className="rounded-full transition duration-200 p-0 leading-none opacity-40 cursor-not-allowed">
-                                                                                <img className="w-5 h-4 block" src={Delete} alt="Delete Disabled" />
-                                                                            </button>
-                                                                        ) : (
-                                                                            canEditDelete && (
-                                                                                <button type="button" className="rounded-full transition duration-200 p-0 leading-none">
-                                                                                    <img
-                                                                                        src={Delete}
-                                                                                        className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                                        onClick={() => handleWeeklyExpensesDelete(row.id)}
-                                                                                        alt="Delete"
-                                                                                    />
-                                                                                </button>
-                                                                            )
-                                                                        )}
-                                                                        {row.type === "Daily" ? (
-                                                                            <button type="button" disabled className="rounded-full transition duration-200 p-0 leading-none opacity-40 cursor-not-allowed">
-                                                                                <img className="w-5 h-4 block" src={history} alt="History Disabled" />
-                                                                            </button>
-                                                                        ) : (
-                                                                            <button type="button" onClick={() => fetchAuditDetailsForExpense(row.id)} className="rounded-full transition duration-200 p-0 leading-none">
-                                                                                <img
-                                                                                    src={history}
-                                                                                    className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                                    alt="History"
-                                                                                />
-                                                                            </button>
-                                                                        )}
-                                                                    </>
-                                                                )}
+                                                                                        }}>
+                                                                                            <img src={Edit} alt="Edit" className="w-5 h-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </span>
+                                                                            )}
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                {row.type === "Daily" || !isWeeklyExpenseTypeMatched(row.type) ? (
+                                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
+                                                                                ) : canEditDelete ? (
+                                                                                    <button type="button" onClick={() => handleWeeklyExpensesDelete(row.id)}>
+                                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={Delete} alt="Delete Disabled" />
+                                                                                )}
+                                                                            </span>
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                {row.type === "Daily" ? (
+                                                                                    <img className="w-5 h-4 opacity-40 cursor-not-allowed" src={history} alt="History Disabled" />
+                                                                                ) : (
+                                                                                    <button type="button" onClick={() => fetchAuditDetailsForExpense(row.id)}>
+                                                                                        <img className="w-5 h-4" src={history} alt="History" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
                                                             </td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
                                                         </EdbcTableBodyRow>
                                                     ))}
                                                 </tbody>
                                             </table>
-                                        )}
+                                        </div>
                                     </div>
-                                </div>
                                 </div>
                             </div>
-                            {!isExpensesEntryUploadOnly && (
-                                <div className="w-fit shrink-0 flex flex-col min-h-0 h-full">
-                                    <div className="flex justify-between items-center mb-[8px]">
-                                        <h1 className="font-bold text-base">Income</h1>
-                                        <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
-                                            ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </h1>
-                                    </div>
-                                    <div className="flex flex-col w-fit max-w-full min-h-0 overflow-hidden">
-                                    <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
-                                        <div className="shrink-0 flex items-center z-[2] bg-white">
-                                            <EdbcFilterToggleButton onClick={() => setShowPaymentsFilters(!showPaymentsFilters)} />
+                            <div className={`w-fit shrink-0 flex flex-col min-h-0 xl:h-full max-xl:h-auto max-xl:w-full${isExpensesEntryUploadOnly ? ' min-w-[486px]' : ''}`}>
+                                {!isExpensesEntryUploadOnly && (
+                                    <>
+                                        <div className="flex justify-between items-center mb-[8px]">
+                                            <h1 className="font-bold text-base">Income</h1>
+                                            <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
+                                                ₹{payments.reduce((total, row) => total + Number(row.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </h1>
                                         </div>
-                                        <div
-                                            ref={paymentsFilterChipsRef}
-                                            className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar cursor-grab"
-                                                onMouseDown={(e) => handleMouseDown(e, paymentsFilterChipsRef, true)}
-                                                onMouseMove={(e) => handleMouseMove(e, paymentsFilterChipsRef, true)}
-                                                onMouseUp={() => handleMouseUp(paymentsFilterChipsRef)}
-                                                onMouseLeave={() => handleMouseUp(paymentsFilterChipsRef)}
-                                            >
-                                            {selectPaymentDate && (
-                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                    <span className="font-medium text-[#BF9853]">Date: </span>
-                                                    <span className="font-semibold text-[14px]">{formatDateOnly(selectPaymentDate)}</span>
-                                                    <button onClick={() => setSelectPaymentDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                                </span>
-                                            )}
-                                            {selectPaymentAmount && (
-                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                    <span className="font-medium text-[#BF9853]">Amount: </span>
-                                                    <span className="font-semibold text-[14px]">{selectPaymentAmount}</span>
-                                                    <button onClick={() => setSelectPaymentAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
-                                                </span>
-                                            )}
-                                            {selectPaymentType && (
-                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
-                                                    <span className="font-medium text-[#BF9853]">Type: </span>
-                                                    <span className="font-semibold text-[14px]">{selectPaymentType}</span>
-                                                    <button onClick={() => setSelectPaymentType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
-                                                </span>
-                                            )}
-                                            </div>
-                                        <EdbcTableToolbarRightActions
-                                            onClearFilters={clearPaymentsFilters}
-                                            overallSearch={paymentsOverallSearch}
-                                            onOverallSearchChange={setPaymentsOverallSearch}
-                                            wrapperClassName="flex items-center gap-[6px] shrink-0 z-[2] bg-white pl-[4px]"
-                                            searchWrapperClassName="h-[34px] w-[286px] shrink-0 min-w-0 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1"
-                                        />
-                                    </div>
-                                    <div className="shrink-0">
-                                        <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar"
-                                            style={{
-                                                height: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
-                                                maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
-                                                willChange: 'scroll-position',
-                                                WebkitOverflowScrolling: 'touch',
-                                                transform: 'translateZ(0)',
-                                                backfaceVisibility: 'hidden'
-                                            }}
-                                            onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
-                                            onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
-                                            onMouseUp={() => handleMouseUp(paymentsScrollRef)}
-                                            onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
-                                            onWheel={(e) => e.stopPropagation()}
-                                        >
-                                            <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS}`}>
-
-                                                <thead className="sticky top-0 z-[99999] bg-white">
-                                                    <EdbcTableHeaderRow>
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={paymentsDstCol2Label} columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} {...paymentsSortProps} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={paymentsDstCol12Label} {...paymentsSortProps} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={paymentsDstCol8Label} {...paymentsSortProps} />
-                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={paymentsDstCol20Label} />
-                                                    </EdbcTableHeaderRow>
-                                                    {showPaymentsFilters && (
-                                                        <EdbcTableFilterRow>
-                                                            <EdbcDateFilter
-                                                                placeholder={paymentsDstCol2Label}
-                                                                value={selectPaymentDate}
-                                                                onChange={setSelectPaymentDate}
-                                                            />
-                                                            <EdbcSelectFilter
-                                                                columnId={EDBC_IDS.EDBC12}
-                                                                placeholder={paymentsDstCol12Label}
-                                                                options={weeklyReceivedTypes.map((type) => ({
-                                                                    value: type.received_type,
-                                                                    label: type.received_type,
-                                                                }))}
-                                                                value={selectPaymentType}
-                                                                onChange={setSelectPaymentType}
-                                                            />
-                                                            <EdbcTotalAmountFilter
-                                                                columnId={EDBC_IDS.EDBC8}
-                                                                totalAmount={payments.reduce((total, row) => total + Number(row.amount || 0), 0)}
-                                                                value={selectPaymentAmount}
-                                                                onChange={(e) => setSelectPaymentAmount(e.target.value)}
-                                                            />
-                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                                        </EdbcTableFilterRow>
-                                                    )}
-                                                    {canEditSelectedWeek ? (
-                                                        <EdbcTableBodyRow className="!bg-white border-b-2 border-gray-200">
-                                                            <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-visible`}>
-                                                                <div
-                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} overflow-visible relative z-[99999]`}
-                                                                    onKeyDown={handleKeyDown1}
-                                                                >
-                                                                    <CustomDateField
-                                                                        value={newPayment.date}
-                                                                        onChange={(dateStr) => handlePaymentChange({ target: { name: 'date', value: dateStr } })}
-                                                                        placeholder={paymentsDstCol2Label}
-                                                                        alwaysOpenBelow
-                                                                        calendarPortal
-                                                                        controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
-                                                                        className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newPayment.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
-                                                                <div
-                                                                    className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}
-                                                                    onKeyDown={handleKeyDown1}
-                                                                >
-                                                                    <Select
-                                                                        name="type"
-                                                                        className="text-xs focus:outline-none w-full"
-                                                                        value={newPayment.type ? { value: newPayment.type, label: newPayment.type } : null}
-                                                                        onChange={(selectedOption) => handlePaymentChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
-                                                                        options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
-                                                                        placeholder={paymentsDstCol12Label}
-                                                                        isSearchable
-                                                                        isClearable
-                                                                        menuPortalTarget={document.body}
-                                                                        menuPosition="fixed"
-                                                                        classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
-                                                                        styles={{
-                                                                            ...CASH_REGISTER_SELECT_STYLES,
-                                                                            menu: (provided) => ({
-                                                                                ...CASH_REGISTER_SELECT_STYLES.menu(provided),
-                                                                                zIndex: 10050,
-                                                                            }),
-                                                                            menuList: entryRowSelectMenuListStyle,
-                                                                            menuPortal: (provided) => ({
-                                                                                ...provided,
-                                                                                zIndex: 10050,
-                                                                            }),
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
-                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
-                                                                    <input
-                                                                        type="number"
-                                                                        name="amount"
-                                                                        style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
-                                                                        placeholder={paymentsDstCol8Label}
-                                                                        value={newPayment.amount}
-                                                                        onChange={handlePaymentChange}
-                                                                        onKeyDown={handleKeyDown1}
-                                                                        onWheel={(e) => e.preventDefault()}
-                                                                        onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
-                                                                        onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC20} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
-                                                        </EdbcTableBodyRow>
-                                                    ) : null}
-                                                </thead>
-                                                <tbody>
-                                                    {sortedPayments.map((row, index) => (
-                                                        <EdbcTableBodyRow key={row.id || index}>
-                                                            {editingPaymentId === (row.id || null) ? (
-                                                                <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-visible`}>
-                                                                    <div
-                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} overflow-visible relative z-[99999]`}
-                                                                    >
-                                                                        <CustomDateField
-                                                                            value={row.date || ""}
-                                                                            onChange={(dateStr) => handleEditPayment(index, "date", dateStr)}
-                                                                            placeholder={paymentsDstCol2Label}
-                                                                            alwaysOpenBelow
-                                                                            calendarPortal
-                                                                            controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
-                                                                            className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${row.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
-                                                                        />
-                                                                    </div>
-                                                                </td>
-                                                            ) : (
-                                                                <EdbcDateBodyCell
-                                                                    expense={row}
-                                                                    rowIndex={index}
-                                                                    expandedCells={expandedCells}
-                                                                    onToggleExpanded={toggleExpandedCell}
-                                                                    formatValue={formatDateOnly}
-                                                                    columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
-                                                                />
-                                                            )}
-                                                            {editingPaymentId === (row.id || null) ? (
-                                                                <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
-                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
-                                                                        <Select
-                                                                            name="type"
-                                                                            className="text-xs focus:outline-none w-full"
-                                                                            value={row.type ? { value: row.type, label: row.type } : null}
-                                                                            onChange={(selectedOption) => handleEditPayment(index, "type", selectedOption ? selectedOption.value : "")}
-                                                                            options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
-                                                                            placeholder={paymentsDstCol12Label}
-                                                                            isSearchable
-                                                                            isClearable
-                                                                            menuPortalTarget={document.body}
-                                                                            menuPosition="fixed"
-                                                                            classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
-                                                                            styles={{
-                                                                                ...CASH_REGISTER_SELECT_STYLES,
-                                                                                menu: (provided) => ({
-                                                                                    ...CASH_REGISTER_SELECT_STYLES.menu(provided),
-                                                                                    zIndex: 10050,
-                                                                                }),
-                                                                                menuList: entryRowSelectMenuListStyle,
-                                                                                menuPortal: (provided) => ({
-                                                                                    ...provided,
-                                                                                    zIndex: 10050,
-                                                                                }),
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                </td>
-                                                            ) : (
-                                                                <EdbcExpandableBodyCell
-                                                                    columnId={EDBC_IDS.EDBC12}
-                                                                    expense={row}
-                                                                    rowIndex={index}
-                                                                    expandedCells={expandedCells}
-                                                                    onToggleExpanded={toggleExpandedCell}
-                                                                    getDisplayValue={(entry) => entry.type}
-                                                                />
-                                                            )}
-                                                            {editingPaymentId === (row.id || null) ? (
-                                                                <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
-                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={row.amount || ""}
-                                                                            onChange={(e) =>
-                                                                                handleEditPayment(index, "amount", e.target.value)
-                                                                            }
-                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
-                                                                            onWheel={(e) => e.preventDefault()}
-                                                                            onFocus={() =>
-                                                                                window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
-                                                                            }
-                                                                            onBlur={() =>
-                                                                                window.removeEventListener("wheel", (e) => e.preventDefault())
-                                                                            }
-                                                                        />
-                                                                    </div>
-                                                                </td>
-                                                            ) : (
-                                                                <EdbcExpandableBodyCell
-                                                                    columnId={EDBC_IDS.EDBC8}
-                                                                    expense={row}
-                                                                    rowIndex={index}
-                                                                    expandedCells={expandedCells}
-                                                                    onToggleExpanded={toggleExpandedCell}
-                                                                    textAlignClass="text-right"
-                                                                    getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
-                                                                />
-                                                            )}
-                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                                {canEditSelectedWeek && (
-                                                                    <div className="flex gap-1">
-                                                                        {editingPaymentId === row.id ? (
-                                                                            <button
-                                                                                className="text-green-600 font-bold text-lg"
-                                                                                onClick={() => saveEditedPaymentReceived(row)}
-                                                                                disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
-                                                                            >
-                                                                                ✓
-                                                                            </button>
-                                                                        ) : (
-                                                                            weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                                canEditSelectedWeek && (
-                                                                                    <button onClick={() => {
-                                                                                        setEditingPaymentId(row.id);
-                                                                                        setEditingOriginalPayment({ ...row });
-                                                                                    }}>
-                                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                                    </button>
-                                                                                )
-                                                                            ) : (
-                                                                                <img
-                                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                                    src={Edit}
-                                                                                    alt="Edit Disabled"
-                                                                                />
-                                                                            )
-                                                                        )}
-                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                            canEditDelete && canEditSelectedWeek && (
-                                                                                <button className="" onClick={() => handleWeeklyReceivedDelete(row.id)}>
-                                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                                                </button>
-                                                                            )
-                                                                        ) : (
-                                                                            <img
-                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                                src={Delete}
-                                                                                alt="Delete Disabled"
-                                                                            />
-                                                                        )}
-                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
-                                                                            <button className="" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
-                                                                                <img src={history} className="w-5 h-4" alt="History" />
-                                                                            </button>
-                                                                        ) : (
-                                                                            <img
-                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
-                                                                                src={history}
-                                                                                alt="History Disabled"
-                                                                            />
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                        </EdbcTableBodyRow>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                    </div>
-                                    <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden">
-                                        <div className="flex flex-col h-full min-h-0">
-                                            <div className="flex items-center justify-between rounded-lg mb-[4px]">
-                                                <p className="text-[16px] font-semibold text-black">Summary Details</p>
-                                                <div className="flex items-center gap-2">
-                                                    {canEditDelete &&
-                                                        lastDeletedWeeklySummary &&
-                                                        String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
-                                                        String(lastDeletedWeeklySummary.year) === String(year) && (
-                                                            <button
-                                                                type="button"
-                                                                disabled={weeklySummaryDeleteLoading}
-                                                                onClick={handleWeeklySummaryUndoDelete}
-                                                                className="text-sm font-semibold text-[#BF9853] flex items-center gap-1 disabled:opacity-50"
-                                                                title="Restore removed summary"
-                                                            >
-                                                                <img src={restore} alt="" className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                    <input
-                                                        ref={weeklySummaryFileInputRef}
-                                                        type="file"
-                                                        className="hidden"
-                                                        accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
-                                                        onChange={handleWeeklySummaryFileChange}
+                                        <div className="flex flex-col w-fit max-w-full min-h-0 overflow-hidden max-xl:w-full max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
+                                            <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                                <div className="shrink-0 flex items-center z-[2] bg-white">
+                                                    <EdbcFilterToggleButton
+                                                        onClick={() => {
+                                                            const willOpen = !showPaymentsFilters;
+                                                            const scroller = paymentsScrollRef.current;
+                                                            if (willOpen) {
+                                                                setShowPaymentsFilters(true);
+                                                                if (!scroller) return;
+                                                                if (scroller.scrollTop <= 0) return;
+                                                                if (paymentsFilterNudgeUsedRef.current) return;
+                                                                paymentsFilterNudgeUsedRef.current = true;
+                                                                requestAnimationFrame(() => {
+                                                                    requestAnimationFrame(() => {
+                                                                        const h = paymentsFilterRowRef.current?.offsetHeight || 0;
+                                                                        if (h > 0) {
+                                                                            scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                                        }
+                                                                    });
+                                                                });
+                                                                return;
+                                                            }
+                                                            const h = paymentsFilterRowRef.current?.offsetHeight || 0;
+                                                            setShowPaymentsFilters(false);
+                                                            if (!scroller || h <= 0 || !paymentsFilterNudgeUsedRef.current) return;
+                                                            paymentsFilterNudgeUsedRef.current = false;
+                                                            requestAnimationFrame(() => {
+                                                                requestAnimationFrame(() => {
+                                                                    scroller.scrollTop = scroller.scrollTop + h;
+                                                                });
+                                                            });
+                                                        }}
                                                     />
-                                                    {hasWeeklySummaryBillCopyUrl ? (
-                                                        <span className="inline-flex items-center gap-1">
-                                                            <a
-                                                                href={weeklySummaryBillCopyUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-[14px] font-semibold text-[#E4572E] hover:underline"
-                                                                title="View Signature Copy"
-                                                            >
-                                                                {weeklySummaryFileLabel}
-                                                            </a>
-                                                            {canEditDelete && (
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={weeklySummaryDeleteLoading}
-                                                                    onClick={handleWeeklySummaryMarkDeleted}
-                                                                    className="inline-flex shrink-0 items-center justify-center rounded-full p-0 leading-none border-0 bg-transparent disabled:opacity-50"
-                                                                    title="Remove Signature Copy"
-                                                                >
-                                                                    <img
-                                                                        src={Delete}
-                                                                        className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
-                                                                        alt="Delete"
-                                                                    />
-                                                                </button>
-                                                            )}
+                                                </div>
+                                                <div
+                                                    ref={paymentsFilterChipsRef}
+                                                    className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
+                                                    onMouseDown={(e) => handleMouseDown(e, paymentsFilterChipsRef, true)}
+                                                    onMouseMove={(e) => handleMouseMove(e, paymentsFilterChipsRef, true)}
+                                                    onMouseUp={() => handleMouseUp(paymentsFilterChipsRef)}
+                                                    onMouseLeave={() => handleMouseUp(paymentsFilterChipsRef)}
+                                                >
+                                                    {selectPaymentDate && (
+                                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Date: </span>
+                                                            <span className="font-semibold text-[14px]">{formatDateOnly(selectPaymentDate)}</span>
+                                                            <button onClick={() => setSelectPaymentDate('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
                                                         </span>
-                                                    ) : canEditDelete ? (
-                                                        <button
-                                                            type="button"
-                                                            disabled={weeklySummaryUploading || weeklySummaryLoading}
-                                                            onClick={() => weeklySummaryFileInputRef.current?.click()}
-                                                            className="inline-flex flex-row items-center gap-1 rounded h-[34px] shrink-0 text-[14px] font-semibold text-[#BF9853] disabled:opacity-50"
-                                                            title="Upload Signature Copy for this week"
-                                                        >
-                                                            <span>{weeklySummaryUploading ? "Uploading…" : "Signature"}</span>
-                                                            <img src={fileSignatureUpload} alt="" className="w-4 h-4 shrink-0" />
-                                                        </button>
-                                                    ) : null}
+                                                    )}
+                                                    {selectPaymentAmount && (
+                                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Amount: </span>
+                                                            <span className="font-semibold text-[14px]">{selectPaymentAmount}</span>
+                                                            <button onClick={() => setSelectPaymentAmount('')} className="text-[#E4572E] ml-1 text-2xl">×</button>
+                                                        </span>
+                                                    )}
+                                                    {selectPaymentType && (
+                                                        <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 text-sm font-medium w-fit">
+                                                            <span className="font-medium text-[#BF9853]">Type: </span>
+                                                            <span className="font-semibold text-[14px]">{selectPaymentType}</span>
+                                                            <button onClick={() => setSelectPaymentType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <EdbcTableToolbarRightActions
+                                                    onClearFilters={clearPaymentsFilters}
+                                                    overallSearch={paymentsOverallSearch}
+                                                    onOverallSearchChange={setPaymentsOverallSearch}
+                                                    wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
+                                                    searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                                />
+                                            </div>
+                                            <div className="shrink-0">
+                                                <div ref={paymentsScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none max-xl:w-full"
+                                                    style={{
+                                                        height: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                        maxHeight: `${40 + (showPaymentsFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                        willChange: 'scroll-position',
+                                                        WebkitOverflowScrolling: 'touch',
+                                                        transform: 'translateZ(0)',
+                                                        backfaceVisibility: 'hidden'
+                                                    }}
+                                                    onWheel={(e) => {
+                                                        paymentsFilterNudgeUsedRef.current = false;
+                                                        e.stopPropagation();
+                                                    }}
+                                                    onMouseDown={(e) => handleMouseDown(e, paymentsScrollRef)}
+                                                    onMouseMove={(e) => handleMouseMove(e, paymentsScrollRef)}
+                                                    onMouseUp={() => handleMouseUp(paymentsScrollRef)}
+                                                    onMouseLeave={() => handleMouseUp(paymentsScrollRef)}
+                                                >
+                                                    <table className={`border-collapse text-left ${WEEKLY_PAYMENT_INCOME_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_th#EDBC-19]:!w-[70px] [&_td#EDBC-19]:!w-[70px] [&_th#EDBC-19]:!min-w-[70px] [&_td#EDBC-19]:!min-w-[70px] [&_th#EDBC-19]:!max-w-[70px] [&_td#EDBC-19]:!max-w-[70px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px] ${WEEKLY_PAYMENT_EDBC8_TABLE_CLASS} ${WEEKLY_PAYMENT_INCOME_TBODY_TABLE_LOCK_TABLE_CLASS}`}>
+                                                        <colgroup>
+                                                            <col style={{ width: '130px' }} />
+                                                            <col style={{ width: '158px' }} />
+                                                            <col style={{ width: '120px' }} />
+                                                            <col style={{ width: '70px' }} />
+                                                            <col style={{ width: '12px' }} />
+                                                        </colgroup>
+
+                                                        <thead className="sticky top-0 z-[99999] bg-white">
+                                                            <EdbcTableHeaderRow>
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label={paymentsDstCol2Label} columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS} {...paymentsSortProps} />
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={paymentsDstCol12Label} {...paymentsSortProps} />
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={paymentsDstCol8Label} {...paymentsSortProps} />
+                                                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label={paymentsDstCol20Label} />
+                                                                <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                            </EdbcTableHeaderRow>
+                                                            {showPaymentsFilters && (
+                                                                <EdbcTableFilterRow ref={paymentsFilterRowRef}>
+                                                                    <EdbcDateFilter
+                                                                        placeholder={paymentsDstCol2Label}
+                                                                        value={selectPaymentDate}
+                                                                        onChange={setSelectPaymentDate}
+                                                                    />
+                                                                    <th id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} overflow-hidden`}>
+                                                                        <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass} min-w-0 max-w-full`}>
+                                                                            <Select
+                                                                                className="text-xs focus:outline-none w-full"
+                                                                                options={weeklyReceivedTypes.map((type) => ({
+                                                                                    value: type.received_type,
+                                                                                    label: type.received_type,
+                                                                                }))}
+                                                                                value={weeklyReceivedTypes.map((type) => ({
+                                                                                    value: type.received_type,
+                                                                                    label: type.received_type,
+                                                                                })).find((opt) => opt.value === selectPaymentType) || null}
+                                                                                onChange={(opt) => setSelectPaymentType(opt ? opt.value : '')}
+                                                                                placeholder={paymentsDstCol12Label}
+                                                                                isSearchable
+                                                                                isClearable={false}
+                                                                                menuPlacement="bottom"
+                                                                                menuPortalTarget={document.body}
+                                                                                noOptionsMessage={() => null}
+                                                                                styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                            />
+                                                                        </div>
+                                                                    </th>
+                                                                    <th id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                        <div className="min-w-0 w-full">
+                                                                            <input
+                                                                                type="text"
+                                                                                inputMode="decimal"
+                                                                                value={selectPaymentAmount}
+                                                                                onChange={(e) => setSelectPaymentAmount(e.target.value.replace(/[^\d.,]/g, ''))}
+                                                                                placeholder={formatEdbcTotalAmountPlaceholder(payments.reduce((total, row) => total + Number(row.amount || 0), 0))}
+                                                                                style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner !w-full`}
+                                                                            />
+                                                                        </div>
+                                                                    </th>
+                                                                    <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
+                                                                    <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                                </EdbcTableFilterRow>
+                                                            )}
+                                                            {canEditSelectedWeek ? (
+                                                                <EdbcTableBodyRow className="!bg-white border-b-2 border-gray-200 !h-[40px] !max-h-[40px] [&>td]:!py-0 overflow-hidden">
+                                                                    <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-hidden`}>
+                                                                        <div
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass} overflow-visible relative z-[99999]`}
+                                                                            onKeyDown={handleKeyDown1}
+                                                                        >
+                                                                            <CustomDateField
+                                                                                value={newPayment.date}
+                                                                                onChange={(dateStr) => handlePaymentChange({ target: { name: 'date', value: dateStr } })}
+                                                                                placeholder={paymentsDstCol2Label}
+                                                                                alwaysOpenBelow
+                                                                                calendarPortal
+                                                                                controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                                className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${newPayment.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} overflow-hidden`}>
+                                                                        <div
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass} min-w-0 max-w-full`}
+                                                                            onKeyDown={handleKeyDown1}
+                                                                        >
+                                                                            <Select
+                                                                                name="type"
+                                                                                className="text-xs focus:outline-none w-full"
+                                                                                value={newPayment.type ? { value: newPayment.type, label: newPayment.type } : null}
+                                                                                onChange={(selectedOption) => handlePaymentChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                                options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
+                                                                                placeholder={paymentsDstCol12Label}
+                                                                                isSearchable
+                                                                                isClearable
+                                                                                menuPortalTarget={document.body}
+                                                                                menuPosition="fixed"
+                                                                                classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                                styles={{
+                                                                                    ...CASH_REGISTER_SELECT_STYLES,
+                                                                                    menu: (provided) => ({
+                                                                                        ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                        zIndex: 10050,
+                                                                                    }),
+                                                                                    menuList: entryRowSelectMenuListStyle,
+                                                                                    menuPortal: (provided) => ({
+                                                                                        ...provided,
+                                                                                        zIndex: 10050,
+                                                                                    }),
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td id={EDBC_IDS.EDBC8} className={`pl-[1px] pr-[9px] ${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass} text-right overflow-hidden`}>
+                                                                        <div className="min-w-0 w-full">
+                                                                            <input
+                                                                                type="number"
+                                                                                name="amount"
+                                                                                style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner !w-full`}
+                                                                                placeholder={paymentsDstCol8Label}
+                                                                                value={newPayment.amount}
+                                                                                onChange={handlePaymentChange}
+                                                                                onKeyDown={handleKeyDown1}
+                                                                                onWheel={(e) => e.preventDefault()}
+                                                                                onFocus={() => window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })}
+                                                                                onBlur={() => window.removeEventListener("wheel", (e) => e.preventDefault())}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td id={EDBC_IDS.EDBC19} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass || ''} !pr-0`} style={{ paddingRight: 0 }}></td>
+                                                                    <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                                </EdbcTableBodyRow>
+                                                            ) : null}
+                                                        </thead>
+                                                        <tbody>
+                                                            {sortedPayments.map((row, index) => (
+                                                                <EdbcTableBodyRow key={row.id || index}>
+                                                                    {editingPaymentId === (row.id || null) ? (
+                                                                        <td id={EDBC_IDS.EDBC2} className={`pl-[12px] ${EDBC2_FIRST_COLUMN_WIDTH_CLASS} pr-[1px] text-left overflow-visible`}>
+                                                                            <div
+                                                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.filterWidthClass || ''} overflow-visible relative z-[99999]`}
+                                                                            >
+                                                                                <CustomDateField
+                                                                                    value={row.date || ""}
+                                                                                    onChange={(dateStr) => handleEditPayment(index, "date", dateStr)}
+                                                                                    placeholder={paymentsDstCol2Label}
+                                                                                    alwaysOpenBelow
+                                                                                    calendarPortal
+                                                                                    controlHeightPx={EDBC_FILTER_CONTROL_HEIGHT_PX}
+                                                                                    className={` !z-[99999] !overflow-visible [&_.absolute]:!z-[99999] [&>div]:!w-full [&>div]:!border-2 [&>div]:!border-[rgba(191,152,83,0.2)] [&>div]:!rounded-lg [&>div]:!shadow-none [&>div]:!text-[14px] [&>div:hover]:!border-[rgba(191,152,83,0.4)] ${row.date ? '[&>div]:!text-black [&>div]:!font-normal' : '[&>div]:!text-[#d3d5db] [&>div]:!font-normal'}`}
+                                                                                />
+                                                                            </div>
+                                                                        </td>
+                                                                    ) : (
+                                                                        <EdbcDateBodyCell
+                                                                            expense={row}
+                                                                            rowIndex={index}
+                                                                            expandedCells={expandedCells}
+                                                                            onToggleExpanded={toggleExpandedCell}
+                                                                            formatValue={formatDateOnly}
+                                                                            columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
+                                                                        />
+                                                                    )}
+                                                                    {editingPaymentId === (row.id || null) ? (
+                                                                        <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
+                                                                                <Select
+                                                                                    name="type"
+                                                                                    className="text-xs focus:outline-none w-full"
+                                                                                    value={row.type ? { value: row.type, label: row.type } : null}
+                                                                                    onChange={(selectedOption) => handleEditPayment(index, "type", selectedOption ? selectedOption.value : "")}
+                                                                                    options={weeklyReceivedTypes.map((type) => ({ value: type.received_type, label: type.received_type }))}
+                                                                                    placeholder={paymentsDstCol12Label}
+                                                                                    isSearchable
+                                                                                    isClearable
+                                                                                    menuPortalTarget={document.body}
+                                                                                    menuPosition="fixed"
+                                                                                    classNames={ENTRY_ROW_SELECT_CLASS_NAMES}
+                                                                                    styles={{
+                                                                                        ...CASH_REGISTER_SELECT_STYLES,
+                                                                                        menu: (provided) => ({
+                                                                                            ...CASH_REGISTER_SELECT_STYLES.menu(provided),
+                                                                                            zIndex: 10050,
+                                                                                        }),
+                                                                                        menuList: entryRowSelectMenuListStyle,
+                                                                                        menuPortal: (provided) => ({
+                                                                                            ...provided,
+                                                                                            zIndex: 10050,
+                                                                                        }),
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </td>
+                                                                    ) : (
+                                                                        <EdbcExpandableBodyCell
+                                                                            columnId={EDBC_IDS.EDBC12}
+                                                                            expense={row}
+                                                                            rowIndex={index}
+                                                                            expandedCells={expandedCells}
+                                                                            onToggleExpanded={toggleExpandedCell}
+                                                                            getDisplayValue={(entry) => entry.type}
+                                                                        />
+                                                                    )}
+                                                                    {editingPaymentId === (row.id || null) ? (
+                                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
+                                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={row.amount || ""}
+                                                                                    onChange={(e) =>
+                                                                                        handleEditPayment(index, "amount", e.target.value)
+                                                                                    }
+                                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                                    onWheel={(e) => e.preventDefault()}
+                                                                                    onFocus={() =>
+                                                                                        window.addEventListener("wheel", (e) => e.preventDefault(), { passive: false })
+                                                                                    }
+                                                                                    onBlur={() =>
+                                                                                        window.removeEventListener("wheel", (e) => e.preventDefault())
+                                                                                    }
+                                                                                />
+                                                                            </div>
+                                                                        </td>
+                                                                    ) : (
+                                                                        <EdbcExpandableBodyCell
+                                                                            columnId={EDBC_IDS.EDBC8}
+                                                                            expense={row}
+                                                                            rowIndex={index}
+                                                                            expandedCells={expandedCells}
+                                                                            onToggleExpanded={toggleExpandedCell}
+                                                                            textAlignClass="text-right"
+                                                                            getDisplayValue={(entry) => formatWeeklyPaymentAmountDisplay(entry.amount)}
+                                                                        />
+                                                                    )}
+                                                                    <td id={EDBC_IDS.EDBC19} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                        <div className="flex gap-1 justify-center">
+                                                                            {canEditSelectedWeek && (
+                                                                                <>
+                                                                                    {editingPaymentId === row.id ? (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            <button
+                                                                                                className="text-green-600 font-bold text-lg"
+                                                                                                onClick={() => saveEditedPaymentReceived(row)}
+                                                                                                disabled={!weeklyReceivedTypes.some(type => type.received_type === row.type)}
+                                                                                            >
+                                                                                                ✓
+                                                                                            </button>
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                                canEditSelectedWeek && (
+                                                                                                    <button onClick={() => {
+                                                                                                        setEditingPaymentId(row.id);
+                                                                                                        setEditingOriginalPayment({ ...row });
+                                                                                                    }}>
+                                                                                                        <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                                                    </button>
+                                                                                                )
+                                                                                            ) : (
+                                                                                                <img
+                                                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                    src={Edit}
+                                                                                                    alt="Edit Disabled"
+                                                                                                />
+                                                                                            )}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            {canEditDelete ? (
+                                                                                                <button type="button" onClick={() => handleWeeklyReceivedDelete(row.id)}>
+                                                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                                </button>
+                                                                                            ) : (
+                                                                                                <img
+                                                                                                    className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                    src={Delete}
+                                                                                                    alt="Delete Disabled"
+                                                                                                />
+                                                                                            )}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                            <img
+                                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                src={Delete}
+                                                                                                alt="Delete Disabled"
+                                                                                            />
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                        {weeklyReceivedTypes.some(type => type.received_type === row.type) ? (
+                                                                                            <button type="button" onClick={() => fetchAuditDetailsForPaymentReceived(row.id)}>
+                                                                                                <img src={history} className="w-5 h-4" alt="History" />
+                                                                                            </button>
+                                                                                        ) : (
+                                                                                            <img
+                                                                                                className="w-5 h-4 opacity-40 cursor-not-allowed"
+                                                                                                src={history}
+                                                                                                alt="History Disabled"
+                                                                                            />
+                                                                                        )}
+                                                                                    </span>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                                </EdbcTableBodyRow>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
-                                            <div className="overflow-y-auto no-scrollbar flex-1 min-h-0">
-                                                {Object.entries(
-                                                    filteredExpenses
-                                                        .filter(expense => Number(expense.amount) > 0)
-                                                        .reduce((acc, expense) => {
-                                                            const type = expense.type;
-                                                            const amount = Number(expense.amount);
-                                                            acc[type] = (acc[type] || 0) + amount;
-                                                            return acc;
-                                                        }, {})
-                                                ).map(([type, total]) => (
-                                                    <div key={type} className="flex items-center justify-between py-[4px]">
-                                                        <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
-                                                        <p className="text-[14px] font-semibold text-black">
-                                                            ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </p>
-                                                    </div>
-                                                ))}
+                                        </div>
+                                    </>
+                                )}
+                                <div className={`${isExpensesEntryUploadOnly ? 'mt-[80px]' : 'mt-[12px]'} flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden max-xl:flex-none max-xl:overflow-visible`}>
+                                    <div className="flex flex-col h-full min-h-0">
+                                        <div className="flex items-center justify-between rounded-lg mb-[4px]">
+                                            <p className="text-[16px] font-semibold text-black">Summary Details</p>
+                                            <div className="flex items-center gap-2">
+                                                {canEditDelete &&
+                                                    lastDeletedWeeklySummary &&
+                                                    String(lastDeletedWeeklySummary.weekNumber) === String(selectedWeek) &&
+                                                    String(lastDeletedWeeklySummary.year) === String(year) && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={weeklySummaryDeleteLoading}
+                                                            onClick={handleWeeklySummaryUndoDelete}
+                                                            className="text-sm font-semibold text-[#BF9853] flex items-center gap-1 disabled:opacity-50"
+                                                            title="Restore removed summary"
+                                                        >
+                                                            <img src={restore} alt="" className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                <input
+                                                    ref={weeklySummaryFileInputRef}
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf"
+                                                    onChange={handleWeeklySummaryFileChange}
+                                                />
+                                                {hasWeeklySummaryBillCopyUrl ? (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <a
+                                                            href={weeklySummaryBillCopyUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-[14px] font-semibold text-[#E4572E] hover:underline"
+                                                            title="View Signature Copy"
+                                                        >
+                                                            {weeklySummaryFileLabel}
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            disabled={weeklySummaryDeleteLoading}
+                                                            onClick={handleWeeklySummaryMarkDeleted}
+                                                            className="inline-flex shrink-0 items-center justify-center rounded-full p-0 leading-none border-0 bg-transparent disabled:opacity-50"
+                                                            title="Remove Signature Copy"
+                                                        >
+                                                            <img
+                                                                src={Delete}
+                                                                className="w-5 h-4 block transform hover:scale-110 hover:brightness-110 transition duration-200"
+                                                                alt="Delete"
+                                                            />
+                                                        </button>
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={weeklySummaryUploading || weeklySummaryLoading}
+                                                        onClick={() => weeklySummaryFileInputRef.current?.click()}
+                                                        className="inline-flex flex-row items-center gap-1 rounded shrink-0 text-[14px] font-semibold text-[#BF9853] disabled:opacity-50"
+                                                        title="Upload Signature Copy for this week"
+                                                    >
+                                                        <span>{weeklySummaryUploading ? "Uploading…" : "Signature"}</span>
+                                                        <img src={fileSignatureUpload} alt="" className="w-4 h-4 shrink-0" />
+                                                    </button>
+                                                )}
                                             </div>
-                                            <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
-                                                <p className="text-[14px] font-semibold text-black">Total Amount</p>
-                                                <p className="text-[14px] font-semibold text-black">
-                                                    ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </p>
-                                            </div>
+                                        </div>
+                                        <div className="overflow-y-auto no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
+                                            {Object.entries(
+                                                filteredExpenses
+                                                    .filter(expense => Number(expense.amount) > 0)
+                                                    .reduce((acc, expense) => {
+                                                        const type = expense.type;
+                                                        const amount = Number(expense.amount);
+                                                        acc[type] = (acc[type] || 0) + amount;
+                                                        return acc;
+                                                    }, {})
+                                            ).map(([type, total]) => (
+                                                <div key={type} className="flex items-center justify-between py-[4px]">
+                                                    <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
+                                                    <p className="text-[14px] font-semibold text-black">
+                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
+                                            <p className="text-[14px] font-semibold text-black">Total Amount</p>
+                                            <p className="text-[14px] font-semibold text-black">
+                                                ₹{filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                         <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} vendorOptions={vendorOptions} contractorOptions={contractorOptions}
                             siteOptions={siteOptions} />
                         <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
                             audits={weeklyPaymentReceivedAudits} />
+                        <HandoverPaymentsModal
+                            show={showHandoverModal}
+                            onClose={() => setShowHandoverModal(false)}
+                        />
                     </div>
                     {showPaymentPopup && (
                         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
                             <div className="bg-white text-left rounded-xl px-[18px] py-[18px] overflow-y-auto">
-                                <label className="font-bold text-[20px]">Add Payment</label>
-                                <div className="space-y-4 mt-[12px]">
-                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                                <label className="font-bold text-[18px]">Add Payment</label>
+                                <div className="space-y-[18px] mt-[14px]">
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-[18px]">
                                         <div className="grid grid-cols-3 gap-4">
                                             <div>
                                                 <label className="block text-[16px] font-semibold text-black mb-2">Date</label>
                                                 <CustomDateField
                                                     value={paymentPopupData.date || ''}
-                                                    onChange={() => {}}
+                                                    onChange={() => { }}
                                                     disabled
                                                     placeholder="Date"
                                                     placeholderButtonClassName="text-[14px] font-normal placeholder:text-[#A6A5A6] placeholder:text-[14px]"
@@ -5434,7 +5513,16 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[16px] font-semibold text-black mb-2">Amount</label>
+                                                {currentProjectAdvanceRow ? (
+                                                    <div className="flex justify-between items-center text-[16px] font-semibold text-black mb-2">
+                                                        <span>Amount</span>
+                                                        <span className="text-[#E45732]">
+                                                            ₹{(Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)).toLocaleString('en-IN')}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <label className="block text-[16px] font-semibold text-black mb-2">Amount</label>
+                                                )}
                                                 <input
                                                     type="number"
                                                     value={paymentPopupData.amount}
@@ -5489,7 +5577,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4">
+                                    <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-[18px]">
                                         <div className="space-y-4">
                                             {paymentPopupData.paymentMode === "Cheque" && (
                                                 <div className="grid grid-cols-2 gap-4">
@@ -5574,354 +5662,351 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             </div>
                                         </div>
                                     </div>
-                                {previousPayments.length > 0 && (
-                                    <div>
-                                        <h4 className="text-md font-semibold text-black  ml-20">Previous Payments: {previousPayments.length} </h4>
-                                        <div className="mb-6 justify-items-center">
-                                            <div className="space-y-4 max-h-64 overflow-y-auto">
-                                                {previousPayments.map((payment, index) => (
-                                                    <div key={index} className="">
-                                                        <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-4 mb-4">
-                                                            <div className="grid grid-cols-3 gap-4">
-                                                                <div>
-                                                                    <label className="block text-[16px] font-semibold text-black mb-2">Date</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={new Date(payment.date).toLocaleDateString('en-GB')}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[16px] font-semibold text-black mb-2">Amount</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.amount.toLocaleString('en-IN')}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[16px] font-semibold text-black mb-2">Mode</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={payment.bill_payment_mode}
-                                                                        readOnly
-                                                                        className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                    />
+                                    {previousPayments.length > 0 && (
+                                        <div>
+                                            <h4 className="text-md font-semibold text-black  ml-20">Previous Payments: {previousPayments.length} </h4>
+                                            <div className="mb-[18px] justify-items-center">
+                                                <div className="space-y-4 max-h-64 overflow-y-auto">
+                                                    {previousPayments.map((payment, index) => (
+                                                        <div key={index} className="">
+                                                            <div className="border-2 border-[#BF9853] border-opacity-25 w-[600px] rounded-lg p-[18px] mb-4">
+                                                                <div className="grid grid-cols-3 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Date</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={new Date(payment.date).toLocaleDateString('en-GB')}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Amount</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={payment.amount.toLocaleString('en-IN')}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Mode</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={payment.bill_payment_mode}
+                                                                            readOnly
+                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                        />
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                        <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
-                                                            <div className="space-y-4">
-                                                                {payment.bill_payment_mode === "Cheque" && (
+                                                            <div className="border-2 border-[#BF9853] border-opacity-25 rounded-lg p-4">
+                                                                <div className="space-y-4">
+                                                                    {payment.bill_payment_mode === "Cheque" && (
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div>
+                                                                                <label className="block text-[16px] font-semibold text-black mb-2">Cheque No</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={payment.cheque_number || ""}
+                                                                                    readOnly
+                                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[16px] font-semibold text-black mb-2">Cheque Date</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
+                                                                                    readOnly
+                                                                                    className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="grid grid-cols-2 gap-4">
                                                                         <div>
-                                                                            <label className="block text-[16px] font-semibold text-black mb-2">Cheque No</label>
+                                                                            <label className="block text-[16px] font-semibold text-black mb-2">Transaction Number</label>
                                                                             <input
                                                                                 type="text"
-                                                                                value={payment.cheque_number || ""}
+                                                                                value={payment.transaction_number || ""}
                                                                                 readOnly
                                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                                             />
                                                                         </div>
                                                                         <div>
-                                                                            <label className="block text-[16px] font-semibold text-black mb-2">Cheque Date</label>
+                                                                            <label className="block text-[16px] font-semibold text-black mb-2">Account Number</label>
                                                                             <input
                                                                                 type="text"
-                                                                                value={payment.cheque_date ? new Date(payment.cheque_date).toLocaleDateString('en-GB') : ""}
+                                                                                value={payment.account_number || ""}
                                                                                 readOnly
                                                                                 className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
                                                                             />
                                                                         </div>
                                                                     </div>
-                                                                )}
-                                                                <div className="grid grid-cols-2 gap-4">
-                                                                    <div>
-                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Transaction Number</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={payment.transaction_number || ""}
-                                                                            readOnly
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="block text-[16px] font-semibold text-black mb-2">Account Number</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={payment.account_number || ""}
-                                                                            readOnly
-                                                                            className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full  text-gray-600"
-                                                                        />
-                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                                {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
-                                    <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                        <div className="text-center">
-                                            <span className="text-sm font-medium text-green-700">
-                                                This Claim Amount Was Already Sent to the Expense Entry
-                                            </span>
+                                    )}
+                                    {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && currentProjectAdvanceRow.send_to_expenses_entry && (
+                                        <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                            <div className="text-center">
+                                                <span className="text-sm font-medium text-green-700">
+                                                    This Claim Amount Was Already Sent to the Expense Entry
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-end items-center mt-[18px]">
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setShowPaymentPopup(false);
+                                                    setPaymentPopupData({
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        amount: "",
+                                                        paymentMode: "",
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setPreviousPayments([]);
+                                                    setCurrentProjectAdvanceRow(null);
+                                                }}
+                                                className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
+                                                            if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
+                                                                let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
+                                                                if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                                    mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
+                                                                } else if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                                    mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
+                                                                }
+                                                                await postBankRegisterLogSave(
+                                                                    bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
+                                                                    "Cash Register — Weekly Payment History",
+                                                                    {
+                                                                        bill_payment_mode: paymentPopupData.paymentMode,
+                                                                        amount: paymentPopupData.amount,
+                                                                        entered_by: enteredBy,
+                                                                    }
+                                                                );
+                                                            }
+                                                            let advancePortalId = null;
+                                                            let staffAdvancePortalId = null;
+                                                            if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
+                                                                try {
+                                                                    const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
+                                                                    if (!res.ok) throw new Error("Failed to fetch entry numbers");
+                                                                    const allData = await res.json();
+                                                                    const maxEntryNo =
+                                                                        allData.length > 0
+                                                                            ? Math.max(...allData.map((item) => item.entry_no || 0))
+                                                                            : 0;
+                                                                    const nextEntryNo = maxEntryNo + 1;
+                                                                    const getWeekNumber = () => {
+                                                                        return getISOWeekNumber(new Date());
+                                                                    };
+                                                                    const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
+                                                                    const advanceUpdateData = {
+                                                                        type: "Advance",
+                                                                        date: paymentPopupData.date,
+                                                                        description: description,
+                                                                        bill_amount: 0,
+                                                                        amount: parseFloat(paymentPopupData.amount),
+                                                                        project_id: currentProjectAdvanceRow.project_id,
+                                                                        vendor_id: currentProjectAdvanceRow.vendor_id,
+                                                                        contractor_id: currentProjectAdvanceRow.contractor_id,
+                                                                        entry_no: nextEntryNo,
+                                                                        week_no: getWeekNumber(),
+                                                                        file_url: "",
+                                                                        transfer_site_id: 0,
+                                                                        refund_amount: 0,
+                                                                        payment_mode: paymentPopupData.paymentMode,
+                                                                        not_allow_to_edit: true,
+                                                                        branch_id: activeBranchId ?? null,
+                                                                        source: "Cash Register",
+                                                                        entered_by: enteredBy,
+                                                                    };
+                                                                    const advanceResponse = await fetch(
+                                                                        "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
+                                                                        {
+                                                                            method: "POST",
+                                                                            headers: { "Content-Type": "application/json" },
+                                                                            body: JSON.stringify(advanceUpdateData)
+                                                                        }
+                                                                    );
+                                                                    if (!advanceResponse.ok) {
+                                                                        console.error("Failed to update advance portal payment mode");
+                                                                    } else {
+                                                                        const advanceResponseData = await advanceResponse.json();
+                                                                        advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error("Error updating advance portal payment mode:", error);
+                                                                }
+                                                            }
+                                                            if (currentProjectAdvanceRow.type === "Staff Advance") {
+                                                                try {
+                                                                    const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
+                                                                    if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
+                                                                    const staffAdvanceData = await staffAdvanceRes.json();
+                                                                    const maxEntryNo =
+                                                                        staffAdvanceData.length > 0
+                                                                            ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
+                                                                            : 0;
+                                                                    const nextEntryNo = maxEntryNo + 1;
+                                                                    const getWeekNumber = () => {
+                                                                        return getISOWeekNumber(new Date());
+                                                                    };
+                                                                    const staffAdvanceSaveData = {
+                                                                        date: paymentPopupData.date,
+                                                                        employee_id: currentProjectAdvanceRow.employee_id,
+                                                                        project_id: currentProjectAdvanceRow.project_id,
+                                                                        type: "Advance",
+                                                                        from_purpose_id: 4,
+                                                                        staff_payment_mode: paymentPopupData.paymentMode,
+                                                                        entry_no: nextEntryNo,
+                                                                        week_no: getWeekNumber(),
+                                                                        amount: parseFloat(paymentPopupData.amount),
+                                                                        staff_refund_amount: 0.0,
+                                                                        description: "",
+                                                                        file_url: null,
+                                                                        labour_id: 0,
+                                                                        not_allow_to_edit: true,
+                                                                        branch_id: activeBranchId ?? null,
+                                                                        entered_by: enteredBy,
+                                                                        source: "Cash Register",
+                                                                    };
+                                                                    const staffAdvanceResponse = await fetch(
+                                                                        "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
+                                                                        {
+                                                                            method: "POST",
+                                                                            headers: { "Content-Type": "application/json" },
+                                                                            body: JSON.stringify(staffAdvanceSaveData)
+                                                                        }
+                                                                    );
+                                                                    if (!staffAdvanceResponse.ok) {
+                                                                        console.error("Failed to save staff advance");
+                                                                    } else {
+                                                                        const staffAdvanceResponseData = await staffAdvanceResponse.json();
+                                                                        staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error("Error saving staff advance:", error);
+                                                                }
+                                                            }
+                                                            const paymentData = {
+                                                                date: paymentPopupData.date,
+                                                                created_at: new Date().toISOString(),
+                                                                contractor_id: currentProjectAdvanceRow.contractor_id || null,
+                                                                vendor_id: currentProjectAdvanceRow.vendor_id || null,
+                                                                employee_id: currentProjectAdvanceRow.employee_id || null,
+                                                                project_id: currentProjectAdvanceRow.project_id || null,
+                                                                type: currentProjectAdvanceRow.type || null,
+                                                                bill_payment_mode: paymentPopupData.paymentMode,
+                                                                amount: parseFloat(paymentPopupData.amount),
+                                                                status: true,
+                                                                weekly_number: Number(selectedWeek),
+                                                                weekly_payment_expense_id: currentProjectAdvanceRow.id,
+                                                                advance_portal_id: advancePortalId,
+                                                                staff_advance_portal_id: staffAdvancePortalId,
+                                                                cheque_number: paymentPopupData.chequeNo || null,
+                                                                cheque_date: paymentPopupData.chequeDate || null,
+                                                                transaction_number: paymentPopupData.transactionNumber || null,
+                                                                account_number: paymentPopupData.accountNumber || null,
+                                                                branch_id: activeBranchId ?? null,
+                                                                entered_by: enteredBy,
+                                                                source: "Cash Register",
+                                                            };
+                                                            const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify(paymentData)
+                                                            });
+                                                            if (!response.ok) {
+                                                                throw new Error("Failed to save payment");
+                                                            }
+                                                            const [expensesRes, paymentsRes] = await Promise.all([
+                                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
+                                                                axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
+                                                            ]);
+                                                            setExpenses(expensesRes.data);
+                                                            const filteredPayments = paymentsRes.data.filter(
+                                                                (payment) => payment.type !== "Handover"
+                                                            );
+                                                            setPayments(filteredPayments);
+                                                            await fetchWeeklyPaymentBills();
+                                                        }
+                                                    } catch (error) {
+                                                        console.error("Error saving payment:", error);
+                                                    }
+
+                                                    setShowPaymentPopup(false);
+                                                    setPaymentPopupData({
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        amount: "",
+                                                        paymentMode: "",
+                                                        chequeNo: "",
+                                                        chequeDate: "",
+                                                        transactionNumber: "",
+                                                        accountNumber: ""
+                                                    });
+                                                    setPreviousPayments([]);
+                                                    setCurrentProjectAdvanceRow(null);
+                                                }}
+                                                className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
+                                                disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
+                                            >
+                                                Submit
+                                            </button>
                                         </div>
                                     </div>
-                                )}
-                                <div className="flex justify-end items-center mt-6">
-                                    <div className="flex gap-3">
-                                        <button
-                                            onClick={() => {
-                                                setShowPaymentPopup(false);
-                                                setPaymentPopupData({
-                                                    date: new Date().toISOString().split('T')[0],
-                                                    amount: "",
-                                                    paymentMode: "",
-                                                    chequeNo: "",
-                                                    chequeDate: "",
-                                                    transactionNumber: "",
-                                                    accountNumber: ""
-                                                });
-                                                setPreviousPayments([]);
-                                                setCurrentProjectAdvanceRow(null);
-                                            }}
-                                            className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    if (currentProjectAdvanceRow && paymentPopupData.paymentMode && paymentPopupData.amount) {
-                                                        if (isPaymentModeRequiringBankRegisterLog(paymentPopupData.paymentMode)) {
-                                                            let mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save";
-                                                            if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
-                                                                mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/advance_portal/save";
-                                                            } else if (currentProjectAdvanceRow.type === "Staff Advance") {
-                                                                mainRefUrl = "https://backendaab.in/demoAabuildersDash/api/staff-advance/save";
-                                                            }
-                                                            await postBankRegisterLogSave(
-                                                                bankRegisterLogSaveUrlMatchingRequest(mainRefUrl),
-                                                                "Cash Register — Weekly Payment History",
-                                                                {
-                                                                    bill_payment_mode: paymentPopupData.paymentMode,
-                                                                    amount: paymentPopupData.amount,
-                                                                    entered_by: enteredBy,
-                                                                }
-                                                            );
-                                                        }
-                                                        let advancePortalId = null;
-                                                        let staffAdvancePortalId = null;
-                                                        if (currentProjectAdvanceRow.type === "Project Advance" && currentProjectAdvanceRow.advance_portal_id) {
-                                                            try {
-                                                                const res = await fetch("https://backendaab.in/demoAabuildersDash/api/advance_portal/getAll");
-                                                                if (!res.ok) throw new Error("Failed to fetch entry numbers");
-                                                                const allData = await res.json();
-                                                                const maxEntryNo =
-                                                                    allData.length > 0
-                                                                        ? Math.max(...allData.map((item) => item.entry_no || 0))
-                                                                        : 0;
-                                                                const nextEntryNo = maxEntryNo + 1;
-                                                                const getWeekNumber = () => {
-                                                                    return getISOWeekNumber(new Date());
-                                                                };
-                                                                const description = portalDescriptions[currentProjectAdvanceRow.advance_portal_id] || "";
-                                                                const advanceUpdateData = {
-                                                                    type: "Advance",
-                                                                    date: paymentPopupData.date,
-                                                                    description: description,
-                                                                    bill_amount: 0,
-                                                                    amount: parseFloat(paymentPopupData.amount),
-                                                                    project_id: currentProjectAdvanceRow.project_id,
-                                                                    vendor_id: currentProjectAdvanceRow.vendor_id,
-                                                                    contractor_id: currentProjectAdvanceRow.contractor_id,
-                                                                    entry_no: nextEntryNo,
-                                                                    week_no: getWeekNumber(),
-                                                                    file_url: "",
-                                                                    transfer_site_id: 0,
-                                                                    refund_amount: 0,
-                                                                    payment_mode: paymentPopupData.paymentMode,
-                                                                    not_allow_to_edit: true,
-                                                                    branch_id: activeBranchId ?? null,
-                                                                    source: "Cash Register",
-                                                                    entered_by: enteredBy,
-                                                                };
-                                                                const advanceResponse = await fetch(
-                                                                    "https://backendaab.in/demoAabuildersDash/api/advance_portal/save",
-                                                                    {
-                                                                        method: "POST",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify(advanceUpdateData)
-                                                                    }
-                                                                );
-                                                                if (!advanceResponse.ok) {
-                                                                    console.error("Failed to update advance portal payment mode");
-                                                                } else {
-                                                                    const advanceResponseData = await advanceResponse.json();
-                                                                    advancePortalId = advanceResponseData.advancePortalId || advanceResponseData.advance_portal_id;
-                                                                }
-                                                            } catch (error) {
-                                                                console.error("Error updating advance portal payment mode:", error);
-                                                            }
-                                                        }
-                                                        if (currentProjectAdvanceRow.type === "Staff Advance") {
-                                                            try {
-                                                                const staffAdvanceRes = await fetch("https://backendaab.in/demoAabuildersDash/api/staff-advance/all");
-                                                                if (!staffAdvanceRes.ok) throw new Error("Failed to fetch staff advance entry numbers");
-                                                                const staffAdvanceData = await staffAdvanceRes.json();
-                                                                const maxEntryNo =
-                                                                    staffAdvanceData.length > 0
-                                                                        ? Math.max(...staffAdvanceData.map((item) => item.entry_no || 0))
-                                                                        : 0;
-                                                                const nextEntryNo = maxEntryNo + 1;
-                                                                const getWeekNumber = () => {
-                                                                    return getISOWeekNumber(new Date());
-                                                                };
-                                                                const staffAdvanceSaveData = {
-                                                                    date: paymentPopupData.date,
-                                                                    employee_id: currentProjectAdvanceRow.employee_id,
-                                                                    project_id: currentProjectAdvanceRow.project_id,
-                                                                    type: "Advance",
-                                                                    from_purpose_id: 4,
-                                                                    staff_payment_mode: paymentPopupData.paymentMode,
-                                                                    entry_no: nextEntryNo,
-                                                                    week_no: getWeekNumber(),
-                                                                    amount: parseFloat(paymentPopupData.amount),
-                                                                    staff_refund_amount: 0.0,
-                                                                    description: "",
-                                                                    file_url: null,
-                                                                    labour_id: 0,
-                                                                    not_allow_to_edit: true,
-                                                                    branch_id: activeBranchId ?? null,
-                                                                    entered_by: enteredBy,
-                                                                    source: "Cash Register",
-                                                                };
-                                                                const staffAdvanceResponse = await fetch(
-                                                                    "https://backendaab.in/demoAabuildersDash/api/staff-advance/save",
-                                                                    {
-                                                                        method: "POST",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify(staffAdvanceSaveData)
-                                                                    }
-                                                                );
-                                                                if (!staffAdvanceResponse.ok) {
-                                                                    console.error("Failed to save staff advance");
-                                                                } else {
-                                                                    const staffAdvanceResponseData = await staffAdvanceResponse.json();
-                                                                    staffAdvancePortalId = staffAdvanceResponseData.staffAdvancePortalId || staffAdvanceResponseData.staff_advance_portal_id;
-                                                                }
-                                                            } catch (error) {
-                                                                console.error("Error saving staff advance:", error);
-                                                            }
-                                                        }
-                                                        const paymentData = {
-                                                            date: paymentPopupData.date,
-                                                            created_at: new Date().toISOString(),
-                                                            contractor_id: currentProjectAdvanceRow.contractor_id || null,
-                                                            vendor_id: currentProjectAdvanceRow.vendor_id || null,
-                                                            employee_id: currentProjectAdvanceRow.employee_id || null,
-                                                            project_id: currentProjectAdvanceRow.project_id || null,
-                                                            type: currentProjectAdvanceRow.type || null,
-                                                            bill_payment_mode: paymentPopupData.paymentMode,
-                                                            amount: parseFloat(paymentPopupData.amount),
-                                                            status: true,
-                                                            weekly_number: Number(selectedWeek),
-                                                            weekly_payment_expense_id: currentProjectAdvanceRow.id,
-                                                            advance_portal_id: advancePortalId,
-                                                            staff_advance_portal_id: staffAdvancePortalId,
-                                                            cheque_number: paymentPopupData.chequeNo || null,
-                                                            cheque_date: paymentPopupData.chequeDate || null,
-                                                            transaction_number: paymentPopupData.transactionNumber || null,
-                                                            account_number: paymentPopupData.accountNumber || null,
-                                                            branch_id: activeBranchId ?? null,
-                                                            entered_by: enteredBy,
-                                                            source: "Cash Register",
-                                                        };
-                                                        const response = await fetch("https://backendaab.in/demoAabuildersDash/api/weekly-payment-bills/save", {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify(paymentData)
-                                                        });
-                                                        if (!response.ok) {
-                                                            throw new Error("Failed to save payment");
-                                                        }
-                                                        const [expensesRes, paymentsRes] = await Promise.all([
-                                                            axios.get(`https://backendaab.in/demoAabuildersDash/api/weekly-expenses/week/${selectedWeek}`, withBranchParams()),
-                                                            axios.get(`https://backendaab.in/demoAabuildersDash/api/payments-received/week/${selectedWeek}`, withBranchParams())
-                                                        ]);
-                                                        setExpenses(expensesRes.data);
-                                                        const filteredPayments = paymentsRes.data.filter(
-                                                            (payment) => payment.type !== "Handover"
-                                                        );
-                                                        setPayments(filteredPayments);
-                                                        await fetchWeeklyPaymentBills();
-                                                    }
-                                                } catch (error) {
-                                                    console.error("Error saving payment:", error);
-                                                }
-
-                                                setShowPaymentPopup(false);
-                                                setPaymentPopupData({
-                                                    date: new Date().toISOString().split('T')[0],
-                                                    amount: "",
-                                                    paymentMode: "",
-                                                    chequeNo: "",
-                                                    chequeDate: "",
-                                                    transactionNumber: "",
-                                                    accountNumber: ""
-                                                });
-                                                setPreviousPayments([]);
-                                                setCurrentProjectAdvanceRow(null);
-                                            }}
-                                            className="px-4 py-2 bg-[#BF9853] text-white rounded-lg"
-                                            disabled={!paymentPopupData.paymentMode || !paymentPopupData.amount}
-                                        >
-                                            Submit
-                                        </button>
-                                    </div>
                                 </div>
-                                {currentProjectAdvanceRow && currentProjectAdvanceRow.type === "Claim" && (
-                                    <div className="mt- p-3 text-center -ml-[600px]">
-                                        <span className="text-sm font-medium text-gray-700">Total Amount: </span>
-                                        <span className="text-lg font-semibold text-gray-900">
-                                            ₹{(Number(currentProjectAdvanceRow.amount) + previousPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)).toLocaleString('en-IN')}
-                                        </span>
-                                    </div>
-                                )}
                             </div>
                         </div>
-                    </div>
                     )}
                     {showPopups && (currentRow?.type === "Project Advance" || currentRow?.type === "Bill Payment") && (
                         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999]">
-                            <div className="bg-white rounded-xl shadow-lg p-6 w-[650px]">
+                            <div className="bg-white rounded-xl shadow-lg p-[18px] w-[650px]">
                                 <label className="block text-left">
                                     <span className="font-semibold text-[18px] block mb-[8px]">Description</span>
                                     <textarea
                                         name="description"
                                         rows={4}
-                                        className="w-full lg:w-[616px] p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none resize-none whitespace-normal break-words"
+                                        className={`w-full p-2 border-2 border-[#BF9853] border-opacity-25 rounded-lg focus:outline-none resize-none whitespace-normal break-words${Boolean(portalDescriptions[currentRow?.advance_portal_id]) && !isDescriptionEditing ? ' bg-[#ededed]' : ''}`}
                                         value={editFormData.description}
                                         onChange={handleEditChange}
-                                        readOnly={Boolean(currentRow?.description)}
+                                        readOnly={Boolean(portalDescriptions[currentRow?.advance_portal_id]) && !isDescriptionEditing}
                                     />
                                 </label>
                                 <div className="flex justify-end gap-[18px] mt-[18px]">
-                                    <button onClick={() => setShowPopups(false)} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-md">
+                                    {portalDescriptions[currentRow?.advance_portal_id] && !isDescriptionEditing && (
+                                        <button onClick={() => setIsDescriptionEditing(true)} disabled={editingRowId !== currentRow?.id} className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                                            Edit
+                                        </button>
+                                    )}
+                                    <button onClick={() => { setShowPopups(false); setIsDescriptionEditing(false); }} className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-md">
                                         Close
                                     </button>
-                                    {!portalDescriptions[currentRow?.advance_portal_id] && (
+                                    {(!portalDescriptions[currentRow?.advance_portal_id] || isDescriptionEditing) && (
                                         <button
                                             onClick={async () => {
                                                 await updateDescription(currentRow.advance_portal_id, editFormData.description);
+                                                setIsDescriptionEditing(false);
                                                 setShowPopups(false);
                                             }}
-                                            disabled={!(editFormData.description || "").trim()}
                                             className="px-4 py-2 bg-[#BF9853] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
@@ -5934,7 +6019,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                     {showBillExpenseEntryModal ? (
                         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-[18px]">
                             <div className="bg-white rounded-lg w-full max-w-[690px] max-h-[92vh] overflow-y-auto shadow-lg relative p-[18px]">
-                                <div className="flex items-center justify-between mb-[12px]">
+                                <div className="flex items-center justify-between mb-[14px]">
                                     <p className="text-[18px] font-semibold text-[#202020]">Expense Entry</p>
                                     <button
                                         type="button"
@@ -5948,11 +6033,32 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                         <img src={FileRemover} className="w-4 h-4" alt="Close" />
                                     </button>
                                 </div>
-                                <ExpenseEntryForm
+                                <style>{`
+                                    .weekly-payment-expense-entry-form > div > div {
+                                        padding-top: 0 !important;
+                                        padding-bottom: 0 !important;
+                                    }
+                                    .weekly-payment-expense-entry-form div.flex.items-start.justify-between:has(label[for="fileInput"]) {
+                                        margin-top: 8px !important;
+                                        margin-bottom: 12px !important;
+                                    }
+                                    .weekly-payment-expense-entry-form div.mt-\\[12px\\].flex:has(button[type="submit"]) {
+                                        margin-top: 0 !important;
+                                    }
+                                    .weekly-payment-expense-entry-form [aria-readonly="true"].w-\\[300px\\] {
+                                        min-height: 40px !important;
+                                        height: 40px !important;
+                                        max-height: 40px !important;
+                                        background-color: #ededed !important;
+                                    }
+                                `}</style>
+                                <div className="weekly-payment-expense-entry-form">
+                                    <ExpenseEntryForm
                                         username={username}
                                         userRoles={userRoles}
                                         embedded
                                         lockAccountTypePrefill
+                                        lockClaimPaymentModeCash
                                         disableWeeklyExpensesSave
                                         onSuccess={() => {
                                             setShowBillExpenseEntryModal(false);
@@ -5960,6 +6066,7 @@ const History = ({ username, userRoles = [], viewMode = 'default', onExportActio
                                             setExpenseEntryRefreshNonce((n) => n + 1);
                                         }}
                                     />
+                                </div>
                             </div>
                         </div>
                     ) : null}
@@ -6511,11 +6618,21 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
         { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
-        { oldKey: "old_project_id", newKey: "new_project_id", label: "Project Name", width: "180px", lookup: siteOptions },
-        { oldKey: "old_vendor_id", newKey: "new_vendor_id", label: "Vendor", width: "150px", lookup: vendorOptions },
-        { oldKey: "old_contractor_id", newKey: "new_contractor_id", label: "Contractor", width: "150px", lookup: contractorOptions },
         { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
     ];
+    const normalizeAuditId = (id) => {
+        if (id == null || String(id).trim() === "" || String(id) === "0") return null;
+        return id;
+    };
+    const getAssociateFromAudit = (audit, keyPrefix) => {
+        const vendorId = normalizeAuditId(audit[`${keyPrefix}_vendor_id`]);
+        const contractorId = normalizeAuditId(audit[`${keyPrefix}_contractor_id`]);
+        const projectId = normalizeAuditId(audit[`${keyPrefix}_project_id`]);
+        if (vendorId) return { name: getNameById(vendorId, vendorOptions), type: "Vendor" };
+        if (contractorId) return { name: getNameById(contractorId, contractorOptions), type: "Contractor" };
+        if (projectId) return { name: getNameById(projectId, siteOptions), type: "Project" };
+        return { name: "-", type: "-" };
+    };
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
         const date = new Date(dateString);
@@ -6550,51 +6667,92 @@ const AuditModal = ({ show, onClose, audits, vendorOptions, contractorOptions, s
     };
     return (
         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
-            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
-                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+            <div className="bg-white rounded-md shadow-lg p-4">
+                <div className="flex justify-between items-center mb-[8px]">
                     <h2 className="text-xl font-bold">History</h2>
                     <button onClick={onClose}>
-                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
                     </button>
                 </div>
-                <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
+                <div className="overflow-auto max-h-80 no-scrollbar scrollbar-none border border-l-8 border-l-[#BF9853] rounded-lg">
                     <table className="table-fixed min-w-full bg-white">
-                        <thead className="bg-[#FAF6ED]">
-                            <tr>
-                                <th style={{ width: "130px" }}>Time Stamp</th>
-                                <th style={{ width: "120px" }}>Edited By</th>
-                                {fields.map((f) => (
-                                    <th key={f.label} style={{ width: f.width }}
-                                        className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                                    >
-                                        {f.label}
-                                    </th>
-                                ))}
-                            </tr>
+                        <thead>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
                         </thead>
                         <tbody>
                             {audits.map((audit, index) => (
-                                <tr key={index} className="odd:bg-white even:bg-[#FAF6ED]">
-                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "130px" }}>
+                                <EdbcTableBodyRow key={index}>
+                                    <td id={EDBC_IDS.EDBC1} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
                                         {formatDateTime(audit.edited_date)}
                                     </td>
-                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "120px" }}>
-                                        {audit.edited_by}
-                                    </td>
-                                    {fields.map((f) => {
+                                    {fields.slice(0, 1).map((f) => {
                                         const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                                         const newDisplay = formatDisplayValue(audit[f.newKey], f);
                                         const changed = oldDisplay !== newDisplay;
                                         return (
-                                            <td key={f.label} style={{ width: f.width }} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
-                                                className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
-                                                    }`}
+                                            <td key={f.label} id={EDBC_IDS.EDBC2} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC2)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
                                             >
                                                 {oldDisplay}
                                             </td>
                                         );
                                     })}
-                                </tr>
+                                    {(() => {
+                                        const oldAssociate = getAssociateFromAudit(audit, "old");
+                                        const newAssociate = getAssociateFromAudit(audit, "new");
+                                        const associateChanged = oldAssociate.name !== newAssociate.name;
+                                        const associateTypeChanged = oldAssociate.type !== newAssociate.type;
+                                        return (
+                                            <>
+                                                <td id={EDBC_IDS.EDBC4} title={associateChanged ? `Previous: ${oldAssociate.name} → Current: ${newAssociate.name}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.name}
+                                                </td>
+                                                <td id={EDBC_IDS.EDBC12} title={associateTypeChanged ? `Previous: ${oldAssociate.type} → Current: ${newAssociate.type}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateTypeChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.type}
+                                                </td>
+                                            </>
+                                        );
+                                    })()}
+                                    {fields.slice(1, 2).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC12} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+                                            >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    {fields.slice(2).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC8} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
+                                            >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {audit.edited_by}
+                                    </td>
+                                </EdbcTableBodyRow>
                             ))}
                         </tbody>
                     </table>
@@ -6612,8 +6770,8 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
     };
     const fields = [
         { oldKey: "old_date", newKey: "new_date", label: "Date", width: "120px" },
-        { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
         { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+        { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
     ];
     const formatDateTime = (dateString) => {
         if (!dateString) return "-";
@@ -6649,51 +6807,47 @@ const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits }) => {
     };
     return (
         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
-            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
-                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
+            <div className="bg-white rounded-md shadow-lg p-4">
+                <div className="flex justify-between items-center mb-[8px]">
                     <h2 className="text-xl font-bold">History</h2>
                     <button onClick={onClose}>
-                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
                     </button>
                 </div>
-                <div className="overflow-auto mt-2 max-h-80 border border-l-8 border-l-[#BF9853] rounded-lg ml-7">
+                <div className="overflow-auto max-h-80 no-scrollbar scrollbar-none border border-l-8 border-l-[#BF9853] rounded-lg">
                     <table className="table-fixed min-w-full bg-white">
-                        <thead className="bg-[#FAF6ED]">
-                            <tr>
-                                <th style={{ width: "130px" }}>Time Stamp</th>
-                                <th style={{ width: "120px" }}>Edited By</th>
-                                {fields.map((f) => (
-                                    <th key={f.label} style={{ width: f.width }}
-                                        className="border-b py-2 px-2 text-center font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                                    >
-                                        {f.label}
-                                    </th>
-                                ))}
-                            </tr>
+                        <thead>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC2} label="Date" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
                         </thead>
                         <tbody>
                             {audits.map((audit, index) => (
-                                <tr key={index} className="odd:bg-white even:bg-[#FAF6ED]">
-                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "130px" }}>
+                                <EdbcTableBodyRow key={index}>
+                                    <td id={EDBC_IDS.EDBC1} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
                                         {formatDateTime(audit.edited_date)}
-                                    </td>
-                                    <td className="whitespace-nowrap overflow-hidden text-ellipsis" style={{ width: "120px" }}>
-                                        {audit.edited_by}
                                     </td>
                                     {fields.map((f) => {
                                         const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
                                         const newDisplay = formatDisplayValue(audit[f.newKey], f);
                                         const changed = oldDisplay !== newDisplay;
+                                        const columnId = f.label === "Date" ? EDBC_IDS.EDBC2 : f.label === "Type" ? EDBC_IDS.EDBC12 : EDBC_IDS.EDBC8;
                                         return (
-                                            <td key={f.label} style={{ width: f.width }} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
-                                                className={`whitespace-nowrap overflow-hidden text-ellipsis px-2 ${changed ? "bg-[#BF9853] font-bold" : ""
-                                                    }`}
+                                            <td key={f.label} id={columnId} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(columnId)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""}`}
                                             >
                                                 {oldDisplay}
                                             </td>
                                         );
                                     })}
-                                </tr>
+                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {audit.edited_by}
+                                    </td>
+                                </EdbcTableBodyRow>
                             ))}
                         </tbody>
                     </table>

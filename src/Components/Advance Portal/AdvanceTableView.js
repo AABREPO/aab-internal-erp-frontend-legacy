@@ -31,6 +31,7 @@ import {
   EdbcExpandableBodyCell,
   EdbcFileBodyCell,
   EDBC_TABLE_EDGE_TABLE_CLASS,
+  EDBC2_FIRST_COLUMN_WIDTH_CLASS,
   formatEdbcFilterDateDMY,
 } from '../ExpensesEntry/databaseExpensesSharedColumns';
 import { syncWeeklyPaymentBillsForAdvancePortal, isAdvanceOnlinePaymentModeForModal, fetchWeeklyPaymentBillsByAdvancePortalId, getAdvancePortalDisplayAmount, syncExpensesEntryFromAdvancePortalEdit, resolveAdvancePortalExpensesEntryId, resolveFilesUploadResponseUrl, syncVendorCarryForwardFromAdvancePortalEdit } from '../../utils/advancePortalWeeklyPaymentBill';
@@ -1675,7 +1676,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
   const { expandedCells, toggleExpandedCell } = useEdbcExpandedCells();
   const edbc3Config = getEdbcColumnConfig(EDBC_IDS.EDBC3);
   const edbc8Config = getEdbcColumnConfig(EDBC_IDS.EDBC8);
-  const edbc20Config = getEdbcColumnConfig(EDBC_IDS.EDBC20);
+  const edbc19Config = getEdbcColumnConfig(EDBC_IDS.EDBC19);
   const mapAdvanceSortKeyToEdbc = (key) => {
     if (key === 'project' || key === 'transfer') return 'siteName';
     if (key === 'entryNo') return 'eno';
@@ -1719,7 +1720,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Advance Amount</label>
               <input
-                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2'
                 value={`₹${totalAdvance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1727,7 +1728,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Bill Amount</label>
               <input
-                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2'
                 value={`₹${totalBill.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1737,12 +1738,12 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
               <input
                 value={`₹${totalTransfer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
-                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2' />
+                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2' />
             </div>
             <div className=''>
               <label className='block mb-[8px] font-semibold'>Refund Amount</label>
               <input
-                className='w-full h-[40px] rounded-lg bg-[#F2F2F2] focus:outline-none p-2'
+                className='lg:w-[220px] h-[40px] rounded-lg bg-[#ededed] focus:outline-none p-2'
                 value={`₹${totalRefund.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
                 readOnly
               />
@@ -1944,6 +1945,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                       sortField={resolveEdbcSortField('date')}
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
+                      columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
                     />
                     <EdbcColumnHeader
                       columnId={EDBC_IDS.EDBC4}
@@ -1959,12 +1961,13 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
                     />
-                    <th
-                      className={edbc3Config?.headerClass}
-                      onClick={() => handleSort('transfer')}
-                    >
-                      Transfer Site {sortConfig.key === 'transfer' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                    </th>
+                    <EdbcColumnHeader
+                      columnId={EDBC_IDS.EDBC3}
+                      label="Transfer Site"
+                      sortField={resolveEdbcSortField('transfer')}
+                      sortDirection={sortConfig.direction}
+                      onSort={() => handleSort('transfer')}
+                    />
                     <EdbcColumnHeader
                       columnId={EDBC_IDS.EDBC8}
                       label="Advance"
@@ -1972,8 +1975,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
                     />
-                    <th className={edbc8Config?.headerClass}>Bill Payment</th>
-                    <th className={edbc8Config?.headerClass}>Refund</th>
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Bill Payment" />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Refund" />
                     <EdbcColumnHeader
                       columnId={EDBC_IDS.EDBC12}
                       label="Type"
@@ -2023,8 +2026,8 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                       sortDirection={sortConfig.direction}
                       onSort={handleEdbcSort}
                     />
+                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC19} label="Activity" />
                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label="File" />
-                    <th className={edbc20Config?.headerClass}>Edit</th>
                   </EdbcTableHeaderRow>
                   {showFilters && (
                     <EdbcTableFilterRow ref={filterRowRef}>
@@ -2150,7 +2153,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                         selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                         textAlign="right"
                       />
-                      <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                      <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC19} />
                       <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                     </EdbcTableFilterRow>
                   )}
@@ -2165,6 +2168,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                           expandedCells={expandedCells}
                           onToggleExpanded={toggleExpandedCell}
                           formatValue={formatDateOnly}
+                          columnWidthClass={EDBC2_FIRST_COLUMN_WIDTH_CLASS}
                         />
                         <EdbcExpandableBodyCell
                           columnId={EDBC_IDS.EDBC4}
@@ -2204,19 +2208,19 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                           textAlignClass="text-right"
                           getDisplayValue={(row) => formatAdvanceAmount(row.amount)}
                         />
-                        <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
+                        <td className={edbc8Config?.tdClass}>
                           <span
                             onClick={() => toggleExpandedCell(`${entry.advancePortalId ?? entry.id ?? index}-bill_amount`)}
-                            className={`block w-full cursor-pointer text-right ${expandedCells[`${entry.advancePortalId ?? entry.id ?? index}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                            className={`block w-full cursor-pointer ${expandedCells[`${entry.advancePortalId ?? entry.id ?? index}-bill_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
                             title={formatAdvanceAmount(entry.bill_amount)}
                           >
                             {formatAdvanceAmount(entry.bill_amount)}
                           </span>
                         </td>
-                        <td className={`${edbc8Config?.tdClass || ''} text-right`.trim()}>
+                        <td className={edbc8Config?.tdClass}>
                           <span
                             onClick={() => toggleExpandedCell(`${entry.advancePortalId ?? entry.id ?? index}-refund_amount`)}
-                            className={`block w-full cursor-pointer text-right ${expandedCells[`${entry.advancePortalId ?? entry.id ?? index}-refund_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
+                            className={`block w-full cursor-pointer ${expandedCells[`${entry.advancePortalId ?? entry.id ?? index}-refund_amount`] ? 'whitespace-normal break-words' : 'truncate whitespace-nowrap overflow-hidden'}`}
                             title={formatAdvanceAmount(entry.refund_amount)}
                           >
                             {formatAdvanceAmount(entry.refund_amount)}
@@ -2279,8 +2283,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                           textAlignClass="text-right"
                           getDisplayValue={(row) => row.entry_no}
                         />
-                        <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...entry, billCopy: entry.file_url }} />
-                        <td className={edbc20Config?.tdClass}>
+                        <td id={EDBC_IDS.EDBC19} className={`${edbc19Config?.tdClass || ''} !justify-center`}>
                           {(() => {
                             const editDisabled =
                               !canUserEditEntry(entry) ||
@@ -2307,6 +2310,7 @@ const AdvanceTableView = ({ username, userRoles = [], paymentModeOptions = [], r
                             );
                           })()}
                         </td>
+                        <EdbcFileBodyCell columnId={EDBC_IDS.EDBC20} expense={{ ...entry, billCopy: entry.file_url }} />
                       </EdbcTableBodyRow>
                     ))
                   ) : (

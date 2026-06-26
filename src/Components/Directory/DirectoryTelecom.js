@@ -916,7 +916,6 @@ const DirectoryTelecom = () => {
           next.serviceEnd = computedEnd;
         }
       }
-
       return next;
     });
   };
@@ -1048,7 +1047,6 @@ const DirectoryTelecom = () => {
   useEffect(() => {
     if (!isCreateOpen) return;
     let isCancelled = false;
-
     const resolveEmployeeName = (emp) =>
       emp?.employeeName ||
       emp?.name ||
@@ -1056,41 +1054,32 @@ const DirectoryTelecom = () => {
       emp?.employee_name ||
       emp?.employee_name ||
       '';
-
     const resolveStaffName = (staff) =>
       staff?.support_staff_name ||
       staff?.supportStaffName ||
       staff?.name ||
       '';
-
     const fetchPeopleOptions = async () => {
       try {
         const [employeeRes, staffRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/employee_details/basic/getAll`),
           fetch(`${API_BASE_URL}/api/support_staff/getAll`)
         ]);
-
         const [employeeJson, staffJson] = await Promise.all([
           employeeRes.ok ? employeeRes.json() : Promise.resolve([]),
           staffRes.ok ? staffRes.json() : Promise.resolve([])
         ]);
-
         if (isCancelled) return;
-
         const employees = Array.isArray(employeeJson) ? employeeJson : [];
         const staff = Array.isArray(staffJson) ? staffJson : [];
-
         const employeeNames = employees
           .map(resolveEmployeeName)
           .filter((name) => typeof name === 'string' && name.trim() !== '');
-
         const staffNames = staff
           .map(resolveStaffName)
           .filter((name) => typeof name === 'string' && name.trim() !== '');
-
         const mergedNames = [...new Set([...employeeNames, ...staffNames])]
           .sort((a, b) => a.localeCompare(b));
-
         setPeopleNameOptions(mergedNames.map((name) => ({ value: name, label: name })));
       } catch (error) {
         // keep dropdowns usable even if API fails
@@ -1099,9 +1088,7 @@ const DirectoryTelecom = () => {
         }
       }
     };
-
     fetchPeopleOptions();
-
     return () => {
       isCancelled = true;
     };

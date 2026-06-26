@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import Select from 'react-select';
 import Change from '../Images/dropdownchange.png';
@@ -7,6 +8,7 @@ import file from '../Images/FileView.svg';
 import NotesStart from '../Images/TextUpload.svg';
 import NotesEnd from '../Images/TextView.svg';
 import FileRemover from '../Images/FileRemover.svg';
+import restore from '../Images/Restore.svg';
 import ExtraFeild from '../Images/ExtraFeild.svg';
 import ExtraFeildClose from '../Images/ExtraFeildClose.svg';
 import Edit from '../Images/Edit.svg';
@@ -27,6 +29,14 @@ import {
     EdbcTextInputFilter,
     EdbcTotalAmountFilter,
     EDBC_TABLE_EDGE_TABLE_CLASS,
+    EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS,
+    EDBC_CASH_REGISTER_DAILY_REFUND_TABLE_LOCK_TABLE_CLASS,
+    EDBC_CASH_REGISTER_DAILY_TABLE_LOCK_TABLE_CLASS,
+    EDBC_CASH_REGISTER_EXTRA_FIELD_BUTTON_COLUMN_CLASS,
+    EDBC_CASH_REGISTER_DESCRIPTION_COLUMN_CLASS,
+    EDBC_CASH_REGISTER_EXTRA_AMOUNT_COLUMN_CLASS,
+    EDBC_CASH_REGISTER_REFUND_PORTAL_BODY_COLUMN_CLASS,
+    EDBC_CASH_REGISTER_REFUND_PORTAL_HEADER_COLUMN_CLASS,
     EDBC_FILTER_CONTROL_BOX_STYLE,
     formatEdbcTotalAmountPlaceholder,
     getEdbcColumnConfig,
@@ -51,6 +61,19 @@ const CASH_REGISTER_SELECT_STYLES = {
         display: state.hasValue && state.selectProps.isClearable ? 'none' : 'flex',
     }),
 };
+
+/** Locks tbody column widths for past weeks without forcing thead entry-row cells. */
+const DAILY_HISTORY_EXPENSES_TBODY_TABLE_LOCK_TABLE_CLASS =
+    EDBC_CASH_REGISTER_DAILY_TABLE_LOCK_TABLE_CLASS
+        .replace(/\[&_td#/g, '[&_tbody_td#')
+        .replace(/\[&_td\.edbc/g, '[&_tbody_td.edbc');
+
+const DAILY_HISTORY_EXPENSES_TABLE_FIXED_WIDTH_CLASS = 'w-[1240px] min-w-[1240px]';
+const DAILY_HISTORY_REFUND_TABLE_FIXED_WIDTH_CLASS = 'w-[480px] min-w-[480px]';
+const DAILY_HISTORY_REFUND_SECTION_FIXED_WIDTH_CLASS = 'w-[488px] min-w-[488px]';
+
+const DAILY_HISTORY_EXPENSES_TBODY_EDBC8_LOCK_TABLE_CLASS =
+    '[&_thead_tr.bg-\\[\\#eeeeee\\]>th#EDBC-8]:!pr-0 [&_th#EDBC-8]:!w-[120px] [&_th#EDBC-8]:!max-w-[120px] [&_th#EDBC-8]:!overflow-hidden [&_tbody_td#EDBC-8]:!w-[98px] [&_tbody_td#EDBC-8]:!max-w-[98px] [&_tbody_td#EDBC-8]:!overflow-visible';
 
 const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabActive = true }) => {
     const resolveActiveBranchId = () => {
@@ -164,10 +187,77 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [entryId, setEntryId] = useState(null);
+    const [descriptionRowId, setDescriptionRowId] = useState(null);
     const [fileUploadPopup, setFileUploadPopup] = useState(false);
     const [currentFileRow, setCurrentFileRow] = useState(null);
     const [selectedFileForPopup, setSelectedFileForPopup] = useState(null);
     const [removedFileUrlRows, setRemovedFileUrlRows] = useState({});
+    const REMOVED_FILE_URL_STORAGE_KEY = 'cashRegister_removedFileUrlIds';
+    const isRestorableRemovedFileUrl = (row) => {
+        if (!row) return false;
+        if (
+            row.removed_file_url ??
+            row.removedFileUrl ??
+            row.stored_file_url ??
+            row.storedFileUrl ??
+            row.backup_file_url ??
+            row.backupFileUrl
+        ) {
+            return true;
+        }
+        return row.file_url_removed === true || row.fileUrlRemoved === true;
+    };
+    const buildRemovedFileUrlRowsMap = (expensesList) => {
+        const map = {};
+        const expenses = expensesList || [];
+        expenses.forEach((exp) => {
+            if (exp?.id != null && !exp.file_url && isRestorableRemovedFileUrl(exp)) {
+                map[exp.id] = true;
+            }
+        });
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_FILE_URL_STORAGE_KEY) || '[]');
+            const ids = Array.isArray(stored) ? stored : [];
+            const nextStored = [];
+            ids.forEach((id) => {
+                const row = expenses.find((e) => String(e.id) === String(id));
+                if (!row) {
+                    nextStored.push(Number(id));
+                    return;
+                }
+                if (!row.file_url) {
+                    map[row.id] = true;
+                    nextStored.push(Number(id));
+                }
+            });
+            localStorage.setItem(REMOVED_FILE_URL_STORAGE_KEY, JSON.stringify(nextStored));
+        } catch {
+            // ignore
+        }
+        return map;
+    };
+    const persistRemovedFileUrlId = (id) => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_FILE_URL_STORAGE_KEY) || '[]');
+            const ids = Array.isArray(stored) ? stored : [];
+            if (!ids.some((x) => String(x) === String(id))) {
+                localStorage.setItem(REMOVED_FILE_URL_STORAGE_KEY, JSON.stringify([...ids, Number(id)]));
+            }
+        } catch {
+            // ignore
+        }
+    };
+    const clearPersistedRemovedFileUrlId = (id) => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REMOVED_FILE_URL_STORAGE_KEY) || '[]');
+            localStorage.setItem(
+                REMOVED_FILE_URL_STORAGE_KEY,
+                JSON.stringify((Array.isArray(stored) ? stored : []).filter((x) => String(x) !== String(id)))
+            );
+        } catch {
+            // ignore
+        }
+    };
     const [editingDailyExpenseRowId, setEditingDailyExpenseRowId] = useState('');
     const [editingPaymentId, setEditingPaymentId] = useState('');
     const [isRefundChangeButtonActive, setIsRefundChangeButtonActive] = useState(false);
@@ -213,8 +303,15 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const [selectProjectName, setSelectProjectName] = useState('');
     const [selectType, setSelectType] = useState('');
     const [selectQuantity, setSelectQuantity] = useState('');
+    const [selectAmount, setSelectAmount] = useState('');
     const scrollRef = useRef(null);
+    const filterRowRef = useRef(null);
+    const filterNudgeUsedRef = useRef(false);
+    const expensesFilterChipsRef = useRef(null);
+    const refundFilterChipsRef = useRef(null);
     const refundScrollRef = useRef(null);
+    const refundFilterRowRef = useRef(null);
+    const refundFilterNudgeUsedRef = useRef(false);
     const isDragging = useRef(false);
     const start = useRef({ x: 0, y: 0 });
     const scroll = useRef({ left: 0, top: 0 });
@@ -234,6 +331,10 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
         parseInt(year, 10) === lastEditableWeek.year;
     const handleMouseDown = (e, ref) => {
         if (!ref.current) return;
+        const interactiveSelector = 'input, select, textarea, button, a, [contenteditable="true"], [role="button"]';
+        if (e.target instanceof Element && e.target.closest(interactiveSelector)) {
+            return;
+        }
         isDragging.current = true;
         start.current = { x: e.clientX, y: e.clientY };
         scroll.current = {
@@ -480,6 +581,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
             setSelectedDate(defaultDate);
             setNewRefundReceived((prev) => ({ ...prev, date: defaultDate }));
             setDailyExpenses(dailyRes.data);
+            setRemovedFileUrlRows(buildRemovedFileUrlRowsMap(dailyRes.data));
             setRefundPayments(refundRes.data);
         } catch (error) {
             console.error("Error loading week and daily data:", error);
@@ -494,9 +596,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
             const requestKey = `${requestBranchId ?? "none"}-${requestYearNum}`;
             const loadToken = ++weekTableLoadTokenRef.current;
             try {
-                const currentWeekNumber = getCurrentISOWeekNumber();
-                const currentWeekYear = getCurrentWeekYear();
-
                 let branchPayments = [];
                 let weeksWithData = new Set();
                 try {
@@ -520,16 +619,9 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 }
 
                 const allWeeks = [];
-                for (let weekNum = 1; weekNum <= 53; weekNum++) {
-                    const weekInfo = getStartAndEndDateOfWeek(weekNum, selectedYear);
-                    const weekStartDate = new Date(weekInfo.start);
-                    const weekYear = getWeekYear(weekStartDate);
-                    const hasData = weeksWithData.has(weekNum);
-                    const isCurrentWeek = (selectedYear === currentWeekYear && weekNum === currentWeekNumber);
-                    if (hasData || (weekYear === selectedYear && isCurrentWeek)) {
-                        allWeeks.push(weekInfo);
-                    }
-                }
+                weeksWithData.forEach((weekNum) => {
+                    allWeeks.push(getStartAndEndDateOfWeek(weekNum, selectedYear));
+                });
 
                 allWeeks.sort((a, b) => b.number - a.number);
 
@@ -877,6 +969,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${dateStr}`, withBranchParams())
             ]);
             setDailyExpenses(dailyRes.data);
+            setRemovedFileUrlRows(buildRemovedFileUrlRowsMap(dailyRes.data));
             setRefundPayments(refundRes.data);
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -980,6 +1073,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 axios.get(`https://backendaab.in/demoAabuildersDash/api/refund_received/date/${selectedDate}`, withBranchParams()),
             ]);
             setDailyExpenses(dailyRes.data);
+            setRemovedFileUrlRows(buildRemovedFileUrlRowsMap(dailyRes.data));
             setRefundPayments(refundRes.data);
         } catch (error) {
             console.error('Error refreshing daily table data:', error);
@@ -1340,6 +1434,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
         setSelectProjectName('');
         setSelectType('');
         setSelectQuantity('');
+        setSelectAmount('');
         setOverallSearch('');
     };
     const clearRefundFilters = () => {
@@ -1394,6 +1489,10 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
         }
         if (selectQuantity.trim()) {
             if (!String(entry.quantity ?? '').toLowerCase().includes(selectQuantity.toLowerCase().trim())) return false;
+        }
+        if (selectAmount.trim()) {
+            const entryAmount = Number(entry.amount || 0) + Number(entry.extra_amount || 0);
+            if (!matchesEdbcAmountFilter(entryAmount, selectAmount)) return false;
         }
         if (!matchesWeeklyPaymentExpenseOverallSearch(entry, overallSearch, {
             formatDateOnly,
@@ -2263,6 +2362,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
         }
     };
     const handleDescriptionClick = (row) => {
+        setDescriptionRowId(row.id);
         if (row.description) {
             setDescription(row.description);
             setEntryId(null);
@@ -2354,6 +2454,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 delete next[currentFileRow.id];
                 return next;
             });
+            clearPersistedRemovedFileUrlId(currentFileRow.id);
             setFileUploadPopup(false);
             setCurrentFileRow(null);
             setSelectedFileForPopup(null);
@@ -2383,6 +2484,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 prev.map((exp) => (exp.id === row.id ? { ...exp, file_url: null } : exp))
             );
             setRemovedFileUrlRows((prev) => ({ ...prev, [row.id]: true }));
+            persistRemovedFileUrlId(row.id);
             if (currentFileRow?.id === row.id) {
                 setCurrentFileRow((prev) => (prev ? { ...prev, file_url: null } : prev));
             }
@@ -2418,6 +2520,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 delete next[row.id];
                 return next;
             });
+            clearPersistedRemovedFileUrlId(row.id);
             if (currentFileRow?.id === row.id && restoredUrl) {
                 setCurrentFileRow((prev) => (prev ? { ...prev, file_url: restoredUrl } : prev));
             }
@@ -2428,10 +2531,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
         }
     };
     const handleUpdate = async () => {
-        if (!description.trim()) {
-            alert("Please enter a description");
-            return;
-        }
+        const trimmedDescription = description.trim();
         setLoading(true);
         try {
             const currentExpense = dailyExpenses.find(exp => exp.id === entryId);
@@ -2450,7 +2550,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                 type_id: getWeeklyExpenseTypeId(currentExpense.type),
                 amount: Number(currentExpense.amount),
                 extra_amount: Number(currentExpense.extra_amount || 0),
-                description: description.trim(),
+                description: trimmedDescription,
                 file_url: currentExpense.file_url || null,
                 branch_id: currentExpense.branch_id ?? currentExpense.branchId ?? activeBranchId ?? null,
             };
@@ -2467,12 +2567,13 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
             setDailyExpenses(prev =>
                 prev.map(exp =>
                     exp.id === entryId
-                        ? { ...exp, description: description.trim() }
+                        ? { ...exp, description: trimmedDescription }
                         : exp
                 )
             );
             setShowPopups(false);
             setEntryId(null);
+            setDescriptionRowId(null);
             setDescription("");
         } catch (err) {
             console.error(err);
@@ -2677,6 +2778,18 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
     const saveEditedRefundPayment = async (id) => {
         try {
             const refundData = refundPayments.find((refund) => refund.id === id);
+            if (!refundData) return;
+            const toNullableNumber = (value) => (value ? Number(value) : null);
+            const hasChanges =
+                toNullableNumber(refundData.labour_id) !== toNullableNumber(editRefundPaymentData.labour_id) ||
+                toNullableNumber(refundData.vendor_id) !== toNullableNumber(editRefundPaymentData.vendor_id) ||
+                toNullableNumber(refundData.contractor_id) !== toNullableNumber(editRefundPaymentData.contractor_id) ||
+                toNullableNumber(refundData.employee_id) !== toNullableNumber(editRefundPaymentData.employee_id) ||
+                Number(refundData.amount) !== Number(editRefundPaymentData.amount);
+            if (!hasChanges) {
+                setEditingPaymentId(null);
+                return;
+            }
             if (refundData && refundData.staff_advance_portal_id) {
                 try {
                     const staffAdvanceUpdatePayload = {
@@ -3176,15 +3289,49 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
         onExportActionsReady({ generatePDF: generateExpensesPDF, generateExcel: generateWeekDataExcel });
         return () => onExportActionsReady(null);
     }, [onExportActionsReady, generateExpensesPDF, generateWeekDataExcel]);
+    const sendExpensesToolbarSlotElRef = useRef(null);
+    const [sendExpensesToolbarSlot, setSendExpensesToolbarSlot] = useState(null);
+    useEffect(() => {
+        if (!isTabActive) {
+            sendExpensesToolbarSlotElRef.current?.remove();
+            sendExpensesToolbarSlotElRef.current = null;
+            setSendExpensesToolbarSlot(null);
+            return;
+        }
+        let cancelled = false;
+        const attachSendExpensesToolbarSlot = () => {
+            if (cancelled) return;
+            const container = document.querySelector('.topbar-title.expense-entry-tabs .flex.items-center.gap-2.shrink-0');
+            const exportWrapper = container?.querySelector('.relative.shrink-0');
+            if (!container || !exportWrapper) {
+                requestAnimationFrame(attachSendExpensesToolbarSlot);
+                return;
+            }
+            const slot = document.createElement('span');
+            slot.className = 'shrink-0';
+            container.insertBefore(slot, exportWrapper);
+            sendExpensesToolbarSlotElRef.current = slot;
+            setSendExpensesToolbarSlot(slot);
+        };
+        attachSendExpensesToolbarSlot();
+        return () => {
+            cancelled = true;
+            sendExpensesToolbarSlotElRef.current?.remove();
+            sendExpensesToolbarSlotElRef.current = null;
+            setSendExpensesToolbarSlot(null);
+        };
+    }, [isTabActive]);
     const expensesDstCol21Label = 'S.No';
-    const expensesDstCol4Label = isChangeButtonActive ? 'Associate' : 'Labour Name';
+    const expensesDstCol4Label = 'Associate';
+    const expensesDstCol4EntryPlaceholder = isChangeButtonActive ? 'Labour Name' : 'Con/Ven/Emp';
     const expensesDstCol3Label = 'Project Name';
     const expensesDstCol8Label = 'Amount';
     const expensesDstCol12Label = 'Type';
     const expensesDstCol7Label = 'Quantity';
     const expensesDstCol20FileLabel = 'File';
     const expensesDstCol20ActivityLabel = 'Activity';
-    const refundDstCol4Label = isRefundChangeButtonActive ? 'Associate' : 'Labour Name';
+    const refundDstCol4Label = 'Associate';
+    const refundDstCol4EntryPlaceholder = isRefundChangeButtonActive ? 'Labour Name' : 'Con/Ven/Emp';
     const refundDstCol8Label = 'Amount';
     const refundDstCol20Label = 'Activity';
     return (
@@ -3192,7 +3339,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
             <div className="flex flex-col h-[calc(100vh-104px)] overflow-hidden bg-[#FAF6ED] px-[18px] pt-[18px] pb-[18px]">
                 <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-[#FAF6ED]">
                     <div className="w-full rounded-[6px] bg-white mb-[18px] shrink-0">
-                        <div className="flex flex-wrap items-center justify-between text-left">
+                        <div className="flex flex-wrap items-center justify-between text-left max-md:flex-col max-md:items-stretch">
                             <div className='flex gap-[12px] p-[18px]'>
                                 {(() => {
                                     const entryCheckLikeSelectStyles = {
@@ -3286,7 +3433,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                         menuList: () => 'no-scrollbar scrollbar-none',
                                         valueContainer: () => '!flex-nowrap !overflow-hidden',
                                         placeholder: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
-                                        singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis',
+                                        singleValue: () => '!whitespace-nowrap !overflow-hidden !text-ellipsis !font-semibold',
                                     };
                                     const formatWeekOptionDate = (date) =>
                                         date.toLocaleDateString("en-GB", {
@@ -3334,7 +3481,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                     type="text"
                                                     readOnly
                                                     value={`₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                                    className="min-w-0 w-[150px] h-[40px] px-3 text-[#000000] text-left text-[14px] font-semibold bg-[#ededed] border-2 border-[rgba(191,152,83,0.2)] rounded-lg bg-transparent focus:outline-none"
+                                                    className="min-w-0 w-[150px] h-[40px] px-3 text-[#000000] text-left text-[14px] font-semibold bg-[#ededed] border-2 border-[rgba(191,152,83,0.2)] rounded-lg focus:outline-none"
                                                 />
                                             </div>
                                         </div>
@@ -3368,7 +3515,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                         <span className="text-[14px] font-semibold leading-tight">
                                                             {day.toLocaleDateString("en-US", { weekday: "short" })}
                                                         </span>
-                                                        <span className="text-[14px] font-semibold leading-tight mt-[2px]">
+                                                        <span className="text-[14px] font-semibold leading-tight mt-[2px] whitespace-nowrap">
                                                             {formatDate(day)}
                                                         </span>
                                                         {isSelected && (
@@ -3381,14 +3528,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                     );
                                 })()}
                             </div>
-                            <div className="flex items-center space-x-3 flex-wrap justify-end pr-[18px]">
-                                <button
-                                    onClick={handleSendToExpensesEntry}
-                                    className="h-[36px] bg-[#BF9853] text-white text-[14px] font-bold px-[16px] rounded shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    disabled={sendingToExpensesEntry}
-                                >
-                                    {sendingToExpensesEntry ? 'Sending...' : 'Send Expenses'}
-                                </button>
+                            <div className="flex items-center space-x-3 flex-wrap justify-end pr-[18px] max-md:justify-start max-md:px-[18px] max-md:pb-[18px] max-md:w-full">
                                 <div
                                     className="rounded-md px-4 py-[8px] text-sm shrink-0"
                                     style={{
@@ -3435,45 +3575,138 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                             </div>
                         </div>
                     </div>
-                    <div className="w-full p-[18px] border-collapse bg-[#FFFFFF] rounded-md flex flex-col flex-1 min-h-0 overflow-hidden">
-                        <div className="w-full flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden">
-                            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden">
+                    <div className="w-full p-[18px] border-collapse bg-[#FFFFFF] rounded-md flex flex-col flex-1 min-h-0 overflow-hidden max-xl:overflow-y-auto no-scrollbar scrollbar-none">
+                        <div className="w-full flex flex-col xl:flex-row gap-[18px] flex-1 min-h-0 overflow-hidden max-xl:flex-none max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
+                            <div className="shrink-0 w-fit max-w-full flex flex-col min-h-0 overflow-hidden max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none">
                                 <div className="flex justify-between items-center mb-[8px]">
                                     <h1 className="font-bold text-base">Expenses (PS {selectedWeek ?? "-"})</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                         ₹{Number(filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </h1>
                                 </div>
-                                <div className="text-left flex flex-row justify-between items-center mb-[12px] gap-[6px]">
-                                    <div className="flex flex-row items-center sm:space-x-3 min-w-0 flex-1 overflow-hidden">
-                                        <EdbcFilterToggleButton onClick={() => setShowFilters(!showFilters)} />
+                                <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                    <div className="shrink-0 flex items-center z-[2] bg-white">
+                                        <EdbcFilterToggleButton
+                                            onClick={() => {
+                                                const willOpen = !showFilters;
+                                                const scroller = scrollRef.current;
+                                                if (willOpen) {
+                                                    setShowFilters(true);
+                                                    if (!scroller) return;
+                                                    if (scroller.scrollTop <= 0) return;
+                                                    if (filterNudgeUsedRef.current) return;
+                                                    filterNudgeUsedRef.current = true;
+                                                    requestAnimationFrame(() => {
+                                                        requestAnimationFrame(() => {
+                                                            const h = filterRowRef.current?.offsetHeight || 0;
+                                                            if (h > 0) {
+                                                                scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
+                                                            }
+                                                        });
+                                                    });
+                                                    return;
+                                                }
+                                                const h = filterRowRef.current?.offsetHeight || 0;
+                                                setShowFilters(false);
+                                                if (!scroller || h <= 0 || !filterNudgeUsedRef.current) return;
+                                                filterNudgeUsedRef.current = false;
+                                                requestAnimationFrame(() => {
+                                                    requestAnimationFrame(() => {
+                                                        scroller.scrollTop = scroller.scrollTop + h;
+                                                    });
+                                                });
+                                            }}
+                                        />
+                                    </div>
+                                    <div
+                                        ref={expensesFilterChipsRef}
+                                        className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
+                                        onMouseDown={(e) => handleMouseDown(e, expensesFilterChipsRef)}
+                                        onMouseMove={(e) => handleMouseMove(e, expensesFilterChipsRef)}
+                                        onMouseUp={() => handleMouseUp(expensesFilterChipsRef)}
+                                        onMouseLeave={() => handleMouseUp(expensesFilterChipsRef)}
+                                    >
+                                        {selectContractororVendorName && (
+                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium text-[#BF9853]">{expensesDstCol4Label}: </span>
+                                                <span className="font-semibold text-[14px]">{selectContractororVendorName}</span>
+                                                <button type="button" onClick={() => setSelectContractororVendorName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectProjectName && (
+                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium text-[#BF9853]">{expensesDstCol3Label}: </span>
+                                                <span className="font-semibold text-[14px]">{selectProjectName}</span>
+                                                <button type="button" onClick={() => setSelectProjectName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectType && (
+                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium text-[#BF9853]">{expensesDstCol12Label}: </span>
+                                                <span className="font-semibold text-[14px]">{selectType}</span>
+                                                <button type="button" onClick={() => setSelectType('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectAmount.trim() && (
+                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium text-[#BF9853]">{expensesDstCol8Label}: </span>
+                                                <span className="font-semibold text-[14px]">{selectAmount}</span>
+                                                <button type="button" onClick={() => setSelectAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
+                                        {selectQuantity.trim() && (
+                                            <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                <span className="font-medium text-[#BF9853]">{expensesDstCol7Label}: </span>
+                                                <span className="font-semibold text-[14px]">{selectQuantity}</span>
+                                                <button type="button" onClick={() => setSelectQuantity('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                            </span>
+                                        )}
                                     </div>
                                     <EdbcTableToolbarRightActions
                                         onClearFilters={clearFilters}
                                         overallSearch={overallSearch}
                                         onOverallSearchChange={setOverallSearch}
+                                        wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
+                                        searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
                                     />
                                 </div>
                                 <div className="w-full flex-1 min-h-0 rounded-lg border-l-8 border-l-[#BF9853] overflow-hidden">
-                                    <div ref={scrollRef} className="w-full flex-1 min-h-0 overflow-y-auto overflow-x-hidden h-full no-scrollbar select-none" onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
+                                    <div ref={scrollRef} className="w-full flex-1 min-h-0 overflow-y-auto overflow-x-auto h-full no-scrollbar scrollbar-none select-none" onWheel={() => { filterNudgeUsedRef.current = false; }} onMouseDown={(e) => handleMouseDown(e, scrollRef)} onMouseMove={(e) => handleMouseMove(e, scrollRef)}
                                         onMouseUp={() => handleMouseUp(scrollRef)} onMouseLeave={() => handleMouseUp(scrollRef)} >
-                                        <table className={`border-collapse text-left w-full table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
+                                        <table className={`border-collapse text-left ${DAILY_HISTORY_EXPENSES_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${DAILY_HISTORY_EXPENSES_TBODY_EDBC8_LOCK_TABLE_CLASS} ${DAILY_HISTORY_EXPENSES_TBODY_TABLE_LOCK_TABLE_CLASS} [&_tbody_tr]:!h-[40px] [&_tbody_tr]:!max-h-[40px] [&_tbody_tr>td]:box-border [&_tbody_tr>td]:!h-[40px] [&_tbody_tr>td]:!max-h-[40px] [&_tbody_tr>td]:!py-0 [&_tbody_tr>td]:!leading-none [&_tbody_tr:has(td#EDBC-8:hover)]:!relative [&_tbody_tr:has(td#EDBC-8:hover)]:!overflow-visible [&_tbody_tr:has(td#EDBC-8:hover)]:!z-[50] [&_thead_tr>th#EDBC-19]:!pr-[1px] [&_tbody_tr>td#EDBC-19]:!pr-[1px] [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
+                                            <colgroup>
+                                                <col style={{ width: '70px' }} />
+                                                <col style={{ width: '218px' }} />
+                                                <col style={{ width: '30px' }} />
+                                                <col style={{ width: '298px' }} />
+                                                <col style={{ width: '158px' }} />
+                                                <col style={{ width: '120px' }} />
+                                                <col style={{ width: '20px' }} />
+                                                <col style={{ width: '66px' }} />
+                                                <col style={{ width: '88px' }} />
+                                                <col style={{ width: '30px' }} />
+                                                <col style={{ width: '70px' }} />
+                                                <col style={{ width: '70px' }} />
+                                                <col style={{ width: '12px' }} />
+                                            </colgroup>
                                             <thead className="sticky top-0 z-10 bg-white">
                                                 <EdbcTableHeaderRow>
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC21} label={expensesDstCol21Label} />
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={expensesDstCol4Label} sortProps={edbcSortProps} />
-                                                    <th className="w-[30px] px-[2px] overflow-visible" aria-hidden="true"></th>
+                                                    <th className={EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS} aria-hidden="true"></th>
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC3} label={expensesDstCol3Label} sortProps={edbcSortProps} />
-                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} sortProps={edbcSortProps} />
-                                                    <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible" aria-hidden="true"></th>
-                                                    <th className=" w-[66px] font-bold text-center" aria-hidden="true"></th>
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label={expensesDstCol12Label} sortProps={edbcSortProps} />
+                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={expensesDstCol8Label} sortProps={edbcSortProps} />
+                                                    <th className="w-[20px] min-w-[20px] max-w-[20px] p-0 overflow-visible" aria-hidden="true"></th>
+                                                    <th className=" w-[66px] font-bold text-center" aria-hidden="true"></th>
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC7} label={expensesDstCol7Label} sortProps={edbcSortProps} />
+                                                    <th className={EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS} aria-hidden="true"></th>
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20FileLabel} />
                                                     <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={expensesDstCol20ActivityLabel} />
+                                                    <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
                                                 </EdbcTableHeaderRow>
                                                 {showFilters && (
-                                                    <EdbcTableFilterRow>
+                                                    <EdbcTableFilterRow ref={filterRowRef}>
                                                         <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC21} />
                                                         <EdbcSelectFilter
                                                             columnId={EDBC_IDS.EDBC4}
@@ -3483,21 +3716,14 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                             onChange={setSelectContractororVendorName}
                                                             selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                         />
-                                                        <th className=" p-0 overflow-visible"></th>
+                                                        <th className={EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS} aria-hidden="true"></th>
                                                         <EdbcProjectNameFilter
                                                             placeholder={expensesDstCol3Label}
                                                             options={projectFilterOptions}
                                                             value={selectProjectName}
                                                             onChange={setSelectProjectName}
-                                                            isClearable
                                                             selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                         />
-                                                        <EdbcTotalAmountFilter
-                                                            columnId={EDBC_IDS.EDBC8}
-                                                            totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
-                                                        />
-                                                        <th className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></th>
-                                                        <th className="pl-[6px] w-[66px]"></th>
                                                         <EdbcSelectFilter
                                                             columnId={EDBC_IDS.EDBC12}
                                                             placeholder={expensesDstCol12Label}
@@ -3506,38 +3732,48 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                             onChange={setSelectType}
                                                             selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
                                                         />
+                                                        <EdbcTotalAmountFilter
+                                                            columnId={EDBC_IDS.EDBC8}
+                                                            totalAmount={filteredExpenses.reduce((total, expense) => total + Number(expense.amount || 0), 0)}
+                                                            value={selectAmount}
+                                                            onChange={(e) => setSelectAmount(e.target.value)}
+                                                        />
+                                                        <th className="w-[20px] min-w-[20px] max-w-[20px] p-0 overflow-visible"></th>
+                                                        <th className="pl-[6px] w-[66px]"></th>
                                                         <EdbcTextInputFilter
                                                             columnId={EDBC_IDS.EDBC7}
                                                             placeholder={expensesDstCol7Label}
                                                             value={selectQuantity}
                                                             onChange={(e) => setSelectQuantity(e.target.value)}
                                                         />
+                                                        <th className={EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS} aria-hidden="true"></th>
                                                         <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
                                                         <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                        <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
                                                     </EdbcTableFilterRow>
                                                 )}
                                                 {canEditSelectedWeek && (
-                                                    <tr className="bg-white border-b border-gray-200 items-center justify-center">
+                                                    <tr className="bg-white items-center justify-center !h-[40px] !max-h-[40px] [&>td]:box-border [&>td]:!h-[40px] [&>td]:!max-h-[40px] [&>td]:!py-0 [&>td]:!leading-none overflow-hidden">
                                                         <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{dailyExpenses.length + 1}.</td>
                                                         <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
                                                             <div className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}>
                                                                 <Select
                                                                     name="labour_id"
                                                                     className="text-xs focus:outline-none w-full"
-                                                                    placeholder={expensesDstCol4Label}
+                                                                    placeholder={expensesDstCol4EntryPlaceholder}
                                                                     isSearchable
                                                                     isClearable
-                                                                    options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                                    options={isChangeButtonActive ? laboursList : combinedOptions}
                                                                     styles={CASH_REGISTER_SELECT_STYLES}
                                                                     menuPortalTarget={document.body}
                                                                     value={
                                                                         isChangeButtonActive
-                                                                            ? combinedOptions.find(opt =>
+                                                                            ? laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
+                                                                            : combinedOptions.find(opt =>
                                                                                 (opt.type === "Employee" && opt.id === Number(newDailyExpense.employee_id)) ||
                                                                                 (opt.type === "Vendor" && opt.id === Number(newDailyExpense.vendor_id)) ||
                                                                                 (opt.type === "Contractor" && opt.id === Number(newDailyExpense.contractor_id))
                                                                             ) || null
-                                                                            : laboursList.find(opt => opt.id === Number(newDailyExpense.labour_id)) || null
                                                                     }
                                                                     onChange={(selectedOption) => {
                                                                         if (selectedOption) {
@@ -3566,13 +3802,15 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 />
                                                             </div>
                                                         </td>
-                                                        <td className="w-[30px] px-[6px] overflow-visible flex items-center justify-center h-[38px]">
-                                                            <button type="button" onClick={handleChangeButtonClick} className="inline-flex items-center justify-center">
-                                                                <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} alt="Toggle name type" />
-                                                            </button>
+                                                        <td className="w-[30px] px-[6px] overflow-visible align-middle">
+                                                            <div className="flex items-center justify-center h-[40px]">
+                                                                <button type="button" onClick={handleChangeButtonClick} className="inline-flex items-center justify-center">
+                                                                    <img src={Change} className={`w-4 h-4 ${isChangeButtonActive ? 'opacity-10' : ''}`} alt="Toggle name type" />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                         <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
-                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
+                                                            <div className="min-w-0 w-full">
                                                                 <Select
                                                                     name="project"
                                                                     value={siteOptions.find(opt => opt.id === Number(newDailyExpense.project_id)) || null}
@@ -3588,6 +3826,25 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     placeholder={expensesDstCol3Label}
                                                                     isSearchable
                                                                     isClearable
+                                                                    styles={CASH_REGISTER_SELECT_STYLES}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                            <div className="min-w-0 w-full">
+                                                                <Select
+                                                                    name="type"
+                                                                    className="text-xs focus:outline-none w-full"
+                                                                    value={newDailyExpense.type ? { value: newDailyExpense.type, label: newDailyExpense.type } : null}
+                                                                    onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
+                                                                    options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
+                                                                        value: isChangeButtonActive ? type.category : type.type,
+                                                                        label: isChangeButtonActive ? type.category : type.type,
+                                                                    }))}
+                                                                    placeholder={expensesDstCol12Label}
+                                                                    isSearchable
+                                                                    isClearable
+                                                                    menuPortalTarget={document.body}
                                                                     styles={CASH_REGISTER_SELECT_STYLES}
                                                                 />
                                                             </div>
@@ -3611,10 +3868,12 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 />
                                                             </div>
                                                         </td>
-                                                        <td className="p-0 overflow-visible flex items-center justify-center h-[38px]">
-                                                            <button onClick={() => setShowExtraAmount(prev => !prev)} type="button" className="inline-flex pl-[6px] items-center justify-center h-4 w-4 shrink-0">
-                                                                <img src={showExtraAmount ? ExtraFeildClose : ExtraFeild} className={`h-4 w-4 min-h-4 min-w-4 max-h-4 max-w-4 shrink-0 object-contain origin-center ${showExtraAmount ? 'scale-[1.375]' : ''}`} alt="Extra" />
-                                                            </button>
+                                                        <td className="w-[20px] min-w-[20px] max-w-[20px] overflow-visible align-middle">
+                                                            <div className="flex items-center justify-center h-[40px]">
+                                                                <button onClick={() => setShowExtraAmount(prev => !prev)} type="button" className="inline-flex pl-[6px] items-center justify-center h-4 w-4 shrink-0">
+                                                                    <img src={showExtraAmount ? ExtraFeildClose : ExtraFeild} className={`h-4 w-4 min-h-4 min-w-4 max-h-4 max-w-4 shrink-0 object-contain origin-center ${showExtraAmount ? 'scale-[1.375]' : ''}`} alt="Extra" />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                         <td className="pl-[6px] w-[66px] text-center">
                                                             {showExtraAmount && (
@@ -3640,25 +3899,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
-                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
-                                                                <Select
-                                                                    name="type"
-                                                                    className="text-xs focus:outline-none w-full"
-                                                                    value={newDailyExpense.type ? { value: newDailyExpense.type, label: newDailyExpense.type } : null}
-                                                                    onChange={(selectedOption) => handleInputChange({ target: { name: 'type', value: selectedOption ? selectedOption.value : '' } })}
-                                                                    options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
-                                                                        value: isChangeButtonActive ? type.category : type.type,
-                                                                        label: isChangeButtonActive ? type.category : type.type,
-                                                                    }))}
-                                                                    placeholder={expensesDstCol12Label}
-                                                                    isSearchable
-                                                                    isClearable
-                                                                    menuPortalTarget={document.body}
-                                                                    styles={CASH_REGISTER_SELECT_STYLES}
-                                                                />
-                                                            </div>
-                                                        </td>
                                                         <td id={EDBC_IDS.EDBC7} className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.tdClass}>
                                                             <div className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.filterWidthClass}>
                                                                 <input
@@ -3678,10 +3918,12 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 />
                                                             </div>
                                                         </td>
+                                                        <td className="w-[30px] px-[6px] overflow-visible flex items-center justify-center h-[40px]"></td>
                                                         <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                         </td>
                                                         <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                         </td>
+                                                        <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
                                                     </tr>
                                                 )}
                                             </thead>
@@ -3690,7 +3932,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                     .filter(row => row.date === selectedDate)
                                                     .reverse()
                                                     .map((row, index) => (
-                                                        <EdbcTableBodyRow key={row.id}>
+                                                        <EdbcTableBodyRow key={row.id} className="!h-[40px] !max-h-[40px] [&>td]:box-border [&>td]:!h-[40px] [&>td]:!max-h-[40px] [&>td]:!py-0 [&>td]:!leading-none">
                                                             <td id={EDBC_IDS.EDBC21} className={getEdbcColumnConfig(EDBC_IDS.EDBC21)?.tdClass}>{dailyExpenses.length - index}</td>
                                                             <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
                                                                 <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center`}>
@@ -3701,17 +3943,17 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                             placeholder={expensesDstCol4Label}
                                                                             isSearchable
                                                                             isClearable
-                                                                            options={isChangeButtonActive ? combinedOptions : laboursList}
+                                                                            options={isChangeButtonActive ? laboursList : combinedOptions}
                                                                             styles={CASH_REGISTER_SELECT_STYLES}
                                                                             menuPortalTarget={document.body}
                                                                             value={
                                                                                 isChangeButtonActive
-                                                                                    ? combinedOptions.find(opt =>
+                                                                                    ? laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
+                                                                                    : combinedOptions.find(opt =>
                                                                                         (opt.type === "Employee" && opt.id === Number(editDailyExpenseData.employee_id)) ||
                                                                                         (opt.type === "Vendor" && opt.id === Number(editDailyExpenseData.vendor_id)) ||
                                                                                         (opt.type === "Contractor" && opt.id === Number(editDailyExpenseData.contractor_id))
                                                                                     ) || null
-                                                                                    : laboursList.find(opt => opt.id === Number(editDailyExpenseData.labour_id)) || null
                                                                             }
                                                                             onChange={(selectedOption) => {
                                                                                 if (selectedOption) {
@@ -3749,7 +3991,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     )}
                                                                 </div>
                                                             </td>
-                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
+                                                            <td className={EDBC_CASH_REGISTER_CHANGE_COLUMN_CLASS} aria-hidden="true"></td>
                                                             <td id={EDBC_IDS.EDBC3} className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.tdClass}>
                                                                 {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
                                                                     <div className={getEdbcColumnConfig(EDBC_IDS.EDBC3)?.filterWidthClass}>
@@ -3782,7 +4024,37 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td id={EDBC_IDS.EDBC8} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} relative group`}>
+                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
+                                                                {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
+                                                                        <Select
+                                                                            name="type"
+                                                                            className="text-xs focus:outline-none w-full"
+                                                                            value={editDailyExpenseData.type ? { value: editDailyExpenseData.type, label: editDailyExpenseData.type } : null}
+                                                                            onChange={(selectedOption) => setEditDailyExpenseData(prev => ({ ...prev, type: selectedOption ? selectedOption.value : '' }))}
+                                                                            options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
+                                                                                value: isChangeButtonActive ? type.category : type.type,
+                                                                                label: isChangeButtonActive ? type.category : type.type,
+                                                                            }))}
+                                                                            placeholder={expensesDstCol12Label}
+                                                                            isSearchable
+                                                                            isClearable
+                                                                            menuPortalTarget={document.body}
+                                                                            styles={CASH_REGISTER_SELECT_STYLES}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass || ''} h-[40px] flex items-center min-w-0`}>
+                                                                        <span
+                                                                            className="block w-full truncate whitespace-nowrap overflow-hidden"
+                                                                            title={row.type || ""}
+                                                                        >
+                                                                            {row.type}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC8} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} relative group hover:z-[100]`}>
                                                                 {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
                                                                     <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
                                                                         <input
@@ -3796,11 +4068,11 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     </div>
                                                                 ) : (
                                                                     <div className="flex items-center justify-end">
-                                                                        <div className="h-[40px] flex flex-col justify-center leading-tight cursor-default text-right">
+                                                                        <div className="relative h-[40px] flex flex-col justify-center leading-tight cursor-default text-right">
                                                                             <span>
                                                                                 {formatEdbcTotalAmountPlaceholder(Number((row.amount || 0) + (row.extra_amount || 0)))}
                                                                             </span>
-                                                                            <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-50 shadow-lg whitespace-nowrap">
+                                                                            <div className="absolute right-0 bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs rounded p-2 z-[100] shadow-lg whitespace-nowrap pointer-events-none">
                                                                                 Amount: {Number(row.amount || 0).toLocaleString('en-IN')} <br />
                                                                                 Extra Amount: {Number(row.extra_amount || 0).toLocaleString('en-IN')}
                                                                             </div>
@@ -3808,8 +4080,8 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td className="w-4 min-w-4 max-w-4 p-0 overflow-visible"></td>
-                                                            <td className="pl-[6px] w-[66px] text-center">
+                                                            <td className={EDBC_CASH_REGISTER_EXTRA_FIELD_BUTTON_COLUMN_CLASS}></td>
+                                                            <td className={`${EDBC_CASH_REGISTER_EXTRA_AMOUNT_COLUMN_CLASS} text-center`}>
                                                                 {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
                                                                     <div className="w-[60px]">
                                                                         <input
@@ -3823,31 +4095,6 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                         />
                                                                     </div>
                                                                 ) : null}
-                                                            </td>
-                                                            <td id={EDBC_IDS.EDBC12} className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass}>
-                                                                <div className="w-[120px] h-[40px] flex items-center">
-                                                                    {editingDailyExpenseRowId === row.id && canEditSelectedWeek ? (
-                                                                        <div className={getEdbcColumnConfig(EDBC_IDS.EDBC12)?.filterWidthClass}>
-                                                                            <Select
-                                                                                name="type"
-                                                                                className="text-xs focus:outline-none w-full"
-                                                                                value={editDailyExpenseData.type ? { value: editDailyExpenseData.type, label: editDailyExpenseData.type } : null}
-                                                                                onChange={(selectedOption) => setEditDailyExpenseData(prev => ({ ...prev, type: selectedOption ? selectedOption.value : '' }))}
-                                                                                options={(isChangeButtonActive ? expensesCategory : weeklyTypes).map((type) => ({
-                                                                                    value: isChangeButtonActive ? type.category : type.type,
-                                                                                    label: isChangeButtonActive ? type.category : type.type,
-                                                                                }))}
-                                                                                placeholder={expensesDstCol12Label}
-                                                                                isSearchable
-                                                                                isClearable
-                                                                                menuPortalTarget={document.body}
-                                                                                styles={CASH_REGISTER_SELECT_STYLES}
-                                                                            />
-                                                                        </div>
-                                                                    ) : (
-                                                                        row.type
-                                                                    )}
-                                                                </div>
                                                             </td>
                                                             <td id={EDBC_IDS.EDBC7} className={getEdbcColumnConfig(EDBC_IDS.EDBC7)?.tdClass}>
                                                                 <div className="w-[60px] h-[40px] flex items-center">
@@ -3867,71 +4114,71 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                     )}
                                                                 </div>
                                                             </td>
+                                                            <td className={`${EDBC_CASH_REGISTER_DESCRIPTION_COLUMN_CLASS} flex items-center justify-center h-[40px]`}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDescriptionClick(row)}
+                                                                    className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center"
+                                                                    title={row.description ? 'View Description' : 'Add Description'}
+                                                                >
+                                                                    <img
+                                                                        src={row.description ? NotesEnd : NotesStart}
+                                                                        alt=""
+                                                                        className=" cursor-pointer opacity-60 hover:opacity-100"
+                                                                    />
+                                                                </button>
+                                                            </td>
                                                             <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
                                                                 <div className="flex w-full items-center justify-center">
-                                                                    <span className="inline-flex items-center gap-[10px]">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleDescriptionClick(row)}
-                                                                            className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center"
-                                                                            title={row.description ? 'View Description' : 'Add Description'}
-                                                                        >
-                                                                            <img
-                                                                                src={row.description ? NotesEnd : NotesStart}
-                                                                                alt=""
-                                                                                className=" cursor-pointer opacity-60 hover:opacity-100"
-                                                                            />
-                                                                        </button>
-                                                                        <span className="inline-flex items-center gap-[4px]">
-                                                                            {row.file_url ? (
-                                                                                <>
-                                                                                    <a
-                                                                                        href={row.file_url}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center cursor-pointer"
-                                                                                        title="View File"
-                                                                                    >
-                                                                                        <img src={file} className="" alt="Open File" />
-                                                                                    </a>
-                                                                                    {canRemoveFileUrl && canEditSelectedWeek && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => handleRemoveFileUrl(row)}
-                                                                                            className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
-                                                                                            title="Remove File"
-                                                                                        >
-                                                                                            <img src={FileRemover} className="" alt="Remove File" />
-                                                                                        </button>
-                                                                                    )}
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
+                                                                    <span className="inline-flex items-center gap-[4px]">
+                                                                        {row.file_url ? (
+                                                                            <>
+                                                                                <a
+                                                                                    href={row.file_url}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="inline-flex shrink-0 w-[16px] h-[16px] items-center justify-center cursor-pointer"
+                                                                                    title="View File"
+                                                                                >
+                                                                                    <img src={file} className="" alt="Open File" />
+                                                                                </a>
+                                                                                {canRemoveFileUrl && canEditSelectedWeek && (
                                                                                     <button
                                                                                         type="button"
-                                                                                        onClick={() => handleFileUploadClick(row)}
-                                                                                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                                                        title="Upload File"
-                                                                                        disabled={!canEditSelectedWeek}
+                                                                                        onClick={() => handleRemoveFileUrl(row)}
+                                                                                        className="flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full hover:bg-[#fff1ee]"
+                                                                                        title="Remove File"
                                                                                     >
-                                                                                        <img
-                                                                                            src={fileUpload}
-                                                                                            className={`w-4 h-4 ${canEditSelectedWeek ? 'opacity-70 hover:opacity-100' : 'opacity-30'}`}
-                                                                                            alt="Upload File"
-                                                                                        />
+                                                                                        <img src={FileRemover} className="" alt="Remove File" />
                                                                                     </button>
-                                                                                </>
-                                                                            )}
-                                                                        </span>
-                                                                        {canRemoveFileUrl && canEditSelectedWeek && !row.file_url && removedFileUrlRows[row.id] && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleRestoreFileUrl(row)}
-                                                                                className="shrink-0 rounded border border-[#007233] px-1 text-[9px] font-semibold leading-tight text-[#007233] hover:bg-[#e9f8f0]"
-                                                                                title="Restore Removed File"
-                                                                            >
-                                                                                Restore
-                                                                            </button>
+                                                                                )}
+                                                                            </>
+                                                                        ) : (
+                                                                            <span className="inline-flex items-center gap-2">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleFileUploadClick(row)}
+                                                                                    className="inline-flex h-4 w-4 shrink-0 items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                                    title="Upload File"
+                                                                                    disabled={!canEditSelectedWeek}
+                                                                                >
+                                                                                    <img
+                                                                                        src={fileUpload}
+                                                                                        className={`w-4 h-4 ${canEditSelectedWeek ? 'opacity-70 hover:opacity-100' : 'opacity-30'}`}
+                                                                                        alt="Upload File"
+                                                                                    />
+                                                                                </button>
+                                                                                {canRemoveFileUrl && canEditSelectedWeek && removedFileUrlRows[row.id] ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleRestoreFileUrl(row)}
+                                                                                        className="inline-flex shrink-0"
+                                                                                        title="Restore Removed File"
+                                                                                    >
+                                                                                        <img src={restore} alt="" className="w-4 h-4" />
+                                                                                    </button>
+                                                                                ) : null}
+                                                                            </span>
                                                                         )}
                                                                     </span>
                                                                 </div>
@@ -3940,27 +4187,36 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                                 {canEditSelectedWeek && (
                                                                     <div className="flex gap-1 justify-center">
                                                                         {editingDailyExpenseRowId === row.id ? (
-                                                                            <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
-                                                                                ✓
-                                                                            </button>
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                <button className="text-green-600 font-bold text-lg relative z-10" onClick={() => saveEditedExpense(row)}>
+                                                                                    ✓
+                                                                                </button>
+                                                                            </span>
                                                                         ) : (
-                                                                            <button onClick={() => handleEditClick(row)}>
-                                                                                <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                            </button>
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                <button onClick={() => handleEditClick(row)}>
+                                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                                </button>
+                                                                            </span>
                                                                         )}
                                                                         {canEditDelete && (
                                                                             <>
-                                                                                <button onClick={() => handleDailyExpensesDelete(row.id)}>
-                                                                                    <img src={Delete} className="w-5 h-4" alt="Delete" />
-                                                                                </button>
+                                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                    <button type="button" onClick={() => handleDailyExpensesDelete(row.id)}>
+                                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                    </button>
+                                                                                </span>
                                                                             </>
                                                                         )}
-                                                                        <button onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
-                                                                            <img src={history} className="w-5 h-4" alt="History" />
-                                                                        </button>
+                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                            <button type="button" onClick={() => fetchAuditDetailsForDailyExpense(row.id)}>
+                                                                                <img className="w-5 h-4" src={history} alt="History" />
+                                                                            </button>
+                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
                                                         </EdbcTableBodyRow>
                                                     ))}
                                             </tbody>
@@ -3968,251 +4224,338 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                     </div>
                                 </div>
                             </div>
-                            <div className="shrink-0 flex flex-col min-h-0 overflow-hidden">
-                                <div className="w-fit max-w-full flex flex-col min-h-0">
-                                <div className="flex justify-between items-center mb-[8px] w-full">
+                            <div className="w-fit shrink-0 flex flex-col min-h-0 xl:h-full max-xl:h-auto max-xl:w-full">
+                                <div className="flex justify-between items-center mb-[8px]">
                                     <h1 className="font-bold text-base">Refund Received</h1>
                                     <h1 className="font-bold text-base" style={{ color: "#E4572E" }}>
                                         ₹{Number(totalRefund).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </h1>
                                 </div>
-                                <div className="text-left flex flex-row items-center mb-[12px] gap-[6px] w-full">
-                                        <EdbcFilterToggleButton onClick={() => setShowRefundFilters(!showRefundFilters)} />
-                                    <EdbcTableToolbarRightActions
-                                        onClearFilters={clearRefundFilters}
-                                        overallSearch={refundOverallSearch}
-                                        onOverallSearchChange={setRefundOverallSearch}
-                                        wrapperClassName="flex items-end gap-[6px] min-w-0 flex-1 justify-end"
-                                        searchWrapperClassName="h-[34px] min-w-0 w-1/2 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1"
-                                    />
-                                </div>
-                                <div className="shrink-0">
-                                    <div className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar"
-                                        style={{
-                                            height: `${40 + (showRefundFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
-                                            maxHeight: `${40 + (showRefundFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
-                                            willChange: 'scroll-position',
-                                            WebkitOverflowScrolling: 'touch',
-                                            transform: 'translateZ(0)',
-                                            backfaceVisibility: 'hidden'
-                                        }}
-                                    >
-                                        <table className={`border-collapse text-left w-max table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px]`}>
-                                            <thead className="sticky top-0 z-10 bg-white">
-                                                <EdbcTableHeaderRow>
-                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={refundDstCol4Label} sortProps={refundEdbcSortProps} />
-                                                    <th className="px-[2px] w-[100px] overflow-visible" aria-hidden="true"></th>
-                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label={refundDstCol8Label} sortProps={refundEdbcSortProps} />
-                                                    <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={refundDstCol20Label} />
-                                                </EdbcTableHeaderRow>
-                                                {showRefundFilters && (
-                                                    <EdbcTableFilterRow>
-                                                        <EdbcSelectFilter
-                                                            columnId={EDBC_IDS.EDBC4}
-                                                            placeholder={refundDstCol4Label}
-                                                            options={refundNameFilterOptions}
-                                                            value={selectRefundName}
-                                                            onChange={setSelectRefundName}
-                                                            selectStyles={DATABASE_TABLE_FILTER_SELECT_STYLES}
-                                                        />
-                                                        <th className="px-[2px] w-[60px] overflow-visible"></th>
-                                                        <EdbcTotalAmountFilter
-                                                            columnId={EDBC_IDS.EDBC8}
-                                                            totalAmount={filteredRefundPayments.reduce((total, row) => total + Number(row.amount || 0), 0)}
-                                                            value={selectRefundAmount}
-                                                            onChange={(e) => setSelectRefundAmount(e.target.value)}
-                                                        />
-                                                        <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
-                                                    </EdbcTableFilterRow>
-                                                )}
-                                                {canEditSelectedWeek && (
-                                                    <tr className="bg-white border-b border-gray-200">
-                                                        <td id={EDBC_IDS.EDBC4} className="pl-[12px] pr-[1px] w-[218px] text-left">
-                                                            <Select
-                                                                name="refund_party"
-                                                                className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass}
-                                                                placeholder={refundDstCol4Label}
-                                                                isSearchable
-                                                                isClearable
-                                                                value={
-                                                                    isRefundChangeButtonActive
-                                                                        ? combinedOptions.find(opt =>
-                                                                            (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
-                                                                            (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
-                                                                            (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
-                                                                        ) || null
-                                                                        : laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
+                                <div className={`flex flex-col ${DAILY_HISTORY_REFUND_SECTION_FIXED_WIDTH_CLASS} max-w-full min-h-0 overflow-hidden max-xl:w-full max-xl:overflow-x-auto max-xl:no-scrollbar max-xl:scrollbar-none`}>
+                                    <div className="mb-[12px] w-full min-w-0 min-h-[34px] shrink-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-hidden">
+                                        <div className="shrink-0 flex items-center z-[2] bg-white">
+                                            <EdbcFilterToggleButton
+                                                onClick={() => {
+                                                    const willOpen = !showRefundFilters;
+                                                    const scroller = refundScrollRef.current;
+                                                    if (willOpen) {
+                                                        setShowRefundFilters(true);
+                                                        if (!scroller) return;
+                                                        if (scroller.scrollTop <= 0) return;
+                                                        if (refundFilterNudgeUsedRef.current) return;
+                                                        refundFilterNudgeUsedRef.current = true;
+                                                        requestAnimationFrame(() => {
+                                                            requestAnimationFrame(() => {
+                                                                const h = refundFilterRowRef.current?.offsetHeight || 0;
+                                                                if (h > 0) {
+                                                                    scroller.scrollTop = Math.max(0, scroller.scrollTop - h);
                                                                 }
-                                                                onChange={handleRefundSelectChange}
-                                                                onKeyDown={handleKeyDown}
-                                                                options={isRefundChangeButtonActive ? combinedOptions : laboursList}
-                                                                styles={CASH_REGISTER_SELECT_STYLES}
-                                                                menuPortalTarget={document.body}
-                                                            />
-                                                        </td>
-                                                        <td className="pl-[6px] w-[100px] overflow-visible">
-                                                            <button type="button" onClick={handleRefundChangeButtonClick}>
-                                                                <img
-                                                                    src={Change}
-                                                                    className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
-                                                                    alt="Toggle options"
-                                                                />
-                                                            </button>
-                                                        </td>
-                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
-                                                            <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
-                                                                <input
-                                                                    type="number"
-                                                                    name="amount"
-                                                                    style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
-                                                                    placeholder={refundDstCol8Label}
-                                                                    value={newRefundReceived.amount}
-                                                                    onChange={handleNewPaymentChange}
-                                                                    onKeyDown={handleKeyDown}
-                                                                    min="0"
-                                                                    step="any"
-                                                                    onWheel={(e) => e.preventDefault()}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </thead>
-                                            <tbody>
-                                                {sortedRefundPayments.map((row, index) => (
-                                                    <EdbcTableBodyRow key={row.id || index}>
-                                                        <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
-                                                            {editingPaymentId === row.id && canEditSelectedWeek ? (
-                                                                <Select
-                                                                    name="refund_party"
-                                                                    className="text-xs focus:outline-none w-full"
-                                                                    placeholder={refundDstCol4Label}
-                                                                    isSearchable
-                                                                    isClearable
-                                                                    value={
-                                                                        refundSelectOptions.find(opt =>
-                                                                            (opt.type === "Labour" && String(opt.id) === String(editRefundPaymentData.labour_id)) ||
-                                                                            (opt.type === "Vendor" && String(opt.id) === String(editRefundPaymentData.vendor_id)) ||
-                                                                            (opt.type === "Contractor" && String(opt.id) === String(editRefundPaymentData.contractor_id)) ||
-                                                                            (opt.type === "Employee" && String(opt.id) === String(editRefundPaymentData.employee_id))
-                                                                        ) || null
-                                                                    }
-                                                                    onChange={handleEditRefundLabourChange}
-                                                                    options={refundSelectOptions}
-                                                                    menuPortalTarget={document.body}
-                                                                    styles={CASH_REGISTER_SELECT_STYLES}
-                                                                />
-                                                            ) : (
-                                                                <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center overflow-hidden`}>
-                                                                    <div className="truncate">
-                                                                        {getRefundRowName(row)}
-                                                                    </div>
+                                                            });
+                                                        });
+                                                        return;
+                                                    }
+                                                    const h = refundFilterRowRef.current?.offsetHeight || 0;
+                                                    setShowRefundFilters(false);
+                                                    if (!scroller || h <= 0 || !refundFilterNudgeUsedRef.current) return;
+                                                    refundFilterNudgeUsedRef.current = false;
+                                                    requestAnimationFrame(() => {
+                                                        requestAnimationFrame(() => {
+                                                            scroller.scrollTop = scroller.scrollTop + h;
+                                                        });
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                        <div
+                                            ref={refundFilterChipsRef}
+                                            className="w-0 flex-1 min-w-0 flex flex-row flex-nowrap items-center gap-[6px] overflow-x-auto overflow-y-hidden no-scrollbar scrollbar-none cursor-grab max-xl:w-auto max-xl:flex-none max-xl:shrink"
+                                            onMouseDown={(e) => handleMouseDown(e, refundFilterChipsRef)}
+                                            onMouseMove={(e) => handleMouseMove(e, refundFilterChipsRef)}
+                                            onMouseUp={() => handleMouseUp(refundFilterChipsRef)}
+                                            onMouseLeave={() => handleMouseUp(refundFilterChipsRef)}
+                                        >
+                                            {selectRefundName && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">{refundDstCol4Label}: </span>
+                                                    <span className="font-semibold text-[14px]">{selectRefundName}</span>
+                                                    <button type="button" onClick={() => setSelectRefundName('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                            {selectRefundAmount.trim() && (
+                                                <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 border text-[#000000] border-[#a1a1a1] h-[34px] rounded px-2 py-1 text-sm font-medium w-fit">
+                                                    <span className="font-medium text-[#BF9853]">{refundDstCol8Label}: </span>
+                                                    <span className="font-semibold text-[14px]">{selectRefundAmount}</span>
+                                                    <button type="button" onClick={() => setSelectRefundAmount('')} className="text-[#E4572E] text-2xl ml-1">×</button>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <EdbcTableToolbarRightActions
+                                            onClearFilters={clearRefundFilters}
+                                            overallSearch={refundOverallSearch}
+                                            onOverallSearchChange={setRefundOverallSearch}
+                                            wrapperClassName="flex items-center gap-[6px] min-w-0 z-[2] bg-white pl-[4px] max-xl:flex-1 xl:shrink-0"
+                                            searchWrapperClassName="h-[34px] min-w-0 flex-1 border border-[#D6D6D6] rounded-md bg-white flex items-center px-2 gap-1 xl:w-[286px] xl:shrink-0"
+                                        />
+                                    </div>
+                                    <div className="shrink-0">
+                                        <div ref={refundScrollRef} className="rounded-lg border-l-8 border-l-[#BF9853] min-h-[330px] w-fit max-w-full shrink-0 overflow-y-auto overflow-x-auto no-scrollbar scrollbar-none"
+                                            onWheel={() => { refundFilterNudgeUsedRef.current = false; }}
+                                            style={{
+                                                height: `${40 + (showRefundFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                maxHeight: `${40 + (showRefundFilters ? 40 : 0) + (canEditSelectedWeek ? 40 : 0) + 180}px`,
+                                                willChange: 'scroll-position',
+                                                WebkitOverflowScrolling: 'touch',
+                                                transform: 'translateZ(0)',
+                                                backfaceVisibility: 'hidden'
+                                            }}
+                                        >
+                                            <table className={`border-collapse text-left ${DAILY_HISTORY_REFUND_TABLE_FIXED_WIDTH_CLASS} table-fixed ${EDBC_TABLE_EDGE_TABLE_CLASS} ${EDBC_CASH_REGISTER_DAILY_REFUND_TABLE_LOCK_TABLE_CLASS} [&_tbody_tr]:!h-[40px] [&_tbody_tr]:!max-h-[40px] [&_tbody_tr>td]:box-border [&_tbody_tr>td]:!h-[40px] [&_tbody_tr>td]:!max-h-[40px] [&_tbody_tr>td]:!py-0 [&_tbody_tr>td]:!leading-none [&_th#EDBC-20]:!w-[70px] [&_td#EDBC-20]:!w-[70px] [&_th#EDBC-20]:!min-w-[70px] [&_td#EDBC-20]:!min-w-[70px] [&_th#EDBC-20]:!max-w-[70px] [&_td#EDBC-20]:!max-w-[70px] [&_thead_tr>th:nth-last-child(3)]:!w-[80px] [&_thead_tr>th:nth-last-child(3)]:!min-w-[80px] [&_thead_tr>th:nth-last-child(3)]:!max-w-[80px] [&_tbody_tr>td:nth-last-child(3)]:!w-[80px] [&_tbody_tr>td:nth-last-child(3)]:!min-w-[80px] [&_tbody_tr>td:nth-last-child(3)]:!max-w-[80px]`}>
+                                                <colgroup>
+                                                    <col style={{ width: '218px' }} />
+                                                    <col style={{ width: '100px' }} />
+                                                    <col style={{ width: '80px' }} />
+                                                    <col style={{ width: '70px' }} />
+                                                    <col style={{ width: '12px' }} />
+                                                </colgroup>
+                                                <thead className="sticky top-0 z-10 bg-white">
+                                                    <EdbcTableHeaderRow>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label={refundDstCol4Label} sortProps={refundEdbcSortProps} />
+                                                        <th className="px-[2px] w-[100px] overflow-visible" aria-hidden="true"></th>
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC22} label={refundDstCol8Label} sortProps={refundEdbcSortProps} />
+                                                        <EdbcColumnHeader columnId={EDBC_IDS.EDBC20} label={refundDstCol20Label} />
+                                                        <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                    </EdbcTableHeaderRow>
+                                                    {showRefundFilters && (
+                                                        <EdbcTableFilterRow ref={refundFilterRowRef}>
+                                                            <th id={EDBC_IDS.EDBC4} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} overflow-hidden !pl-[12px]`}>
+                                                                <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} min-w-0 max-w-full`}>
+                                                                    <Select
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        options={refundNameFilterOptions}
+                                                                        value={refundNameFilterOptions.find((opt) => opt.value === selectRefundName) || null}
+                                                                        onChange={(opt) => setSelectRefundName(opt ? opt.value : '')}
+                                                                        placeholder={refundDstCol4Label}
+                                                                        isSearchable
+                                                                        isClearable={false}
+                                                                        menuPlacement="bottom"
+                                                                        menuPortalTarget={document.body}
+                                                                        noOptionsMessage={() => null}
+                                                                        styles={DATABASE_TABLE_FILTER_SELECT_STYLES}
+                                                                    />
                                                                 </div>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-[2px] overflow-visible">
-                                                            {editingPaymentId !== row.id && (() => {
-                                                                const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
-                                                                const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) ||
-                                                                    (row.contractor_id && Number(row.contractor_id) > 0);
-                                                                if (!hasLabourId && !hasVendorOrContractorId) return null;
-                                                                return (
-                                                                    <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap flex items-center justify-center">
-                                                                        {hasLabourId ? 'Staff Portal' : 'Loan Portal'}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </td>
-                                                        <td id={EDBC_IDS.EDBC8} className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass}>
-                                                            {editingPaymentId === row.id && canEditSelectedWeek ? (
-                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC8)?.filterWidthClass}>
+                                                            </th>
+                                                            <th className={EDBC_CASH_REGISTER_REFUND_PORTAL_HEADER_COLUMN_CLASS} aria-hidden="true"></th>
+                                                            <EdbcTotalAmountFilter
+                                                                columnId={EDBC_IDS.EDBC22}
+                                                                totalAmount={filteredRefundPayments.reduce((total, row) => total + Number(row.amount || 0), 0)}
+                                                                value={selectRefundAmount}
+                                                                onChange={(e) => setSelectRefundAmount(e.target.value)}
+                                                            />
+                                                            <EdbcEmptyFilterCell columnId={EDBC_IDS.EDBC20} />
+                                                            <th className="w-[12px] min-w-[12px] max-w-[12px] p-0" aria-hidden="true"></th>
+                                                        </EdbcTableFilterRow>
+                                                    )}
+                                                    {canEditSelectedWeek && (
+                                                        <tr className="bg-white !h-[40px] !max-h-[40px] [&>td]:box-border [&>td]:!h-[40px] [&>td]:!max-h-[40px] [&>td]:!py-0 [&>td]:!leading-none overflow-hidden">
+                                                            <td id={EDBC_IDS.EDBC4} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} overflow-hidden !pl-[12px]`}>
+                                                                <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} min-w-0 max-w-full`}>
+                                                                    <Select
+                                                                        name="refund_party"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        placeholder={refundDstCol4EntryPlaceholder}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        value={
+                                                                            isRefundChangeButtonActive
+                                                                                ? laboursList.find(opt => String(opt.id) === String(newRefundReceived.labour_id)) || null
+                                                                                : combinedOptions.find(opt =>
+                                                                                    (opt.type === "Employee" && String(opt.id) === String(newRefundReceived.employee_id)) ||
+                                                                                    (opt.type === "Vendor" && String(opt.id) === String(newRefundReceived.vendor_id)) ||
+                                                                                    (opt.type === "Contractor" && String(opt.id) === String(newRefundReceived.contractor_id))
+                                                                                ) || null
+                                                                        }
+                                                                        onChange={handleRefundSelectChange}
+                                                                        onKeyDown={handleKeyDown}
+                                                                        options={isRefundChangeButtonActive ? laboursList : combinedOptions}
+                                                                        styles={CASH_REGISTER_SELECT_STYLES}
+                                                                        menuPortalTarget={document.body}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className={`${EDBC_CASH_REGISTER_REFUND_PORTAL_BODY_COLUMN_CLASS} align-middle`}>
+                                                                <div className="flex h-[40px]">
+                                                                    <button type="button" onClick={handleRefundChangeButtonClick} className="inline-flex items-center justify-center">
+                                                                        <img
+                                                                            src={Change}
+                                                                            className={`w-4 h-4 ${isRefundChangeButtonActive ? 'opacity-10' : ''}`}
+                                                                            alt="Toggle options"
+                                                                        />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC22} className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.tdClass}>
+                                                                <div className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.filterWidthClass}>
                                                                     <input
                                                                         type="number"
                                                                         name="amount"
-                                                                        value={editRefundPaymentData.amount}
-                                                                        onChange={handleEditRefundChange}
                                                                         style={EDBC_FILTER_CONTROL_BOX_STYLE}
-                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.inputClassName || ''} no-spinner`}
+                                                                        className={`${getEdbcColumnConfig(EDBC_IDS.EDBC22)?.inputClassName || ''} no-spinner`}
                                                                         placeholder={refundDstCol8Label}
+                                                                        value={newRefundReceived.amount}
+                                                                        onChange={handleNewPaymentChange}
+                                                                        onKeyDown={handleKeyDown}
                                                                         min="0"
                                                                         step="any"
                                                                         onWheel={(e) => e.preventDefault()}
                                                                     />
                                                                 </div>
-                                                            ) : (
-                                                                formatEdbcTotalAmountPlaceholder(row.amount)
-                                                            )}
-                                                        </td>
-                                                        <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
-                                                            {canEditSelectedWeek && (
-                                                                <div className="flex gap-1 justify-center">
-                                                                    {editingPaymentId === row.id ? (
-                                                                        <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
-                                                                            ✓
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button onClick={() => handleEditRefundClick(row)}>
-                                                                            <img className="w-5 h-4" src={Edit} alt="Edit" />
-                                                                        </button>
-                                                                    )}
-                                                                    {canEditDelete && (
-                                                                        <>
-                                                                            <button onClick={() => handleRefundPaymentsDelete(row.id)}>
-                                                                                <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                            </td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                        </tr>
+                                                    )}
+                                                </thead>
+                                                <tbody>
+                                                    {sortedRefundPayments.map((row, index) => (
+                                                        <EdbcTableBodyRow key={row.id || index} className="!h-[40px] !max-h-[40px] [&>td]:box-border [&>td]:!h-[40px] [&>td]:!max-h-[40px] [&>td]:!py-0 [&>td]:!leading-none overflow-hidden">
+                                                            <td id={EDBC_IDS.EDBC4} className={getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass}>
+                                                                {editingPaymentId === row.id && canEditSelectedWeek ? (
+                                                                    <Select
+                                                                        name="refund_party"
+                                                                        className="text-xs focus:outline-none w-full"
+                                                                        placeholder={refundDstCol4Label}
+                                                                        isSearchable
+                                                                        isClearable
+                                                                        value={
+                                                                            refundSelectOptions.find(opt =>
+                                                                                (opt.type === "Labour" && String(opt.id) === String(editRefundPaymentData.labour_id)) ||
+                                                                                (opt.type === "Vendor" && String(opt.id) === String(editRefundPaymentData.vendor_id)) ||
+                                                                                (opt.type === "Contractor" && String(opt.id) === String(editRefundPaymentData.contractor_id)) ||
+                                                                                (opt.type === "Employee" && String(opt.id) === String(editRefundPaymentData.employee_id))
+                                                                            ) || null
+                                                                        }
+                                                                        onChange={handleEditRefundLabourChange}
+                                                                        options={refundSelectOptions}
+                                                                        menuPortalTarget={document.body}
+                                                                        styles={CASH_REGISTER_SELECT_STYLES}
+                                                                    />
+                                                                ) : (
+                                                                    <div className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.filterWidthClass} h-[40px] flex items-center overflow-hidden`}>
+                                                                        <div className="truncate">
+                                                                            {getRefundRowName(row)}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-[2px] overflow-visible">
+                                                                {editingPaymentId !== row.id && (() => {
+                                                                    const hasLabourId = row.labour_id && Number(row.labour_id) > 0;
+                                                                    const hasVendorOrContractorId = (row.vendor_id && Number(row.vendor_id) > 0) ||
+                                                                        (row.contractor_id && Number(row.contractor_id) > 0);
+                                                                    if (!hasLabourId && !hasVendorOrContractorId) return null;
+                                                                    return (
+                                                                        <div className="bg-[#E3F2FD] text-[#1565C0] font-semibold px-3 py-[2px] text-xs rounded-full whitespace-nowrap flex items-center justify-center">
+                                                                            {hasLabourId ? 'Staff Portal' : 'Loan Portal'}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC22} className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.tdClass}>
+                                                                {editingPaymentId === row.id && canEditSelectedWeek ? (
+                                                                    <div className={getEdbcColumnConfig(EDBC_IDS.EDBC22)?.filterWidthClass}>
+                                                                        <input
+                                                                            type="number"
+                                                                            name="amount"
+                                                                            value={editRefundPaymentData.amount}
+                                                                            onChange={handleEditRefundChange}
+                                                                            style={EDBC_FILTER_CONTROL_BOX_STYLE}
+                                                                            className={`${getEdbcColumnConfig(EDBC_IDS.EDBC22)?.inputClassName || ''} no-spinner`}
+                                                                            placeholder={refundDstCol8Label}
+                                                                            min="0"
+                                                                            step="any"
+                                                                            onWheel={(e) => e.preventDefault()}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    formatEdbcTotalAmountPlaceholder(row.amount)
+                                                                )}
+                                                            </td>
+                                                            <td id={EDBC_IDS.EDBC20} className={getEdbcColumnConfig(EDBC_IDS.EDBC20)?.tdClass}>
+                                                                {canEditSelectedWeek && (
+                                                                    <div className="flex gap-1 justify-center">
+                                                                        {editingPaymentId === row.id ? (
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                <button className="text-green-600 font-bold text-lg" onClick={() => saveEditedRefundPayment(row.id)}>
+                                                                                    ✓
+                                                                                </button>
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                <button onClick={() => handleEditRefundClick(row)}>
+                                                                                    <img className="w-5 h-4" src={Edit} alt="Edit" />
+                                                                                </button>
+                                                                            </span>
+                                                                        )}
+                                                                        {canEditDelete && (
+                                                                            <>
+                                                                                <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                                    <button type="button" onClick={() => handleRefundPaymentsDelete(row.id)}>
+                                                                                        <img src={Delete} className="w-5 h-4" alt="Delete" />
+                                                                                    </button>
+                                                                                </span>
+                                                                            </>
+                                                                        )}
+                                                                        <span className="inline-flex w-5 h-4 shrink-0 items-center justify-center">
+                                                                            <button type="button" onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)}>
+                                                                                <img className="w-5 h-4" src={history} alt="History" />
                                                                             </button>
-                                                                        </>
-                                                                    )}
-                                                                    <button onClick={() => fetchAuditDetailsForRefundPaymentReceived(row.id)}>
-                                                                        <img src={history} className="w-5 h-4" alt="History" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </EdbcTableBodyRow>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                    <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden">
-                                        <div className="flex flex-col h-full min-h-0">
-                                            <div className="flex items-center justify-between rounded-lg mb-[4px]">
-                                                <p className="text-[16px] font-semibold text-black">Summary Details</p>
-                                            </div>
-                                            <div className="overflow-y-auto no-scrollbar flex-1 min-h-0">
-                                                {Object.entries(
-                                                    sortedDailyExpenses
-                                                        .filter((expense) => expense.date === selectedDate && Number(expense.amount) > 0)
-                                                        .reduce((acc, expense) => {
-                                                            const type = expense.type;
-                                                            const amount = Number(expense.amount);
-                                                            acc[type] = (acc[type] || 0) + amount;
-                                                            return acc;
-                                                        }, {})
-                                                ).map(([type, total]) => (
-                                                    <div key={type} className="flex items-center justify-between py-[4px]">
-                                                        <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
-                                                        <p className="text-[14px] font-semibold text-black">
-                                                            ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
-                                                <p className="text-[14px] font-semibold text-black">Total Amount</p>
-                                                <p className="text-[14px] font-semibold text-black">
-                                                    ₹{sortedDailyExpenses
-                                                        .filter((expense) => expense.date === selectedDate)
-                                                        .reduce((total, expense) => total + Number(expense.amount || 0), 0)
-                                                        .toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </p>
-                                            </div>
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="w-[12px] min-w-[12px] max-w-[12px] p-0"></td>
+                                                        </EdbcTableBodyRow>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>
+                                <div className="mt-[12px] flex-1 min-h-0 rounded-xl bg-white px-[18px] py-[12px] border border-[#E6DAC6] text-left overflow-hidden max-xl:flex-none max-xl:overflow-visible">
+                                    <div className="flex flex-col h-full min-h-0">
+                                        <div className="flex items-center justify-between rounded-lg mb-[4px]">
+                                            <p className="text-[16px] font-semibold text-black">Summary Details</p>
+                                        </div>
+                                        <div className="overflow-y-auto no-scrollbar scrollbar-none flex-1 min-h-0 max-xl:overflow-visible max-xl:flex-none">
+                                            {Object.entries(
+                                                sortedDailyExpenses
+                                                    .filter((expense) => expense.date === selectedDate && Number(expense.amount) > 0)
+                                                    .reduce((acc, expense) => {
+                                                        const type = expense.type;
+                                                        const amount = Number(expense.amount);
+                                                        acc[type] = (acc[type] || 0) + amount;
+                                                        return acc;
+                                                    }, {})
+                                            ).map(([type, total]) => (
+                                                <div key={type} className="flex items-center justify-between py-[4px]">
+                                                    <p className="text-[14px] font-semibold text-[#666666]">{type}</p>
+                                                    <p className="text-[14px] font-semibold text-black">
+                                                        ₹{Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between py-[6px] border-b border-t border-dashed mt-[4px] border-[#454545]">
+                                            <p className="text-[14px] font-semibold text-black">Total Amount</p>
+                                            <p className="text-[14px] font-semibold text-black">
+                                                ₹{sortedDailyExpenses
+                                                    .filter((expense) => expense.date === selectedDate)
+                                                    .reduce((total, expense) => total + Number(expense.amount || 0), 0)
+                                                    .toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4223,15 +4566,16 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                 if (e.key === 'Escape') {
                                     setShowPopups(false);
                                     setEntryId(null);
+                                    setDescriptionRowId(null);
                                     setDescription("");
                                 }
-                                if (e.key === 'Enter' && entryId && description.trim()) {
+                                if (e.key === 'Enter' && entryId) {
                                     handleUpdate();
                                 }
                             }}
                             tabIndex={0}
                         >
-                            <div className="bg-white rounded-xl shadow-lg p-6 w-[650px]">
+                            <div className="bg-white rounded-xl shadow-lg p-[18px] w-[650px]">
                                 <label className="block text-left">
                                     <span className="font-semibold block text-[18px] mb-[8px]">Description</span>
                                     {entryId ? (
@@ -4240,7 +4584,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                 name="description"
                                                 placeholder="Enter description"
                                                 rows={4}
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full lg:w-[616px] focus:outline-none resize-none whitespace-normal break-words"
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none resize-none whitespace-normal break-words"
                                                 value={description}
                                                 onChange={(e) => setDescription(e.target.value)}
                                                 onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
@@ -4252,7 +4596,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                                 name="description"
                                                 placeholder="Description"
                                                 rows={4}
-                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full lg:w-[616px] focus:outline-none resize-none whitespace-normal break-words"
+                                                className="border-2 border-[#BF9853] border-opacity-25 p-2 rounded-lg w-full focus:outline-none resize-none whitespace-normal break-words bg-[#ededed]"
                                                 value={description}
                                                 readOnly
                                             />
@@ -4260,10 +4604,20 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                     )}
                                 </label>
                                 <div className="flex justify-end gap-[18px] mt-[18px]">
+                                    {!entryId && (
+                                        <button
+                                            onClick={() => setEntryId(descriptionRowId)}
+                                            disabled={editingDailyExpenseRowId !== descriptionRowId}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => {
                                             setShowPopups(false);
                                             setEntryId(null);
+                                            setDescriptionRowId(null);
                                             setDescription("");
                                         }}
                                         className="px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-md"
@@ -4273,7 +4627,7 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                                     {entryId && (
                                         <button
                                             onClick={handleUpdate}
-                                            disabled={loading || !description.trim()}
+                                            disabled={loading}
                                             className="px-4 py-2 bg-[#BF9853] text-white rounded-md hover:bg-[#BF9853] disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {loading ? 'Saving...' : 'Save'}
@@ -4389,98 +4743,10 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                             </div>
                         </div>
                     )}
-                    {showWeeklyPaymentExpensesModal && (
-                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
-                            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
-                                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
-                                    <h2 className="text-xl font-bold">History</h2>
-                                    <button onClick={() => setShowWeeklyPaymentExpensesModal(false)}>
-                                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
-                                    </button>
-                                </div>
-                                <div className="overflow-auto max-h-[600px] w-full">
-                                    <table className="w-full border-collapse text-left">
-                                        <thead className="sticky top-0 z-10 bg-white">
-                                            <tr className="bg-[#FAF6ED] h-12">
-                                                <th className="py-2 px-4 text-left">S.No</th>
-                                                <th className="py-2 px-4 text-left">Date</th>
-                                                <th className="py-2 px-4 text-left">Action</th>
-                                                <th className="py-2 px-4 text-left">Changed By</th>
-                                                <th className="py-2 px-4 text-left">Old Values</th>
-                                                <th className="py-2 px-4 text-left">New Values</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {weeklyPaymentExpensesAudits.map((audit, index) => (
-                                                <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                    <td className="px-4 py-2">{index + 1}</td>
-                                                    <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
-                                                    <td className="px-4 py-2">{audit.action || '-'}</td>
-                                                    <td className="px-4 py-2">{audit.changed_by || '-'}</td>
-                                                    <td className="px-4 py-2">
-                                                        <div className="max-w-xs overflow-auto">
-                                                            {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <div className="max-w-xs overflow-auto">
-                                                            {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {showWeeklyPaymentReceivedModal && (
-                        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
-                            <div className="bg-white rounded-md shadow-lg w-[95%] max-w-[1800px] mx-4 p-2">
-                                <div className="flex justify-between items-center mt-4 ml-7 mr-7">
-                                    <h2 className="text-xl font-bold">History</h2>
-                                    <button onClick={() => setShowWeeklyPaymentReceivedModal(false)}>
-                                        <h2 className="text-xl text-red-500 -mt-10 font-bold">x</h2>
-                                    </button>
-                                </div>
-                                <div className="overflow-auto max-h-[600px] w-full">
-                                    <table className="w-full border-collapse text-left">
-                                        <thead className="sticky top-0 z-10 bg-white">
-                                            <tr className="bg-[#FAF6ED] h-12">
-                                                <th className="py-2 px-4 text-left">S.No</th>
-                                                <th className="py-2 px-4 text-left">Date</th>
-                                                <th className="py-2 px-4 text-left">Action</th>
-                                                <th className="py-2 px-4 text-left">Changed By</th>
-                                                <th className="py-2 px-4 text-left">Old Values</th>
-                                                <th className="py-2 px-4 text-left">New Values</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {weeklyPaymentReceivedAudits.map((audit, index) => (
-                                                <tr key={audit.id || index} className="even:bg-[#FAF6ED] odd:bg-[#FFFFFF] text-left">
-                                                    <td className="px-4 py-2">{index + 1}</td>
-                                                    <td className="px-4 py-2">{audit.created_at ? new Date(audit.created_at).toLocaleString() : '-'}</td>
-                                                    <td className="px-4 py-2">{audit.action || '-'}</td>
-                                                    <td className="px-4 py-2">{audit.changed_by || '-'}</td>
-                                                    <td className="px-4 py-2">
-                                                        <div className="max-w-xs overflow-auto">
-                                                            {audit.old_values ? JSON.stringify(audit.old_values, null, 2) : '-'}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <div className="max-w-xs overflow-auto">
-                                                            {audit.new_values ? JSON.stringify(audit.new_values, null, 2) : '-'}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <AuditModal show={showWeeklyPaymentExpensesModal} onClose={() => setShowWeeklyPaymentExpensesModal(false)} audits={weeklyPaymentExpensesAudits} laboursList={laboursList} contractorOptions={contractorOptions}
+                        siteOptions={siteOptions} vendorOptions={vendorOptions} employeeOptions={employeeOptions} />
+                    <AuditModalWeeklyPaymentsReceived show={showWeeklyPaymentReceivedModal} onClose={() => setShowWeeklyPaymentReceivedModal(false)}
+                        audits={weeklyPaymentReceivedAudits} laboursList={laboursList} />
                     {sendingToExpensesEntry && (
                         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                             <div className="bg-white rounded-xl shadow-lg p-6 w-[400px]">
@@ -4616,7 +4882,296 @@ const DailyHistory = ({ username, userRoles = [], onExportActionsReady, isTabAct
                         </div>
                     )}
                 </div>
+            </div>
+            {sendExpensesToolbarSlot && createPortal(
+                <button
+                    type="button"
+                    onClick={handleSendToExpensesEntry}
+                    className="py-1.5 bg-[#BF9853] text-white text-[14px] font-bold px-[16px] rounded shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={sendingToExpensesEntry}
+                >
+                    {sendingToExpensesEntry ? 'Sending...' : 'Send Expenses'}
+                </button>,
+                sendExpensesToolbarSlot
+            )}
         </body>
     );
 };
 export default DailyHistory;
+const AuditModal = ({ show, onClose, audits, laboursList, siteOptions, vendorOptions, employeeOptions, contractorOptions }) => {
+    if (!show) return null;
+    const getNameById = (id, options) => {
+        if (!id && id !== 0) return "-";
+        const found = options.find(opt => String(opt.id) === String(id));
+        return found ? found.label : id;
+    };
+    const fields = [
+        { oldKey: "old_type", newKey: "new_type", label: "Type", width: "100px" },
+        { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
+        { oldKey: "old_extra_amount", newKey: "new_extra_amount", label: "Extra", width: "100px" },
+        { oldKey: "old_quantity", newKey: "new_quantity", label: "Quantity", width: "100px" },
+    ];
+    const normalizeAuditId = (id) => {
+        if (id == null || String(id).trim() === "" || String(id) === "0") return null;
+        return id;
+    };
+    const getAssociateFromAudit = (audit, keyPrefix) => {
+        const vendorId = normalizeAuditId(audit[`${keyPrefix}_vendor_id`]);
+        const contractorId = normalizeAuditId(audit[`${keyPrefix}_contractor_id`]);
+        const employeeId = normalizeAuditId(audit[`${keyPrefix}_employee_id`]);
+        const labourId = normalizeAuditId(audit[`${keyPrefix}_labour_id`]);
+        const projectId = normalizeAuditId(audit[`${keyPrefix}_project_id`]);
+        if (vendorId) return { name: getNameById(vendorId, vendorOptions), type: "Vendor" };
+        if (contractorId) return { name: getNameById(contractorId, contractorOptions), type: "Contractor" };
+        if (employeeId) return { name: getNameById(employeeId, employeeOptions), type: "Employee" };
+        if (labourId) return { name: getNameById(labourId, laboursList), type: "Labour" };
+        if (projectId) return { name: getNameById(projectId, siteOptions), type: "Project" };
+        return { name: "-", type: "-" };
+    };
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "-";
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        hours = String(hours).padStart(2, "0");
+        return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+    };
+    const formatDisplayValue = (value, field) => {
+        if (
+            (field.oldKey?.includes("labour_id") || field.oldKey?.includes("vendor_id") || field.oldKey?.includes("contractor_id") || field.oldKey?.includes("employee_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("labour_id") || field.newKey?.includes("vendor_id") || field.newKey?.includes("contractor_id") || field.newKey?.includes("employee_id") || field.newKey?.includes("transfer_site_id")) &&
+            String(value) === "0"
+        ) {
+            return "-";
+        }
+        if (field.lookup) {
+            return getNameById(value, field.lookup);
+        }
+        if (field.label.includes("Amount") || field.label === "Extra") {
+            return value ? Number(value).toLocaleString("en-IN") : "-";
+        }
+        if (field.label === "Date") {
+            return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+        }
+        return value ?? "-";
+    };
+    return (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-md shadow-lg p-4">
+                <div className="flex justify-between items-center mb-[8px]">
+                    <h2 className="text-xl font-bold">History</h2>
+                    <button onClick={onClose}>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+                    </button>
+                </div>
+                <div className="overflow-auto max-h-80 no-scrollbar scrollbar-none border border-l-8 border-l-[#BF9853] rounded-lg">
+                    <table className="table-fixed min-w-full bg-white">
+                        <thead>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <th className="w-[66px] min-w-[66px] max-w-[66px] pl-[1px] pr-[1px] font-bold text-left">Extra</th>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC7} label="Quantity" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
+                        </thead>
+                        <tbody>
+                            {audits.map((audit, index) => (
+                                <EdbcTableBodyRow key={index}>
+                                    <td id={EDBC_IDS.EDBC1} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {formatDateTime(audit.edited_date)}
+                                    </td>
+                                    {(() => {
+                                        const oldAssociate = getAssociateFromAudit(audit, "old");
+                                        const newAssociate = getAssociateFromAudit(audit, "new");
+                                        const associateChanged = oldAssociate.name !== newAssociate.name;
+                                        const associateTypeChanged = oldAssociate.type !== newAssociate.type;
+                                        return (
+                                            <>
+                                                <td id={EDBC_IDS.EDBC4} title={associateChanged ? `Previous: ${oldAssociate.name} → Current: ${newAssociate.name}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.name}
+                                                </td>
+                                                <td id={EDBC_IDS.EDBC12} title={associateTypeChanged ? `Previous: ${oldAssociate.type} → Current: ${newAssociate.type}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateTypeChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.type}
+                                                </td>
+                                            </>
+                                        );
+                                    })()}
+                                    {fields.slice(0, 2).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        const columnId = f.label === "Type" ? EDBC_IDS.EDBC12 : EDBC_IDS.EDBC8;
+                                        return (
+                                            <td key={f.label} id={columnId} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(columnId)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""
+                                                    }`} >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    {fields.slice(2).map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        if (f.label === "Extra") {
+                                            return (
+                                                <td key={f.label} className={`w-[66px] min-w-[66px] max-w-[66px] pl-[6px] whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""
+                                                    }`} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}>
+                                                    {oldDisplay}
+                                                </td>
+                                            );
+                                        }
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC7} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC7)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""
+                                                    }`} >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {audit.edited_by}
+                                    </td>
+                                </EdbcTableBodyRow>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+const AuditModalWeeklyPaymentsReceived = ({ show, onClose, audits, laboursList }) => {
+    if (!show) return null;
+    const getNameById = (id, options) => {
+        if (!id && id !== 0) return "-";
+        const found = options.find(opt => String(opt.id) === String(id));
+        return found ? found.label : id;
+    };
+    const fields = [
+        { oldKey: "old_amount", newKey: "new_amount", label: "Amount", width: "100px" },
+    ];
+    const normalizeAuditId = (id) => {
+        if (id == null || String(id).trim() === "" || String(id) === "0") return null;
+        return id;
+    };
+    const getAssociateFromAudit = (audit, keyPrefix) => {
+        const labourId = normalizeAuditId(audit[`${keyPrefix}_labour_id`]);
+        if (labourId) return { name: getNameById(labourId, laboursList), type: "Labour" };
+        return { name: "-", type: "-" };
+    };
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "-";
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        hours = String(hours).padStart(2, "0");
+        return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+    };
+    const formatDisplayValue = (value, field) => {
+        if (
+            (field.oldKey?.includes("labour_id") || field.oldKey?.includes("transfer_site_id") ||
+                field.newKey?.includes("labour_id") || field.newKey?.includes("transfer_site_id")) &&
+            String(value) === "0"
+        ) {
+            return "-";
+        }
+        if (field.lookup) {
+            return getNameById(value, field.lookup);
+        }
+        if (field.label.includes("Amount")) {
+            return value ? Number(value).toLocaleString("en-IN") : "-";
+        }
+        if (field.label === "Date") {
+            return value ? new Date(value).toLocaleDateString("en-GB") : "-";
+        }
+        return value ?? "-";
+    };
+    return (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-md shadow-lg p-4">
+                <div className="flex justify-between items-center mb-[8px]">
+                    <h2 className="text-xl font-bold">History</h2>
+                    <button onClick={onClose}>
+                        <img src={FileRemover} className="w-[10px] h-[10px]" alt="Close" />
+                    </button>
+                </div>
+                <div className="overflow-auto max-h-80 no-scrollbar scrollbar-none border border-l-8 border-l-[#BF9853] rounded-lg">
+                    <table className="table-fixed min-w-full bg-white">
+                        <thead>
+                            <EdbcTableHeaderRow>
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC1} label="Time Stamp" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC4} label="Associate" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Associate Type" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC8} label="Amount" />
+                                <EdbcColumnHeader columnId={EDBC_IDS.EDBC12} label="Edited By" />
+                            </EdbcTableHeaderRow>
+                        </thead>
+                        <tbody>
+                            {audits.map((audit, index) => (
+                                <EdbcTableBodyRow key={index}>
+                                    <td id={EDBC_IDS.EDBC1} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC1)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {formatDateTime(audit.edited_date)}
+                                    </td>
+                                    {(() => {
+                                        const oldAssociate = getAssociateFromAudit(audit, "old");
+                                        const newAssociate = getAssociateFromAudit(audit, "new");
+                                        const associateChanged = oldAssociate.name !== newAssociate.name;
+                                        const associateTypeChanged = oldAssociate.type !== newAssociate.type;
+                                        return (
+                                            <>
+                                                <td id={EDBC_IDS.EDBC4} title={associateChanged ? `Previous: ${oldAssociate.name} → Current: ${newAssociate.name}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC4)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.name}
+                                                </td>
+                                                <td id={EDBC_IDS.EDBC12} title={associateTypeChanged ? `Previous: ${oldAssociate.type} → Current: ${newAssociate.type}` : ""}
+                                                    className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${associateTypeChanged ? "bg-[#BF9853] font-bold" : ""}`}
+                                                >
+                                                    {oldAssociate.type}
+                                                </td>
+                                            </>
+                                        );
+                                    })()}
+                                    {fields.map((f) => {
+                                        const oldDisplay = formatDisplayValue(audit[f.oldKey], f);
+                                        const newDisplay = formatDisplayValue(audit[f.newKey], f);
+                                        const changed = oldDisplay !== newDisplay;
+                                        return (
+                                            <td key={f.label} id={EDBC_IDS.EDBC8} title={changed ? `Previous: ${oldDisplay} → Current: ${newDisplay}` : ""}
+                                                className={`${getEdbcColumnConfig(EDBC_IDS.EDBC8)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis ${changed ? "bg-[#BF9853] font-bold" : ""
+                                                    }`} >
+                                                {oldDisplay}
+                                            </td>
+                                        );
+                                    })}
+                                    <td id={EDBC_IDS.EDBC12} className={`${getEdbcColumnConfig(EDBC_IDS.EDBC12)?.tdClass} whitespace-nowrap overflow-hidden text-ellipsis`} >
+                                        {audit.edited_by}
+                                    </td>
+                                </EdbcTableBodyRow>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};

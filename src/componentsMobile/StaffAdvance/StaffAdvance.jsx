@@ -203,7 +203,13 @@ const StaffAdvance = ({ user, onLogout }) => {
       return (
         <div
           key={tabId}
-          className={activeTab === tabId ? 'block h-full' : 'hidden h-full'}
+          className={
+            activeTab === tabId
+              ? tabId === 'advance' || tabId === 'history' || tabId === 'summary' || tabId === 'report'
+                ? 'flex h-full min-h-0 flex-col overflow-hidden'
+                : 'block h-full'
+              : 'hidden h-full'
+          }
         >
           {tabId === 'advance' && dataState.isLoading && historyPrefillToken === 0 ? (
             <LoadingState />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import search from '../Images/search.png';
 import imports from '../Images/Import.svg';
@@ -7,6 +8,23 @@ import edit from '../Images/Edit.svg';
 import deleteIcon from '../Images/Delete.svg';
 import Add from '../Images/+Add.svg';
 import { set } from 'date-fns';
+
+const MODAL_OVERLAY_CLASS = 'fixed inset-0 z-[9999] bg-black bg-opacity-50 flex justify-center items-center';
+const MODAL_PANEL_CLASS = 'bg-white text-left rounded-xl shadow-lg p-[18px] w-[480px] relative';
+const MODAL_LABEL_CLASS = 'font-semibold text-[18px] block mb-[8px]';
+const MODAL_INPUT_CLASS = 'border-2 border-[#BF9853] border-opacity-25 h-[40px] box-border px-2 rounded-lg w-full focus:outline-none text-[14px] placeholder:text-[#A6A5A6] placeholder:text-[14px] placeholder:font-normal';
+const MODAL_FIELDS_CLASS = 'space-y-[18px]';
+const MODAL_ACTIONS_CLASS = 'flex justify-end gap-[18px] mt-[18px]';
+const MODAL_SUBMIT_BTN_CLASS = 'px-4 py-2 bg-[#BF9853] text-white rounded-lg';
+const MODAL_CANCEL_BTN_CLASS = 'px-4 py-2 border border-[#BF9853] text-[#BF9853] rounded-lg';
+
+function ModalOverlay({ children }) {
+    return createPortal(
+        <div className={MODAL_OVERLAY_CLASS}>{children}</div>,
+        document.body
+    );
+}
+
 const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
     const [isWeeklyTypeOpen, setIsWeeklyTypeOpen] = useState(false);
     const [weeklyReceivedTypeSearch, setWeeklyReceivedTypeSearch] = useState('');
@@ -678,12 +696,11 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                             <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
                                 <img src={search} alt='search' className=' w-5 h-5' />
                             </button>
-                            <button className="text-black font-bold px-1 ml-4"
-                                onClick={openLabourDetails}>
+                            <button className="text-black font-bold px-1 ml-4">
                                 <img src={Add} alt='add' className='w-[30px] h-[30px]' />
                             </button>
                         </div>
-                        <button onClick={openLabourBulkUploadModal} className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
+                        <button className="text-[#E4572E] flex mb-[8px]"><img src={imports} alt='import' className=' w-6 h-5 bg-transparent pr-2 mt-[6px]' /><h1 className='mt-1.5 text-[14px] font-semibold'>Import file</h1></button>
                         <div className='rounded-lg border border-gray-200 border-l-8 border-l-[#BF9853] overflow-hidden'>
                             <div className="bg-[#FAF6ED]">
                                 <table className="table-auto lg:w-72 ">
@@ -693,7 +710,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                             <th className="p-2 text-left lg:w-72 text-[16px] font-semibold">
                                                 <div className="flex items-center justify-between gap-[12px]">
                                                     <span>Labour Name</span>
-                                                    <button type="button" onClick={handleDeleteAllLaboursList} className="inline-flex shrink-0 items-center justify-center">
+                                                    <button type="button" className="inline-flex shrink-0 items-center justify-center">
                                                         <img src={deleteIcon} alt='del' className='w-4 h-4' />
                                                     </button>
                                                 </div>
@@ -711,14 +728,6 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                                 <td className="p-2 text-left text-[14px] group flex font-semibold">
                                                     <div className="flex flex-grow">
                                                         {item.labour_name}
-                                                    </div>
-                                                    <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                                                        <button type="button" >
-                                                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditLaboursDetails(item)} />
-                                                        </button>
-                                                        <button >
-                                                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleLabourDataDelete(item.id)} />
-                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -740,8 +749,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                             <button className="-ml-8 mt-5 transform -translate-y-1/2 text-gray-500">
                                 <img src={search} alt='search' className=' w-5 h-5' />
                             </button>
-                            <button className="text-black font-bold px-1 ml-4"
-                                onClick={openEmployeeDetails}>
+                            <button className="text-black font-bold px-1 ml-4">
                                 <img src={Add} alt='add' className='w-[30px] h-[30px]' />
                             </button>
                         </div>
@@ -755,7 +763,7 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                             <th className="p-2 text-left lg:w-72 text-[16px] font-semibold">
                                                 <div className="flex items-center justify-between gap-[12px]">
                                                     <span>Employee Name</span>
-                                                    <button type="button" onClick={handleDeleteAllEmployeeDetails} className="inline-flex shrink-0 items-center justify-center">
+                                                    <button type="button" className="inline-flex shrink-0 items-center justify-center">
                                                         <img src={deleteIcon} alt='del' className='w-4 h-4' />
                                                     </button>
                                                 </div>
@@ -774,14 +782,6 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                                                     <div className="flex flex-grow">
                                                         {item.employee_name}
                                                     </div>
-                                                    <div className="flex space-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ">
-                                                        <button type="button" >
-                                                            <img src={edit} alt="add" className="w-4 h-4" type="button" onClick={() => openEditEmployeeDetails(item)} />
-                                                        </button>
-                                                        <button >
-                                                            <img src={deleteIcon} alt="delete" className="w-4 h-4" onClick={() => handleEmployeeDataDelete(item.id)} />
-                                                        </button>
-                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -792,351 +792,311 @@ const WeeklyPaymentAddInput = ({ username, userRoles = [] }) => {
                     </div>
                 </div>
                 {isWeeklyTypeOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-                        <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeWeeklyTypes}>
-                                    <img src={cross} alt='cross' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeWeeklyTypes}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleSubmitWeeklyTypes}>
-                                <div className="mb-4">
-                                    <label className="block text-lg font-medium mb-2 -ml-60">Type</label>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Type</span>
                                     <input
                                         type="text"
-                                        className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                        placeholder="Enter Type"
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Type"
                                         onChange={(e) => setWeeklyReceivedType(e.target.value)}
                                         required
                                     />
-                                </div>
-                                <div className="flex space-x-2 mt-4 ml-12">
-                                    <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                                        Submit
-                                    </button>
-                                    <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeWeeklyTypes}>
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeWeeklyTypes}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isWeeklyReceivedTypeOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-                        <div className="bg-white rounded-md w-[30rem] h-52 px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeWeeklyReceivedTypes}>
-                                    <img src={cross} alt='cross' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeWeeklyReceivedTypes}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleSubmitWeeklyReceivedType}>
-                                <div className="mb-4">
-                                    <label className="block text-lg font-medium mb-2 -ml-52">Received Type</label>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Received Type</span>
                                     <input
                                         type="text"
-                                        className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                        placeholder="Enter Received Type"
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Received Type"
                                         onChange={(e) => setWeeklyReceivedName(e.target.value)}
                                         required
                                     />
-                                </div>
-                                <div className="flex space-x-2 mt-4 ml-12">
-                                    <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                                        Submit
-                                    </button>
-                                    <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeWeeklyReceivedTypes}>
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeWeeklyReceivedTypes}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isLaboursListDataOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-                        <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeLabourDetails}>
-                                    <img src={cross} alt='cross' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeLabourDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleSubmitLaboursData}>
-                                <div className=''>
-                                    <div className="mb-4">
-                                        <label className="block text-lg font-medium mb-2 -ml-64">Labour Name</label>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Labour Name</span>
                                         <input
                                             type="text"
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                            placeholder="Enter Name"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Labour Name"
                                             onChange={(e) => setLabourName(e.target.value)}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="block text-lg font-medium mb-2 -ml-80">Salary</label>
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Salary</span>
                                         <input
                                             type="number"
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                            placeholder="Enter Salary"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Salary"
                                             onChange={(e) => setLabourSalary(e.target.value)}
                                             required
                                         />
-                                    </div>
+                                    </label>
                                 </div>
-                                <div className="flex space-x-2 mt-4 ml-12">
-                                    <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                                        Submit
-                                    </button>
-                                    <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeLabourDetails}>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeLabourDetails}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isEmployeeDataOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center ">
-                        <div className="bg-white rounded-md w-[30rem] px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeEmployeeDetails}>
-                                    <img src={cross} alt='cross' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEmployeeDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleSubmitEmployeeData}>
-                                <div className=''>
-                                    <div className="mb-4">
-                                        <label className="block text-lg font-medium mb-2 -ml-64">Employee Name</label>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Employee Name</span>
                                         <input
                                             type="text"
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                            placeholder="Enter Name"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Employee Name"
                                             onChange={(e) => setEmployeeName(e.target.value)}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="block text-lg font-medium mb-2 -ml-80">Mobile Number</label>
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Mobile Number</span>
                                         <input
                                             type="text"
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                            placeholder="Enter Mobile Number"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Mobile Number"
                                             onChange={(e) => setMobileNumber(e.target.value)}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="block text-lg font-medium mb-2 -ml-80">Role</label>
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Role</span>
                                         <input
                                             type="text"
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded h-14 focus:outline-none"
-                                            placeholder="Enter Role"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Role"
                                             onChange={(e) => setRoleOfEmployee(e.target.value)}
                                             required
                                         />
-                                    </div>
+                                    </label>
                                 </div>
-                                <div className="flex space-x-2 mt-4 ml-12">
-                                    <button type="submit" className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold">
-                                        Submit
-                                    </button>
-                                    <button type="button" className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]" onClick={closeEmployeeDetails}>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEmployeeDetails}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isEditWeeklyReceivedTypeOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-                        <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeEditWeeklyTypePopup}>
-                                    <img src={cross} alt='close' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditWeeklyTypePopup}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleEditWeeklyTypes}>
-                                <div className="mb-4">
-                                    <label className="block text-lg font-medium mb-2 -ml-[15rem]">Type</label>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Type</span>
                                     <input
                                         type="text"
                                         value={editWeeklyReceivedType}
-                                        className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                        placeholder="Enter Account Type"
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Type"
                                         onChange={(e) => setEditWeeklyReceivedType(e.target.value)}
                                         required
                                     />
-                                </div>
-                                <div className="flex space-x-2 mt-8 ml-12">
-                                    <button
-                                        type="submit"
-                                        className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                                    >
-                                        Submit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                                        onClick={closeEditWeeklyTypePopup}>
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditWeeklyTypePopup}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isEditWeeklyReceivedNameOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-                        <div className="bg-white rounded-md w-[30rem] h-60 px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeEditWeeklyReceivedNamePopup}>
-                                    <img src={cross} alt='close' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditWeeklyReceivedNamePopup}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleEditWeeklyReceivedType}>
-                                <div className="mb-4">
-                                    <label className="block text-lg font-medium mb-2 -ml-[13rem]">Received Type</label>
+                                <label className="block text-left">
+                                    <span className={MODAL_LABEL_CLASS}>Received Type</span>
                                     <input
                                         type="text"
                                         value={editWeeklyReceivedName}
-                                        className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                        placeholder="Enter Received Type"
+                                        className={MODAL_INPUT_CLASS}
+                                        placeholder="Received Type"
                                         onChange={(e) => setEditWeeklyReceivedName(e.target.value)}
                                         required
                                     />
-                                </div>
-                                <div className="flex space-x-2 mt-8 ml-12">
-                                    <button
-                                        type="submit"
-                                        className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                                    >
-                                        Submit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                                        onClick={closeEditWeeklyReceivedNamePopup}>
+                                </label>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditWeeklyReceivedNamePopup}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isEditLaboursListDataOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-                        <div className="bg-white rounded-md w-[30rem] h-80 px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeEditLaboursDetails}>
-                                    <img src={cross} alt='close' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditLaboursDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleEditLabourData}>
-                                <div>
-                                    <div>
-                                        <label className="block text-lg font-medium mb-2 -ml-[15rem]">Labour Name</label>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Labour Name</span>
                                         <input
                                             type="text"
                                             value={editLabourName}
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                            placeholder="Enter Labour Name"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Labour Name"
                                             onChange={(e) => setEditLabourName(e.target.value)}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-2">
-                                        <label className="block text-lg font-medium mb-2 -ml-[19rem]">Salary</label>
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Salary</span>
                                         <input
                                             type="number"
                                             value={editLabourSalary}
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                            placeholder="Enter Salary"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Salary"
                                             onChange={(e) => setEditLabourSalary(e.target.value)}
                                             required
                                         />
-                                    </div>
+                                    </label>
                                 </div>
-                                <div className="flex space-x-2 mt-8 ml-12">
-                                    <button
-                                        type="submit"
-                                        className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                                    >
-                                        Submit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                                        onClick={closeEditLaboursDetails}>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditLaboursDetails}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 {isEditEmployeeDataOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center" >
-                        <div className="bg-white rounded-md w-[30rem] px-2 py-2">
-                            <div>
-                                <button className="text-red-500 ml-[95%]" onClick={closeEditEmployeeDetails}>
-                                    <img src={cross} alt='close' className='w-5 h-5' />
-                                </button>
-                            </div>
+                    <ModalOverlay>
+                        <div className={MODAL_PANEL_CLASS}>
+                            <button type="button" className="absolute top-[18px] right-[18px]" onClick={closeEditEmployeeDetails}>
+                                <img src={cross} alt="close" className="w-5 h-5" />
+                            </button>
                             <form onSubmit={handleEditEmployeeData}>
-                                <div>
-                                    <div>
-                                        <label className="block text-lg font-medium mb-2 -ml-[15rem]">Employee Name</label>
+                                <div className={MODAL_FIELDS_CLASS}>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Employee Name</span>
                                         <input
                                             type="text"
                                             value={editEmployeeName}
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                            placeholder="Enter Employee Name"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Employee Name"
                                             onChange={(e) => setEditEmployeeName(e.target.value)}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-2">
-                                        <label className="block text-lg font-medium mb-2 -ml-[19rem]">Moblie Number</label>
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Mobile Number</span>
                                         <input
                                             type="text"
                                             value={editEmployeeMobileNumber}
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                            placeholder="Enter Mobile Number"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Mobile Number"
                                             onChange={(e) => setEditEmployeeMobileNumber(e.target.value)}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-2">
-                                        <label className="block text-lg font-medium mb-2 -ml-[19rem]">Role</label>
+                                    </label>
+                                    <label className="block text-left">
+                                        <span className={MODAL_LABEL_CLASS}>Role</span>
                                         <input
                                             type="text"
                                             value={editRoleOfEmployee}
-                                            className="w-96 ml-4 border border-[#FAF6ED] border-r-[0.25rem] border-l-[0.25rem] border-b-[0.25rem] border-t-[0.25rem] p-2 rounded-lg h-14 focus:outline-none"
-                                            placeholder="Enter Role"
+                                            className={MODAL_INPUT_CLASS}
+                                            placeholder="Role"
                                             onChange={(e) => setEditRoleOfEmployee(e.target.value)}
                                             required
                                         />
-                                    </div>
+                                    </label>
                                 </div>
-                                <div className="flex space-x-2 mt-8 ml-12">
-                                    <button
-                                        type="submit"
-                                        className="btn bg-[#BF9853] text-white px-8 py-2 rounded-lg hover:bg-yellow-800 font-semibold"
-                                    >
-                                        Submit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853]"
-                                        onClick={closeEditEmployeeDetails}>
+                                <div className={MODAL_ACTIONS_CLASS}>
+                                    <button type="button" className={MODAL_CANCEL_BTN_CLASS} onClick={closeEditEmployeeDetails}>
                                         Cancel
+                                    </button>
+                                    <button type="submit" className={MODAL_SUBMIT_BTN_CLASS}>
+                                        Submit
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalOverlay>
                 )}
                 <ModalLaboursList
                     isOpen={laboursListBulkUploadOpen}
@@ -1152,32 +1112,29 @@ export default WeeklyPaymentAddInput
 function ModalLaboursList({ isOpen, onClose, onFileChange, onUpload }) {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-5 rounded-lg text-center w-96 shadow-lg">
-                <h2 className="mb-4 text-xl text-gray-800">Upload Bulk Data</h2>
-                <div className="mb-5">
+        <ModalOverlay>
+            <div className={`${MODAL_PANEL_CLASS} w-[384px]`}>
+                <button type="button" className="absolute top-[18px] right-[18px]" onClick={onClose}>
+                    <img src={cross} alt="close" className="w-5 h-5" />
+                </button>
+                <label className="block text-left">
+                    <span className={MODAL_LABEL_CLASS}>Upload Bulk Data</span>
                     <input
                         type="file"
                         onChange={onFileChange}
                         accept=".csv, .sql"
-                        className="w-full p-3 mb-4 border border-gray-300 rounded-md"
+                        className={`${MODAL_INPUT_CLASS} h-auto py-2`}
                     />
-                    <div className="flex justify-between">
-                        <button
-                            onClick={onUpload}
-                            className="px-8 py-2 bg-[#BF9853] text-white rounded-lg cursor-pointer  transition-colors"
-                        >
-                            Upload
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="px-8 py-2 border rounded-lg text-[#BF9853] border-[#BF9853] transition-colors"
-                        >
-                            Close
-                        </button>
-                    </div>
+                </label>
+                <div className={MODAL_ACTIONS_CLASS}>
+                    <button type="button" onClick={onClose} className={MODAL_CANCEL_BTN_CLASS}>
+                        Close
+                    </button>
+                    <button type="button" onClick={onUpload} className={MODAL_SUBMIT_BTN_CLASS}>
+                        Upload
+                    </button>
                 </div>
             </div>
-        </div>
+        </ModalOverlay>
     );
 }

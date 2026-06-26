@@ -119,12 +119,8 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
       rows
     );
   };
-
   return (
-    <div
-      className="relative w-full bg-white max-w-[360px] flex flex-col scrollbar-none overflow-hidden"
-      style={{ fontFamily: "'Manrope', sans-serif" }}
-    >
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full bg-white" style={{ fontFamily: "'Manrope', sans-serif" }} >
       <SelectVendorModal
         isOpen={showEmployeeModal}
         onClose={() => setShowEmployeeModal(false)}
@@ -137,7 +133,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
         fieldName="Employee"
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showPurposeModal}
         onClose={() => setShowPurposeModal(false)}
@@ -150,7 +145,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
         fieldName="Purpose"
         showStarIcon={false}
       />
-
       <SelectVendorModal
         isOpen={showStatusModal}
         onClose={() => setShowStatusModal(false)}
@@ -163,7 +157,7 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
         fieldName="Status"
         showStarIcon={false}
       />
-
+      <div className="flex-shrink-0">
       <div className="mb-[8px]">
         <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-[8px]">
           <p className="text-[12px] font-semibold text-black leading-normal">#{currentWeek.label}</p>
@@ -177,24 +171,16 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
           </button>
         </div>
       </div>
-
       <div className="rounded-[8px] bg-[#F2F4F7] p-[2px] mb-[10px]">
         <div className="grid grid-cols-2 gap-[4px]">
-          <SegmentedButton
-            active={viewMode === 'employee'}
-            onClick={() => setViewMode('employee')}
-          >
+          <SegmentedButton active={viewMode === 'employee'} onClick={() => setViewMode('employee')} >
             Employee
           </SegmentedButton>
-          <SegmentedButton
-            active={viewMode === 'purpose'}
-            onClick={() => setViewMode('purpose')}
-          >
+          <SegmentedButton active={viewMode === 'purpose'} onClick={() => setViewMode('purpose')} >
             Purpose
           </SegmentedButton>
         </div>
       </div>
-
       <div className="rounded-[12px] border border-[#EEE9E2] bg-[#FFFDFC] p-[12px] shadow-[0_4px_14px_rgba(0,0,0,0.03)]">
         <div className="relative">
           <div
@@ -243,7 +229,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
             )}
           </div>
         </div>
-
         <div className="mt-[10px] flex items-start justify-between gap-[12px]">
           <div className="min-w-0">
             <p className="truncate text-[12px] text-[#C98A26]">{selectedLabel}</p>
@@ -258,7 +243,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
           </div>
         </div>
       </div>
-
       <div className="mt-[10px] rounded-full border border-[#D7D1C8] px-[14px]">
         <div className="flex h-[36px] items-center gap-[8px]">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -273,7 +257,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
           />
         </div>
       </div>
-
       <div className="pb-[8px] pt-[10px] flex items-center justify-between flex-wrap gap-[8px]">
         <div className="flex items-center gap-[8px] min-w-0">
           <button
@@ -286,7 +269,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
               <span className="text-[13px] font-semibold flex-shrink-0 text-[#9E9E9E]">Filter</span>
             ) : null}
           </button>
-
           <div
             className="flex items-center gap-[8px] overflow-x-auto no-scrollbar scrollbar-none min-w-0 scrollbar-hide"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -307,7 +289,6 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
             ) : null}
           </div>
         </div>
-
         <div className="flex items-center gap-[8px]">
           {statusFilter ? (
             <button
@@ -323,19 +304,20 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
           </div>
         </div>
       </div>
-
-      <div className="overflow-y-auto no-scrollbar scrollbar-none scrollbar-hide max-h-[calc(100vh-250px-90px)] pb-[105px]">
+      </div>
+      <div
+        className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y pb-[12px] [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+      >
         {filteredItems.length ? (
-          <div className="space-y-[8px]">
-            {filteredItems.map((item) => (
-              <SummaryCard
-                key={viewMode === 'employee' ? item.purposeId : item.personKey}
-                title={viewMode === 'employee' ? item.purposeName : item.personName}
-                advanceAmount={item.totalAdvance}
-                pendingAmount={item.pendingAdvance}
-              />
-            ))}
-          </div>
+          filteredItems.map((item) => (
+            <SummaryCard
+              key={viewMode === 'employee' ? item.purposeId : item.personKey}
+              title={viewMode === 'employee' ? item.purposeName : item.personName}
+              advanceAmount={item.totalAdvance}
+              pendingAmount={item.pendingAdvance}
+            />
+          ))
         ) : (
           <div className="flex flex-col items-center justify-center py-[48px]">
             <div className="w-[64px] h-[64px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
@@ -349,46 +331,28 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
           </div>
         )}
       </div>
-
       {showFilterModal ? (
-        <div
-          className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40"
-          onClick={() => setShowFilterModal(false)}
-        >
-          <div
-            className="bg-white rounded-t-2xl w-full p-[16px] relative"
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40" onClick={() => setShowFilterModal(false)}>
+          <div className="bg-white rounded-t-2xl w-full p-[16px] relative" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[16px] font-semibold text-black">Select Filters</p>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="w-6 h-6 flex items-center justify-center"
-              >
+              <button type="button" onClick={() => setShowFilterModal(false)} className="w-6 h-6 flex items-center justify-center" >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M15 5L5 15M5 5L15 15" stroke="#E4572E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
-
             <div className="flex flex-col gap-[16px] mb-3">
               <div>
                 <p className="text-[12px] font-semibold text-black leading-normal mb-0.5">Status</p>
                 <div className="relative">
-                  <div
-                    onClick={() => setShowStatusModal(true)}
+                  <div onClick={() => setShowStatusModal(true)}
                     className="w-full h-[32px] border border-[rgba(0,0,0,0.16)] rounded pl-[12px] pr-[32px] text-[12px] font-medium bg-white flex items-center cursor-pointer"
                     style={{ boxSizing: 'border-box', color: statusFilter ? '#000' : '#9E9E9E' }}
                   >
                     {statusFilter || 'Select'}
                     {statusFilter ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setStatusFilter('');
-                        }}
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setStatusFilter(''); }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <img src={CloseIcon} alt="Close" className="w-[12px] h-[12px]" />
@@ -404,23 +368,13 @@ const Summary = ({ records, peopleOptions, purposeOptions }) => {
                 </div>
               </div>
             </div>
-
             <div className="flex justify-end gap-[16px]">
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('');
-                  setShowFilterModal(false);
-                }}
+              <button type="button" onClick={() => { setStatusFilter(''); setShowFilterModal(false); }}
                 className="px-[24px] py-[8px] text-[14px] font-semibold text-black border border-[rgba(0,0,0,0.16)] rounded"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="px-[24px] py-[8px] text-[14px] font-semibold text-white bg-black rounded"
-              >
+              <button type="button" onClick={() => setShowFilterModal(false)} className="px-[24px] py-[8px] text-[14px] font-semibold text-white bg-black rounded">
                 Save
               </button>
             </div>

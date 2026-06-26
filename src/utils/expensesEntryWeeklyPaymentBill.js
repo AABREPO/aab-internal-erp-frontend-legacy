@@ -158,3 +158,220 @@ export const expenseEntryNeedsWeeklyBillPaymentModal = async (expensesEntryId, f
   const existing = await fetchWeeklyPaymentBillsByExpensesEntryId(expensesEntryId);
   return existing.length === 0;
 };
+
+export const weeklyExpenseMatchesExpensesEntryId = (row, expensesEntryId) => {
+  if (expensesEntryId == null || expensesEntryId === '') return false;
+  const rowExpId = row?.expenses_entry_id ?? row?.expensesEntryId;
+  if (rowExpId == null || rowExpId === '') return false;
+  return String(rowExpId) === String(expensesEntryId);
+};
+
+export const fetchWeeklyExpensesByExpensesEntryId = async (
+  expensesEntryId,
+  apiBase = EXPENSES_WEEKLY_BILLS_API_BASE
+) => {
+  try {
+    const response = await fetch(`${apiBase}/api/weekly-expenses/getAll`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const list = Array.isArray(data) ? data : [];
+    return list.filter((row) => weeklyExpenseMatchesExpensesEntryId(row, expensesEntryId));
+  } catch {
+    return [];
+  }
+};
+
+/** Weekly Payment table type label from expense entry account type (Form.js cash save). */
+export const getWeeklyExpenseTypeFromExpensesEntry = (accountType, utilityType, existingType) => {
+  const t = String(accountType || '').trim();
+  if (!t) return existingType || null;
+  if (t === 'Claim Payment') return 'Claim Payment';
+  if (t === 'Sundry Payment') return 'Sundry Payment';
+  if (t === 'Bill Payments') return 'Bill Payment';
+  if (t === 'Bill Refund') return 'Bill Refund';
+  if (t === 'Utility Bills') {
+    const ut = String(utilityType || '').trim();
+    if (ut) return ut;
+    return existingType || 'Utility Payment';
+  }
+  return getExpenseEntryWeeklyBillType(accountType);
+};
+
+export const buildWeeklyExpenseStubFromWeeklyPaymentBill = (bill) => {
+  if (!bill) return null;
+  const expenseId = bill.weekly_payment_expense_id ?? bill.weeklyPaymentExpenseId;
+  if (expenseId == null) return null;
+  return {
+    id: expenseId,
+    date: bill.date,
+    created_at: bill.created_at ?? bill.createdAt,
+    contractor_id: bill.contractor_id ?? bill.contractorId,
+    vendor_id: bill.vendor_id ?? bill.vendorId,
+    employee_id: bill.employee_id ?? bill.employeeId,
+    labour_id: bill.labour_id ?? bill.labourId,
+    project_id: bill.project_id ?? bill.projectId,
+    type: bill.type,
+    amount: bill.amount,
+    status: bill.status,
+    weekly_number: bill.weekly_number ?? bill.weeklyNumber,
+    branch_id: bill.branch_id ?? bill.branchId,
+    expenses_entry_id: bill.expenses_entry_id ?? bill.expensesEntryId,
+    advance_portal_id: bill.advance_portal_id ?? bill.advancePortalId,
+    staff_advance_portal_id: bill.staff_advance_portal_id ?? bill.staffAdvancePortalId,
+    loan_portal_id: bill.loan_portal_id ?? bill.loanPortalId,
+    rent_management_id: bill.rent_management_id ?? bill.rentManagementId,
+    bill_copy_url: bill.bill_copy_url ?? bill.billCopyUrl ?? '',
+  };
+};
+
+export const buildWeeklyExpenseUpdatePayloadFromExpensesEntry = (
+  updatedFormData,
+  existingRow,
+  { editedBy = '', expensesEntryId = null } = {}
+) => {
+  const row = existingRow || {};
+  const employeeId =
+    updatedFormData.employeeId ??
+    updatedFormData.employee_id ??
+    row.employee_id ??
+    row.employeeId;
+  const labourId =
+    updatedFormData.labourId ??
+    updatedFormData.labour_id ??
+    row.labour_id ??
+    row.labourId;
+
+  const resolvedDate =
+    normalizeWeeklyBillApiDate(updatedFormData.date) ??
+    normalizeWeeklyBillApiDate(row.date) ??
+    null;
+
+  const accountType = updatedFormData.accountType;
+  const utilityType = updatedFormData.utilityType ?? updatedFormData.utility_type;
+  const type = getWeeklyExpenseTypeFromExpensesEntry(accountType, utilityType, row.type);
+
+  const amountRaw = parseFloat(updatedFormData.amount);
+  let amount = Number.isFinite(amountRaw) ? amountRaw : parseFloat(row.amount) || 0;
+  if (accountType === 'Bill Refund') {
+    amount = -Math.abs(amount);
+  }
+
+  const billCopy =
+    String(
+      updatedFormData.billCopyUrl ??
+        updatedFormData.billCopy ??
+        updatedFormData.bill_copy_url ??
+        ''
+    ).trim() ||
+    row.bill_copy_url ||
+    row.billCopyUrl ||
+    '';
+
+  return {
+    ...row,
+    date: resolvedDate,
+    contractor_id: normalizeWeeklyBillNullableId(
+      updatedFormData.contractorId ??
+        updatedFormData.contractor_id ??
+        row.contractor_id ??
+        row.contractorId
+    ),
+    vendor_id: normalizeWeeklyBillNullableId(
+      updatedFormData.vendorId ?? updatedFormData.vendor_id ?? row.vendor_id ?? row.vendorId
+    ),
+    employee_id: normalizeWeeklyBillNullableId(employeeId),
+    labour_id: normalizeWeeklyBillNullableId(labourId),
+    project_id: normalizeWeeklyBillNullableId(
+      updatedFormData.projectId ?? updatedFormData.project_id ?? row.project_id ?? row.projectId
+    ),
+    type,
+    amount,
+    bill_copy_url: billCopy,
+    expenses_entry_id: normalizeWeeklyBillNullableId(
+      expensesEntryId ?? updatedFormData.id ?? row.expenses_entry_id ?? row.expensesEntryId
+    ),
+    branch_id: normalizeWeeklyBillNullableId(row.branch_id ?? row.branchId),
+    edited_by: editedBy || row.edited_by || null,
+  };
+};
+
+export const updateWeeklyExpenseById = async (
+  weeklyExpenseId,
+  payload,
+  { editedBy = '', apiBase = EXPENSES_WEEKLY_BILLS_API_BASE } = {}
+) => {
+  const response = await fetch(
+    `${apiBase}/api/weekly-expenses/edit/${weeklyExpenseId}?username=${encodeURIComponent(editedBy || '')}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Weekly expense update failed: ${errText}`);
+  }
+  const text = await response.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+};
+
+export const collectWeeklyExpensesLinkedToExpensesEntry = async (
+  expensesEntryId,
+  existingWeeklyBills = [],
+  apiBase = EXPENSES_WEEKLY_BILLS_API_BASE
+) => {
+  const byId = new Map();
+
+  const fromApi = await fetchWeeklyExpensesByExpensesEntryId(expensesEntryId, apiBase);
+  for (const row of fromApi) {
+    if (row?.id != null) byId.set(String(row.id), row);
+  }
+
+  for (const bill of existingWeeklyBills || []) {
+    const stub = buildWeeklyExpenseStubFromWeeklyPaymentBill(bill);
+    if (!stub?.id) continue;
+    const key = String(stub.id);
+    if (!byId.has(key)) {
+      byId.set(key, stub);
+    } else {
+      byId.set(key, { ...stub, ...byId.get(key) });
+    }
+  }
+
+  return Array.from(byId.values());
+};
+
+/** Keep Weekly Payment / History rows in sync when an expense entry is edited. */
+export const syncWeeklyExpensesForExpensesEntryEdit = async (
+  expensesEntryId,
+  updatedFormData,
+  { editedBy = '', existingWeeklyBills = [], apiBase = EXPENSES_WEEKLY_BILLS_API_BASE } = {}
+) => {
+  if (!expensesEntryId) return;
+
+  const linkedRows = await collectWeeklyExpensesLinkedToExpensesEntry(
+    expensesEntryId,
+    existingWeeklyBills,
+    apiBase
+  );
+
+  for (const row of linkedRows) {
+    if (row?.id == null) continue;
+    const payload = buildWeeklyExpenseUpdatePayloadFromExpensesEntry(updatedFormData, row, {
+      editedBy,
+      expensesEntryId,
+    });
+    await updateWeeklyExpenseById(row.id, payload, { editedBy, apiBase });
+  }
+};
